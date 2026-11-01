@@ -948,7 +948,7 @@ end
 ---@class Tasks.ListsSub
 ---@field usage string  Shown on a wrong argument count (exit 2)
 ---@field names integer  How many names follow the subcommand (exactly)
----@field run fun(ctx: Tasks.CliCtx, a: string, b: string|nil): integer
+---@field run fun(ctx: Tasks.CliCtx, a: string, b: string): integer  `b` is only set when `names` is 2
 
 --- Report a failed `lists.*` call the way every subcommand does.
 ---@param ctx Tasks.CliCtx
@@ -969,7 +969,7 @@ local LISTS_SUBS = {
       if not entry then
         return lists_fail(ctx, err)
       end
-      ctx.say(("%s	%s"):format(entry.name, entry.source))
+      ctx.say(("%s\t%s"):format(entry.name, entry.source))
       if entry.def.desc then
         ctx.say("desc: " .. fsio.clean(entry.def.desc))
       end
@@ -994,7 +994,7 @@ local LISTS_SUBS = {
       if not saved then
         return lists_fail(ctx, err)
       end
-      ctx.say(("saved	%s	%s"):format(name, lists.path()))
+      ctx.say(("saved\t%s\t%s"):format(name, lists.path()))
       return 0
     end,
   },
@@ -1006,7 +1006,7 @@ local LISTS_SUBS = {
       if not deleted then
         return lists_fail(ctx, err)
       end
-      ctx.say(("deleted	%s"):format(name))
+      ctx.say(("deleted\t%s"):format(name))
       return 0
     end,
   },
@@ -1018,7 +1018,7 @@ local LISTS_SUBS = {
       if not renamed then
         return lists_fail(ctx, err)
       end
-      ctx.say(("renamed	%s	%s"):format(old, new))
+      ctx.say(("renamed\t%s\t%s"):format(old, new))
       return 0
     end,
   },
@@ -1032,7 +1032,7 @@ function commands.lists(ctx)
   if sub == nil or sub == "ls" then
     local entries, notes = lists.all()
     for _, e in ipairs(entries) do
-      ctx.say(table.concat({ e.name, e.source, lists.summary(e.def) }, "	"))
+      ctx.say(table.concat({ e.name, e.source, lists.summary(e.def) }, "\t"))
     end
     for _, n in ipairs(notes) do
       ctx.warn("warn: " .. n)
