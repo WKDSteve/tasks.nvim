@@ -51,6 +51,28 @@ return function(H)
   eq(stepped, { 1, 1, { "lib.nvim/old-done" } }, "the same answer")
   ok(ticks >= 3, "an area per turn (two areas, then the end), not one go: " .. ticks)
 
+  -- the vault is listed once for all the steps, not twice per area (2 313 runs x 15 ms in the telemetry)
+  do
+    local real_areas, listed = vault.areas, 0
+    vault.areas = function(...)
+      listed = listed + 1
+      return real_areas(...)
+    end
+    local done_steps
+    hint.count_in_steps({ root = root, today = "2026-02-01" }, function(...)
+      done_steps = { ... }
+    end)
+    ok(
+      vim.wait(2000, function()
+        return done_steps ~= nil
+      end, 10),
+      "the steps finish (listing)"
+    )
+    vault.areas = real_areas
+    eq(done_steps, { 1, 1, { "lib.nvim/old-done" } }, "the same answer with the prepared areas")
+    eq(listed, 1, "the vault is listed once for all steps")
+  end
+
   -- the scan of one area, and the finished ones in a linked bucket
   eq(#assert(scan.open_reminders({ root = root, area = "lib.nvim" })), 1)
   eq(#assert(scan.open_reminders({ root = root, area = "cascade.nvim" })), 0)

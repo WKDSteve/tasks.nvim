@@ -32,35 +32,31 @@ local function is_due(task, today)
   return require("tasks_nvim.model").is_date(task.remind) and task.remind <= today
 end
 
----The vault and its areas for a scan; nil when there is no vault.
+---The vault and its areas for a scan; nil when there is no vault. The areas are listed once here, not once per area
+---and per scan (listing the vault is the cost of a step, about 15 ms on a vault of this size).
 ---@param opts? Tasks.ScanOpts
 ---@return string|nil root
----@return string[] names
+---@return { name: string }[] areas
 local function areas_of(opts)
   local vault = require("tasks_nvim.vault")
   local root = vault.root(opts)
-  local names = {}
-  if root then
-    for _, area in ipairs(vault.areas(root)) do
-      names[#names + 1] = area.name
-    end
-  end
-  return root, names
+  return root, root and vault.areas(root) or {}
 end
 
 ---Add what is due in one area to `total`.
 ---@param total Tasks.RemindersDue
 ---@param root string
----@param name string
+---@param area { name: string }
 ---@param today string
-local function add_area(total, root, name, today)
+local function add_area(total, root, area, today)
   local scan = require("tasks_nvim.scan")
-  for _, task in ipairs(scan.open_reminders({ root = root, area = name }) or {}) do
+  local scan_opts = { root = root, areas = { area } }
+  for _, task in ipairs(scan.open_reminders(scan_opts) or {}) do
     if is_due(task, today) then
       total.open = total.open + 1
     end
   end
-  for _, task in ipairs(scan.backlog_reminders({ root = root, area = name }) or {}) do
+  for _, task in ipairs(scan.backlog_reminders(scan_opts) or {}) do
     if is_due(task, today) then
       total.done[#total.done + 1] = task
     end
@@ -93,11 +89,11 @@ end
 ---@return string[] done_ids  # The finished ones, the oldest date first.
 function M.count(opts)
   local today = (opts and opts.today) or require("tasks_nvim.model").today()
-  local root, names = areas_of(opts)
+  local root, areas = areas_of(opts)
   local total = { open = 0, done = {} }
   if root then
-    for _, name in ipairs(names) do
-      add_area(total, root, name, today)
+    for _, area in ipairs(areas) do
+      add_area(total, root, area, today)
     end
   end
   return summary(total)
@@ -109,7 +105,7 @@ end
 ---@param on_done fun(open: integer|nil, done: integer, done_ids: string[])
 ---@return nil
 function M.count_in_steps(opts, on_done)
-  local ok, root, names = pcall(areas_of, opts)
+  local ok, root, areas = pcall(areas_of, opts)
   if not ok or not root then
     on_done(ok and 0 or nil, 0, {})
     return
@@ -119,11 +115,11 @@ function M.count_in_steps(opts, on_done)
   local at = 0
   local function step()
     at = at + 1
-    if at > #names then
+    if at > #areas then
       on_done(summary(total))
       return
     end
-    if not pcall(add_area, total, root, names[at], today) then
+    if not pcall(add_area, total, root, areas[at], today) then
       on_done(nil, 0, {})
       return
     end

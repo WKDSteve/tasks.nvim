@@ -461,6 +461,7 @@ end
 
 ---@class Tasks.RemindersOpts : Tasks.ScanOpts
 ---@field area? string   # One area (default: all of them).
+---@field areas? { name: string }[]  # The areas to look at, already listed (`vault.areas`): the scan does not list the vault again.
 
 ---The open tasks that carry a `remind:` line, one area (`opts.area`) or all of them. The files are not parsed to find
 ---them: only a file that has the line is.
@@ -478,7 +479,7 @@ function M.open_reminders(opts)
   local now = os.time()
   local out, errors = {}, {}
   local wanted = area_set(root, opts.area)
-  for _, area in ipairs(vault.areas(root)) do
+  for _, area in ipairs(opts.areas or vault.areas(root)) do
     if not wanted or wanted[area.name] then
       local dir = vault.tasks_dir(root, area.name)
       local files, walk_errors = markdown_files(dir, opts, root)
@@ -522,7 +523,7 @@ function M.backlog_reminders(opts)
   local now = os.time()
   local out, errors = {}, {}
   local wanted = area_set(root, opts.area)
-  for _, area in ipairs(vault.areas(root)) do
+  for _, area in ipairs(opts.areas or vault.areas(root)) do
     if not wanted or wanted[area.name] then
       for _, bucket in ipairs({ "FEATURES", "TASKS" }) do
         local dir = vault.backlog_dir(root, area.name, bucket)
