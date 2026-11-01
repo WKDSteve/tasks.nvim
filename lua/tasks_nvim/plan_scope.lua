@@ -91,6 +91,29 @@ function M.shared(root, scanned)
     nil
 end
 
+---The scan of the vault plus the tasks a dry run's earlier `new` operations would create (`drafts`, in id order), in
+---the shape `M.shared` takes as `scanned`.
+---@param root? string
+---@param drafts table<string, Tasks.DraftTask>
+---@return { all: Tasks.Task[], errors?: string[] }|nil scanned
+---@return string|nil err
+function M.scanned_with(root, drafts)
+  local all, errors = scan.all({ root = root })
+  if not all then
+    return nil, tostring(errors)
+  end
+  local ids = vim.tbl_keys(drafts)
+  table.sort(ids)
+  local mutate = require("tasks_nvim.mutate")
+  for _, id in ipairs(ids) do
+    local task = mutate.find_open(id, root or "", drafts)
+    if task then
+      all[#all + 1] = task
+    end
+  end
+  return { all = all, errors = errors }, nil
+end
+
 ---@param root? string
 ---@param scanned? { all: Tasks.Task[], errors?: string[] }
 ---@return Tasks.PlanIndex|nil index

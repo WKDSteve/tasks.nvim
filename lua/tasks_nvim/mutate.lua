@@ -79,6 +79,17 @@ function M.find_open(id, root, drafts)
   return scan.find(id, { root = root })
 end
 
+---A dry run carries on with the text an operation would write: later operations of the request find the task as the
+---real run leaves it (`drafts` is the request's table, the one `find_open` reads first).
+---@param drafts? table<string, Tasks.DraftTask>
+---@param task Tasks.Task
+---@param text string
+local function keep_draft(drafts, task, text)
+  if drafts then
+    drafts[task.id] = { path = task.path, text = text, folder = task.folder == true }
+  end
+end
+
 ---The text of an open task found by `M.find_open`: the draft's, or the file's.
 ---@param task Tasks.Task
 ---@param drafts? table<string, Tasks.DraftTask>
@@ -1388,6 +1399,7 @@ function M.set(id, patch, opts)
 
   if opts.dry_run then
     -- everything is checked (the patch, the version, the text it would give), nothing is written
+    keep_draft(opts.drafts, task, probe)
     return result, nil
   end
 
@@ -1542,6 +1554,9 @@ function M.edit_text(id, transform, opts)
     extra = extra,
   }
   if not result.changed or opts.dry_run then
+    if result.changed then
+      keep_draft(opts.drafts, task, new_text)
+    end
     return result, nil
   end
   local ok, werr, winfo = fsio.with_lock(task.path, function()

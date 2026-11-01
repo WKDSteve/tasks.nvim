@@ -550,6 +550,24 @@ return function(H)
     local probe_set = ops(with_set, { dry_run = true })
     eq(probe_set.ok, true, vim.inspect(probe_set))
     eq(everything(), files_before, "a dry run writes nothing")
+    -- `reorder` and `move_area` of such a task are judged on the file `new` would write
+    local siblings = {
+      { op = "new", area = "lib.nvim", title = "Sib one" },
+      { op = "new", area = "lib.nvim", title = "Sib two" },
+    }
+    local reordered = vim.list_extend(vim.deepcopy(siblings), {
+      { op = "reorder", id = "lib.nvim/sib-two", before = "lib.nvim/sib-one" },
+    })
+    local probe_reorder = ops(reordered, { dry_run = true })
+    eq(probe_reorder.results[3].ok, true, vim.inspect(probe_reorder.results[3]))
+    eq(probe_reorder.results[3].outcome, "would_change", vim.inspect(probe_reorder.results[3]))
+    local moved = vim.list_extend(vim.deepcopy(siblings), {
+      { op = "move_area", id = "lib.nvim/sib-one", to_area = "cascade.nvim" },
+    })
+    local probe_move = ops(moved, { dry_run = true })
+    eq(probe_move.results[3].ok, true, vim.inspect(probe_move.results[3]))
+    eq(probe_move.results[3].move.new_id, "cascade.nvim/sib-one", vim.inspect(probe_move.results[3]))
+    eq(everything(), files_before, "a dry run writes nothing")
     -- an id no earlier op makes is still dangling
     eq(
       ops({
@@ -782,23 +800,35 @@ return function(H)
     eq(real_done.results[2].to, dry_done.results[2].to)
     eq(one({ { op = "reopen", id = id } }).outcome, "changed")
     os.remove(find(id).path)
-    -- the dry run does not see an earlier change of the request: a `done` after a `set` of the new task names the
-    -- version `new` writes, so the token of that preview meets the changed file in the real run
+    -- the dry run carries an earlier change of the request on: a `done` after a `set` of the new task names the
+    -- version the `set` leaves, so the token of that preview fits the file in the real run
     local changed_first = request({
       { op = "set", id = id, patch = { prio = 1 } },
       { op = "done", id = id },
     })
     local dry_late = ops(changed_first, { dry_run = true })
     eq(dry_late.results[3].outcome, "would_done", vim.inspect(dry_late))
-    eq(dry_late.results[3].etag_before, dry_done.results[2].etag_before, "the version `new` writes")
+    assert(
+      dry_late.results[3].etag_before ~= dry_done.results[2].etag_before,
+      "the version after the set, not the one `new` writes"
+    )
     changed_first[3].confirm = mutate.confirm_token(id, dry_late.results[3].etag_before)
     local real_late = ops(changed_first)
     eq(real_late.results[2].outcome, "changed", vim.inspect(real_late))
-    eq(
-      real_late.results[3].error and real_late.results[3].error.code,
-      "conflict",
-      vim.inspect(real_late)
-    )
+    eq(real_late.results[3].outcome, "done", vim.inspect(real_late))
+    eq(one({ { op = "reopen", id = id } }).outcome, "changed")
+    os.remove(find(id).path)
+    -- [new, set, tick_step]: every later operation names, in the dry run, the version the real run names
+    local chain = request({
+      { op = "set", id = id, patch = { prio = 1 } },
+      { op = "tick_step", id = id, n = 1 },
+    })
+    local dry_chain = ops(chain, { dry_run = true })
+    eq(dry_chain.ok, true, vim.inspect(dry_chain))
+    local real_chain = ops(chain)
+    eq(real_chain.ok, true, vim.inspect(real_chain))
+    eq(dry_chain.results[3].etag_before, real_chain.results[3].etag_before, "tick_step: same version")
+    eq(dry_chain.results[2].etag_before, real_chain.results[2].etag_before, "set: same version")
     os.remove(find(id).path)
   end
   eq(

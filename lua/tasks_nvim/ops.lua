@@ -903,7 +903,7 @@ local function do_reorder(op, ctx)
     before = op.before,
     group = op.group,
     if_match = op.if_match,
-  }, { root = ctx.root, today = ctx.today, index = false, dry_run = ctx.dry })
+  }, { root = ctx.root, today = ctx.today, index = false, dry_run = ctx.dry, drafts = drafts_of(ctx) })
   if not r then
     return fail(ctx, err, info)
   end
@@ -1078,7 +1078,7 @@ local function do_move_area(op, ctx)
     end
     return entry
   end
-  local report, err, info = moves.preview(op.id, op.to_area, { root = ctx.root })
+  local report, err, info = moves.preview(op.id, op.to_area, { root = ctx.root, drafts = drafts_of(ctx) })
   if not report then
     return fail(ctx, err, info)
   end

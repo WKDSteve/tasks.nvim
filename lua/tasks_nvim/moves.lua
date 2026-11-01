@@ -48,7 +48,7 @@ local M = {}
 ---What moving `id` to `to_area` would do and break.
 ---@param id string
 ---@param to_area string
----@param opts { root?: string }
+---@param opts { root?: string, drafts?: table<string, Tasks.DraftTask> }  # `drafts`: a dry run's tasks that earlier `new` operations would create
 ---@return Tasks.MovePreview|nil preview
 ---@return string|nil err
 ---@return table|nil info   # `{ code = "not_found"|"invalid_argument" }`
@@ -58,7 +58,7 @@ function M.preview(id, to_area, opts)
   if not root then
     return nil, rerr, { code = "not_found" }
   end
-  local task, ferr = scan.find(id, { root = root })
+  local task, ferr = require("tasks_nvim.mutate").find_open(id, root, opts.drafts)
   if not task then
     return nil, ferr, { code = "not_found" }
   end
@@ -109,7 +109,18 @@ function M.preview(id, to_area, opts)
   end
 
   -- who names the old id
-  local all, scan_errors = scan.all({ root = root })
+  local all, scan_errors
+  if opts.drafts then
+    -- a dry run: the tasks earlier `new` operations would create name ids too
+    local scanned, serr = require("tasks_nvim.plan_scope").scanned_with(root, opts.drafts)
+    if scanned then
+      all, scan_errors = scanned.all, scanned.errors
+    else
+      all, scan_errors = nil, serr
+    end
+  else
+    all, scan_errors = scan.all({ root = root })
+  end
   if not all then
     return nil, tostring(scan_errors), { code = "io" }
   end

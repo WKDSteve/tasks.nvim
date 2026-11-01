@@ -272,13 +272,19 @@ end
 ---given to, so a half-finished move does not scramble the list).
 ---@param id string
 ---@param spec Tasks.ReorderSpec
----@param opts { root: string, today?: string, index?: boolean, dry_run?: boolean, max_writes?: integer }
+---@param opts { root: string, today?: string, index?: boolean, dry_run?: boolean, max_writes?: integer, drafts?: table<string, Tasks.DraftTask> }  # `drafts`: a dry run's tasks that earlier `new` operations would create
 ---@return Tasks.ReorderResult|nil result
 ---@return string|nil err
 ---@return table|nil info
 function M.reorder(id, spec, opts)
   spec = spec or {}
-  local shared, serr = plan_scope.shared(opts.root)
+  local scanned, shared, serr
+  if opts.drafts then
+    scanned, serr = plan_scope.scanned_with(opts.root, opts.drafts)
+  end
+  if not serr then
+    shared, serr = plan_scope.shared(opts.root, scanned)
+  end
   if not shared then
     return nil, tostring(serr), { code = "io" }
   end
