@@ -212,6 +212,54 @@ return function(H)
     return answered
   end, 5))
 
+  -- cancel kills the git process in flight; its late answer starts nothing and calls nobody back
+  do
+    staleness.reset_cache()
+    local killed, started = {}, 0
+    local exits = {}
+    staleness.spawn = function(_, _, on_exit)
+      started = started + 1
+      exits[#exits + 1] = on_exit
+      return {
+        kill = function(_, sig)
+          killed[#killed + 1] = sig
+        end,
+      }
+    end
+    local kill_hook
+    local cancelled = false
+    local cb_calls = 0
+    staleness.git_dates_async(lib_repo, { "lua/a.lua", "lua/b.lua" }, {
+      alive = function()
+        return not cancelled
+      end,
+      on_cancel = function(kill)
+        kill_hook = kill
+      end,
+    }, function()
+      cb_calls = cb_calls + 1
+    end)
+    ok(
+      vim.wait(2000, function()
+        return started == 1
+      end, 5),
+      "the hanging git process is started"
+    )
+    local registered = kill_hook
+    ok(type(registered) == "function", "the lookup hands over a kill function")
+    cancelled = true
+    registered()
+    eq(killed, { 9 }, "cancel kills the running process")
+    -- the killed process reports back (code 137): the halving must not start the repo probe or the halves
+    exits[1]({ code = 137, signal = 9, stdout = "", stderr = "" })
+    vim.wait(100, function()
+      return false
+    end, 10)
+    eq(started, 1, "after cancel no further git call is started")
+    eq(cb_calls <= 1, true, "the lookup answers at most once")
+    staleness.spawn = orig_spawn
+  end
+
   -- an async stub: the dater holds its answer; cancel drops the run
   local pending = {}
   local stub = function(_, rels, _, cb)

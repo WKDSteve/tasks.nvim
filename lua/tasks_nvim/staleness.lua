@@ -374,6 +374,7 @@ end
 ---@param cmd string[]
 ---@param timeout_ms integer
 ---@param done fun(ok: boolean, res: any)
+---@return any handle  what `spawn` returned (nil when it raised)
 local function run_async(cmd, timeout_ms, done)
   local started, err = pcall(
     M.spawn,
@@ -387,12 +388,15 @@ local function run_async(cmd, timeout_ms, done)
     vim.schedule(function()
       done(false, err)
     end)
+    return nil
   end
+  return err
 end
 
 ---@class Tasks.GitDatesOpts
 ---@field deadline? integer  # `uv.hrtime()` value after which no further git call is started.
 ---@field alive? fun(): boolean  # `git_dates_async` only: false once the caller cancelled; no further git call is started.
+---@field on_cancel? fun(kill: fun())  # `git_dates_async` only: hands over a function that kills the git process running now.
 
 ---The date of the last commit touching each path, one `git log` per chunk of
 ---`GIT_CHUNK` paths. A path in `rels` that is a directory is matched by the files
@@ -485,6 +489,16 @@ function M.git_dates_async(base, rels, gopts, cb)
   end
   local deadline = gopts and gopts.deadline
   local alive = gopts and gopts.alive
+  ---The process of the git call in flight; `kill` ends it when the caller cancels.
+  local proc
+  if gopts and gopts.on_cancel then
+    gopts.on_cancel(function()
+      local handle = proc
+      if handle and type(handle.kill) == "function" then
+        pcall(handle.kill, handle, 9)
+      end
+    end)
+  end
   local result = {}
   local failed, first_err, stopped, finished = 0, nil, false, false
   ---The answer `finish` decided on, handed to `cb` outside every pcall (a raising `cb` must not be swallowed).
@@ -563,10 +577,16 @@ function M.git_dates_async(base, rels, gopts, cb)
         first_err = first_err or "time budget used up"
       else
         timeout = left and math.min(timeout, left) or timeout
-        run_async(
+        proc = run_async(
           log_cmd(base, paths),
           timeout,
           guarded(#paths, function(ok, res)
+            if alive and not alive() then
+              -- cancelled: whatever the (killed) process left is of no use, and nothing more is started
+              stopped, failed = true, failed + #paths
+              first_err = first_err or "cancelled"
+              return step()
+            end
             local found, err, kind = parse_log(ok, res, paths, timeout)
             if found then
               for rel, hit in pairs(found) do
@@ -586,7 +606,7 @@ function M.git_dates_async(base, rels, gopts, cb)
               failed = failed + 1
               return step()
             end
-            run_async(
+            proc = run_async(
               repo_cmd(base),
               timeout,
               guarded(#paths, function(ok2, res2)
@@ -855,9 +875,10 @@ end
 ---@param budget_ms integer
 ---@param note fun(text: string)
 ---@param alive fun(): boolean  false once the run was cancelled: no further git call is started
+---@param track fun(kill: fun())  receives the function that kills the git process in flight
 ---@param done fun(dated: table<string, table<string, Tasks.FileDate|false>>)
 ---@param fail fun(err: any)  an error anywhere in the chain (a raising dater, for any base): the run ends here
-local function date_files_async(found, dater, budget_ms, note, alive, done, fail)
+local function date_files_async(found, dater, budget_ms, note, alive, track, done, fail)
   ---@type table<string, table<string, Tasks.FileDate|false>>
   local dated = {}
   local deadline = uv.hrtime() + budget_ms * 1e6
@@ -889,21 +910,26 @@ local function date_files_async(found, dater, budget_ms, note, alive, done, fail
       dated[base] = date_group(base, group.rels, nil)
       return true
     end
-    dater(base, group.rels, { deadline = deadline, alive = alive }, function(git, err)
-      if failed then
-        return
-      end
-      local ok, perr = pcall(function()
-        if err then
-          note(("%s: %s%s"):format(base, err, git and "" or " (file times used)"))
+    dater(
+      base,
+      group.rels,
+      { deadline = deadline, alive = alive, on_cancel = track },
+      function(git, err)
+        if failed then
+          return
         end
-        dated[base] = date_group(base, group.rels, git)
-      end)
-      if not ok then
-        return stop(perr)
+        local ok, perr = pcall(function()
+          if err then
+            note(("%s: %s%s"):format(base, err, git and "" or " (file times used)"))
+          end
+          dated[base] = date_group(base, group.rels, git)
+        end)
+        if not ok then
+          return stop(perr)
+        end
+        next_base()
       end
-      next_base()
-    end)
+    )
     return nil
   end
   next_base = function()
@@ -1081,9 +1107,14 @@ end
 function M.compute_async(tasks, opts, cb)
   opts = opts or {}
   local cancelled, delivered = false, false
+  ---@type fun()[]
+  local kills = {}
   local job = {
     cancel = function()
       cancelled = true
+      for _, kill in ipairs(kills) do
+        pcall(kill)
+      end
     end,
   }
   ---@param report Tasks.StalenessReport
@@ -1138,6 +1169,9 @@ function M.compute_async(tasks, opts, cb)
       end,
       function()
         return not cancelled
+      end,
+      function(kill)
+        kills[#kills + 1] = kill
       end,
       function(dated)
         local done_ok, done_err = pcall(function()
