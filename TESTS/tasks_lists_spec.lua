@@ -299,6 +299,40 @@ return function(H)
   has(res.out, "quick-wins\tbuiltin\t")
   res = run({ "lists", "show", "worth" })
   has(res.out, "tasks list --effort=<=S --value=>=4 --sort=roi")
+  -- every `lists` subcommand shares one argument-count check and one error shape
+  for _, case in ipairs({
+    { { "lists", "show" }, "usage: lists show <name>" },
+    { { "lists", "show", "a", "b" }, "usage: lists show <name>" },
+    { { "lists", "save" }, "usage: lists save <name>" },
+    { { "lists", "delete" }, "usage: lists delete <name>" },
+    { { "lists", "rename", "a" }, "usage: lists rename <old> <new>" },
+    { { "lists", "rename", "a", "b", "c" }, "usage: lists rename <old> <new>" },
+  }) do
+    res = run(case[1])
+    eq(res.code, 2, table.concat(case[1], " "))
+    has(res.err, case[2])
+  end
+  res = run({ "lists", "frobnicate" })
+  eq(res.code, 2)
+  has(res.err, "unknown lists command: frobnicate (save, delete, rename, show)")
+  res = run({ "lists", "show", "no-such-list" })
+  eq(res.code, 1, "a failing lookup is exit 1, not a usage error")
+  has(res.err, "error: ")
+  res = run({ "lists", "rename", "worth", "worthy" })
+  eq(res.code, 0, res.err)
+  has(res.out, "renamed\tworth\tworthy")
+  res = run({ "lists", "rename", "worthy", "worth" })
+  eq(res.code, 0, res.err)
+  local cli_src = table.concat(
+    vim.fn.readfile(
+      vim.fn.fnamemodify(debug.getinfo(1, "S").source:sub(2), ":h:h") .. "/lua/tasks_nvim/cli.lua"
+    ),
+    "\n"
+  )
+  ok(
+    cli_src:find("LISTS_SUBS", 1, true) and not cli_src:find('sub == "delete"', 1, true),
+    "lists subcommands live in one table"
+  )
   res = run({ "list", "@worth" })
   eq(res.code, 0, res.err)
   has(res.out, "lib.nvim/small-ok")

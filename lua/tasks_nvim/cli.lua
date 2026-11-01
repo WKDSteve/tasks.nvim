@@ -945,6 +945,85 @@ local function apply_list(args, name, command)
   return nil
 end
 
+---@class Tasks.ListsSub
+---@field usage string  Shown on a wrong argument count (exit 2)
+---@field names integer  How many names follow the subcommand (exactly)
+---@field run fun(ctx: Tasks.CliCtx, a: string, b: string|nil): integer
+
+--- Report a failed `lists.*` call the way every subcommand does.
+---@param ctx Tasks.CliCtx
+---@param err any
+---@return integer code
+local function lists_fail(ctx, err)
+  ctx.warn("error: " .. tostring(err))
+  return 1
+end
+
+---@type table<string, Tasks.ListsSub>
+local LISTS_SUBS = {
+  show = {
+    usage = "lists show <name>",
+    names = 1,
+    run = function(ctx, name)
+      local entry, err = lists.get(name)
+      if not entry then
+        return lists_fail(ctx, err)
+      end
+      ctx.say(("%s	%s"):format(entry.name, entry.source))
+      if entry.def.desc then
+        ctx.say("desc: " .. fsio.clean(entry.def.desc))
+      end
+      ctx.say(
+        "tasks list "
+          .. (entry.def.area and (entry.def.area .. " ") or "")
+          .. table.concat(lists.words(entry.def), " ")
+      )
+      return 0
+    end,
+  },
+  save = {
+    usage = "lists save <name> [filters] [--sort=] [--area=] [--desc=]",
+    names = 1,
+    run = function(ctx, name)
+      local def = def_from_options(ctx.args.opt)
+      if def.readiness == "both" then
+        ctx.warn("error: --ready and --waiting exclude each other")
+        return 2
+      end
+      local saved, err = lists.save(name, def)
+      if not saved then
+        return lists_fail(ctx, err)
+      end
+      ctx.say(("saved	%s	%s"):format(name, lists.path()))
+      return 0
+    end,
+  },
+  delete = {
+    usage = "lists delete <name>",
+    names = 1,
+    run = function(ctx, name)
+      local deleted, err = lists.delete(name)
+      if not deleted then
+        return lists_fail(ctx, err)
+      end
+      ctx.say(("deleted	%s"):format(name))
+      return 0
+    end,
+  },
+  rename = {
+    usage = "lists rename <old> <new>",
+    names = 2,
+    run = function(ctx, old, new)
+      local renamed, err = lists.rename(old, new)
+      if not renamed then
+        return lists_fail(ctx, err)
+      end
+      ctx.say(("renamed	%s	%s"):format(old, new))
+      return 0
+    end,
+  },
+}
+
 ---@param ctx Tasks.CliCtx
 ---@return integer code
 function commands.lists(ctx)
@@ -953,78 +1032,23 @@ function commands.lists(ctx)
   if sub == nil or sub == "ls" then
     local entries, notes = lists.all()
     for _, e in ipairs(entries) do
-      ctx.say(table.concat({ e.name, e.source, lists.summary(e.def) }, "\t"))
+      ctx.say(table.concat({ e.name, e.source, lists.summary(e.def) }, "	"))
     end
     for _, n in ipairs(notes) do
       ctx.warn("warn: " .. n)
     end
     return 0
   end
-  local name = args.pos[2]
-  if sub == "show" then
-    if not name or #args.pos > 2 then
-      ctx.warn("error: usage: lists show <name>")
-      return 2
-    end
-    local entry, err = lists.get(name)
-    if not entry then
-      ctx.warn("error: " .. err)
-      return 1
-    end
-    ctx.say(("%s\t%s"):format(entry.name, entry.source))
-    if entry.def.desc then
-      ctx.say("desc: " .. fsio.clean(entry.def.desc))
-    end
-    ctx.say(
-      "tasks list "
-        .. (entry.def.area and (entry.def.area .. " ") or "")
-        .. table.concat(lists.words(entry.def), " ")
-    )
-    return 0
-  elseif sub == "save" then
-    if not name or #args.pos > 2 then
-      ctx.warn("error: usage: lists save <name> [filters] [--sort=] [--area=] [--desc=]")
-      return 2
-    end
-    local def = def_from_options(args.opt)
-    if def.readiness == "both" then
-      ctx.warn("error: --ready and --waiting exclude each other")
-      return 2
-    end
-    local saved, err = lists.save(name, def)
-    if not saved then
-      ctx.warn("error: " .. tostring(err))
-      return 1
-    end
-    ctx.say(("saved\t%s\t%s"):format(name, lists.path()))
-    return 0
-  elseif sub == "delete" then
-    if not name or #args.pos > 2 then
-      ctx.warn("error: usage: lists delete <name>")
-      return 2
-    end
-    local deleted, err = lists.delete(name)
-    if not deleted then
-      ctx.warn("error: " .. tostring(err))
-      return 1
-    end
-    ctx.say(("deleted\t%s"):format(name))
-    return 0
-  elseif sub == "rename" then
-    if not name or not args.pos[3] or #args.pos > 3 then
-      ctx.warn("error: usage: lists rename <old> <new>")
-      return 2
-    end
-    local renamed, err = lists.rename(name, args.pos[3])
-    if not renamed then
-      ctx.warn("error: " .. tostring(err))
-      return 1
-    end
-    ctx.say(("renamed\t%s\t%s"):format(name, args.pos[3]))
-    return 0
+  local entry = LISTS_SUBS[sub]
+  if not entry then
+    ctx.warn("error: unknown lists command: " .. tostring(sub) .. " (save, delete, rename, show)")
+    return 2
   end
-  ctx.warn("error: unknown lists command: " .. tostring(sub) .. " (save, delete, rename, show)")
-  return 2
+  if args.pos[1 + entry.names] == nil or #args.pos > 1 + entry.names then
+    ctx.warn("error: usage: " .. entry.usage)
+    return 2
+  end
+  return entry.run(ctx, args.pos[2], args.pos[3])
 end
 
 commands["plan-new"] = function(ctx)
