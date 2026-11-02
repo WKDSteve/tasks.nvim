@@ -57,7 +57,7 @@ DATA="$(data_dir)"
 # `env_allow`); without it the run goes on and says so first.
 if [[ -n "${SNACKS_DIR:-}" ]]; then
   # An override that is set decides alone: it is never skipped for another checkout.
-  [[ -d "$SNACKS_DIR/lua/snacks/picker" ]] || fail "error: dependency 'snacks.nvim' not found. \$SNACKS_DIR ($(show_path "$SNACKS_DIR")) is no snacks.nvim checkout."
+  [[ -d "$SNACKS_DIR/lua/snacks/picker" ]] || fail "error: dependency 'snacks.nvim' not found. \$SNACKS_DIR (${SNACKS_DIR//\\//}) is no snacks.nvim checkout."
 else
   for dir in "$ROOT/.deps/snacks.nvim" "$ROOT/../snacks.nvim" "$DATA/lazy/snacks.nvim"; do
     if [[ -d "$dir/lua/snacks/picker" ]]; then
