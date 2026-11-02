@@ -566,7 +566,11 @@ return function(H)
     })
     local probe_move = ops(moved, { dry_run = true })
     eq(probe_move.results[3].ok, true, vim.inspect(probe_move.results[3]))
-    eq(probe_move.results[3].move.new_id, "cascade.nvim/sib-one", vim.inspect(probe_move.results[3]))
+    eq(
+      probe_move.results[3].move.new_id,
+      "cascade.nvim/sib-one",
+      vim.inspect(probe_move.results[3])
+    )
     eq(everything(), files_before, "a dry run writes nothing")
     -- an id no earlier op makes is still dangling
     eq(
@@ -827,7 +831,11 @@ return function(H)
     eq(dry_chain.ok, true, vim.inspect(dry_chain))
     local real_chain = ops(chain)
     eq(real_chain.ok, true, vim.inspect(real_chain))
-    eq(dry_chain.results[3].etag_before, real_chain.results[3].etag_before, "tick_step: same version")
+    eq(
+      dry_chain.results[3].etag_before,
+      real_chain.results[3].etag_before,
+      "tick_step: same version"
+    )
     eq(dry_chain.results[2].etag_before, real_chain.results[2].etag_before, "set: same version")
     os.remove(find(id).path)
   end

@@ -112,11 +112,11 @@ function M.preview(id, to_area, opts)
   local all, scan_errors
   if opts.drafts then
     -- a dry run: the tasks earlier `new` operations would create name ids too
-    local scanned, serr = require("tasks_nvim.plan_scope").scanned_with(root, opts.drafts)
+    local scanned, scope_err = require("tasks_nvim.plan_scope").scanned_with(root, opts.drafts)
     if scanned then
       all, scan_errors = scanned.all, scanned.errors
     else
-      all, scan_errors = nil, serr
+      all, scan_errors = nil, scope_err
     end
   else
     all, scan_errors = scan.all({ root = root })
