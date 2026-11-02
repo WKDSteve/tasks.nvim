@@ -525,4 +525,64 @@ return function(H)
     vim.notify = orig_notify
     dash.config.watch = was_watch
   end
+
+  -- ── the plain vim.ui.select fallback cannot redraw: it opens once, with the answer ──────────
+  do
+    local dash = require("tasks_nvim.ui.dash")
+    local was_watch = dash.config.watch
+    dash.config.watch = false
+    local orig_notify, orig_select = vim.notify, vim.ui.select
+    vim.notify = function() end
+    local shown_lists = {}
+    vim.ui.select = function(items, _, cb)
+      shown_lists[#shown_lists + 1] = vim.tbl_map(function(t)
+        return t.id
+      end, items)
+      cb(nil)
+    end
+    pending = {}
+    local partial = function(_, rels, _, cb)
+      pending[#pending + 1] = function()
+        local out = {}
+        for _, rel in ipairs(rels) do
+          out[rel] = { date = rel == "lua/a.lua" and "2030-01-01" or "2000-01-01", file = rel }
+        end
+        cb(out, nil)
+      end
+    end
+    local filter = {
+      stale_refs = true,
+      ref_opts = vim.tbl_extend("force", opts, { git_dates_async = partial }),
+    }
+    local state = dash.open(
+      { root = root, area = "lib.nvim", filter = filter },
+      { backend = "select", persist = false }
+    )
+    eq(#shown_lists, 0, "select fallback: no list before the answer")
+    ok(state.ref_job ~= nil, "select fallback: the check runs")
+    ok(
+      vim.wait(5000, function()
+        return #pending > 0
+      end, 5),
+      "select fallback: the check asked its dater"
+    )
+    while #pending > 0 do
+      table.remove(pending, 1)()
+    end
+    ok(
+      vim.wait(5000, function()
+        return #shown_lists > 0
+      end, 5),
+      "select fallback: the list opens with the answer"
+    )
+    eq(#shown_lists, 1, "select fallback: opened once")
+    local joined = table.concat(shown_lists[1], " ")
+    ok(joined:find("stale-git", 1, true) ~= nil, "select fallback: the stale task is listed")
+    ok(
+      joined:find("fresh", 1, true) == nil,
+      "select fallback: the list is already cut by the answer"
+    )
+    vim.notify, vim.ui.select = orig_notify, orig_select
+    dash.config.watch = was_watch
+  end
 end

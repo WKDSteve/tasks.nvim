@@ -1615,6 +1615,16 @@ local function open_select(state)
   local function again()
     open_select(state)
   end
+  -- `vim.ui.select` cannot redraw an open list: with `--stale=refs` still being checked, wait for the answer and
+  -- open the list once, already cut by it (the picker backends show the list first and redraw it)
+  if state.filter and state.filter.stale_refs and state.ref_job and state.ref_stale == nil then
+    state.rerender = function()
+      state.rerender = nil
+      open_select(state)
+    end
+    notify.info("--stale=refs: the list opens when the check is done")
+    return
+  end
   vim.ui.select(shown, {
     prompt = title_of(state),
     format_item = function(t)
