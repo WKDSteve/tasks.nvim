@@ -18,8 +18,6 @@
 #   2. <repo>/.deps/<name>          (what CI checks out)
 #   3. <repo>/../<name>             (a sibling checkout)
 #   4. stdpath('data')/lazy/<name>  (what a plugin manager installed)
-# snacks.nvim (override $SNACKS_DIR) is optional: the dashboard specs drive its picker. It is looked up the
-# same way and handed to the specs; when it is not found the run goes on and says so first.
 
 set -euo pipefail
 
@@ -28,8 +26,6 @@ ROOT="$(pwd)"
 
 # The runner first, then what the project needs (this list is the `deps` of .testing.lua).
 DEPS=('testing.nvim' 'lib.nvim')
-# What the specs use when it is there. Not a `deps` entry: the runner would fail the whole run without it.
-OPTIONAL_DEPS=('snacks.nvim')
 
 # `ci`: a missing nvim, runner or dependency is infrastructure (exit 3, as `testing ci` reports it), not a failed step
 FAIL_CODE=1
@@ -55,21 +51,36 @@ data_dir() {
 }
 DATA="$(data_dir)"
 
+# testing:keep begin optional snacks.nvim
+# snacks.nvim (override $SNACKS_DIR) is optional: the dashboard specs drive its picker. The runner gives every child
+# editor a sandbox stdpath('data'), so the directory is found here and handed over (.testing.lua lists SNACKS_DIR in
+# `env_allow`); without it the run goes on and says so first.
+if [[ -n "${SNACKS_DIR:-}" ]]; then
+  # An override that is set decides alone: it is never skipped for another checkout.
+  [[ -d "$SNACKS_DIR/lua/snacks/picker" ]] || fail "error: dependency 'snacks.nvim' not found. \$SNACKS_DIR ($(show_path "$SNACKS_DIR")) is no snacks.nvim checkout."
+else
+  for dir in "$ROOT/.deps/snacks.nvim" "$ROOT/../snacks.nvim" "$DATA/lazy/snacks.nvim"; do
+    if [[ -d "$dir/lua/snacks/picker" ]]; then
+      export SNACKS_DIR="$dir"
+      break
+    fi
+  done
+  if [[ -z "${SNACKS_DIR:-}" ]]; then
+    printf '\033[33mnote: optional dependency snacks.nvim not found; the picker part of the dashboard specs cannot run.\n  Set $SNACKS_DIR, or clone it to .deps/snacks.nvim, or place it beside this repo.\033[0m\n' >&2
+  fi
+fi
+# testing:keep end
+
 marker_of() {
   case "$1" in
     lib.nvim) printf 'lua/lib/nvim' ;;
     testing.nvim) printf 'lua/testing' ;;
-    snacks.nvim) printf 'lua/snacks/picker' ;;
     *) printf 'lua' ;;
   esac
 }
 
 env_name_of() {
-  case "$1" in
-    # the name the dashboard specs read (and .testing.lua lets through)
-    snacks.nvim) printf 'SNACKS_DIR' ;;
-    *) printf '%s_DIR' "$(printf '%s' "$1" | tr 'a-z' 'A-Z' | tr -c 'A-Z0-9' '_')" ;;
-  esac
+  printf '%s_DIR' "$(printf '%s' "$1" | tr 'a-z' 'A-Z' | tr -c 'A-Z0-9' '_')"
 }
 
 # A path as shown in an error message: one separator style on every platform (Git Bash would
@@ -81,13 +92,18 @@ show_path() {
   printf '%s' "${1//\\//}"
 }
 
-# resolve <name> [optional]: sets RESOLVED, or exits 1 naming all four places. With `optional`, a dependency
-# that is not found returns 1 instead; an override that is set but not valid still exits 1.
+# resolve <name>: sets RESOLVED, or exits 1 naming all four places.
 resolve() {
-  local name="$1" optional="${2:-}" marker envname override
+  local name="$1" marker envname override
   marker="$(marker_of "$name")"
   envname="$(env_name_of "$name")"
   override="${!envname:-}"
+  local p1="unset"
+  [[ -n "$override" ]] && p1="$(show_path "$override")"
+  local p2 p3 p4
+  p2="$(show_path "$ROOT/.deps/$name")"
+  p3="$(show_path "$ROOT/../$name")"
+  p4="$(show_path "$DATA/lazy/$name")"
 
   if [[ -n "$override" ]]; then
     # An override that is set decides alone: it is never skipped for another checkout.
@@ -105,17 +121,6 @@ resolve() {
     done
   fi
 
-  if [[ "$optional" == "optional" && -z "$override" ]]; then
-    RESOLVED=""
-    return 1
-  fi
-
-  # The paths as text are for the message only: showing one can start a process (cygpath), so not before.
-  local p1="unset" p2 p3 p4
-  [[ -n "$override" ]] && p1="$(show_path "$override")"
-  p2="$(show_path "$ROOT/.deps/$name")"
-  p3="$(show_path "$ROOT/../$name")"
-  p4="$(show_path "$DATA/lazy/$name")"
   fail "error: dependency '$name' not found. Searched, in this order:
   1. \$$envname ($p1)
   2. .deps/$name ($p2)
@@ -135,26 +140,18 @@ for name in "${DEPS[@]}"; do
 done
 [[ -f "$DRIVER" ]] || fail "error: the runner entry is missing: $DRIVER"
 
-# The runner gives every child editor a sandbox stdpath('data'), so a spec cannot look into the plugin
-# manager's folder itself: it gets the directory found here (.testing.lua lists the variable in `env_allow`).
-for name in "${OPTIONAL_DEPS[@]}"; do
-  if resolve "$name" optional; then
-    export "$(env_name_of "$name")=$RESOLVED"
-  else
-    printf '\033[33mnote: optional dependency %s not found; the picker part of the dashboard specs cannot run.\n  Set $%s, or clone it to .deps/%s, or place it beside this repo.\033[0m\n' \
-      "$name" "$(env_name_of "$name")" "$name" >&2
-  fi
-done
-
 # Throwaway app name: the run gets its own stdpath("config"/"data"/"state"), never the developer's.
-# `ci`: the pipeline's document (ci.json) and the suite's stamp must land in the developer's real state directory,
-# where `testing ci verify`, the pre-push hook and `:Testing ci status` read them. It is asked for BEFORE the throwaway
-# app name and the scratch directory below and handed to `testing ci --state-dir` (an argument, not the environment:
-# the specs must not inherit it).
+# `ci` and the plain run: the pipeline's document (ci.json), the suite's stamp and the run history (runs.jsonl) must
+# land in the developer's real state directory, where `testing ci verify`, the pre-push hook, `:Testing ci status` and
+# the editor's test explorer read them. It is asked for BEFORE the throwaway app name and the scratch directory below
+# and handed to `testing ci --state-dir` / `testing run --state-dir` (an argument, not the environment: the specs
+# must not inherit it).
 real_state=""
-if [[ "${1:-}" == "ci" ]]; then
+if [[ "${1:-}" != "surface" && "${1:-}" != "conformance" ]]; then
   real_state="$(nvim -n -i NONE --headless -u NONE --cmd 'lua io.stdout:write(vim.fn.stdpath("state"))' --cmd 'qa!' 2>/dev/null)" || real_state=""
-  [[ -n "$real_state" ]] || fail 'error: cannot ask nvim for stdpath("state"); the ci document would be lost.'
+  if [[ "${1:-}" == "ci" ]]; then
+    [[ -n "$real_state" ]] || fail 'error: cannot ask nvim for stdpath("state"); the ci document would be lost.'
+  fi
 fi
 
 # Always this name: an NVIM_APPNAME the developer exported (a second config) would make the run read and write that
@@ -177,7 +174,7 @@ if [ "${1:-}" = "surface" ]; then
   nvim -n -i NONE --headless -u NONE -l "$DRIVER" surface . "$@"
   exit $?
 fi
-# `scripts/test.sh conformance`: the conformance suite K1..K15 in the same environment (docs/CONFORMANCE.md of testing.nvim)
+# `scripts/test.sh conformance`: the conformance suite K1..K16 in the same environment (docs/CONFORMANCE.md of testing.nvim)
 if [ "${1:-}" = "conformance" ]; then
   shift
   nvim -n -i NONE --headless -u NONE -l "$DRIVER" conformance . "$@"
@@ -200,4 +197,6 @@ if [ "${1:-}" = "ci" ]; then
   nvim -n -i NONE --headless -u NONE -l "$DRIVER" ci ${ci_args[@]+"${ci_args[@]}"} "$@"
   exit $?
 fi
+# the real state directory goes first, an `--state-dir` of the caller after it wins
+[[ -z "$real_state" ]] || set -- --state-dir "$real_state" "$@"
 nvim -n -i NONE --headless -u NONE -l "$DRIVER" run . --sentinel 'TASKS_TESTS_OK' "$@"
