@@ -27,7 +27,15 @@ return function(H)
   end
 
   -- ── relevant: editor droppings do not count ─────────────────────────────
-  for _, name in ipairs({ "task.md", "folder-task", "sub/task.md", "\\0\\task.md", "x.md.bak" }) do
+  for _, name in ipairs({
+    "task.md",
+    "folder-task",
+    "sub/task.md",
+    "\\0\\task.md",
+    "x.md.bak",
+    ".x.md.lock",
+    ".x.md.lock.takeover",
+  }) do
     ok(watch.relevant(name), name .. " matters")
   end
   ok(watch.relevant(nil), "an event without a name is assumed to matter")
@@ -38,6 +46,7 @@ return function(H)
     "4913",
     "task.md.tasks-tmp.123.456",
     "sub/.hidden",
+    ".x.md.lock.other",
   }) do
     ok(not watch.relevant(name), name .. " is noise")
   end
