@@ -1,3 +1,5 @@
+![tasks-nvim](assets/icons/tasks-nvim/png/tasks-nvim-128.png)
+
 > **Alpha, not released yet.** The engine, the `:Tasks` command, the dashboard, the form and the headless CLI are
 > built and covered by specs (72 spec files). Developed and tested on Windows; the CI runs the pipeline on Windows
 > (pushes to main) and on Linux and Windows (pull requests).
