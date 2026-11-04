@@ -93,6 +93,42 @@ local function child_lint(files, md_lint, nvim, timeout_ms)
   return M.interpret(res, timeout_ms)
 end
 
+---The command line of the engine, for a fix the gate names (from the vault root).
+---@return string
+local function engine_command()
+  local here = vim.fn.fnamemodify(debug.getinfo(1, "S").source:sub(2), ":p")
+  local plugin = vim.fs.dirname(vim.fs.dirname(vim.fs.dirname(vim.fs.normalize(here))))
+  return ("nvim --headless -u NONE -l %s/scripts/tasks.lua --vault=."):format(plugin)
+end
+
+---Lines that say what to type for the findings a session can fix itself. A gate that only says "stale" is how a stale
+---index stays pushed: the session staged its own paths and does not know which file it left behind.
+---@param done_in_roadmap string[]  # Ids of tasks with `status: done` still in `ROADMAP/tasks/`.
+---@param stale_areas string[]      # Areas whose index is stale.
+---@return string[]
+function M.fix_lines(done_in_roadmap, stale_areas)
+  local lines = {}
+  if #done_in_roadmap == 0 and #stale_areas == 0 then
+    return lines
+  end
+  local engine = engine_command()
+  lines[1] = "tasks-ci: to fix, from the vault root:"
+  for _, id in ipairs(done_in_roadmap) do
+    lines[#lines + 1] = ("  %s done %s   # moves it to Backlog/ and rewrites the index"):format(
+      engine,
+      id
+    )
+  end
+  for _, area in ipairs(stale_areas) do
+    lines[#lines + 1] = ("  %s index %s && git add %s/ROADMAP/TASKS.md"):format(engine, area, area)
+  end
+  lines[#lines + 1] =
+    "  then commit and stage these paths too; read `git diff --cached` first: an index"
+  lines[#lines + 1] =
+    "  regenerated in a shared tree also lists another session's uncommitted tasks."
+  return lines
+end
+
 ---Run the gate.
 ---@param opts? Tasks.CiOpts
 ---@param say? fun(line: string)  # Default: collect only.
@@ -121,6 +157,8 @@ function M.run(opts, say)
     return result
   end
 
+  local done_in_roadmap, stale_areas = {}, {}
+
   -- 1. rule check
   local res, cerr = check.run({ root = root })
   if not res then
@@ -128,6 +166,9 @@ function M.run(opts, say)
   else
     for _, f in ipairs(res.findings) do
       out(check.format(f, root))
+      if f.code == "done-in-roadmap" and f.id then
+        done_in_roadmap[#done_in_roadmap + 1] = fsio.clean(f.id)
+      end
     end
     local bad = res.errors + (opts.strict and res.warnings or 0)
     local line = ("check: %d error(s), %d warning(s) in %d area(s), %d task file(s) read"):format(
@@ -153,6 +194,7 @@ function M.run(opts, say)
     for _, r in ipairs(results) do
       if r.action == "stale" then
         stale = stale + 1
+        stale_areas[#stale_areas + 1] = fsio.clean(r.area)
         out(("index: %s is %s: %s"):format(r.area, r.reason or "stale", r.path))
       elseif r.action ~= "removed" and fsio.is_file(vault.index_path(root, r.area)) then
         indexes[#indexes + 1] = vault.index_path(root, r.area)
@@ -244,6 +286,9 @@ function M.run(opts, say)
   if result.ok then
     out("tasks-ci: OK")
   else
+    for _, line in ipairs(M.fix_lines(done_in_roadmap, stale_areas)) do
+      out(line)
+    end
     out("tasks-ci: FAILED (" .. table.concat(result.failed, ", ") .. ")")
   end
   return result

@@ -107,6 +107,36 @@ return function(H)
   eq(res.code, 1, "a gate that cannot lint fails instead of skipping")
   has(table.concat(res.lines, "\n"), "script not found")
 
+  -- ── a finding a session can fix names the command ───────────────────────
+  root = green_vault()
+  H.write(
+    root .. "/lib.nvim/ROADMAP/tasks/by-hand.md",
+    F.text(F.meta("by hand", "done", { { "created", "2026-09-01" }, { "updated", "2026-09-02" } }))
+  )
+  H.write(root .. "/TOOLS/scripts/md_lint.lua", "os.exit(0)\n")
+  res = ci.run({ root = root, run_lint = runner(0) })
+  eq(res.code, 1, "status: done in ROADMAP/tasks/ fails")
+  local fix_text = table.concat(res.lines, "\n")
+  has(fix_text, "done-in-roadmap")
+  has(fix_text, "--vault=. done lib.nvim/by-hand")
+  has(fix_text, "scripts/tasks.lua")
+  res = ci.run({ root = green_vault(), run_lint = runner(0) })
+  eq(res.code, 0, "green: " .. table.concat(res.lines, "\n"))
+  eq(table.concat(res.lines, "\n"):find("to fix", 1, true), nil, "green: no fix line")
+  root = green_vault()
+  H.write(
+    root .. "/lib.nvim/ROADMAP/tasks/not-indexed.md",
+    F.text(
+      F.meta("not indexed", "open", { { "created", "2026-09-01" }, { "updated", "2026-09-02" } })
+    )
+  )
+  H.write(root .. "/TOOLS/scripts/md_lint.lua", "os.exit(0)\n")
+  res = ci.run({ root = root, run_lint = runner(0) })
+  eq(res.code, 1, "a stale index fails")
+  fix_text = table.concat(res.lines, "\n")
+  has(fix_text, "--vault=. index lib.nvim && git add lib.nvim/ROADMAP/TASKS.md")
+  has(fix_text, "another session's uncommitted tasks")
+
   -- ── warnings: only --strict fails on them ───────────────────────────────
   root = green_vault()
   -- a done blocker is a warning (blocked-by-done); the finished task goes to Backlog
