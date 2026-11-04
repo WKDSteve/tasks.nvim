@@ -123,7 +123,7 @@ function M.fix_lines(done_in_roadmap, stale_areas)
     lines[#lines + 1] = ("  %s index %s && git add %s/ROADMAP/TASKS.md"):format(engine, area, area)
   end
   lines[#lines + 1] =
-    "  then commit and stage these paths too; read `git diff --cached` first: an index"
+    "  then stage what changed and commit; read `git diff --cached` first: an index"
   lines[#lines + 1] =
     "  regenerated in a shared tree also lists another session's uncommitted tasks."
   return lines
