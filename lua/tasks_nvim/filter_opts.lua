@@ -47,7 +47,7 @@ end
 ---words the same way. Unknown words are an error, never silently ignored.
 ---`stale` may be a number, a digit string or `refs` (same as `stale_refs`: a
 ---file named in `refs` changed since `updated`); `today` is passed through.
----@param opt { plan?: string, phase?: string, status?: string, prio?: string|integer, effort?: string, kind?: string, tag?: string, category?: string, severity?: string, value?: string|integer, actor?: string, stale?: string|integer, stale_refs?: boolean, blocked?: boolean, reminders?: boolean, unestimated?: boolean, quick_win?: boolean, sheet?: string, today?: string }
+---@param opt { plan?: string, phase?: string, status?: string, prio?: string|integer, effort?: string, kind?: string, tag?: string, category?: string, severity?: string, value?: string|integer, actor?: string, stale?: string|integer, stale_refs?: boolean, blocked?: boolean, reminders?: boolean, overdue?: boolean, due_before?: string, starts_after?: string, unestimated?: boolean, quick_win?: boolean, sheet?: string, today?: string }
 ---@return Tasks.Filter|nil filter
 ---@return string|nil err
 function M.parse(opt)
@@ -250,6 +250,18 @@ function M.parse(opt)
   end
   if opt.reminders then
     f.reminders = true
+  end
+  if opt.overdue then
+    f.overdue = true
+  end
+  for _, pair in ipairs({ { "due_before", "due-before" }, { "starts_after", "starts-after" } }) do
+    local value = opt[pair[1]]
+    if value ~= nil then
+      if not model.is_date(value) then
+        return nil, ("--%s must be YYYY-MM-DD, got '%s'"):format(pair[2], tostring(value))
+      end
+      f[pair[1]] = value
+    end
   end
   if opt.unestimated then
     f.unestimated = true

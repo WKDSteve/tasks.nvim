@@ -1054,6 +1054,21 @@ function M.compare_roi(a, b)
   return M.compare(a, b)
 end
 
+---Earliest due date first; a task without one follows, in the default order (so does a tie).
+---@param a Tasks.Task
+---@param b Tasks.Task
+---@return boolean
+local function compare_due(a, b)
+  local da, db = M.is_date(a.due) and a.due or nil, M.is_date(b.due) and b.due or nil
+  if da and db and da ~= db then
+    return da < db
+  end
+  if (da ~= nil) ~= (db ~= nil) then
+    return da ~= nil
+  end
+  return M.compare(a, b)
+end
+
 ---`frecency` here is only the fallback (no scores known: the default order);
 ---`M.sort` builds the real comparator from the scores it is given.
 ---@type table<string, fun(a: Tasks.Task, b: Tasks.Task): boolean>
@@ -1063,6 +1078,7 @@ local COMPARATORS = {
   severity = M.compare_severity,
   roi = M.compare_roi,
   frecency = M.compare,
+  due = compare_due,
 }
 
 ---Highest frecency score first; equal (or no) scores fall back to the default order.
@@ -1089,8 +1105,10 @@ function M.parse_sort(name)
   if type(name) == "string" and COMPARATORS[name] then
     return name, nil
   end
+  -- `due` is a sort of the headless `list` only: the dashboard cycles through `M.SORTS`
+  local words = vim.list_extend(vim.list_slice(M.SORTS, 1), { "due" })
   return nil,
-    ("unknown --sort '%s' (expected %s)"):format(tostring(name), table.concat(M.SORTS, ", "))
+    ("unknown --sort '%s' (expected %s)"):format(tostring(name), table.concat(words, ", "))
 end
 
 ---Sort in place and return the list. `order` is one of `M.SORTS` (default:
@@ -1265,6 +1283,16 @@ function M.filter(tasks, f)
       keep = false
     end
     if keep and f.blocked and not (t.status == "blocked" or #t.blocked_by > 0) then
+      keep = false
+    end
+    -- the dates: overdue (due before today), due before a day, a start after a day; a task without the date never matches
+    if keep and f.overdue and not (M.is_date(t.due) and t.due < today) then
+      keep = false
+    end
+    if keep and f.due_before and not (M.is_date(t.due) and t.due < f.due_before) then
+      keep = false
+    end
+    if keep and f.starts_after and not (M.is_date(t.start) and t.start > f.starts_after) then
       keep = false
     end
     -- a reminder that is due: its date is today or earlier

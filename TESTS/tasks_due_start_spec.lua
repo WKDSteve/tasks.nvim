@@ -109,6 +109,43 @@ return function(H)
   has(reopened, "due: 2026-09-09")
   has(reopened, "start: 2026-09-01")
 
+  -- ── filters and the sort order ────────────────────────────────────────
+  local filter_opts = require("tasks_nvim.filter_opts")
+  local function task(slug, front)
+    local t = model.parse_text(
+      "---\ntitle: " .. slug .. "\nstatus: open\n" .. front .. "created: 2026-01-01\n---\n\nBody.\n",
+      { path = "/v/a/ROADMAP/tasks/" .. slug .. ".md", area = "a", slug = slug }
+    )
+    t.id = "a/" .. slug
+    return t
+  end
+  local sample = {
+    task("none", ""),
+    task("late", "due: 2026-03-20\n"),
+    task("early", "due: 2026-02-10\nstart: 2026-02-01\n"),
+    task("later", "due: 2026-06-01\nstart: 2026-05-01\n"),
+  }
+  ---@param opt table
+  ---@return string[]
+  local function ids_of(opt)
+    opt.today = "2026-03-01"
+    local f = assert(filter_opts.parse(opt))
+    local ids = vim.tbl_map(function(t)
+      return t.id
+    end, model.sort(model.filter(vim.list_slice(sample, 1), f), "due"))
+    return ids
+  end
+  eq(ids_of({}), { "a/early", "a/late", "a/later", "a/none" }, "earliest due first, undated last")
+  eq(ids_of({ overdue = true }), { "a/early" }, "before today; the undated never match")
+  eq(ids_of({ due_before = "2026-04-01" }), { "a/early", "a/late" })
+  eq(ids_of({ due_before = "2026-02-10" }), {}, "before, not on the day")
+  eq(ids_of({ starts_after = "2026-03-01" }), { "a/later" })
+  local _, derr = filter_opts.parse({ due_before = "soon" })
+  has(derr, "--due-before")
+  local _, starts_err = filter_opts.parse({ starts_after = "2026-13-40" })
+  has(starts_err, "--starts-after")
+  eq(model.parse_sort("due"), "due", "a sort word the lists accept")
+
   -- ── the contract ───────────────────────────────────────────────────────
   local function call(method, params)
     local raw = api.call(method, params and vim.json.encode({ params = params }) or nil, {

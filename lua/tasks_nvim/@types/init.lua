@@ -73,6 +73,9 @@
 ---@field plan? string|string[]      # Matches `plan:` (the plan file id; a task without a plan never matches).
 ---@field phase? string|string[]     # Matches `phase:` (a task without a phase never matches).
 ---@field blocked? boolean            # status `blocked` or a non-empty `blocked_by`.
+---@field overdue? boolean           # Only tasks whose `due` date is before today (a task without `due` never matches).
+---@field due_before? string          # `YYYY-MM-DD`: only tasks due before that day.
+---@field starts_after? string        # `YYYY-MM-DD`: only tasks that start after that day.
 ---@field reminders? boolean         # A reminder (`remind:`) that is due: its date is today or earlier.
 ---@field unestimated? boolean        # Missing the effort or the value (the tasks `estimate` walks).
 ---@field sheet? string|string[]     # The state of the test-sheet block (`tasks_nvim.sheets`: red, stale, never, inbox, manual, green, unknown) or `any`; a task without the block never matches.

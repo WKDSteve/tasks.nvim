@@ -39,7 +39,16 @@ return function(H)
     ["folderize"] = { composer = {}, cli = { "no-index" } },
     ["list"] = {
       composer = { "force", "list", "to" },
-      cli = { "all", "done", "limit", "offset", "stale-refs" },
+      cli = {
+        "all",
+        "done",
+        "due-before",
+        "limit",
+        "offset",
+        "overdue",
+        "stale-refs",
+        "starts-after",
+      },
     },
     ["lists"] = {
       composer = {},

@@ -63,8 +63,9 @@ commands:
   list [<area>] [--status=a,b] [--prio=1,2|<=2] [--effort=S,M|<=M] [--kind=k] [--tag=t]
        [--category=c,d] [--severity=high,critical] [--value=4,5|>=4] [--actor=cdx,me,pair,none]
        [--stale=<days>|refs] [--stale-refs] [--blocked] [--reminders] [--ready|--waiting] [--unestimated] [--quick-win]
+       [--overdue] [--due-before=YYYY-MM-DD] [--starts-after=YYYY-MM-DD]
        [--sheet=red,stale,never,inbox,manual,green,unknown|any]
-       [--sort=default|prio-effort|severity|frecency|roi] [--format=tsv|ids|json] [--done]   open tasks, sorted; one line each
+       [--sort=default|prio-effort|severity|frecency|roi|due] [--format=tsv|ids|json] [--done]   open tasks, sorted; one line each
        (--format=json: the tasks.list document in plan order or that of --sort, with [--limit=1..100] [--offset=N]; --done: the finished tasks)
        (categories: @CATEGORIES@; --category=bug also finds kind=bug;
         --sort=prio-effort: small first within a prio; --sort=severity: critical first;
@@ -74,6 +75,8 @@ commands:
        (--ready: nothing open blocks it; --waiting: an open blocker; --unestimated: no effort or no value;
         --quick-win: value and effort at the quick-win thresholds, see `quickwins`;
         --reminders: a reminder (`remind:`) that is due, its date is today or earlier;
+        --overdue / --due-before=<day>: the `due:` date is before today / before that day; --starts-after=<day>: the
+        `start:` date is after it; a task without the date never matches; --sort=due: earliest due first, undated last;
         --sheet: the state of the test-sheet block testing.nvim wrote into the task, its worst sheet (inbox:
         green and waiting for your judgement), any: a task with the block; nothing is run)
   plan-new <area> <title> [--areas=a,b] [--target=<id>] [--phases=a,b,c] [--gate=hard] [--summary=text]
@@ -190,12 +193,15 @@ local SPECS = {
       "limit",
       "offset",
       "sheet",
+      "due-before",
+      "starts-after",
     },
     flag = {
       "blocked",
       "all",
       "done",
       "reminders",
+      "overdue",
       "stale-refs",
       "ready",
       "waiting",
@@ -441,6 +447,9 @@ local function filter_option_map(opt)
     phase = opt.phase --[[@as string|nil]],
     blocked = opt.blocked == true,
     reminders = opt.reminders == true,
+    overdue = opt.overdue == true,
+    due_before = opt["due-before"] --[[@as string|nil]],
+    starts_after = opt["starts-after"] --[[@as string|nil]],
     unestimated = opt.unestimated == true,
     quick_win = opt["quick-win"] == true,
     sheet = opt.sheet --[[@as string|nil]],
