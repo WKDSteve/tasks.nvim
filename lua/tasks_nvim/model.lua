@@ -63,7 +63,7 @@ M.SEVERITIES = { "low", "medium", "high", "critical" }
 
 ---The listing orders `sort` knows. `default` is what the index uses.
 ---@type string[]
-M.SORTS = { "default", "prio-effort", "severity", "frecency", "roi" }
+M.SORTS = { "default", "prio-effort", "severity", "frecency", "roi", "due" }
 
 ---@type integer[]
 M.PRIOS = { 1, 2, 3 }
@@ -1105,10 +1105,8 @@ function M.parse_sort(name)
   if type(name) == "string" and COMPARATORS[name] then
     return name, nil
   end
-  -- `due` is a sort of the headless `list` only: the dashboard cycles through `M.SORTS`
-  local words = vim.list_extend(vim.list_slice(M.SORTS, 1), { "due" })
   return nil,
-    ("unknown --sort '%s' (expected %s)"):format(tostring(name), table.concat(words, ", "))
+    ("unknown --sort '%s' (expected %s)"):format(tostring(name), table.concat(M.SORTS, ", "))
 end
 
 ---Sort in place and return the list. `order` is one of `M.SORTS` (default:

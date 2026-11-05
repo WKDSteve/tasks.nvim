@@ -268,6 +268,25 @@ return function(H)
   })
   eq(urgent.task.id, "a/urgent", "a due date does not outrank the priority")
 
+  -- ── the dashboard and the saved lists: an `overdue` chip, stored and read back, a list that holds it ──
+  local core = require("tasks_nvim.ui.dash_core")
+  local lists = require("tasks_nvim.lists")
+  local chip_filter = core.set_dim({}, "overdue", true)
+  eq(chip_filter.overdue, true)
+  ok(vim.tbl_contains(core.chips(chip_filter), "overdue"), "the chip is shown")
+  eq(core.set_dim(chip_filter, "overdue", nil).overdue, nil, "and clears")
+  local stored = core.filter_to_options(chip_filter)
+  eq(stored.overdue, true)
+  eq(core.filter_from_stored(stored).overdue, true, "what the dashboard stores comes back")
+  local def = assert(lists.normalize("late", { overdue = true, sort = "due" }))
+  eq(def.overdue, true)
+  local resolved = assert(lists.resolve(def))
+  eq(resolved.filter.overdue, true, "a saved list filters like the flag")
+  eq(resolved.sort, "due")
+  local saved = lists.from_filter(resolved.filter, "due", nil, "late")
+  eq(saved.overdue, true, "and a filter saves as a list with the key")
+  ok(vim.tbl_contains(model.SORTS, "due"), "the dashboard cycle and the completion offer due")
+
   -- ── the ops door: new with fields, set with a patch ───────────────────
   local function ops(list)
     local raw =

@@ -338,7 +338,7 @@ local function filter_note(flags)
   if flags.blocked then
     parts[#parts + 1] = "blocked"
   end
-  for _, name in ipairs({ "ready", "waiting", "reminders", "unestimated", "quick-win" }) do
+  for _, name in ipairs({ "ready", "waiting", "reminders", "overdue", "unestimated", "quick-win" }) do
     if flags[name] then
       parts[#parts + 1] = name
     end
@@ -417,7 +417,7 @@ function M.plan(ctx)
   if not no_stray_words(ctx) then
     return
   end
-  if not apply_list(ctx, { "waiting", "reminders" }) then
+  if not apply_list(ctx, { "waiting", "reminders", "overdue" }) then
     return
   end
   local flags = ctx.flags
@@ -739,7 +739,7 @@ function M.estimate(ctx)
   if not no_stray_words(ctx) then
     return
   end
-  if not apply_list(ctx, { "ready", "waiting", "reminders" }) then
+  if not apply_list(ctx, { "ready", "waiting", "reminders", "overdue" }) then
     return
   end
   local scope = load_scope(ctx)
@@ -844,6 +844,7 @@ function M.list(ctx)
     stale = flags.stale,
     blocked = flags.blocked,
     reminders = flags.reminders,
+    overdue = flags.overdue,
     unestimated = flags.unestimated,
     quick_win = flags["quick-win"],
     plan = flags.plan,

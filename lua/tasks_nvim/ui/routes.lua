@@ -509,6 +509,7 @@ local LIST_FLAGS = {
   { name = "plan", type = "TASK_PLAN", desc = "Only the tasks of this plan file (area/slug)" },
   { name = "phase", type = "STRING", desc = "Only the tasks in this stage of their plan" },
   { name = "reminders", bool = true, desc = "Only tasks whose reminder (remind:) is due" },
+  { name = "overdue", bool = true, desc = "Only tasks whose due date (due:) is before today" },
   { name = "unestimated", bool = true, desc = "Only tasks missing an effort or a value" },
   {
     name = "quick-win",
@@ -555,7 +556,7 @@ local LIST_FLAGS = {
 
 ---The filter flags of `list`, for the commands that take the same filters (`plan`, `estimate`, `quickwins`). Not the
 ---ones that only make sense for a list of tasks as such: the order, the target, `--ready` / `--waiting` (a command that
----takes them words its own) and `--reminders` (a plan or an estimate is not about what is due).
+---takes them words its own) and `--reminders` and `--overdue` (a plan or an estimate is not about what is due).
 ---@param extra table[]
 ---@return table[]
 local function filter_flags(extra)
@@ -567,6 +568,7 @@ local function filter_flags(extra)
     ready = true,
     waiting = true,
     reminders = true,
+    overdue = true,
     -- the state of a task's test sheets is about the list of tasks, not a plan or an estimate
     sheet = true,
     -- (the commands that take these filters name their own `--plan`, with their own words)

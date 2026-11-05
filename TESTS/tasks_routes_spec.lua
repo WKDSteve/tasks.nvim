@@ -1736,6 +1736,7 @@ return function(H)
         "--sort=severity",
         "--sort=frecency",
         "--sort=roi",
+        "--sort=due",
       })
       ok(vim.tbl_contains(complete("TaskT tasks --to="), "--to=mdview"))
       ok(vim.tbl_contains(complete("TaskT task preview lib.nvim/al"), "lib.nvim/alpha"))

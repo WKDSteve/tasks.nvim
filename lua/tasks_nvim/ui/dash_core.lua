@@ -62,6 +62,7 @@ M.FILTER_DIMS = {
   "tag",
   "blocked",
   "reminders",
+  "overdue",
   "unestimated",
   "quick-win",
   "stale-refs",
@@ -537,6 +538,9 @@ function M.chips(f)
   if f.reminders then
     chips[#chips + 1] = "reminder due"
   end
+  if f.overdue then
+    chips[#chips + 1] = "overdue"
+  end
   if f.unestimated then
     chips[#chips + 1] = "unestimated"
   end
@@ -602,7 +606,7 @@ end
 
 ---Copy of a filter with one dimension replaced (`value == nil` clears it).
 ---`prio` takes `1`, `2`, `3` or `<=N`, `effort` a size / day value or `<=<size>`;
----`blocked` and `reminders` take `true`/`nil`.
+---`blocked`, `reminders` and `overdue` take `true`/`nil`.
 ---@param f Tasks.Filter|nil
 ---@param dim string
 ---@param value string|boolean|nil
@@ -643,6 +647,8 @@ function M.set_dim(f, dim, value)
     out.blocked = value and true or nil
   elseif dim == "reminders" then
     out.reminders = value and true or nil
+  elseif dim == "overdue" then
+    out.overdue = value and true or nil
   elseif dim == "unestimated" then
     out.unestimated = value and true or nil
   elseif dim == "stale-refs" then
@@ -766,6 +772,9 @@ function M.filter_to_options(f)
   if f.reminders then
     o.reminders = true
   end
+  if f.overdue then
+    o.overdue = true
+  end
   if f.unestimated then
     o.unestimated = true
   end
@@ -803,6 +812,7 @@ function M.filter_from_stored(opts)
     stale_refs = opts.stale_refs == true,
     blocked = opts.blocked == true,
     reminders = opts.reminders == true,
+    overdue = opts.overdue == true,
     unestimated = opts.unestimated == true,
     plan = type(opts.plan) == "string" and opts.plan or nil,
     phase = type(opts.phase) == "string" and opts.phase or nil,

@@ -440,9 +440,16 @@ return function(H)
     keys("o")
     ok(
       wait_for(function()
+        return p.title:find("[sort: due]", 1, true) ~= nil
+      end),
+      "the fifth press goes on to due"
+    )
+    keys("o")
+    ok(
+      wait_for(function()
         return p.title:find("sort:", 1, true) == nil
       end),
-      "the fifth press wraps around to the default"
+      "the sixth press wraps around to the default"
     )
     p = opened(4)
     eq(ids(p)[1], "lib.nvim/alpha")

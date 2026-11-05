@@ -45,7 +45,6 @@ return function(H)
         "due-before",
         "limit",
         "offset",
-        "overdue",
         "stale-refs",
         "starts-after",
       },
