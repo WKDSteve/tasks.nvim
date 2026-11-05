@@ -231,6 +231,7 @@ return function(H)
     "plan",
     "prio",
     "refs",
+    "scope",
     "severity",
     "start",
     "status",

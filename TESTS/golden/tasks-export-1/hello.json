@@ -79,6 +79,18 @@
       2,
       3
     ],
+    "scope": [
+      "usercmd",
+      "keymap",
+      "config",
+      "ui",
+      "api",
+      "docs",
+      "tests",
+      "health",
+      "migration",
+      "multi-repo"
+    ],
     "severity": [
       "low",
       "medium",

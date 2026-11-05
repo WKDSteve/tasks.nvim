@@ -1,7 +1,7 @@
 {
   "body": "\nThe body of alpha.\n\n## Plan\n\n- [x] 1. first\n- [ ] 2. second\n- [ ] 3. third (dropped)\n\n\n## Offene Fragen\n\n### Which format? [q1]\nA line of text.\n- [ ] Section (empfohlen)\n- [ ] Frontmatter\n\n### Settled already [q2]\n- [x] Yes\n- [ ] No\n\n\u003c!-- testing:sheets:begin -->\n## Test sheets\n\n- **One** (`one`): automated part green, waiting for your judgement\n\u003c!-- testing:sheets:states one=inbox two=green -->\n\u003c!-- testing:sheets:end -->\n",
   "body_truncated": false,
-  "digest": "sha256:06ab419c71fc85db",
+  "digest": "sha256:51aa863bb0c68415",
   "engine": {
     "git": "0000000",
     "nvim": "0.0.0",
@@ -54,7 +54,7 @@
       "title": "Settled already"
     }
   ],
-  "rev": "rev:b27824",
+  "rev": "rev:91ce5f",
   "schema": 1,
   "steps": [
     {
@@ -88,7 +88,7 @@
     "created": "2026-01-01",
     "effort": "S",
     "effort_days": 0.5,
-    "etag": "sha256:790d4972b307e63b",
+    "etag": "sha256:b3fc5b0215162275",
     "file": "lib.nvim/ROADMAP/tasks/alpha.md",
     "folder": false,
     "group": "open|1",
@@ -115,6 +115,10 @@
       "repo@abc1234"
     ],
     "roi": 10,
+    "scope": [
+      "ui",
+      "usercmd"
+    ],
     "sheets": {
       "counts": {
         "green": 1,

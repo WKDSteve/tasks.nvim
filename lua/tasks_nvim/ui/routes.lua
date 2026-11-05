@@ -596,6 +596,7 @@ local FIELD_DESC = {
   due = "Deadline as YYYY-MM-DD (optional); the reminder is remind",
   start = "Earliest day to begin as YYYY-MM-DD (optional); never after due",
   category = "Concerns the task serves; several allowed, comma list",
+  scope = "What the task touches (usercmd, keymap, ui, ...); several allowed, comma list",
   severity = "How serious a bug or security task is",
   value = "Expected benefit from 1 (little) to 5 (a lot)",
   actor = "Who can take the task on: an AI session, you or both",
@@ -616,6 +617,7 @@ local function set_kv()
     status = model.OPEN_STATUSES,
     kind = model.KINDS,
     category = model.CATEGORIES,
+    scope = model.SCOPES,
     severity = model.SEVERITIES,
     prio = { "1", "2", "3" },
     effort = model.EFFORTS,
@@ -724,6 +726,12 @@ local function nested_routes()
           type = "STRING",
           values = model.CATEGORIES,
           desc = FIELD_DESC.category,
+        },
+        {
+          key = "scope",
+          type = "STRING",
+          values = model.SCOPES,
+          desc = FIELD_DESC.scope,
         },
         {
           key = "severity",

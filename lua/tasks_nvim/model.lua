@@ -57,6 +57,23 @@ M.CATEGORIES = {
   "ci",
 }
 
+---What a task touches (the `scope` list): the surfaces of a plugin or an app, several allowed. Independent of
+---`category` (the concern) and `kind`. The one list the form, `new --scope`, `set scope=`, `check` and the
+---`hello` enums read. New words go at the end.
+---@type string[]
+M.SCOPES = {
+  "usercmd",
+  "keymap",
+  "config",
+  "ui",
+  "api",
+  "docs",
+  "tests",
+  "health",
+  "migration",
+  "multi-repo",
+}
+
 ---Severity of a bug or security task, worst last. Optional, see `model.categories`.
 ---@type string[]
 M.SEVERITIES = { "low", "medium", "high", "critical" }
@@ -80,6 +97,12 @@ M.ACTORS = { "cdx", "me", "pair" }
 
 ---@type string[]
 M.EFFORTS = { "XS", "S", "M", "L", "XL" }
+
+---@type table<string, boolean>
+local SCOPE_SET = {}
+for _, c in ipairs(M.SCOPES) do
+  SCOPE_SET[c] = true
+end
 
 ---@type table<string, integer>
 local STATUS_RANK = {}
@@ -141,6 +164,12 @@ end
 ---@return boolean
 function M.is_category(s)
   return type(s) == "string" and CATEGORY_SET[s] == true
+end
+
+---@param s any
+---@return boolean
+function M.is_scope(s)
+  return type(s) == "string" and SCOPE_SET[s] == true
 end
 
 ---The categories a task counts for: its `category` list, `bug` when `kind` is
@@ -549,6 +578,7 @@ function M.parse_text(text, ctx)
     title = slug,
     tags = {},
     category = {},
+    scope = {},
     blocked_by = {},
     after = {},
     refs = {},
@@ -694,6 +724,16 @@ function M.parse_text(text, ctx)
         bad(
           "unknown-category",
           ("unknown category '%s' (expected %s)"):format(c, table.concat(M.CATEGORIES, ", "))
+        )
+      end
+    end
+
+    task.scope = as_list(meta.scope, "scope", bad)
+    for _, c in ipairs(task.scope) do
+      if not M.is_scope(c) then
+        bad(
+          "unknown-scope",
+          ("unknown scope '%s' (expected %s)"):format(c, table.concat(M.SCOPES, ", "))
         )
       end
     end

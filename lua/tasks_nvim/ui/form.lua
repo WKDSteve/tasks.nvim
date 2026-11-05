@@ -58,7 +58,7 @@ function M.help_lines(keys)
       key("tick_space"),
       key("tick_enter")
     ),
-    "                 (one-choice lists keep a single tick, category takes several)",
+    "                 (one-choice lists keep a single tick, category and scope take several)",
     ("%s            submit (checked, then created)"):format(key("submit")),
     ("%s / %s        cancel -- nothing is created (asks first when you typed something)"):format(
       key("cancel"),
@@ -211,6 +211,9 @@ function M.read(buf, areas, root, lang)
     M.show_errors(buf, errors)
     return nil
   end
+  for _, note in ipairs(values.notes or {}) do
+    require("lib.nvim.notify").create("[tasks]").warn(note)
+  end
   return values
 end
 
@@ -275,6 +278,7 @@ end
 ---@field title? string
 ---@field summary? string
 ---@field tags? string
+---@field other? string  # The `Other:` line.
 ---@field refs? string
 ---@field links? string  # Web addresses, comma separated.
 ---@field after? string  # Task ids, comma separated.
@@ -322,6 +326,7 @@ function M.open(opts)
       lang = opts.lang,
       areas = opts.areas,
       tags = opts.tags,
+      other = opts.other,
       refs = opts.refs,
       links = opts.links,
       after = opts.after,

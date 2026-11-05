@@ -1219,6 +1219,9 @@ function M.task_new_form(given)
   if given.category then
     ticks.category = vim.split(given.category, ",", { trimempty = true })
   end
+  if given.scope then
+    ticks.scope = vim.split(given.scope, ",", { trimempty = true })
+  end
 
   local ui = require("tasks_nvim.ui.form")
   local open = M.form_open or ui.open
@@ -1406,6 +1409,7 @@ function M.task_new(ctx)
       "tags",
       "links",
       "category",
+      "scope",
       "severity",
       "status",
       "mode",
@@ -1446,6 +1450,7 @@ function M.task_new(ctx)
     "tags",
     "links",
     "category",
+    "scope",
     "severity",
     "status",
   }) do
@@ -1463,6 +1468,7 @@ function M.task_new(ctx)
       effort = values.effort,
       tags = values.tags,
       category = values.category,
+      scope = values.scope,
       severity = values.severity,
       value = values.value,
       actor = values.actor,

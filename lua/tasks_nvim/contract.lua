@@ -255,6 +255,8 @@ local function task_entry(root, task, node, rank)
     commits = (task.commits and #task.commits > 0) and vim.list_slice(task.commits, 1) or nil,
     tags = vim.list_slice(task.tags or {}, 1),
     category = model.categories(task),
+    -- only when the task names a scope, so a document without one reads as before
+    scope = (task.scope and #task.scope > 0) and vim.list_slice(task.scope, 1) or nil,
     blocked_by = vim.list_slice(task.blocked_by or {}, 1),
     after = vim.list_slice(task.after or {}, 1),
     refs = vim.tbl_map(function(r)
@@ -576,6 +578,7 @@ function M.hello(opts)
     effort = efforts,
     actor = vim.list_slice(model.ACTORS, 1),
     category = vim.list_slice(model.CATEGORIES, 1),
+    scope = vim.list_slice(model.SCOPES, 1),
     severity = vim.list_slice(model.SEVERITIES, 1),
   })
   return doc

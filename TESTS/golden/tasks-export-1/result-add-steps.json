@@ -1,6 +1,6 @@
 {
   "client_op_id": "golden-add-steps",
-  "digest": "sha256:ba742101adab67cc",
+  "digest": "sha256:1a4999c3fe5f9fa6",
   "dry_run": false,
   "engine": {
     "git": "0000000",
@@ -16,8 +16,8 @@
       "changed_ids": [
         "lib.nvim/alpha"
       ],
-      "etag_after": "sha256:e3b7c0d1d40613c2",
-      "etag_before": "sha256:790d4972b307e63b",
+      "etag_after": "sha256:b62cd0f8812f5d87",
+      "etag_before": "sha256:b3fc5b0215162275",
       "id": "lib.nvim/alpha",
       "index": {
         "action": "written"
@@ -25,7 +25,7 @@
       "inverse": {
         "body": "\nThe body of alpha.\n\n## Plan\n\n- [x] 1. first\n- [ ] 2. second\n- [ ] 3. third (dropped)\n\n\n## Offene Fragen\n\n### Which format? [q1]\nA line of text.\n- [ ] Section (empfohlen)\n- [ ] Frontmatter\n\n### Settled already [q2]\n- [x] Yes\n- [ ] No\n\n\u003c!-- testing:sheets:begin -->\n## Test sheets\n\n- **One** (`one`): automated part green, waiting for your judgement\n\u003c!-- testing:sheets:states one=inbox two=green -->\n\u003c!-- testing:sheets:end -->\n",
         "id": "lib.nvim/alpha",
-        "if_match": "sha256:e3b7c0d1d40613c2",
+        "if_match": "sha256:b62cd0f8812f5d87",
         "op": "set_body"
       },
       "n": 1,

@@ -106,10 +106,11 @@ commands:
   migrate-actor [<area>] [--write]        propose actor=me for tasks that wait for you (status decision, tag
                                           needs-user) and leave every other task EMPTY; dry run unless --write
   new <area>[,<area>...] <title> [--kind=k] [--prio=1..3] [--effort=XS..XL|0.5d] [--value=1..5] [--actor=cdx|me|pair] [--after=id,id] [--order=2.5] [--plan=id] [--phase=word] [--tags=a,b]
-       [--category=c,d] [--severity=low|medium|high|critical] [--due=YYYY-MM-DD] [--start=YYYY-MM-DD] [--refs=path,repo@sha] [--links=https://...,...]
+       [--category=c,d] [--scope=a,b] [--severity=low|medium|high|critical] [--due=YYYY-MM-DD] [--start=YYYY-MM-DD] [--refs=path,repo@sha] [--links=https://...,...]
        [--summary=text] [--slug=slug] [--status=s]
        [--lang=de|en] [--folder]             create a task file (--lang: body headings;
-                                               --folder: a folder task that can hold assets)
+                                               --folder: a folder task that can hold assets;
+                                               scopes: @SCOPES@)
   set <area>/<slug> key=value ...         change frontmatter (empty value removes the key)
   answer <area>/<slug> <q1|#n> <n|clear>  answer a question of the `## Offene Fragen` section: tick option n (1-based),
                                           or take the answer back (clear)
@@ -166,6 +167,10 @@ global options: --vault=<dir> (default: $TASKS_VAULT; no built-in default path)
 -- The category words come from the model, so --help, `new --category`, `set` and `check` never disagree.
 USAGE = USAGE:gsub("@CATEGORIES@", function()
   return table.concat(model.CATEGORIES, " ")
+end)
+
+USAGE = USAGE:gsub("@SCOPES@", function()
+  return table.concat(model.SCOPES, " ")
 end)
 
 ---@class Tasks.CliSpec
@@ -299,6 +304,7 @@ local SPECS = {
       "effort",
       "tags",
       "category",
+      "scope",
       "severity",
       "value",
       "actor",
@@ -1223,6 +1229,7 @@ function commands.new(ctx)
     effort = opt.effort --[[@as string|nil]],
     tags = opt.tags --[[@as string|nil]],
     category = opt.category --[[@as string|nil]],
+    scope = opt.scope --[[@as string|nil]],
     severity = opt.severity --[[@as string|nil]],
     value = opt.value --[[@as string|nil]],
     actor = opt.actor --[[@as string|nil]],

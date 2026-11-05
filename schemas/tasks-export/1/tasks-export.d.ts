@@ -54,6 +54,7 @@ export type Hello = Head & {
     effort: string[];
     actor: string[];
     category: string[];
+    scope: string[];
     severity: string[];
   };
 };
@@ -190,6 +191,8 @@ export type Actor = "cdx" | "me" | "pair";
 export type Severity = "low" | "medium" | "high" | "critical";
 export type Category =
   "bug" | "security" | "performance" | "docs" | "ruleset" | "ux" | "bindings" | "refactor" | "tests" | "ci";
+export type Scope =
+  "usercmd" | "keymap" | "config" | "ui" | "api" | "docs" | "tests" | "health" | "migration" | "multi-repo";
 /**
  * tasks.list: one page of tasks in plan order, or in the order the request named (`sort`).
  */
@@ -716,6 +719,10 @@ export interface TaskEntry {
   commits?: string[];
   tags: string[];
   category: Category[];
+  /**
+   * What the task touches (optional, only when the task names a scope).
+   */
+  scope?: Scope[];
   blocked_by: string[];
   after: string[];
   /**

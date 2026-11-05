@@ -52,6 +52,7 @@ function M.build(H)
       { "value", "5" },
       { "actor", "cdx" },
       { "tags", "[ui, docs]" },
+      { "scope", "[ui, usercmd]" },
       {
         "refs",
         "[docs/shared.md, /abs/outside/secret.md, C:/Users/someone/private/notes.md, repo@abc1234]",

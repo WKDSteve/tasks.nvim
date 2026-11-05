@@ -27,6 +27,7 @@
 ---@field effort? string
 ---@field tags string[]
 ---@field category string[]           # The `category` list as written (see `model.categories` for the effective set).
+---@field scope string[]              # The `scope` list as written (`model.SCOPES`; may hold an unknown word, see `errors`).
 ---@field severity? string             # `low|medium|high|critical`, as written (meant for bug/security tasks; may be an unknown word, see `errors`).
 ---@field created? string             # `YYYY-MM-DD`
 ---@field updated? string             # `YYYY-MM-DD`
@@ -113,6 +114,7 @@
 ---@field effort? string
 ---@field tags? string[]|string       # A string is split at commas.
 ---@field category? string[]|string   # Concerns (`model.CATEGORIES`); a string is split at commas.
+---@field scope? string[]|string      # Surfaces it touches (`model.SCOPES`); a string is split at commas.
 ---@field severity? string            # `model.SEVERITIES`; meant for bug/security tasks (a warning from `check` otherwise).
 ---@field value? integer|string       # 1..5, the expected benefit.
 ---@field after? string[]|string     # Task ids that should come first (soft).

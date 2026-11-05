@@ -208,6 +208,7 @@ local NEW_FIELDS = {
   effort = true,
   tags = true,
   category = true,
+  scope = true,
   severity = true,
   value = true,
   actor = true,

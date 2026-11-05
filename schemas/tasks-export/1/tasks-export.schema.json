@@ -82,6 +82,9 @@
     "Category": {
       "enum": ["bug", "security", "performance", "docs", "ruleset", "ux", "bindings", "refactor", "tests", "ci"]
     },
+    "Scope": {
+      "enum": ["usercmd", "keymap", "config", "ui", "api", "docs", "tests", "health", "migration", "multi-repo"]
+    },
     "Effort": {
       "description": "A size (XS to XL) or a duration in days (`3d`, `0.5d`). `effort_days` is always the figure.",
       "type": "string",
@@ -424,6 +427,13 @@
             "$ref": "#/$defs/Category"
           }
         },
+        "scope": {
+          "description": "What the task touches (optional, only when the task names a scope).",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Scope"
+          }
+        },
         "blocked_by": {
           "type": "array",
           "items": {
@@ -645,6 +655,7 @@
             "effort",
             "actor",
             "category",
+            "scope",
             "severity"
           ],
           "properties": {
@@ -685,6 +696,12 @@
               }
             },
             "category": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "scope": {
               "type": "array",
               "items": {
                 "type": "string"

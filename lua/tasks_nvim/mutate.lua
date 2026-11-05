@@ -334,7 +334,7 @@ local function check_lang(lang)
 end
 
 ---Frontmatter keys in the order concept section 3 shows them.
----@param meta { title: string, status: string, kind?: string, prio?: integer|string, effort?: string, value?: integer|string, actor?: string, after?: string[], order?: number|string, plan?: string, phase?: string, tags?: string[], category?: string[], severity?: string, due?: string, start?: string, refs?: string[], links?: string[], created: string, updated: string }
+---@param meta { title: string, status: string, kind?: string, prio?: integer|string, effort?: string, value?: integer|string, actor?: string, after?: string[], order?: number|string, plan?: string, phase?: string, tags?: string[], category?: string[], scope?: string[], severity?: string, due?: string, start?: string, refs?: string[], links?: string[], created: string, updated: string }
 ---@return table[] pairs
 local function meta_pairs(meta)
   local pairs_ = {
@@ -373,6 +373,9 @@ local function meta_pairs(meta)
   end
   if meta.category then
     pairs_[#pairs_ + 1] = { "category", meta.category }
+  end
+  if meta.scope then
+    pairs_[#pairs_ + 1] = { "scope", meta.scope }
   end
   if meta.severity then
     pairs_[#pairs_ + 1] = { "severity", meta.severity }
@@ -596,6 +599,23 @@ local function category_list(value)
   return list, nil
 end
 
+---A list of scopes (`model.SCOPES`), each checked.
+---@param value any
+---@return string[]|nil list
+---@return string|nil err
+local function scope_list(value)
+  local list, err = string_list(value, "scope", true)
+  if not list then
+    return nil, err
+  end
+  for _, c in ipairs(list) do
+    if not model.is_scope(c) then
+      return nil, ("unknown scope '%s' (expected %s)"):format(c, table.concat(model.SCOPES, ", "))
+    end
+  end
+  return list, nil
+end
+
 ---Keys `set` accepts, in the order they are written when new. `updated` is
 ---deliberately absent: the tool sets it. Exported as `M.SETTABLE` for front
 ---ends that complete or document the keys.
@@ -607,6 +627,7 @@ local SETTABLE = {
   "effort",
   "tags",
   "category",
+  "scope",
   "severity",
   "value",
   "actor",
@@ -771,6 +792,12 @@ local function normalize_patch(patch, opts)
       result[#result + 1] = { key, #list > 0 and list or M.REMOVE }
     elseif key == "category" then
       local list, err = category_list(value)
+      if not list then
+        return nil, err
+      end
+      result[#result + 1] = { key, #list > 0 and list or M.REMOVE }
+    elseif key == "scope" then
+      local list, err = scope_list(value)
       if not list then
         return nil, err
       end
@@ -1044,6 +1071,14 @@ function M.new(area, opts)
     end
     category = #list > 0 and list or nil
   end
+  local scope
+  if opts.scope ~= nil then
+    local list, serr = scope_list(opts.scope)
+    if not list then
+      return nil, serr
+    end
+    scope = #list > 0 and list or nil
+  end
   if opts.severity ~= nil and not model.is_severity(opts.severity) then
     return nil,
       ("unknown severity '%s' (expected %s)"):format(
@@ -1137,6 +1172,7 @@ function M.new(area, opts)
       phase = opts.phase,
       tags = tags,
       category = category,
+      scope = scope,
       severity = opts.severity,
       due = opts.due,
       start = opts.start,

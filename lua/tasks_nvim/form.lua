@@ -20,6 +20,9 @@
 ---     ...
 ---     ## category (several)
 ---     ...
+---     ## scope (several)
+---     ...
+---     Other: ui, newword
 ---     Tags: ui, perf
 ---     Refs: lua/foo.lua
 ---
@@ -64,6 +67,7 @@ function M.fields()
     { name = "value", multi = false, values = strings(model.VALUES) },
     { name = "actor", multi = false, values = strings(model.ACTORS) },
     { name = "category", multi = true, values = strings(model.CATEGORIES) },
+    { name = "scope", multi = true, values = strings(model.SCOPES) },
     { name = "severity", multi = false, values = strings(model.SEVERITIES) },
     { name = "status", multi = false, values = strings(model.OPEN_STATUSES), default = "open" },
   }
@@ -130,7 +134,7 @@ local function heading(f)
 end
 
 ---Fresh form text.
----@param opts? { area?: string, title?: string, summary?: string, areas?: string[], tags?: string, refs?: string, links?: string, after?: string, plan?: string, phase?: string, due?: string, start?: string, ticks?: table<string, string|string[]>, hint?: string, lang?: "de"|"en" }
+---@param opts? { area?: string, title?: string, summary?: string, areas?: string[], tags?: string, other?: string, refs?: string, links?: string, after?: string, plan?: string, phase?: string, due?: string, start?: string, ticks?: table<string, string|string[]>, hint?: string, lang?: "de"|"en" }
 ---  `ticks` overrides the ticked values per field name; `hint` is the second line (the keys of the user's setup);
 ---  `lang` picks the headings of the body sections (default `de`).
 ---@return string[] lines
@@ -165,6 +169,9 @@ function M.template(opts)
     for _, v in ipairs(f.values) do
       lines[#lines + 1] = ("- [%s] %s"):format(ticked[v] and "x" or " ", v)
     end
+    if f.name == "scope" then
+      lines[#lines + 1] = "Other: " .. (opts.other or "")
+    end
   end
   lines[#lines + 1] = ""
   lines[#lines + 1] = "Tags: " .. (opts.tags or "")
@@ -189,6 +196,7 @@ end
 ---@field title string
 ---@field summary string
 ---@field tags string
+---@field other string   # The `Other:` line under the scope list: scope words not ticked, and anything else (it goes to the tags).
 ---@field refs string
 ---@field links string
 ---@field after string   # Task ids, comma separated.
@@ -210,6 +218,7 @@ function M.parse(lines)
     title = "",
     summary = "",
     tags = "",
+    other = "",
     refs = "",
     links = "",
     after = "",
@@ -258,6 +267,7 @@ function M.parse(lines)
           or key == "title"
           or key == "summary"
           or key == "tags"
+          or key == "other"
           or key == "refs"
           or key == "links"
           or key == "after"
@@ -292,6 +302,7 @@ end
 ---@field area string        # The first area named.
 ---@field areas string[]     # Every area named, once each, in the order typed: one task is created in each.
 ---@field opts Tasks.NewOpts
+---@field notes string[]     # Things the form changed on the way, for the user to read (not errors).
 
 ---The area names of the `Area:` line: a comma list, blanks around a name dropped, a name once.
 ---@param text string
@@ -367,6 +378,31 @@ function M.validate(parsed, areas, root, lang)
     end
   end
   local tags, refs = trim(parsed.tags), trim(parsed.refs)
+  -- `Other:` -- a word that is a scope joins the scope ticks; any other word is a tag, and the user is told so
+  local notes = {}
+  do
+    local scope = vim.deepcopy(parsed.ticks.scope or {})
+    local extra = {}
+    for _, word in ipairs(vim.split(trim(parsed.other), "[,%s]+", { trimempty = true })) do
+      if model.is_scope(word) then
+        if not vim.tbl_contains(scope, word) then
+          scope[#scope + 1] = word
+        end
+      elseif not vim.tbl_contains(extra, word) then
+        extra[#extra + 1] = word
+      end
+    end
+    if #scope > 0 then
+      opts.scope = table.concat(scope, ",")
+    end
+    if #extra > 0 then
+      tags = (tags ~= "" and (tags .. ", ") or "") .. table.concat(extra, ", ")
+      notes[#notes + 1] = ("Other: %s %s no scope, added to the tags"):format(
+        table.concat(extra, ", "),
+        #extra == 1 and "is" or "are"
+      )
+    end
+  end
   if tags ~= "" then
     opts.tags = tags
   end
@@ -425,7 +461,7 @@ function M.validate(parsed, areas, root, lang)
   if #errors > 0 then
     return nil, errors
   end
-  return { area = names[1], areas = names, opts = opts }, errors
+  return { area = names[1], areas = names, opts = opts, notes = notes }, errors
 end
 
 ---Flip the choice bullet on line `lnum`. A single-choice field ends with at
