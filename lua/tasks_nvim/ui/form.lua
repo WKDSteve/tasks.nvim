@@ -59,6 +59,8 @@ function M.help_lines(keys)
       key("tick_enter")
     ),
     "                 (one-choice lists keep a single tick, category and scope take several)",
+    "                 (the cascade.nvim checkbox toggle does the flip when it is installed, the form's own otherwise)",
+    "                 the scaffold lines follow kind, category and scope; untick one to drop it",
     ("%s            submit (checked, then created)"):format(key("submit")),
     ("%s / %s        cancel -- nothing is created (asks first when you typed something)"):format(
       key("cancel"),
