@@ -40,6 +40,16 @@ return function(H)
   local beta =
     vim.json.decode((api.call("task", '{"params":{"id":"lib.nvim/beta"}}', { root = root })))
   eq(beta.task.scope, nil)
+
+  -- a hand-written file with an unknown word: the entry names the known ones only (the schema's enum), the word is a finding
+  H.write(
+    root .. "/lib.nvim/ROADMAP/tasks/odd-scope.md",
+    "---\ntitle: Odd\nstatus: open\nscope: [ui, galaxy]\ncreated: 2026-01-01\n---\n\nBody.\n"
+  )
+  local odd =
+    vim.json.decode((api.call("task", '{"params":{"id":"lib.nvim/odd-scope"}}', { root = root })))
+  eq(odd.task.scope, { "ui" })
+  eq(odd.task.valid, false)
   local opts = { root = root, today = "2026-03-01", index = false }
   local made, nerr =
     mutate.new("lib.nvim", vim.tbl_extend("force", opts, { title = "Scoped", scope = "ui,api" }))

@@ -255,8 +255,12 @@ local function task_entry(root, task, node, rank)
     commits = (task.commits and #task.commits > 0) and vim.list_slice(task.commits, 1) or nil,
     tags = vim.list_slice(task.tags or {}, 1),
     category = model.categories(task),
-    -- only when the task names a scope, so a document without one reads as before
-    scope = (task.scope and #task.scope > 0) and vim.list_slice(task.scope, 1) or nil,
+    -- only when the task names a known scope, so a document without one reads as before (an unknown word of a
+    -- hand-written file is the `unknown-scope` finding of `check`, not a value the schema's enum would refuse)
+    scope = (function()
+      local known = vim.tbl_filter(model.is_scope, task.scope or {})
+      return #known > 0 and known or nil
+    end)(),
     blocked_by = vim.list_slice(task.blocked_by or {}, 1),
     after = vim.list_slice(task.after or {}, 1),
     refs = vim.tbl_map(function(r)
