@@ -46,7 +46,7 @@
     "listed": 14,
     "unlisted": 2
   },
-  "digest": "sha256:75c9bb2a323bc060",
+  "digest": "sha256:99976c94500d9d89",
   "engine": {
     "git": "0000000",
     "nvim": "0.0.0",
@@ -160,7 +160,7 @@
       "title": "Old and done"
     }
   ],
-  "rev": "rev:4510e2",
+  "rev": "rev:ab53cd",
   "schema": 1,
   "tasks": [
     {
@@ -552,7 +552,8 @@
       ],
       "category": [],
       "created": "2026-01-01",
-      "etag": "sha256:ced00be7e0993e05",
+      "due": "2026-03-01",
+      "etag": "sha256:9d5ce5ad27c4572c",
       "file": "cascade.nvim/ROADMAP/tasks/iota.md",
       "folder": false,
       "group": "open|-",
@@ -569,6 +570,7 @@
       },
       "refs": [],
       "slug": "iota",
+      "start": "2026-02-01",
       "status": "open",
       "summary": "A summary line for iota.",
       "tags": [],

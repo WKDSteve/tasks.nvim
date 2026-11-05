@@ -246,6 +246,8 @@ local function task_entry(root, task, node, rank)
     updated = model.is_date(task.updated) and task.updated or nil,
     -- the date only; whether it is due is for the reader to say (a digest does not change with the day)
     remind = model.is_date(task.remind) and task.remind or nil,
+    due = model.is_date(task.due) and task.due or nil,
+    start = model.is_date(task.start) and task.start or nil,
     plan = task.plan,
     phase = task.phase,
     done_in = task.done_in,

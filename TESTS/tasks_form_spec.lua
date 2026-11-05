@@ -242,8 +242,11 @@ return function(H)
   eq(in_form, FORM_FIELDS, "the fields of the :Tasks new form")
   local engine_new = {}
   for name in pairs(require("tasks_nvim.ops").NEW_FIELDS) do
-    -- the slug comes from the title; the relations (after, plan, phase) have no field in the form yet
-    if name ~= "slug" and name ~= "after" and name ~= "plan" and name ~= "phase" then
+    -- the slug comes from the title; the relations (after, plan, phase) and the dates (due, start) have no field in
+    -- the form yet
+    local left_out =
+      { slug = true, after = true, plan = true, phase = true, due = true, start = true }
+    if not left_out[name] then
       engine_new[#engine_new + 1] = name
     end
   end

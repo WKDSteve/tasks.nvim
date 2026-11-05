@@ -702,6 +702,14 @@ export interface TaskEntry {
    * A calendar day, YYYY-MM-DD.
    */
   remind?: string;
+  /**
+   * A calendar day, YYYY-MM-DD.
+   */
+  due?: string;
+  /**
+   * A calendar day, YYYY-MM-DD.
+   */
+  start?: string;
   plan?: string;
   phase?: string;
   done_in?: string;

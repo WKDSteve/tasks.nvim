@@ -30,6 +30,8 @@
 ---@field severity? string             # `low|medium|high|critical`, as written (meant for bug/security tasks; may be an unknown word, see `errors`).
 ---@field created? string             # `YYYY-MM-DD`
 ---@field updated? string             # `YYYY-MM-DD`
+---@field due? string                 # `YYYY-MM-DD`, optional: when the task is due (not the reminder, see `remind`).
+---@field start? string               # `YYYY-MM-DD`, optional: the earliest day to begin; `check` refuses a start after the due date.
 ---@field blocked_by string[]         # Task ids (hard edges: the task cannot begin before they are finished). A wikilink is its id; a bare `[[slug]]` that names no single id stays as written (see `link_problems`).
 ---@field after string[]              # Task ids (soft edges: "should come after", never an error), read like `blocked_by`.
 ---@field order? number               # Sort hint inside a stage (a fraction like 2.5 slots a task in between).

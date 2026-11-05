@@ -162,7 +162,7 @@ function M.build(H)
     root,
     "cascade.nvim",
     "iota",
-    { { "blocked_by", "[lib.nvim/alpha]" } },
+    { { "blocked_by", "[lib.nvim/alpha]" }, { "start", "2026-02-01" }, { "due", "2026-03-01" } },
     "open",
     "Iota waits across areas"
   )

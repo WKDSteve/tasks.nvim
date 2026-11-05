@@ -334,7 +334,7 @@ local function check_lang(lang)
 end
 
 ---Frontmatter keys in the order concept section 3 shows them.
----@param meta { title: string, status: string, kind?: string, prio?: integer|string, effort?: string, value?: integer|string, actor?: string, after?: string[], order?: number|string, plan?: string, phase?: string, tags?: string[], category?: string[], severity?: string, refs?: string[], links?: string[], created: string, updated: string }
+---@param meta { title: string, status: string, kind?: string, prio?: integer|string, effort?: string, value?: integer|string, actor?: string, after?: string[], order?: number|string, plan?: string, phase?: string, tags?: string[], category?: string[], severity?: string, due?: string, start?: string, refs?: string[], links?: string[], created: string, updated: string }
 ---@return table[] pairs
 local function meta_pairs(meta)
   local pairs_ = {
@@ -376,6 +376,12 @@ local function meta_pairs(meta)
   end
   if meta.severity then
     pairs_[#pairs_ + 1] = { "severity", meta.severity }
+  end
+  if meta.due then
+    pairs_[#pairs_ + 1] = { "due", meta.due }
+  end
+  if meta.start then
+    pairs_[#pairs_ + 1] = { "start", meta.start }
   end
   pairs_[#pairs_ + 1] = { "created", meta.created }
   pairs_[#pairs_ + 1] = { "updated", meta.updated }
@@ -617,6 +623,8 @@ local SETTABLE = {
   "commits",
   "created",
   "remind",
+  "due",
+  "start",
 }
 
 ---@type string[]
@@ -732,6 +740,11 @@ local function normalize_patch(patch, opts)
     elseif key == "created" then
       if not model.is_date(value) then
         return nil, ("created '%s' is not a date (YYYY-MM-DD)"):format(tostring(value))
+      end
+      result[#result + 1] = { key, value }
+    elseif key == "due" or key == "start" then
+      if not model.is_date(value) then
+        return nil, ("%s '%s' is not a date (YYYY-MM-DD)"):format(key, tostring(value))
       end
       result[#result + 1] = { key, value }
     elseif key == "remind" then
@@ -1067,6 +1080,15 @@ function M.new(area, opts)
   if not lang then
     return nil, langerr
   end
+  for _, key in ipairs({ "due", "start" }) do
+    local v = opts[key]
+    if v ~= nil and not model.is_date(v) then
+      return nil, ("%s '%s' is not a date (YYYY-MM-DD)"):format(key, tostring(v))
+    end
+  end
+  if opts.due ~= nil and opts.start ~= nil and opts.start > opts.due then
+    return nil, ("start %s is after due %s"):format(opts.start, opts.due)
+  end
   local summary
   if opts.summary ~= nil then
     local s, serr = one_line(opts.summary, "summary")
@@ -1116,6 +1138,8 @@ function M.new(area, opts)
       tags = tags,
       category = category,
       severity = opts.severity,
+      due = opts.due,
+      start = opts.start,
       refs = refs,
       links = links,
       rules = rules,
@@ -1355,6 +1379,20 @@ function M.set(id, patch, opts)
   )
   if not pairs_ then
     return nil, perr
+  end
+  -- due and start together: the file as it would be must not start after it is due
+  do
+    local due, start = task.due, task.start
+    for _, p in ipairs(pairs_) do
+      if p[1] == "due" then
+        due = p[2] ~= M.REMOVE and p[2] or nil
+      elseif p[1] == "start" then
+        start = p[2] ~= M.REMOVE and p[2] or nil
+      end
+    end
+    if model.is_date(due) and model.is_date(start) and start > due then
+      return nil, ("start %s is after due %s"):format(start, due)
+    end
   end
   local mode = wikilinks.mode(opts)
   ---@param cur string

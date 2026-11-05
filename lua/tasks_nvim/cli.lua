@@ -103,7 +103,7 @@ commands:
   migrate-actor [<area>] [--write]        propose actor=me for tasks that wait for you (status decision, tag
                                           needs-user) and leave every other task EMPTY; dry run unless --write
   new <area>[,<area>...] <title> [--kind=k] [--prio=1..3] [--effort=XS..XL|0.5d] [--value=1..5] [--actor=cdx|me|pair] [--after=id,id] [--order=2.5] [--plan=id] [--phase=word] [--tags=a,b]
-       [--category=c,d] [--severity=low|medium|high|critical] [--refs=path,repo@sha] [--links=https://...,...]
+       [--category=c,d] [--severity=low|medium|high|critical] [--due=YYYY-MM-DD] [--start=YYYY-MM-DD] [--refs=path,repo@sha] [--links=https://...,...]
        [--summary=text] [--slug=slug] [--status=s]
        [--lang=de|en] [--folder]             create a task file (--lang: body headings;
                                                --folder: a folder task that can hold assets)
@@ -302,6 +302,8 @@ local SPECS = {
       "phase",
       "refs",
       "links",
+      "due",
+      "start",
       "lang",
       "summary",
       "slug",
@@ -1221,6 +1223,8 @@ function commands.new(ctx)
     phase = opt.phase --[[@as string|nil]],
     refs = opt.refs --[[@as string|nil]],
     web_links = opt.links --[[@as string|nil]],
+    due = opt.due --[[@as string|nil]],
+    start = opt.start --[[@as string|nil]],
     lang = opt.lang --[[@as "de"|"en"|nil]],
     summary = opt.summary --[[@as string|nil]],
     slug = opt.slug --[[@as string|nil]],

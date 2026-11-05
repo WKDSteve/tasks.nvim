@@ -389,6 +389,14 @@
           "$ref": "#/$defs/Date",
           "description": "When to look at the task again (a reminder). The date only: whether it is due is for the reader to say, so that a digest does not change with the day."
         },
+        "due": {
+          "$ref": "#/$defs/Date",
+          "description": "When the task is due (optional). Not the reminder: `remind` brings a task back, `due` is a deadline. The date only; whether it is overdue is for the reader to say."
+        },
+        "start": {
+          "$ref": "#/$defs/Date",
+          "description": "The earliest day to begin (optional). Never after `due`."
+        },
         "plan": {
           "type": "string"
         },

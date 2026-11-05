@@ -280,7 +280,7 @@ opens with the same title and ref filled in.
 
 Changes frontmatter of an *open* task and sets `updated` -- but only when something really
 changed (an identical value rewrites nothing). Settable: `title status kind prio effort tags
-category severity value actor summary blocked_by after order plan phase refs rules done_in commits created remind`. A value may contain spaces
+category severity value actor summary blocked_by after order plan phase refs rules done_in commits created remind due start`. A value may contain spaces
 (`title=Fix the thing status=doing`: a word that does not start with a known `key=`
 continues the value before it); an empty value removes the key (`kind=`). `status=done` is
 refused: finishing moves the file, see `task done`. A *finished* task takes `remind=` only (a date, or `+7d` / `+2w` from today;

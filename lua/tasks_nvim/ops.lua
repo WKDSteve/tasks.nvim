@@ -14,7 +14,7 @@
 ---    cannot both win; a change of the relations (`blocked_by`, `after`, `plan`, `phase`) is judged first
 ---    (`tasks_nvim.edges`)
 ---  - `new` { area, title, fields?, body? }: create a task; `body` (text, at most 20000 characters) replaces the template
----    sections of the file; `fields` are the keys (kind, prio, effort, tags, category, severity, value, actor, summary,
+---    sections of the file; `fields` are the keys (kind, prio, effort, tags, category, severity, value, actor, due, start, summary,
 ---    refs, links, status, slug, after, plan, phase); `after`, `plan` and `phase` are judged as `set` judges them
 ---    (`tasks_nvim.edges`: a target that exists nowhere, a plan that is no plan file, a phase not in its `phase_order`)
 ---  - `reorder` { id, after?, before?, group?, if_match? }: move a task inside its group (`batch.reorder`)
@@ -219,6 +219,8 @@ local NEW_FIELDS = {
   after = true,
   plan = true,
   phase = true,
+  due = true,
+  start = true,
 }
 M.NEW_FIELDS = NEW_FIELDS
 

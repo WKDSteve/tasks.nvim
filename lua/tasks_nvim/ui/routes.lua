@@ -591,6 +591,8 @@ local FIELD_DESC = {
   effort = "Size: XS to XL, or days such as 0.5d",
   tags = "Free labels, comma-separated; filter with --tag",
   links = "Web addresses (http or https), comma-separated; paths go in refs",
+  due = "Deadline as YYYY-MM-DD (optional); the reminder is remind",
+  start = "Earliest day to begin as YYYY-MM-DD (optional); never after due",
   category = "Concerns the task serves; several allowed, comma list",
   severity = "How serious a bug or security task is",
   value = "Expected benefit from 1 (little) to 5 (a lot)",
@@ -629,6 +631,8 @@ local function set_kv()
     commits = "Every commit made for the task, repo@sha each (replaces the list)",
     created = "Creation date, YYYY-MM-DD",
     remind = "Look at the task again on this date (YYYY-MM-DD, or +7d / +2w from today)",
+    due = FIELD_DESC.due,
+    start = FIELD_DESC.start,
   })
   local out = {}
   for _, key in ipairs(mutate.SETTABLE) do
@@ -742,6 +746,8 @@ local function nested_routes()
         { key = "order", type = "STRING", desc = FIELD_DESC.order },
         { key = "plan", type = "TASK_PLAN", desc = FIELD_DESC.plan },
         { key = "phase", type = "STRING", desc = FIELD_DESC.phase },
+        { key = "due", type = "STRING", desc = FIELD_DESC.due },
+        { key = "start", type = "STRING", desc = FIELD_DESC.start },
         {
           key = "status",
           type = "STRING",

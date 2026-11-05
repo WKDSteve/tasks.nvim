@@ -1462,6 +1462,8 @@ function M.task_new(ctx)
       order = values.order,
       plan = values.plan,
       phase = values.phase,
+      due = ctx.kv.due,
+      start = ctx.kv.start,
       status = values.status,
       web_links = values.links,
       -- a list: a string would be split at the commas of a file name (`a,b.lua`)

@@ -720,7 +720,7 @@ function M.parse_text(text, ctx)
       end
     end
 
-    for _, field in ipairs({ "created", "updated", "remind" }) do
+    for _, field in ipairs({ "created", "updated", "remind", "due", "start" }) do
       local date = as_text(meta[field], field, bad)
       if date then
         task[field] = date
@@ -728,6 +728,9 @@ function M.parse_text(text, ctx)
           bad("bad-date", ("%s '%s' is not a date (YYYY-MM-DD)"):format(field, date))
         end
       end
+    end
+    if M.is_date(task.start) and M.is_date(task.due) and task.start > task.due then
+      bad("start-after-due", ("start %s is after due %s"):format(task.start, task.due))
     end
 
     -- A reference is an id or an Obsidian wikilink (`tasks_nvim.wikilinks`): `[[<area>/<slug>]]` is the id here, a
