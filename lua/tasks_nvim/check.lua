@@ -12,6 +12,7 @@
 ---  - `unknown-status`, `unknown-kind`, `unknown-category`, `unknown-severity`,
 ---    `bad-prio`, `bad-effort`, `bad-date`, `bad-link` (a `links` entry that is no http(s) address)
 ---  - `start-after-due`: the `start` date is later than the `due` date
+---  - `overdue` (warning): an open task (not `parked`) whose `due` date is before today (`opts.today`)
 ---  - `severity-without-bug-or-security` (warning): `severity` on a task that is
 ---    neither `kind: bug` nor in the bug/security category
 ---  - `slug`: the filename is not a kebab-case slug, or the file is nested
@@ -71,6 +72,7 @@ local M = {}
 ---@class Tasks.CheckOpts
 ---@field root? string
 ---@field area? string      # Check one area (blockers are still resolved vault-wide).
+---@field today? string     # `YYYY-MM-DD`: the day `overdue` is judged against (default: today).
 
 ---@class Tasks.CheckResult
 ---@field findings Tasks.Finding[]
@@ -684,6 +686,15 @@ function M.run(opts)
   end
 
   plan_findings(findings, open_ids, names, scan_opts, is_finished)
+  -- an open task past its due date: a warning, never an error (a parked task waits on purpose)
+  local today = opts.today or model.today()
+  for _, name in ipairs(names) do
+    for _, t in ipairs(by_area[name] and by_area[name].tasks or {}) do
+      if t.status ~= "parked" and model.is_date(t.due) and t.due < today then
+        add(findings, "warn", "overdue", t, ("due %s is before today (%s)"):format(t.due, today))
+      end
+    end
+  end
   plan_file_findings(findings, open_ids, names, scan_opts, is_finished)
   view_findings(findings, root, names)
   if not opts.area then

@@ -1359,7 +1359,7 @@ function M.check(params, opts)
       return nil,
         { code = "not_found", message = "unknown area: " .. params.area, retryable = false }
     end
-    local result, cerr = check.run({ root = view.root, area = params.area })
+    local result, cerr = check.run({ root = view.root, area = params.area, today = opts.today })
     if not result then
       return nil, cerr
     end

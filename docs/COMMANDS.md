@@ -435,7 +435,7 @@ all see it), `--target` the task that means "done". When the last member task is
 
 What to start next: the best **ready** task and why, with a small dialog (`Not now` first, `Open <id>`, `Show another`).
 The order is fixed: freed by the task you just finished, then the same area, then the vault; `doing` before `open`
-before `decision`; the effective prio; the return on effort; the smaller effort; the id. Tasks written `cdx` are not
+before `decision`; the effective prio; the earlier `due` date (undated after dated); the return on effort; the smaller effort; the id. Tasks written `cdx` are not
 "your next task": they are listed apart ("an AI session could take ..."); `--actor=cdx` asks for that queue instead.
 When there is nothing, the answer says which kind of nothing: **never** "all done" while work is only waiting
 ("Nothing can be started. Still open: 4 for you, 6 blocked, 3 parked.").

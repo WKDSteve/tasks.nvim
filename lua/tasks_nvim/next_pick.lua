@@ -11,8 +11,9 @@
 ---  2. the same area, then the whole vault   (a `plan:` scope slots in between once plan files exist)
 ---  3. status: `doing`, then `open`, then `decision`
 ---  4. effective priority (`plan`: a task that blocks a better one rates as that one)
----  5. return on effort (`model.roi`, highest first; a task without a figure after those with one)
----  6. effort ascending, then the id
+---  5. the earlier `due` date (a task without one after those with one): a tie-breaker, never above the rank
+---  6. return on effort (`model.roi`, highest first; a task without a figure after those with one)
+---  7. effort ascending, then the id
 ---
 --- Who it is for: without `opts.actor` the answer is for the human, so tasks written `cdx` are not offered as "your
 --- next task" but listed apart (`cdx`, "an AI session could take these"). `opts.actor = "cdx"` (or `me`, `pair`,
@@ -173,6 +174,14 @@ function M.pick(opts)
     local pb = built.nodes[b.id].eff_prio or b.prio or 99
     if pa ~= pb then
       return pa < pb
+    end
+    local da = model.is_date(a.due) and a.due or nil
+    local db = model.is_date(b.due) and b.due or nil
+    if da ~= db then
+      if da and db then
+        return da < db
+      end
+      return da ~= nil
     end
     local roa, rob = model.roi(a), model.roi(b)
     if roa ~= rob then

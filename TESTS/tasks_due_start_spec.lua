@@ -209,6 +209,65 @@ return function(H)
   ok(enum ~= nil, "the definition of tasks.order is found in the schema")
   ok(vim.tbl_contains(enum or {}, "due"), "and its sort enum has due")
 
+  -- ── check: an open task past its due date is a warning, a parked one is not ──
+  H.write(
+    root .. "/lib.nvim/ROADMAP/tasks/parked-late.md",
+    table.concat({
+      "---",
+      "title: Parked late",
+      "status: parked",
+      "due: 2026-01-05",
+      "created: 2026-01-01",
+      "updated: 2026-01-01",
+      "---",
+      "",
+      "Body.",
+      "",
+    }, "\n")
+  )
+  local function overdue_ids(today)
+    local res = assert(require("tasks_nvim.check").run({ root = root, today = today }))
+    local found = {}
+    for _, f in ipairs(res.findings) do
+      if f.code == "overdue" then
+        ok(f.severity == "warn", "a warning, not an error")
+        found[#found + 1] = f.id
+      end
+    end
+    table.sort(found)
+    return found
+  end
+  eq(overdue_ids("2026-01-02"), {}, "nothing is past its due date yet")
+  -- iota: 2026-03-01, with-dates: 2026-09-01, handmade: 2026-06-01; parked-late is parked
+  eq(overdue_ids("2026-07-01"), { "cascade.nvim/iota", "lib.nvim/handmade" })
+  eq(overdue_ids("2026-03-01"), {}, "the day itself is not overdue")
+
+  -- ── next: the earlier due date breaks a tie, never outranks the priority ──
+  local function T(slug, front)
+    local t = model.parse_text(
+      "---\ntitle: " .. slug .. "\nstatus: open\n" .. front .. "created: 2026-01-01\n---\n\nBody.\n",
+      { path = "/v/a/ROADMAP/tasks/" .. slug .. ".md", area = "a", slug = slug }
+    )
+    t.id = "a/" .. slug
+    return t
+  end
+  local next_pick = require("tasks_nvim.next_pick")
+  local tied = next_pick.pick({
+    tasks = {
+      T("undated", "prio: 2\n"),
+      T("later", "prio: 2\ndue: 2026-09-01\n"),
+      T("sooner", "prio: 2\ndue: 2026-04-01\n"),
+    },
+    area = "a",
+  })
+  eq(tied.task.id, "a/sooner", "the earliest due date wins among equals")
+  eq(tied.alternatives[1].id, "a/later", "then the later one, then the undated")
+  local urgent = next_pick.pick({
+    tasks = { T("urgent", "prio: 1\n"), T("dated", "prio: 2\ndue: 2026-02-01\n") },
+    area = "a",
+  })
+  eq(urgent.task.id, "a/urgent", "a due date does not outrank the priority")
+
   -- ── the ops door: new with fields, set with a patch ───────────────────
   local function ops(list)
     local raw =
