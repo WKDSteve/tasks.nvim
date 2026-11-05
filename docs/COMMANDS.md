@@ -207,7 +207,7 @@ lists whose values come from the engine (`tasks.model`); `category` takes severa
 others one (ticking a bullet clears its siblings; leaving a list empty means "not set", and
 `kind` / `status` then get the engine defaults `task` / `open`). `Area:` and `Title:` are
 required; `Tags:`, `Refs:` and `Links:` are comma separated (`Links:` takes web addresses, `http://` or `https://`;
-anything else is reported; `Refs:` takes paths and commits; `:Tasks new links=https://...` pre-fills it). `Area:` may name several areas (`lib.nvim, cascade.nvim`): one
+anything else is reported; `Refs:` takes paths and commits; `:Tasks new links=https://...` pre-fills it). `After:` (task ids, comma separated), `Plan:` (a plan id), `Phase:` (a stage of that plan), `Due:` and `Start:` (`YYYY-MM-DD`, start never after due) are plain lines too; an id that exists nowhere, a plan that is none or a phase the plan does not name is refused by the engine when the form is submitted (the same words as `set`), a date that is none by the form itself; `:Tasks new after=... plan=... phase=... due=... start=...` pre-fills them. `Area:` may name several areas (`lib.nvim, cascade.nvim`): one
 task with the same text is created in each (every area is checked first; a bad one creates nothing). `Summary:` is the
 one line that ends up in the index. The sections `## Kontext`, `## Akzeptanz` and `## Notizen` at the end are free
 text and become the body of the task (an `Akzeptanz` line without a checkbox becomes `- [ ] line`; a section left

@@ -221,13 +221,18 @@ return function(H)
   -- added to the engine's `new` has to be in both forms, or in the list of what a form leaves out on purpose.
   local FORM_FIELDS = {
     "actor",
+    "after",
     "category",
+    "due",
     "effort",
     "kind",
     "links",
+    "phase",
+    "plan",
     "prio",
     "refs",
     "severity",
+    "start",
     "status",
     "summary",
     "tags",
@@ -237,16 +242,16 @@ return function(H)
   for _, f in ipairs(form.fields()) do
     in_form[#in_form + 1] = f.name
   end
-  vim.list_extend(in_form, { "tags", "refs", "links", "summary" })
+  vim.list_extend(
+    in_form,
+    { "tags", "refs", "links", "summary", "after", "plan", "phase", "due", "start" }
+  )
   table.sort(in_form)
   eq(in_form, FORM_FIELDS, "the fields of the :Tasks new form")
   local engine_new = {}
   for name in pairs(require("tasks_nvim.ops").NEW_FIELDS) do
-    -- the slug comes from the title; the relations (after, plan, phase) and the dates (due, start) have no field in
-    -- the form yet
-    local left_out =
-      { slug = true, after = true, plan = true, phase = true, due = true, start = true }
-    if not left_out[name] then
+    -- the slug comes from the title
+    if name ~= "slug" then
       engine_new[#engine_new + 1] = name
     end
   end
@@ -256,6 +261,48 @@ return function(H)
     FORM_FIELDS,
     "a field of `new` that no form offers (add it to both forms, or leave it out here)"
   )
+
+  -- ── After, Plan, Phase, Due, Start ────────────────────────────────────────
+  local rel = form.template({
+    area = "ALL",
+    title = "T",
+    after = "a/one, a/two",
+    plan = "a/the-plan",
+    phase = "build",
+    due = "2026-09-01",
+    start = "2026-08-01",
+  })
+  ok(find(rel, "After: a/one, a/two"), "prefilled")
+  ok(find(rel, "Due: 2026-09-01"), "prefilled")
+  local rv = assert(form.validate(form.parse(rel), { "ALL" }))
+  eq(rv.opts.after, "a/one, a/two")
+  eq(rv.opts.plan, "a/the-plan")
+  eq(rv.opts.phase, "build")
+  eq(rv.opts.due, "2026-09-01")
+  eq(rv.opts.start, "2026-08-01")
+  local blank =
+    assert(form.validate(form.parse(form.template({ area = "ALL", title = "T" })), { "ALL" }))
+  ok(
+    blank.opts.after == nil
+      and blank.opts.plan == nil
+      and blank.opts.phase == nil
+      and blank.opts.due == nil
+      and blank.opts.start == nil,
+    "an empty line adds nothing"
+  )
+  local _, bad_date =
+    form.validate(form.parse(form.template({ area = "ALL", title = "T", due = "soon" })), { "ALL" })
+  ok(
+    find(bad_date, "Due: 'soon' is not a date (YYYY-MM-DD)"),
+    "a date that is none is named: " .. vim.inspect(bad_date)
+  )
+  local _, backwards = form.validate(
+    form.parse(
+      form.template({ area = "ALL", title = "T", due = "2026-08-01", start = "2026-09-01" })
+    ),
+    { "ALL" }
+  )
+  ok(find(backwards, "Start 2026-09-01 is after Due 2026-08-01"), "start after due is refused")
 
   -- ── Links: web addresses only, apart from Refs ─────────────────────────────
   local lk = form.template({ area = "ALL", title = "T", links = "https://a.org/x#y, http://b.io" })

@@ -1233,6 +1233,11 @@ function M.task_new_form(given)
     tags = given.tags,
     refs = given.refs,
     links = given.links,
+    after = given.after,
+    plan = given.plan,
+    phase = given.phase,
+    due = given.due,
+    start = given.start,
     ticks = ticks,
     on_cancel = function()
       notify.info("task new cancelled")
@@ -1253,9 +1258,9 @@ function M.task_new_form(given)
           end
           local with_screenshot = picked == 3
           local with_assets = picked == 2 or with_screenshot
-          -- after=/order=/plan=/phase= are no fields of the form: they go on as they were typed on the command line
-          local carried =
-            { after = given.after, order = given.order, plan = given.plan, phase = given.phase }
+          -- order= is no field of the form: it goes on as it was typed on the command line (after, plan, phase, due
+          -- and start are in the form, typed there or put in by the command line)
+          local carried = { order = given.order }
           local opts = vim.tbl_extend("force", carried, values.opts, { folder = with_assets })
           -- The range ref is typed into the form as text, and a text field cannot hold a comma (`a,b.lua:5`): when the
           -- user left the line alone, the ref goes on as the list it is.
@@ -1404,11 +1409,13 @@ function M.task_new(ctx)
       "severity",
       "status",
       "mode",
-      -- not fields of the form: carried through to `mutate.new` as they were typed
       "after",
-      "order",
       "plan",
       "phase",
+      "due",
+      "start",
+      -- not a field of the form: carried through to `mutate.new` as it was typed
+      "order",
     }) do
       if ctx.kv[key] ~= nil and ctx.kv[key] ~= "" then
         given[key] = ctx.kv[key]

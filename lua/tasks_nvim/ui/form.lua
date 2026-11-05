@@ -277,6 +277,11 @@ end
 ---@field tags? string
 ---@field refs? string
 ---@field links? string  # Web addresses, comma separated.
+---@field after? string  # Task ids, comma separated.
+---@field plan? string
+---@field phase? string
+---@field due? string    # `YYYY-MM-DD`.
+---@field start? string  # `YYYY-MM-DD`.
 ---@field lang? "de"|"en"  # Headings of the body sections (default `de`).
 ---@field mode? Tasks.FormMode  # Default: `setup({ form = { mode } })`, `float`.
 ---@field ticks? table<string, string|string[]>
@@ -319,6 +324,11 @@ function M.open(opts)
       tags = opts.tags,
       refs = opts.refs,
       links = opts.links,
+      after = opts.after,
+      plan = opts.plan,
+      phase = opts.phase,
+      due = opts.due,
+      start = opts.start,
       ticks = opts.ticks,
       hint = M.key_hint(form_keys),
     })

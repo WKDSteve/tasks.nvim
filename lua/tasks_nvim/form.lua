@@ -130,7 +130,7 @@ local function heading(f)
 end
 
 ---Fresh form text.
----@param opts? { area?: string, title?: string, summary?: string, areas?: string[], tags?: string, refs?: string, links?: string, ticks?: table<string, string|string[]>, hint?: string, lang?: "de"|"en" }
+---@param opts? { area?: string, title?: string, summary?: string, areas?: string[], tags?: string, refs?: string, links?: string, after?: string, plan?: string, phase?: string, due?: string, start?: string, ticks?: table<string, string|string[]>, hint?: string, lang?: "de"|"en" }
 ---  `ticks` overrides the ticked values per field name; `hint` is the second line (the keys of the user's setup);
 ---  `lang` picks the headings of the body sections (default `de`).
 ---@return string[] lines
@@ -170,6 +170,11 @@ function M.template(opts)
   lines[#lines + 1] = "Tags: " .. (opts.tags or "")
   lines[#lines + 1] = "Refs: " .. (opts.refs or "")
   lines[#lines + 1] = "Links: " .. (opts.links or "")
+  lines[#lines + 1] = "After: " .. (opts.after or "")
+  lines[#lines + 1] = "Plan: " .. (opts.plan or "")
+  lines[#lines + 1] = "Phase: " .. (opts.phase or "")
+  lines[#lines + 1] = "Due: " .. (opts.due or "")
+  lines[#lines + 1] = "Start: " .. (opts.start or "")
   local headings = SECTION_HEADINGS[opts.lang or "de"] or SECTION_HEADINGS.de
   for _, h in ipairs(headings) do
     lines[#lines + 1] = ""
@@ -186,6 +191,11 @@ end
 ---@field tags string
 ---@field refs string
 ---@field links string
+---@field after string   # Task ids, comma separated.
+---@field plan string
+---@field phase string
+---@field due string     # `YYYY-MM-DD` or empty.
+---@field start string   # `YYYY-MM-DD` or empty.
 ---@field sections table<string, string>  # Free text per body section (`context`, `acceptance`, `notes`).
 ---@field ticks table<string, string[]>  # Ticked values per choice field, in form order.
 ---@field unknown string[]               # Ticked choices that are not in the value set.
@@ -202,6 +212,11 @@ function M.parse(lines)
     tags = "",
     refs = "",
     links = "",
+    after = "",
+    plan = "",
+    phase = "",
+    due = "",
+    start = "",
     sections = {},
     ticks = {},
     unknown = {},
@@ -245,6 +260,11 @@ function M.parse(lines)
           or key == "tags"
           or key == "refs"
           or key == "links"
+          or key == "after"
+          or key == "plan"
+          or key == "phase"
+          or key == "due"
+          or key == "start"
         then
           out[key] = value
           current = nil
@@ -363,6 +383,29 @@ function M.validate(parsed, areas, root, lang)
       end
     end
     opts.web_links = links
+  end
+  -- the relations are judged by the engine (`after-dangling`, `plan-unknown`, `plan-phase`), the dates here too
+  for _, key in ipairs({ "after", "plan", "phase" }) do
+    local text = trim(parsed[key])
+    if text ~= "" then
+      opts[key] = text
+    end
+  end
+  for _, key in ipairs({ "due", "start" }) do
+    local text = trim(parsed[key])
+    if text ~= "" then
+      if model.is_date(text) then
+        opts[key] = text
+      else
+        errors[#errors + 1] = ("%s: '%s' is not a date (YYYY-MM-DD)"):format(
+          key == "due" and "Due" or "Start",
+          text
+        )
+      end
+    end
+  end
+  if opts.due and opts.start and opts.start > opts.due then
+    errors[#errors + 1] = ("Start %s is after Due %s"):format(opts.start, opts.due)
   end
   local summary = trim(parsed.summary)
   if summary ~= "" then

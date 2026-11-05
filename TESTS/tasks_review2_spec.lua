@@ -415,7 +415,7 @@ return function(H)
     eq(node["cascade.nvim/c1"].same_file, {}, "another repo's README is another file")
   end
 
-  -- ── `:Tasks new`: the keys the form has no field for go on to the task; a range ref is one ref ──
+  -- ── `:Tasks new`: plan= and phase= pre-fill the form, the key it has no line for (order=) goes on; a range ref is one ref ──
   do
     local cmd = require("tasks_nvim.ui.cmd")
     local confirm = require("tasks_nvim.ui.confirm")
@@ -440,7 +440,13 @@ return function(H)
     })
     cmd.form_open = nil
     assert(captured, "the form was opened")
-    captured.on_submit({ area = "lib.nvim", opts = { title = "Via the form" } }, nil)
+    eq(captured.plan, "lib.nvim/rel", "plan= pre-fills the form (it has a line for it)")
+    eq(captured.phase, "build", "phase= too")
+    -- what the form holds comes back in the values; order= has no line and is carried from the command line
+    captured.on_submit({
+      area = "lib.nvim",
+      opts = { title = "Via the form", plan = "lib.nvim/rel", phase = "build" },
+    }, nil)
     local made = assert(scan.find("lib.nvim/via-the-form", { root = root }))
     eq(made.plan, "lib.nvim/rel", "plan= reached the task")
     eq(made.phase, "build", "phase= too")
