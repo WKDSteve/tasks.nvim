@@ -213,7 +213,7 @@ export type List = Head & {
 export type Order = Head & {
   kind: "tasks.order";
   digest: Digest;
-  sort: "default" | "prio-effort" | "severity" | "frecency" | "roi";
+  sort: "default" | "prio-effort" | "severity" | "frecency" | "roi" | "due";
   total: number;
   ids: string[];
   incomplete: string[];

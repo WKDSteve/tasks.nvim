@@ -1380,17 +1380,18 @@ function M.set(id, patch, opts)
   if not pairs_ then
     return nil, perr
   end
-  -- due and start together: the file as it would be must not start after it is due
+  -- due and start together: a patch that touches one of them must leave a file that does not start after it is due.
+  -- A patch that touches neither is not judged on them: a file that is wrong already (written by hand) stays editable.
   do
-    local due, start = task.due, task.start
+    local due, start, touched = task.due, task.start, false
     for _, p in ipairs(pairs_) do
       if p[1] == "due" then
-        due = p[2] ~= M.REMOVE and p[2] or nil
+        due, touched = p[2] ~= M.REMOVE and p[2] or nil, true
       elseif p[1] == "start" then
-        start = p[2] ~= M.REMOVE and p[2] or nil
+        start, touched = p[2] ~= M.REMOVE and p[2] or nil, true
       end
     end
-    if model.is_date(due) and model.is_date(start) and start > due then
+    if touched and model.is_date(due) and model.is_date(start) and start > due then
       return nil, ("start %s is after due %s"):format(start, due)
     end
   end

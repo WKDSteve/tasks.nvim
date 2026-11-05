@@ -11,6 +11,7 @@
 ---    `status-missing`, `field-type`: the file cannot be read as a task
 ---  - `unknown-status`, `unknown-kind`, `unknown-category`, `unknown-severity`,
 ---    `bad-prio`, `bad-effort`, `bad-date`, `bad-link` (a `links` entry that is no http(s) address)
+---  - `start-after-due`: the `start` date is later than the `due` date
 ---  - `severity-without-bug-or-security` (warning): `severity` on a task that is
 ---    neither `kind: bug` nor in the bug/security category
 ---  - `slug`: the filename is not a kebab-case slug, or the file is nested

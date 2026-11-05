@@ -59,6 +59,34 @@ return function(H)
   ok(mutate.set("lib.nvim/alpha", { due = mutate.REMOVE }, opts))
   ok(not H.read(file):find("due:", 1, true), "taken away")
 
+  -- a file that starts after it is due (written by hand) stays editable by a patch that leaves the dates alone
+  H.write(
+    root .. "/lib.nvim/ROADMAP/tasks/handmade.md",
+    table.concat({
+      "---",
+      "title: Handmade",
+      "status: open",
+      "start: 2026-05-01",
+      "due: 2026-04-01",
+      "created: 2026-01-01",
+      "updated: 2026-01-01",
+      "---",
+      "",
+      "Body.",
+      "",
+    }, "\n")
+  )
+  ok(
+    mutate.set("lib.nvim/handmade", { prio = 2 }, opts),
+    "an unrelated patch is not refused for the dates"
+  )
+  local _, still = mutate.set("lib.nvim/handmade", { start = "2026-05-02" }, opts)
+  has(still, "after due", "a patch that touches a date is judged on the result")
+  ok(
+    mutate.set("lib.nvim/handmade", { due = "2026-06-01" }, opts),
+    "and the date that fixes it is accepted"
+  )
+
   -- ── new ────────────────────────────────────────────────────────────────
   local n, nerr = mutate.new("lib.nvim", {
     title = "With dates",
@@ -159,6 +187,27 @@ return function(H)
   eq(doc.task.start, "2026-08-01")
   local plain = call("task", { id = "lib.nvim/beta" })
   ok(plain.task.due == nil and plain.task.start == nil, "a task without the fields reads as before")
+
+  -- the order method names its sort word in the document, and the schema lists `due` for it
+  local ordered = call("order", { sort = "due" })
+  eq(ordered.sort, "due")
+  eq(ordered.ids[1], "cascade.nvim/iota", "the earliest due date (2026-03-01) first")
+  local function at(id)
+    return vim.fn.index(ordered.ids, id)
+  end
+  ok(at(n.id) >= 0 and at("lib.nvim/beta") >= 0, "both are in the order")
+  ok(at(n.id) < at("lib.nvim/beta"), "a task with a due date comes before an undated one")
+  local schema =
+    vim.json.decode(H.read(here .. "/../schemas/tasks-export/1/tasks-export.schema.json"))
+  local enum
+  for _, def in pairs(schema["$defs"]) do
+    local props = type(def) == "table" and def.properties or nil
+    if props and props.kind and props.kind.const == "tasks.order" then
+      enum = props.sort and props.sort.enum
+    end
+  end
+  ok(enum ~= nil, "the definition of tasks.order is found in the schema")
+  ok(vim.tbl_contains(enum or {}, "due"), "and its sort enum has due")
 
   -- ── the ops door: new with fields, set with a patch ───────────────────
   local function ops(list)

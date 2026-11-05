@@ -1203,7 +1203,7 @@
           "$ref": "#/$defs/Digest"
         },
         "sort": {
-          "enum": ["default", "prio-effort", "severity", "frecency", "roi"]
+          "enum": ["default", "prio-effort", "severity", "frecency", "roi", "due"]
         },
         "total": {
           "type": "integer",
