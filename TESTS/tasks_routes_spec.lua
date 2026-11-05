@@ -1434,8 +1434,8 @@ return function(H)
       ok(line_of("- [x] low") and line_of("- [ ] high"), "severity keeps one tick")
       eq(
         select(2, buf_text():gsub("%- %[x%] ", "")),
-        6,
-        "kind, effort, 2 categories, severity, status"
+        12,
+        "kind, effort, 2 categories, severity, status, and the 6 scaffold lines of bug and security"
       )
 
       -- submit with the required fields empty: errors in the buffer, nothing lost, nothing created

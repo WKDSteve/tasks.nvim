@@ -45,6 +45,7 @@ local M = {}
 ---@field multi boolean      # Several ticks allowed.
 ---@field values string[]    # Choices, in display order.
 ---@field default? string    # Ticked in a fresh form.
+---@field free? boolean       # Any bullet text is a value (the scaffold block).
 
 ---@param list any[]
 ---@return string[]
@@ -73,9 +74,17 @@ function M.fields()
   }
 end
 
+---The acceptance scaffold block (`model.scaffold`): ticked lines that end up in the Akzeptanz section. Not a
+---field of `new` (so it is not in `fields()`): its bullets are free text, derived from kind, category and scope.
+---@type Tasks.FormField
+local SCAFFOLD_FIELD = { name = "scaffold", multi = true, values = {}, free = true }
+
 ---@param name string
 ---@return Tasks.FormField|nil
 local function field_by_name(name)
+  if name == "scaffold" then
+    return SCAFFOLD_FIELD
+  end
   for _, f in ipairs(M.fields()) do
     if f.name == name then
       return f
@@ -128,9 +137,32 @@ end
 
 ---Heading line of a choice field, e.g. `## kind (one)`.
 ---@param f Tasks.FormField
+---@param sel? { kind?: string, category?: string[] }  # With it, `severity` says when it does not fit.
 ---@return string
-local function heading(f)
+local function heading(f, sel)
+  if f.name == "severity" and sel and not model.severity_applies(sel) then
+    return "## severity (one, only for bug and security)"
+  end
   return ("## %s (%s)"):format(f.name, f.multi and "several" or "one")
+end
+
+---The scaffold block: its heading and one bullet per line. `off` holds the texts the person unticked.
+---@param rows { id: string, text: string }[]
+---@param off? table<string, boolean>
+---@return string[]
+local function scaffold_block(rows, off)
+  local out = { "## scaffold (several)" }
+  for _, row in ipairs(rows) do
+    out[#out + 1] = ("- [%s] %s"):format((off and off[row.text]) and " " or "x", row.text)
+  end
+  return out
+end
+
+---The choice (kind, category, scope) the ticks of a form stand for.
+---@param ticks table<string, string[]>
+---@return { kind?: string, category: string[], scope: string[] }
+local function selection(ticks)
+  return { kind = (ticks.kind or {})[1], category = ticks.category or {}, scope = ticks.scope or {} }
 end
 
 ---Fresh form text.
@@ -151,21 +183,32 @@ function M.template(opts)
   lines[#lines + 1] = "Area: " .. (opts.area or "")
   lines[#lines + 1] = "Title: " .. (opts.title or "")
   lines[#lines + 1] = "Summary: " .. (opts.summary or "")
+  -- what is ticked per field: the ticks given, else the default (kind: task, status: open)
+  ---@type table<string, table<string, boolean>>
+  local picked = {}
+  ---@type table<string, string[]>
+  local picked_list = {}
   for _, f in ipairs(M.fields()) do
-    lines[#lines + 1] = ""
-    lines[#lines + 1] = heading(f)
-    local ticked = {}
+    local ticked, list = {}, {}
     local want = opts.ticks and opts.ticks[f.name]
     if want == nil then
       want = f.default
     end
     if type(want) == "string" then
-      ticked[want] = true
+      ticked[want], list[1] = true, want
     elseif type(want) == "table" then
       for _, v in ipairs(want) do
         ticked[tostring(v)] = true
+        list[#list + 1] = tostring(v)
       end
     end
+    picked[f.name], picked_list[f.name] = ticked, list
+  end
+  local sel = selection(picked_list)
+  for _, f in ipairs(M.fields()) do
+    lines[#lines + 1] = ""
+    lines[#lines + 1] = heading(f, sel)
+    local ticked = picked[f.name]
     for _, v in ipairs(f.values) do
       lines[#lines + 1] = ("- [%s] %s"):format(ticked[v] and "x" or " ", v)
     end
@@ -173,6 +216,9 @@ function M.template(opts)
       lines[#lines + 1] = "Other: " .. (opts.other or "")
     end
   end
+  -- the acceptance lines that go with the choice; they follow it when kind, category or scope are ticked (`refresh`)
+  lines[#lines + 1] = ""
+  vim.list_extend(lines, scaffold_block(model.scaffold(sel, opts.lang)))
   lines[#lines + 1] = ""
   lines[#lines + 1] = "Tags: " .. (opts.tags or "")
   lines[#lines + 1] = "Refs: " .. (opts.refs or "")
@@ -281,7 +327,7 @@ function M.parse(lines)
         else
           local mark, text = line:match("^%s*[-*]%s+%[(.)%]%s+(.*)$")
           if current and mark and (mark == "x" or mark == "X") then
-            if vim.tbl_contains(current.values, text) then
+            if current.free or vim.tbl_contains(current.values, text) then
               table.insert(out.ticks[current.name], text)
             else
               out.unknown[#out.unknown + 1] = current.name .. ": " .. text
@@ -447,10 +493,27 @@ function M.validate(parsed, areas, root, lang)
   if summary ~= "" then
     opts.summary = summary
   end
+  if
+    opts.severity
+    and not model.severity_applies({ kind = opts.kind, category = parsed.ticks.category })
+  then
+    notes[#notes + 1] =
+      "severity is meant for bug or security tasks (kind bug, or category bug / security)"
+  end
   local texts, any = {}, false
   for _, s in ipairs(M.SECTIONS) do
     texts[s.key] = parsed.sections[s.key] or ""
     any = any or texts[s.key] ~= ""
+  end
+  -- the ticked scaffold lines open the Akzeptanz section, the person's own text follows
+  local rows = {}
+  for _, text in ipairs(parsed.ticks.scaffold or {}) do
+    rows[#rows + 1] = "- [ ] " .. trim(text)
+  end
+  if #rows > 0 then
+    local own = texts.acceptance
+    texts.acceptance = table.concat(rows, "\n") .. (own ~= "" and ("\n" .. own) or "")
+    any = true
   end
   if any then
     -- All three sections are written (an empty one keeps the template's placeholder); with nothing typed the
@@ -505,6 +568,53 @@ function M.toggle(lines, lnum)
     end
   end
   out[lnum] = indent .. "[" .. (was_ticked and " " or "x") .. "]" .. text
+  return out
+end
+
+---Bring the derived parts of a form back in line with its ticks: the scaffold block holds the acceptance lines of
+---the kind, categories and scopes now ticked (a line the person unticked stays unticked, one that is new comes
+---ticked, one that no longer applies goes), and the severity heading says when it does not fit. Call it after
+---every toggle; the text of the form is otherwise left alone.
+---@param lines string[]
+---@param lang? "de"|"en"
+---@return string[]|nil new_lines  # `nil` when nothing changes (or the form has no scaffold block).
+function M.refresh(lines, lang)
+  local sel = selection(M.parse(lines).ticks)
+  local out = vim.deepcopy(lines)
+  local start
+  for i, l in ipairs(out) do
+    if l:match("^##%s+scaffold%f[%W]") then
+      start = i
+      break
+    end
+  end
+  if start then
+    local stop = start
+    local off = {}
+    while out[stop + 1] and out[stop + 1]:match("^%s*[-*]%s+%[.%]") do
+      stop = stop + 1
+      local mark, text = out[stop]:match("^%s*[-*]%s+%[(.)%]%s+(.*)$")
+      if text and mark ~= "x" and mark ~= "X" then
+        off[rtrim(text)] = true
+      end
+    end
+    local block = scaffold_block(model.scaffold(sel, lang), off)
+    for _ = start, stop do
+      table.remove(out, start)
+    end
+    for k, l in ipairs(block) do
+      table.insert(out, start + k - 1, l)
+    end
+  end
+  for i, l in ipairs(out) do
+    if l:match("^##%s+severity%f[%W]") then
+      out[i] = heading({ name = "severity", multi = false, values = {} }, sel)
+      break
+    end
+  end
+  if vim.deep_equal(out, lines) then
+    return nil
+  end
   return out
 end
 

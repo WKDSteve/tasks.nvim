@@ -584,6 +584,13 @@ function M.hello(opts)
     category = vim.list_slice(model.CATEGORIES, 1),
     scope = vim.list_slice(model.SCOPES, 1),
     severity = vim.list_slice(model.SEVERITIES, 1),
+    -- not a word list: the fixed acceptance lines by kind, category and scope (`model.scaffold` joins them)
+    scaffold = json.object({
+      kind = json.object(vim.deepcopy(model.SCAFFOLD.kind)),
+      category = json.object(vim.deepcopy(model.SCAFFOLD.category)),
+      scope = json.object(vim.deepcopy(model.SCAFFOLD.scope)),
+      implied = vim.deepcopy(model.SCAFFOLD_IMPLIED),
+    }),
   })
   return doc
 end

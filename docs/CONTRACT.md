@@ -82,7 +82,7 @@ Every document starts with the same head:
 
 **`tasks.hello`** -- `schemas` (the versions this engine speaks), `capabilities` (what it can answer, sorted: an app shows
 only what is listed), `limits` (`title`, `summary`, `body_bytes`, `list_items`, `batch_ops`) and `enums` (the words of
-`status`, `kind`, `prio`, `value`, `effort`, `actor`, `category`, `severity`, so a client needs no copy of them).
+`status`, `kind`, `prio`, `value`, `effort`, `actor`, `category`, `scope`, `severity`, so a client needs no copy of them), plus `enums.scaffold`: the fixed acceptance lines by kind, category and scope (`kind`, `category`, `scope`: word to rows `{ id, de, en }`; `implied`: scopes whose rows a kind and category also get). A client joins the rows of what applies, each `id` once, in the order kind, category, scope (the order of the lists).
 
 **`tasks.snapshot`** -- the primary document.
 

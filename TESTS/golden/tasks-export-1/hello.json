@@ -79,6 +79,238 @@
       2,
       3
     ],
+    "scaffold": {
+      "category": {
+        "bug": [
+          {
+            "de": "Reproduktion beschrieben",
+            "en": "Steps to reproduce described",
+            "id": "repro"
+          },
+          {
+            "de": "Regressionstest, der ohne den Fix rot ist",
+            "en": "Regression test that fails without the fix",
+            "id": "regression-test"
+          },
+          {
+            "de": "Betroffene Version genannt",
+            "en": "Affected version named",
+            "id": "version"
+          }
+        ],
+        "ci": [
+          {
+            "de": "Auswirkung für Aufrufer (API, Typen) notiert",
+            "en": "Effect on callers (API, types) noted",
+            "id": "caller-impact"
+          }
+        ],
+        "refactor": [
+          {
+            "de": "Auswirkung für Aufrufer (API, Typen) notiert",
+            "en": "Effect on callers (API, types) noted",
+            "id": "caller-impact"
+          }
+        ],
+        "ruleset": [
+          {
+            "de": "Rule-ID vergeben",
+            "en": "Rule ID assigned",
+            "id": "ruleset-id"
+          },
+          {
+            "de": "Klasse (Data Class) gewählt",
+            "en": "Class (data class) chosen",
+            "id": "ruleset-class"
+          },
+          {
+            "de": "Beleg verlinkt",
+            "en": "Evidence linked",
+            "id": "ruleset-evidence"
+          },
+          {
+            "de": "Gate benannt",
+            "en": "Gate named",
+            "id": "ruleset-gate"
+          }
+        ],
+        "security": [
+          {
+            "de": "Ein Test belegt die Lücke",
+            "en": "A test proves the gap",
+            "id": "proof-test"
+          },
+          {
+            "de": "Auf Regel oder ID verwiesen",
+            "en": "Rule or ID referenced",
+            "id": "rule-id"
+          },
+          {
+            "de": "Keine Details im Titel",
+            "en": "No details in the title",
+            "id": "no-details"
+          }
+        ],
+        "tests": [
+          {
+            "de": "Auswirkung für Aufrufer (API, Typen) notiert",
+            "en": "Effect on callers (API, types) noted",
+            "id": "caller-impact"
+          }
+        ]
+      },
+      "implied": [
+        {
+          "category": [
+            "ux",
+            "bindings"
+          ],
+          "kind": "feature",
+          "scope": [
+            "keymap",
+            "usercmd",
+            "config",
+            "docs",
+            "tests"
+          ]
+        }
+      ],
+      "kind": {
+        "bug": [
+          {
+            "de": "Reproduktion beschrieben",
+            "en": "Steps to reproduce described",
+            "id": "repro"
+          },
+          {
+            "de": "Regressionstest, der ohne den Fix rot ist",
+            "en": "Regression test that fails without the fix",
+            "id": "regression-test"
+          },
+          {
+            "de": "Betroffene Version genannt",
+            "en": "Affected version named",
+            "id": "version"
+          }
+        ],
+        "idea": [
+          {
+            "de": "Die Frage ist formuliert",
+            "en": "The question is stated",
+            "id": "question"
+          },
+          {
+            "de": "Gewünschtes Ergebnisformat benannt",
+            "en": "Wanted format of the result named",
+            "id": "result-format"
+          }
+        ],
+        "research": [
+          {
+            "de": "Die Frage ist formuliert",
+            "en": "The question is stated",
+            "id": "question"
+          },
+          {
+            "de": "Gewünschtes Ergebnisformat benannt",
+            "en": "Wanted format of the result named",
+            "id": "result-format"
+          }
+        ]
+      },
+      "scope": {
+        "api": [
+          {
+            "de": "LuaLS-Typen ergänzt",
+            "en": "LuaLS types added",
+            "id": "api-types"
+          },
+          {
+            "de": "Doku geschrieben",
+            "en": "Documented",
+            "id": "api-docs"
+          },
+          {
+            "de": "Beispiel vorhanden",
+            "en": "Example given",
+            "id": "api-example"
+          },
+          {
+            "de": "Abwärtskompatibilität geprüft",
+            "en": "Backward compatibility checked",
+            "id": "api-compat"
+          }
+        ],
+        "config": [
+          {
+            "de": "Option mit Default und Validierung",
+            "en": "Option with a default and validation",
+            "id": "config"
+          }
+        ],
+        "docs": [
+          {
+            "de": "README und Docs aktualisiert",
+            "en": "README and docs updated",
+            "id": "docs"
+          }
+        ],
+        "health": [
+          {
+            "de": ":checkhealth prüft es",
+            "en": ":checkhealth covers it",
+            "id": "health"
+          }
+        ],
+        "keymap": [
+          {
+            "de": "Mapping nur per Config, kein Default",
+            "en": "Mapping only through the config, no default",
+            "id": "keymap"
+          }
+        ],
+        "migration": [
+          {
+            "de": "Migrationspfad für alte Daten oder Config",
+            "en": "Migration path for old data or config",
+            "id": "migration"
+          }
+        ],
+        "multi-repo": [
+          {
+            "de": "Betroffene Repos und Reihenfolge benannt",
+            "en": "Affected repos and their order named",
+            "id": "repos-order"
+          },
+          {
+            "de": "engine.lock angehoben",
+            "en": "engine.lock raised",
+            "id": "engine-lock"
+          }
+        ],
+        "tests": [
+          {
+            "de": "Spec ergänzt",
+            "en": "Spec added",
+            "id": "spec"
+          }
+        ],
+        "ui": [
+          {
+            "de": "Leer- und Fehlerzustand geprüft",
+            "en": "Empty and error state checked",
+            "id": "ui-states"
+          }
+        ],
+        "usercmd": [
+          {
+            "de": "Usercmd mit Completion und Help-Tag",
+            "en": "User command with completion and help tag",
+            "id": "usercmd"
+          }
+        ]
+      }
+    },
     "scope": [
       "usercmd",
       "keymap",

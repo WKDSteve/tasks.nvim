@@ -74,6 +74,221 @@ M.SCOPES = {
   "multi-repo",
 }
 
+---The acceptance scaffold: fixed lines the form offers for the `## Akzeptanz` section of a new task, by `kind`,
+---`category` and `scope` (no AI, no vault setting). A row is `{ id, de, en }`; the text follows the language of the
+---task's headings. The rows of everything that applies are joined, each `id` once, in the order kind, category
+---(`CATEGORIES` order), scope (`SCOPES` order). The form pre-ticks them and lets a row be unticked; nothing is forced.
+---@alias Tasks.ScaffoldRow { id: string, de: string, en: string }
+---@type { kind: table<string, Tasks.ScaffoldRow[]>, category: table<string, Tasks.ScaffoldRow[]>, scope: table<string, Tasks.ScaffoldRow[]> }
+M.SCAFFOLD = {
+  kind = {
+    bug = {
+      { id = "repro", de = "Reproduktion beschrieben", en = "Steps to reproduce described" },
+      {
+        id = "regression-test",
+        de = "Regressionstest, der ohne den Fix rot ist",
+        en = "Regression test that fails without the fix",
+      },
+      { id = "version", de = "Betroffene Version genannt", en = "Affected version named" },
+    },
+    idea = {
+      { id = "question", de = "Die Frage ist formuliert", en = "The question is stated" },
+      {
+        id = "result-format",
+        de = "Gewünschtes Ergebnisformat benannt",
+        en = "Wanted format of the result named",
+      },
+    },
+    research = {
+      { id = "question", de = "Die Frage ist formuliert", en = "The question is stated" },
+      {
+        id = "result-format",
+        de = "Gewünschtes Ergebnisformat benannt",
+        en = "Wanted format of the result named",
+      },
+    },
+  },
+  category = {
+    bug = {
+      { id = "repro", de = "Reproduktion beschrieben", en = "Steps to reproduce described" },
+      {
+        id = "regression-test",
+        de = "Regressionstest, der ohne den Fix rot ist",
+        en = "Regression test that fails without the fix",
+      },
+      { id = "version", de = "Betroffene Version genannt", en = "Affected version named" },
+    },
+    security = {
+      { id = "proof-test", de = "Ein Test belegt die Lücke", en = "A test proves the gap" },
+      { id = "rule-id", de = "Auf Regel oder ID verwiesen", en = "Rule or ID referenced" },
+      { id = "no-details", de = "Keine Details im Titel", en = "No details in the title" },
+    },
+    ruleset = {
+      { id = "ruleset-id", de = "Rule-ID vergeben", en = "Rule ID assigned" },
+      {
+        id = "ruleset-class",
+        de = "Klasse (Data Class) gewählt",
+        en = "Class (data class) chosen",
+      },
+      { id = "ruleset-evidence", de = "Beleg verlinkt", en = "Evidence linked" },
+      { id = "ruleset-gate", de = "Gate benannt", en = "Gate named" },
+    },
+    refactor = {
+      {
+        id = "caller-impact",
+        de = "Auswirkung für Aufrufer (API, Typen) notiert",
+        en = "Effect on callers (API, types) noted",
+      },
+    },
+    tests = {
+      {
+        id = "caller-impact",
+        de = "Auswirkung für Aufrufer (API, Typen) notiert",
+        en = "Effect on callers (API, types) noted",
+      },
+    },
+    ci = {
+      {
+        id = "caller-impact",
+        de = "Auswirkung für Aufrufer (API, Typen) notiert",
+        en = "Effect on callers (API, types) noted",
+      },
+    },
+  },
+  scope = {
+    usercmd = {
+      {
+        id = "usercmd",
+        de = "Usercmd mit Completion und Help-Tag",
+        en = "User command with completion and help tag",
+      },
+    },
+    keymap = {
+      {
+        id = "keymap",
+        de = "Mapping nur per Config, kein Default",
+        en = "Mapping only through the config, no default",
+      },
+    },
+    config = {
+      {
+        id = "config",
+        de = "Option mit Default und Validierung",
+        en = "Option with a default and validation",
+      },
+    },
+    ui = {
+      {
+        id = "ui-states",
+        de = "Leer- und Fehlerzustand geprüft",
+        en = "Empty and error state checked",
+      },
+    },
+    api = {
+      { id = "api-types", de = "LuaLS-Typen ergänzt", en = "LuaLS types added" },
+      { id = "api-docs", de = "Doku geschrieben", en = "Documented" },
+      { id = "api-example", de = "Beispiel vorhanden", en = "Example given" },
+      {
+        id = "api-compat",
+        de = "Abwärtskompatibilität geprüft",
+        en = "Backward compatibility checked",
+      },
+    },
+    docs = { { id = "docs", de = "README und Docs aktualisiert", en = "README and docs updated" } },
+    tests = { { id = "spec", de = "Spec ergänzt", en = "Spec added" } },
+    health = { { id = "health", de = ":checkhealth prüft es", en = ":checkhealth covers it" } },
+    migration = {
+      {
+        id = "migration",
+        de = "Migrationspfad für alte Daten oder Config",
+        en = "Migration path for old data or config",
+      },
+    },
+    ["multi-repo"] = {
+      {
+        id = "repos-order",
+        de = "Betroffene Repos und Reihenfolge benannt",
+        en = "Affected repos and their order named",
+      },
+      { id = "engine-lock", de = "engine.lock angehoben", en = "engine.lock raised" },
+    },
+  },
+}
+
+---Scopes whose rows a task gets besides its own: a user-facing feature with bindings (scenario 1) also needs the
+---lines of these scopes, without the scopes being set. `kind` and one of `category` have to match.
+---@type { kind: string, category: string[], scope: string[] }[]
+M.SCAFFOLD_IMPLIED = {
+  {
+    kind = "feature",
+    category = { "ux", "bindings" },
+    scope = { "keymap", "usercmd", "config", "docs", "tests" },
+  },
+}
+
+---The scaffold lines for a choice of `kind`, `category` and `scope`.
+---@param sel { kind?: string, category?: string[], scope?: string[] }
+---@param lang? "de"|"en"  default `de`
+---@return { id: string, text: string }[]
+function M.scaffold(sel, lang)
+  lang = lang == "en" and "en" or "de"
+  local want_cat, want_scope = {}, {}
+  for _, c in ipairs(sel.category or {}) do
+    want_cat[c] = true
+  end
+  for _, c in ipairs(sel.scope or {}) do
+    want_scope[c] = true
+  end
+  for _, rule in ipairs(M.SCAFFOLD_IMPLIED) do
+    local hit = false
+    for _, c in ipairs(rule.category) do
+      hit = hit or want_cat[c] == true
+    end
+    if sel.kind == rule.kind and hit then
+      for _, c in ipairs(rule.scope) do
+        want_scope[c] = true
+      end
+    end
+  end
+  local out, seen = {}, {}
+  ---@param rows Tasks.ScaffoldRow[]|nil
+  local function add(rows)
+    for _, row in ipairs(rows or {}) do
+      if not seen[row.id] then
+        seen[row.id] = true
+        out[#out + 1] = { id = row.id, text = row[lang] }
+      end
+    end
+  end
+  add(sel.kind and M.SCAFFOLD.kind[sel.kind])
+  for _, c in ipairs(M.CATEGORIES) do
+    if want_cat[c] then
+      add(M.SCAFFOLD.category[c])
+    end
+  end
+  for _, c in ipairs(M.SCOPES) do
+    if want_scope[c] then
+      add(M.SCAFFOLD.scope[c])
+    end
+  end
+  return out
+end
+
+---Does `severity` fit the choice? Only a bug or security task (kind bug, or the category bug / security).
+---@param sel { kind?: string, category?: string[] }
+---@return boolean
+function M.severity_applies(sel)
+  if sel.kind == "bug" then
+    return true
+  end
+  for _, c in ipairs(sel.category or {}) do
+    if c == "bug" or c == "security" then
+      return true
+    end
+  end
+  return false
+end
+
 ---Severity of a bug or security task, worst last. Optional, see `model.categories`.
 ---@type string[]
 M.SEVERITIES = { "low", "medium", "high", "critical" }

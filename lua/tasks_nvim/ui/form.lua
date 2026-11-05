@@ -177,6 +177,11 @@ function M.toggle_here(buf)
   if not done then
     set_lines(buf, wanted)
   end
+  -- the scaffold block and the severity heading follow what is ticked now
+  local refreshed = form.refresh(buf_lines(buf), vim.b[buf].tasks_form_lang)
+  if refreshed then
+    set_lines(buf, refreshed)
+  end
   vim.api.nvim_win_set_cursor(0, { lnum, 0 })
   return true
 end
@@ -308,6 +313,7 @@ function M.open(opts)
   local buf
   buf, mode = open_window(mode)
   vim.b[buf].tasks_form_mode = mode
+  vim.b[buf].tasks_form_lang = opts.lang
   vim.bo[buf].buftype = "nofile"
   vim.bo[buf].bufhidden = "wipe"
   vim.bo[buf].swapfile = false

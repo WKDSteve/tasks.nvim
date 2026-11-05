@@ -82,6 +82,23 @@
     "Category": {
       "enum": ["bug", "security", "performance", "docs", "ruleset", "ux", "bindings", "refactor", "tests", "ci"]
     },
+    "ScaffoldRows": {
+      "description": "Acceptance lines by word of a list (a kind, a category or a scope).",
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["id", "de", "en"],
+          "properties": {
+            "id": { "type": "string" },
+            "de": { "type": "string" },
+            "en": { "type": "string" }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
     "Scope": {
       "enum": ["usercmd", "keymap", "config", "ui", "api", "docs", "tests", "health", "migration", "multi-repo"]
     },
@@ -712,6 +729,30 @@
               "items": {
                 "type": "string"
               }
+            },
+            "scaffold": {
+              "description": "The fixed acceptance lines a new task can start with, by kind, category and scope. A client joins the rows of what applies, each id once, in the order kind, category, scope (the order of the lists above); `implied` adds the rows of the named scopes when the kind and one of the categories match. The text follows the language of the task's headings (`de` or `en`).",
+              "type": "object",
+              "required": ["kind", "category", "scope", "implied"],
+              "properties": {
+                "kind": { "$ref": "#/$defs/ScaffoldRows" },
+                "category": { "$ref": "#/$defs/ScaffoldRows" },
+                "scope": { "$ref": "#/$defs/ScaffoldRows" },
+                "implied": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": ["kind", "category", "scope"],
+                    "properties": {
+                      "kind": { "type": "string" },
+                      "category": { "type": "array", "items": { "type": "string" } },
+                      "scope": { "type": "array", "items": { "type": "string" } }
+                    },
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false

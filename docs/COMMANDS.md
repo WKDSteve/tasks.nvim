@@ -202,6 +202,9 @@ Title: Notify: unify the output channels
 - [x] ui
 ...
 Other: keymap, newword
+## scaffold (several)
+- [x] Mapping only through the config, no default
+...
 Tags: ui, notify
 Refs: lua/foo/init.lua
 ```
@@ -210,7 +213,7 @@ The choice fields `kind`, `prio`, `effort`, `value`, `actor`, `category`, `scope
 lists whose values come from the engine (`tasks.model`); `category` and `scope` take several ticks, the
 others one (ticking a bullet clears its siblings; leaving a list empty means "not set", and
 `kind` / `status` then get the engine defaults `task` / `open`). `Area:` and `Title:` are
-required; `Other:` (under `scope`) takes words: a scope word joins the ticks, any other word goes to the tags and the form says so; `Tags:`, `Refs:` and `Links:` are comma separated (`Links:` takes web addresses, `http://` or `https://`;
+required; the `## scaffold` block lists acceptance lines for the kind, categories and scopes ticked above (a bug: reproduction, regression test, version; a feature with `bindings`: usercmd, keymap, config, docs and tests; `ruleset`, `security`, `api`, `multi-repo` and more, from `tasks.model`). They are ticked in advance and follow every tick above; untick one to drop it, the ticked ones become `- [ ]` lines at the top of `## Akzeptanz`. `severity` fits `bug` and `security` only (its heading says so; elsewhere it is told on submit, never refused); `Other:` (under `scope`) takes words: a scope word joins the ticks, any other word goes to the tags and the form says so; `Tags:`, `Refs:` and `Links:` are comma separated (`Links:` takes web addresses, `http://` or `https://`;
 anything else is reported; `Refs:` takes paths and commits; `:Tasks new links=https://...` pre-fills it). `After:` (task ids, comma separated), `Plan:` (a plan id), `Phase:` (a stage of that plan), `Due:` and `Start:` (`YYYY-MM-DD`, start never after due) are plain lines too; an id that exists nowhere, a plan that is none or a phase the plan does not name is refused by the engine when the form is submitted (the same words as `set`), a date that is none by the form itself; `:Tasks new after=... plan=... phase=... due=... start=...` pre-fills them. `Area:` may name several areas (`lib.nvim, cascade.nvim`): one
 task with the same text is created in each (every area is checked first; a bad one creates nothing). `Summary:` is the
 one line that ends up in the index. The sections `## Kontext`, `## Akzeptanz` and `## Notizen` at the end are free

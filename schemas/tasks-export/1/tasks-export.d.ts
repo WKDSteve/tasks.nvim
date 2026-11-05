@@ -56,6 +56,19 @@ export type Hello = Head & {
     category: string[];
     scope: string[];
     severity: string[];
+    /**
+     * The fixed acceptance lines a new task can start with, by kind, category and scope. A client joins the rows of what applies, each id once, in the order kind, category, scope (the order of the lists above); `implied` adds the rows of the named scopes when the kind and one of the categories match. The text follows the language of the task's headings (`de` or `en`).
+     */
+    scaffold?: {
+      kind: ScaffoldRows;
+      category: ScaffoldRows;
+      scope: ScaffoldRows;
+      implied: {
+        kind: string;
+        category: string[];
+        scope: string[];
+      }[];
+    };
   };
 };
 /**
@@ -649,6 +662,16 @@ export interface Head {
   };
   rev?: Rev;
   digest?: Digest;
+}
+/**
+ * Acceptance lines by word of a list (a kind, a category or a scope).
+ */
+export interface ScaffoldRows {
+  [k: string]: {
+    id: string;
+    de: string;
+    en: string;
+  }[];
 }
 export interface StatusCounts {
   [k: string]: number;
