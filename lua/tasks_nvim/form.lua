@@ -158,6 +158,21 @@ local function scaffold_block(rows, off)
   return out
 end
 
+---Every text a scaffold row can have (both languages): what `refresh` may rewrite; any other line of the block is the
+---person's own.
+---@return table<string, boolean>
+local function scaffold_texts()
+  local known = {}
+  for _, group in pairs(model.SCAFFOLD) do
+    for _, rows in pairs(group) do
+      for _, row in ipairs(rows) do
+        known[row.de], known[row.en] = true, true
+      end
+    end
+  end
+  return known
+end
+
 ---The choice (kind, category, scope) the ticks of a form stand for.
 ---@param ticks table<string, string[]>
 ---@return { kind?: string, category: string[], scope: string[] }
@@ -590,15 +605,22 @@ function M.refresh(lines, lang)
   end
   if start then
     local stop = start
-    local off = {}
+    local off, own = {}, {}
+    local known = scaffold_texts()
     while out[stop + 1] and out[stop + 1]:match("^%s*[-*]%s+%[.%]") do
       stop = stop + 1
       local mark, text = out[stop]:match("^%s*[-*]%s+%[(.)%]%s+(.*)$")
-      if text and mark ~= "x" and mark ~= "X" then
-        off[rtrim(text)] = true
+      if text and known[rtrim(text)] then
+        if mark ~= "x" and mark ~= "X" then
+          off[rtrim(text)] = true
+        end
+      else
+        -- a line the person typed into the block: it is theirs, it stays
+        own[#own + 1] = out[stop]
       end
     end
     local block = scaffold_block(model.scaffold(sel, lang), off)
+    vim.list_extend(block, own)
     for _ = start, stop do
       table.remove(out, start)
     end

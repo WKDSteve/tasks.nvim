@@ -160,6 +160,19 @@ return function(H)
   ok(vim.tbl_contains(again, "- [ ] Regression test that fails without the fix"), "kept unticked")
   ok(vim.tbl_contains(again, "- [x] A test proves the gap"), "new row comes ticked")
 
+  -- a line the person typed into the block is kept, and goes to the Akzeptanz section like the rows
+  local mine = vim.deepcopy(refreshed)
+  for i, l in ipairs(mine) do
+    if l:match("^## scaffold") then
+      table.insert(mine, i + 1, "- [x] My own check")
+      break
+    end
+  end
+  local kept = form.refresh(mine, "en")
+  mine = kept or mine
+  ok(vim.tbl_contains(mine, "- [x] My own check"), "kept after a refresh")
+  eq(#block(mine), 4, "the three rows and the own line")
+
   -- ── validate: the ticked rows open the Akzeptanz section ───────────────
   local function validated(l)
     local filled = vim.deepcopy(l)
