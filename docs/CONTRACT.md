@@ -155,7 +155,9 @@ repeated title gets `-2`). An operation on such a task (`set`, `done`, `tick_ste
 `add_steps`, `set_body`, `reopen`, `attach`, `reorder`, `move_area`) works on the file that `new` would write, and a
 `set` or a text change (`tick_step`, `answer`, `append_note`, `add_steps`, `set_body`) carries that file on, so a later
 operation of the request finds the task as the real run leaves it and names the same `etag_before`. (`done`, `reopen`
-and `move_area` do not carry on: the operation after one of them still sees the file before it.) A `done` after a
+and `move_area` do not carry on, on purpose: the operation after one of them still sees the file before it. A draft
+knows one state, open; a finished or moved state would change what every later operation answers, and no client sends
+`set` and then `done` of the same task in one dry run that needs the second answer.) A `done` after a
 change of the same task therefore takes the confirm token of its own preview. At most 100 operations.
 `attach_dirs` (optional, at most 8 absolute paths) names the folders `attach` with `from: latest` takes the newest
 image from, instead of `attach.screenshot_dirs` and the folders of the system;
