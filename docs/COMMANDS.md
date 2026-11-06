@@ -723,8 +723,9 @@ second word (`:TasksVault clipboard ALL all`). Part words are never completed to
 **Several vaults.** `setup({ vaults = { main = "~/tasks-vault", tricentis = "~/tricentis-vault" }, vault = "main" })` names
 them; `vault` may be a name (a path stays valid and names nothing; without `vault` the first name, sorted, is active).
 `:TasksVault switch <name>` completes the names and changes the vault of the running session: every command after it
-(`:Tasks`, the dashboard opened next, `:checkhealth tasks_nvim`) works on the new one. A dashboard that is open keeps the
-vault it was opened on, so close and reopen it. An unknown name, or a folder that is gone, is refused and the active
+(`:Tasks`, the dashboard opened next, `:checkhealth tasks_nvim`) works on the new one. A dashboard that is open is
+closed and opened again on the new vault (with the filter remembered for that vault, and its area when the new vault has
+one of that name); with several names configured its title starts with `[<name>]`. An unknown name, or a folder that is gone, is refused and the active
 vault stays. Areas of the same name in two vaults are separate (`lib.nvim` in each). `:TasksVault status` and
 `:checkhealth` show which vault is active. Choosing the vault by the working directory is not built (`vault` plus
 `switch` only).

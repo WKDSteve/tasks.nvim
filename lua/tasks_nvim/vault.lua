@@ -113,8 +113,24 @@ function M.active_name()
   return active_name
 end
 
----Make a named vault the one this session works on. Dashboards opened later follow; one that is open
----keeps the vault it was opened on (it holds its root).
+---The configured name of the vault at `root`, `nil` when it has none (a plain path, or no names configured).
+---@param root string
+---@return string|nil
+function M.name_of(root)
+  if type(root) ~= "string" or root == "" then
+    return nil
+  end
+  local want = fsio.norm(root)
+  for _, name in ipairs(M.vault_names()) do
+    if named[name] == want then
+      return name
+    end
+  end
+  return nil
+end
+
+---Make a named vault the one this session works on. Dashboards opened later follow, and so do open ones
+---(`ui.dash.follow_vault`, called by `:TasksVault switch`).
 ---@param name string
 ---@return string|nil root  the new root
 ---@return string|nil err   unknown name, or the folder is gone (the active vault is then unchanged)

@@ -89,6 +89,7 @@ local MAX_CONFIRM_LINES = 8
 ---@field ref_fresh? boolean                         # An answer arrived: the next load uses it without checking again.
 ---@field ref_job? Tasks.StalenessJob                # The check still running.
 ---@field rerender? fun()                            # Redraws the open list (set by the picker backends).
+---@field close? fun()                               # Closes the open list (set by the picker backends that can).
 
 ---@class Tasks.DashOpts
 ---@field persist? boolean   # Remember the filter between sessions (default true).
@@ -96,6 +97,10 @@ local MAX_CONFIRM_LINES = 8
 ---@field watch? boolean     # Live refresh (default: `M.config.watch`).
 
 -- ── small helpers ────────────────────────────────────────────────────────────
+
+---The dashboards opened by `M.open` (a state leaves when its picker closes or when it is re-rooted).
+---@type table<Tasks.DashState, boolean>
+local open_states = setmetatable({}, { __mode = "k" })
 
 ---@return table
 local function cmd()
@@ -222,6 +227,7 @@ end
 ---@param state Tasks.DashState
 local function drop_refs_check(state)
   state.rerender = nil
+  state.close = nil
   if state.ref_job then
     state.ref_job.cancel()
     state.ref_job = nil
@@ -334,6 +340,13 @@ end
 ---@return string
 local function title_of(state)
   local title = core.header(state.shown, state.filter, state.area, state.sort, state.readiness)
+  -- with several named vaults, say which one this list is from
+  local vault_name = #require("tasks_nvim.vault").vault_names() > 1
+      and require("tasks_nvim.vault").name_of(state.root)
+    or nil
+  if vault_name then
+    title = ("[%s] %s"):format(vault_name, title)
+  end
   if state.ref_job and state.filter and state.filter.stale_refs then
     title = title .. " (checking refs ...)"
   end
@@ -1541,6 +1554,9 @@ local function open_picker(engine, Snacks, state)
       state.rerender = function()
         M.redraw(state, adapter)
       end
+      state.close = function()
+        adapter:close()
+      end
     end
     watcher = start_watch(state, adapter)
     if watcher and adapter.closed then
@@ -1599,6 +1615,9 @@ local function open_picker(engine, Snacks, state)
   if not picker.closed then
     state.rerender = function()
       M.redraw(state, picker)
+    end
+    state.close = function()
+      picker:close()
     end
   end
   watcher = start_watch(state, picker)
@@ -1797,7 +1816,36 @@ function M.open(v, opts)
     notify.error(("cannot open the dashboard: %s"):format(tostring(err)))
     return nil
   end
+  -- weak: a dashboard nobody references any more must not be kept alive by this list
+  open_states[state] = true
   return state
+end
+
+---`:TasksVault switch` calls this: every dashboard that is open on another vault is closed and opened again on
+---`root` (its filter is the one remembered for that vault; the area stays when the new vault has it).
+---@param root string  the new vault root
+---@return integer reopened
+function M.follow_vault(root)
+  local stale = {}
+  for state in pairs(open_states) do
+    if state.close and state.root ~= root then
+      stale[#stale + 1] = state
+    end
+  end
+  local vault = require("tasks_nvim.vault")
+  local reopened = 0
+  for _, state in ipairs(stale) do
+    open_states[state] = nil
+    local area = state.area
+    if area and not vim.tbl_contains(vault.area_names(root), area) then
+      area = nil
+    end
+    pcall(state.close)
+    if M.open({ tasks = {}, area = area, filter = {}, root = root }, { watch = state.watch }) then
+      reopened = reopened + 1
+    end
+  end
+  return reopened
 end
 
 return M

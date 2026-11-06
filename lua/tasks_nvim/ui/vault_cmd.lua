@@ -632,10 +632,15 @@ function M.switch(ctx)
     notify.warn(tostring(err))
     return
   end
+  -- an open dashboard follows (closed and opened again on the new vault); `package.loaded` keeps this from
+  -- loading the UI for a headless switch
+  local dash = package.loaded["tasks_nvim.ui.dash"]
+  local reopened = dash and dash.follow_vault(root) or 0
   notify.info(
-    ("Vault: %s = %s\nDashboards opened from now on use it; an open one keeps its vault."):format(
+    ("Vault: %s = %s%s"):format(
       name,
-      root
+      root,
+      reopened > 0 and ("\n%d open dashboard(s) moved to it."):format(reopened) or ""
     )
   )
 end
