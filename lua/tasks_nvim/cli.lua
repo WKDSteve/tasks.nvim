@@ -103,6 +103,8 @@ commands:
                                           setup({ quick_wins })), best return first, plus the small tasks that miss a
                                           value; default status open,doing,decision. --report writes the Markdown
   index [<area>] [--check]                (re)write ROADMAP/TASKS.md; --check only reports
+  index <area> --staged                   build it from the staging area and stage it; the working tree stays as it
+                                          is, so another session's uncommitted tasks stay out of the commit
   migrate-actor [<area>] [--write]        propose actor=me for tasks that wait for you (status decision, tag
                                           needs-user) and leave every other task EMPTY; dry run unless --write
   new <area>[,<area>...] <title> [--kind=k] [--prio=1..3] [--effort=XS..XL|0.5d] [--value=1..5] [--actor=cdx|me|pair] [--after=id,id] [--order=2.5] [--plan=id] [--phase=word] [--tags=a,b]
@@ -296,7 +298,7 @@ local SPECS = {
     value = { "areas", "target", "phases", "gate", "status", "summary", "slug", "title" },
     flag = {},
   },
-  index = { value = {}, flag = { "check", "all" } },
+  index = { value = {}, flag = { "check", "all", "staged" } },
   new = {
     value = {
       "kind",
@@ -1158,6 +1160,19 @@ function commands.index(ctx)
   if #args.pos > 1 then
     ctx.warn("error: index takes at most one area")
     return 2
+  end
+  if args.opt.staged then
+    if not args.pos[1] or args.opt.check or args.opt.all then
+      ctx.warn("error: index --staged takes one area, and no --check or --all")
+      return 2
+    end
+    local res, err = index.stage_area(args.pos[1], { root = eo.root })
+    if not res then
+      ctx.warn("error: " .. tostring(err))
+      return 1
+    end
+    ctx.say(("%s	%s	%d open	%s (staged)"):format(res.action, res.area, res.open, res.path))
+    return 0
   end
   local opts = { root = eo.root, check = args.opt.check == true }
   local results, errors

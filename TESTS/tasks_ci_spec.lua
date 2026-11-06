@@ -134,7 +134,7 @@ return function(H)
   res = ci.run({ root = root, run_lint = runner(0) })
   eq(res.code, 1, "a stale index fails")
   fix_text = table.concat(res.lines, "\n")
-  has(fix_text, "--vault=. index lib.nvim && git add lib.nvim/ROADMAP/TASKS.md")
+  has(fix_text, "--vault=. index lib.nvim --staged")
   has(fix_text, "another session's uncommitted tasks")
 
   -- ── warnings: only --strict fails on them ───────────────────────────────

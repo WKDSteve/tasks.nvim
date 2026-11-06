@@ -120,12 +120,12 @@ function M.fix_lines(done_in_roadmap, stale_areas)
     )
   end
   for _, area in ipairs(stale_areas) do
-    lines[#lines + 1] = ("  %s index %s && git add %s/ROADMAP/TASKS.md"):format(engine, area, area)
+    lines[#lines + 1] = ("  %s index %s --staged"):format(engine, area)
   end
   lines[#lines + 1] =
-    "  then stage what changed and commit; read `git diff --cached` first: an index"
+    "  stage your task files first, then this, then commit: `--staged` builds the index"
   lines[#lines + 1] =
-    "  regenerated in a shared tree also lists another session's uncommitted tasks."
+    "  from the staging area, so another session's uncommitted tasks stay out of it."
   return lines
 end
 

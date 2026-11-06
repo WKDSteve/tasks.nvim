@@ -177,6 +177,82 @@ end
 
 ---Bring one area's index in line with its task files.
 ---
+---`git` in `dir`, or `nil` and what it said.
+---@param dir string
+---@param args string[]
+---@return string|nil stdout
+---@return string|nil err
+local function git(dir, args)
+  local res = vim.system(vim.list_extend({ "git", "-C", dir }, args), { text = true }):wait()
+  if res.code ~= 0 then
+    return nil, ("git %s: %s"):format(args[1], vim.trim(res.stderr or ""))
+  end
+  return res.stdout or ""
+end
+
+---Regenerate the index of `area` from the staging area and stage the result, without touching the
+---working tree. In a shared checkout the tree also holds another session's uncommitted tasks: an
+---index written from it lists tasks the commit does not contain, which the pre-push gate refuses.
+---
+---The staging area, not `HEAD`, because it is what the next commit will hold, own new tasks included.
+---All of it, not only the area: rendering reads other areas for the titles of blockers and for groups.
+---@param area string
+---@param opts? Tasks.IndexOpts
+---@return Tasks.IndexResult|nil result `path` is relative to the repository
+---@return string|nil err
+function M.stage_area(area, opts)
+  opts = opts or {}
+  local root, rerr = vault.root(opts)
+  if not root then
+    return nil, rerr
+  end
+  local top, terr = git(root, { "rev-parse", "--show-toplevel" })
+  if not top then
+    return nil, terr
+  end
+  top = vim.trim(top)
+  local prefix = vim.trim(git(root, { "rev-parse", "--show-prefix" }) or "")
+
+  local tmp = vim.fn.tempname()
+  local function run()
+    vim.fn.mkdir(tmp, "p")
+    local _, cerr = git(top, { "checkout-index", "--all", "--prefix=" .. tmp .. "/" })
+    if cerr then
+      return nil, cerr
+    end
+    local tmp_root = (tmp .. "/" .. prefix):gsub("/+$", "")
+    local result, werr =
+      M.write_area(area, vim.tbl_extend("force", opts, { root = tmp_root, check = false }))
+    if not result then
+      return nil, werr
+    end
+    local rel = prefix .. area .. "/ROADMAP/TASKS.md"
+    local _, serr
+    if result.action == "removed" then
+      _, serr = git(top, { "update-index", "--force-remove", "--", rel })
+    elseif result.action == "written" then
+      -- `--path`: the same clean filter (line endings) `git add` of that path would apply.
+      local blob, herr = git(top, { "hash-object", "-w", "--path=" .. rel, result.path })
+      if not blob then
+        return nil, herr
+      end
+      local entry = ("100644,%s,%s"):format(vim.trim(blob), rel)
+      _, serr = git(top, { "update-index", "--add", "--cacheinfo", entry })
+    end
+    if serr then
+      return nil, serr
+    end
+    result.path = rel
+    return result
+  end
+  local ran, result, err = pcall(run)
+  vim.fn.delete(tmp, "rf")
+  if not ran then
+    return nil, tostring(result)
+  end
+  return result, err
+end
+
 ---`action` is `written`, `removed`, `unchanged`, or (check mode) `stale` with a
 ---`reason`: `missing` (no file, but open tasks), `outdated` (content differs),
 ---`orphan` (a file although no task is open). A directory that could not be
