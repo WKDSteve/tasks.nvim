@@ -29,7 +29,7 @@ return function(H)
     return vim
       .system(cmd, {
         text = true,
-        env = { NVIM = vim.NIL, NVIM_LISTEN_ADDRESS = vim.NIL },
+        env = { NVIM = "", NVIM_LISTEN_ADDRESS = "" },
       })
       :wait(60000)
   end

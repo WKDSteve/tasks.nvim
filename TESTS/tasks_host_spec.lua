@@ -90,8 +90,8 @@ return function(H)
       text = true,
       stdin = requests,
       env = {
-        NVIM = vim.NIL,
-        NVIM_LISTEN_ADDRESS = vim.NIL,
+        NVIM = "",
+        NVIM_LISTEN_ADDRESS = "",
         TASKS_VAULT = root,
         LIB_NVIM_DIR = lib_dir,
       },
@@ -119,8 +119,8 @@ return function(H)
       text = true,
       stdin = "1\tsnapshot\t\n2\thello\t\n",
       env = {
-        NVIM = vim.NIL,
-        NVIM_LISTEN_ADDRESS = vim.NIL,
+        NVIM = "",
+        NVIM_LISTEN_ADDRESS = "",
         TASKS_VAULT = root .. "/no-such-vault",
         LIB_NVIM_DIR = lib_dir,
       },

@@ -385,7 +385,7 @@ return function(H)
     return vim
       .system(cmd, {
         text = true,
-        env = { NVIM = vim.NIL, NVIM_LISTEN_ADDRESS = vim.NIL, TASKS_EXTRA_AREAS = "migrate.nvim" },
+        env = { NVIM = "", NVIM_LISTEN_ADDRESS = "", TASKS_EXTRA_AREAS = "migrate.nvim" },
       })
       :wait(60000)
   end

@@ -178,8 +178,8 @@ return function(H)
         env = {
           XDG_CONFIG_HOME = empty_cfg,
           LIB_NVIM_DIR = lib,
-          NVIM = vim.NIL,
-          NVIM_LISTEN_ADDRESS = vim.NIL,
+          NVIM = "",
+          NVIM_LISTEN_ADDRESS = "",
         },
       })
       :wait(60000)
