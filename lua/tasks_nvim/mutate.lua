@@ -651,6 +651,183 @@ local SETTABLE = {
 ---@type string[]
 M.SETTABLE = SETTABLE
 
+---What the normalisers of `FIELD_NORMALIZERS` may need besides the value.
+---@class Tasks.NormalizeCtx
+---@field typed table<string, table> # the `typed` of the result: references given as wikilinks
+---@field resolver fun(): Tasks.LinkResolver|nil # the link resolver of `opts`, made on first use
+---@field opts? table # the `opts` of `normalize_patch`
+
+---A value of one of the listed words.
+---@param what string
+---@param is_valid fun(value: any): boolean
+---@param allowed string[]
+---@return fun(value: any): any, string?
+local function one_of(what, is_valid, allowed)
+  return function(value)
+    if not is_valid(value) then
+      return nil,
+        ("unknown %s '%s' (expected %s)"):format(what, tostring(value), table.concat(allowed, ", "))
+    end
+    return value
+  end
+end
+
+---A list from `parse`; an empty one removes the key.
+---@param parse fun(value: any): table|nil, string?
+---@return fun(value: any): any, string?
+local function list_or_remove(parse)
+  return function(value)
+    local list, err = parse(value)
+    if not list then
+      return nil, err
+    end
+    return #list > 0 and list or M.REMOVE
+  end
+end
+
+---A date (YYYY-MM-DD).
+---@param value any
+---@param key string
+---@return any, string?
+local function date_field(value, key)
+  if not model.is_date(value) then
+    return nil, ("%s '%s' is not a date (YYYY-MM-DD)"):format(key, tostring(value))
+  end
+  return value
+end
+
+---`string_list` with an empty list removing the key. Tags and commits are single tokens: a bracket, quote or comma
+---in one would break the line it is written on.
+---@param value any
+---@param key string
+---@return any, string?
+local function strings_field(value, key)
+  local list, err = string_list(value, key, key == "tags" or key == "commits")
+  if not list then
+    return nil, err
+  end
+  return #list > 0 and list or M.REMOVE
+end
+
+---`blocked_by` and `after`: ids, one as a plain scalar.
+---@param value any
+---@param key string
+---@param ctx Tasks.NormalizeCtx
+---@return any, string?
+local function id_list_field(value, key, ctx)
+  local needs = type(value) == "string" and value:find("[[", 1, true)
+  if type(value) == "table" then
+    for _, item in ipairs(value) do
+      needs = needs or (type(item) == "string" and item:find("[[", 1, true))
+    end
+  end
+  local ids, typed = id_list(
+    value,
+    key,
+    needs and ctx.resolver() or nil,
+    ctx.opts and ctx.opts.kept_links and ctx.opts.kept_links[key]
+  )
+  if not ids then
+    return nil, typed --[[@as string]]
+  end
+  ctx.typed[key] = typed
+  if #ids == 0 then
+    return M.REMOVE
+  end
+  return #ids == 1 and ids[1] or ids
+end
+
+---Each settable field's check and the form it is stored in: `(value, key, ctx)` to the stored value, or nil and the
+---refusal. A field not listed here (`summary`, an allowed unknown one) is a single-line text.
+---@type table<string, fun(value: any, key: string, ctx: Tasks.NormalizeCtx): any, string?>
+local FIELD_NORMALIZERS = {
+  title = function(value)
+    return one_line(value, "title")
+  end,
+  status = function(value)
+    if value == "done" then
+      return nil, "status 'done' is set by finishing the task (tasks done), which also moves it"
+    end
+    if not model.is_open_status(value) then
+      return nil,
+        ("unknown status '%s' (expected %s)"):format(
+          tostring(value),
+          table.concat(model.OPEN_STATUSES, ", ")
+        )
+    end
+    return value
+  end,
+  kind = one_of("kind", model.is_kind, model.KINDS),
+  prio = function(value)
+    local prio = model.to_prio(value)
+    if not prio then
+      return nil, "prio must be 1, 2 or 3, got " .. tostring(value)
+    end
+    return tostring(prio)
+  end,
+  effort = function(value)
+    if not model.is_effort(value) then
+      return nil, ("effort '%s' is neither XS..XL nor days like 0.5d"):format(tostring(value))
+    end
+    return value
+  end,
+  value = function(value)
+    local v = model.to_value(value)
+    if not v then
+      return nil, "value must be 1, 2, 3, 4 or 5, got " .. tostring(value)
+    end
+    return tostring(v)
+  end,
+  actor = one_of("actor", model.is_actor, model.ACTORS),
+  created = date_field,
+  due = date_field,
+  start = date_field,
+  remind = function(value, _, ctx)
+    -- a date, or days / weeks from today: the file always holds the date
+    return model.resolve_remind(value, (ctx.opts and ctx.opts.today) or model.today())
+  end,
+  severity = one_of("severity", model.is_severity, model.SEVERITIES),
+  links = list_or_remove(link_list),
+  category = list_or_remove(category_list),
+  scope = list_or_remove(scope_list),
+  tags = strings_field,
+  refs = strings_field,
+  rules = strings_field,
+  commits = strings_field,
+  done_in = function(value, key)
+    local list, err = strings_field(value, key)
+    if list == nil or list == M.REMOVE then
+      return list, err
+    end
+    return table.concat(list, ", ")
+  end,
+  blocked_by = id_list_field,
+  after = id_list_field,
+  plan = function(value, key, ctx)
+    local needs = tostring(value):find("[[", 1, true)
+    local id, typed = plan_ref(value, needs and ctx.resolver() or nil)
+    if not id then
+      return nil, typed --[[@as string]]
+    end
+    ctx.typed[key] = typed
+    return id
+  end,
+  phase = function(value)
+    if not vault.valid_slug(vim.trim(tostring(value))) then
+      return nil, "phase must be a kebab-case word, got '" .. tostring(value) .. "'"
+    end
+    return vim.trim(tostring(value))
+  end,
+  order = function(value)
+    local n = tonumber(value)
+    if not n or n ~= n or n == math.huge or n == -math.huge then
+      return nil,
+        "order must be a number (2.5 slots a task between 2 and 3), got " .. tostring(value)
+    end
+    return vim.trim(tostring(value))
+  end,
+}
+
 ---Check and normalise a `set` patch into an ordered list of `{ key, value }`.
 ---A value of `REMOVE` deletes the key (not for `title` and `status`). `blocked_by`, `after` and `plan` come out as
 ---ids (a wikilink is resolved, a bare `[[slug]]` against the vault of `opts`); `result.typed[key]` names the ids that
@@ -692,6 +869,7 @@ local function normalize_patch(patch, opts)
     return nil, "nothing to set"
   end
 
+  local ctx = { typed = result.typed, resolver = resolver, opts = opts }
   for _, key in ipairs(keys) do
     local value = patch[key]
     local removing = value == M.REMOVE
@@ -705,173 +883,18 @@ local function normalize_patch(patch, opts)
       return nil, key .. " cannot be removed"
     elseif removing then
       result[#result + 1] = { key, M.REMOVE }
-    elseif key == "title" then
-      local t, err = one_line(value, "title")
-      if not t then
-        return nil, err
-      end
-      result[#result + 1] = { key, t }
-    elseif key == "status" then
-      if value == "done" then
-        return nil, "status 'done' is set by finishing the task (tasks done), which also moves it"
-      end
-      if not model.is_open_status(value) then
-        return nil,
-          ("unknown status '%s' (expected %s)"):format(
-            tostring(value),
-            table.concat(model.OPEN_STATUSES, ", ")
-          )
-      end
-      result[#result + 1] = { key, value }
-    elseif key == "kind" then
-      if not model.is_kind(value) then
-        return nil,
-          ("unknown kind '%s' (expected %s)"):format(
-            tostring(value),
-            table.concat(model.KINDS, ", ")
-          )
-      end
-      result[#result + 1] = { key, value }
-    elseif key == "prio" then
-      local prio = model.to_prio(value)
-      if not prio then
-        return nil, "prio must be 1, 2 or 3, got " .. tostring(value)
-      end
-      result[#result + 1] = { key, tostring(prio) }
-    elseif key == "effort" then
-      if not model.is_effort(value) then
-        return nil, ("effort '%s' is neither XS..XL nor days like 0.5d"):format(tostring(value))
-      end
-      result[#result + 1] = { key, value }
-    elseif key == "value" then
-      local v = model.to_value(value)
-      if not v then
-        return nil, "value must be 1, 2, 3, 4 or 5, got " .. tostring(value)
-      end
-      result[#result + 1] = { key, tostring(v) }
-    elseif key == "actor" then
-      if not model.is_actor(value) then
-        return nil,
-          ("unknown actor '%s' (expected %s)"):format(
-            tostring(value),
-            table.concat(model.ACTORS, ", ")
-          )
-      end
-      result[#result + 1] = { key, value }
-    elseif key == "created" then
-      if not model.is_date(value) then
-        return nil, ("created '%s' is not a date (YYYY-MM-DD)"):format(tostring(value))
-      end
-      result[#result + 1] = { key, value }
-    elseif key == "due" or key == "start" then
-      if not model.is_date(value) then
-        return nil, ("%s '%s' is not a date (YYYY-MM-DD)"):format(key, tostring(value))
-      end
-      result[#result + 1] = { key, value }
-    elseif key == "remind" then
-      -- a date, or days / weeks from today: the file always holds the date
-      local date, rerr = model.resolve_remind(value, (opts and opts.today) or model.today())
-      if not date then
-        return nil, rerr
-      end
-      result[#result + 1] = { key, date }
-    elseif key == "severity" then
-      if not model.is_severity(value) then
-        return nil,
-          ("unknown severity '%s' (expected %s)"):format(
-            tostring(value),
-            table.concat(model.SEVERITIES, ", ")
-          )
-      end
-      result[#result + 1] = { key, value }
-    elseif key == "links" then
-      local list, err = link_list(value)
-      if not list then
-        return nil, err
-      end
-      result[#result + 1] = { key, #list > 0 and list or M.REMOVE }
-    elseif key == "category" then
-      local list, err = category_list(value)
-      if not list then
-        return nil, err
-      end
-      result[#result + 1] = { key, #list > 0 and list or M.REMOVE }
-    elseif key == "scope" then
-      local list, err = scope_list(value)
-      if not list then
-        return nil, err
-      end
-      result[#result + 1] = { key, #list > 0 and list or M.REMOVE }
-    elseif
-      key == "tags"
-      or key == "refs"
-      or key == "rules"
-      or key == "done_in"
-      or key == "commits"
-    then
-      -- tags and commits are single tokens: a bracket, quote or comma in one would break the line it is written on
-      local list, err = string_list(value, key, key == "tags" or key == "commits")
-      if not list then
-        return nil, err
-      end
-      if #list == 0 then
-        result[#result + 1] = { key, M.REMOVE }
-      elseif key == "done_in" then
-        result[#result + 1] = { key, table.concat(list, ", ") }
-      else
-        result[#result + 1] = { key, list }
-      end
-    elseif key == "blocked_by" or key == "after" then
-      local needs = type(value) == "string" and value:find("[[", 1, true)
-      if type(value) == "table" then
-        for _, item in ipairs(value) do
-          needs = needs or (type(item) == "string" and item:find("[[", 1, true))
-        end
-      end
-      local ids, typed = id_list(
-        value,
-        key,
-        needs and resolver() or nil,
-        opts and opts.kept_links and opts.kept_links[key]
-      )
-      if not ids then
-        return nil, typed --[[@as string]]
-      end
-      result.typed[key] = typed
-      if #ids == 0 then
-        result[#result + 1] = { key, M.REMOVE }
-      elseif #ids == 1 then
-        result[#result + 1] = { key, ids[1] }
-      else
-        result[#result + 1] = { key, ids }
-      end
-    elseif key == "plan" then
-      local needs = tostring(value):find("[[", 1, true)
-      local id, typed = plan_ref(value, needs and resolver() or nil)
-      if not id then
-        return nil, typed --[[@as string]]
-      end
-      result.typed[key] = typed
-      result[#result + 1] = { key, id }
-    elseif key == "phase" then
-      if not vault.valid_slug(vim.trim(tostring(value))) then
-        return nil, "phase must be a kebab-case word, got '" .. tostring(value) .. "'"
-      end
-      result[#result + 1] = { key, vim.trim(tostring(value)) }
-    elseif key == "order" then
-      local n = tonumber(value)
-      if not n or n ~= n or n == math.huge or n == -math.huge then
-        return nil,
-          "order must be a number (2.5 slots a task between 2 and 3), got " .. tostring(value)
-      end
-      result[#result + 1] = { key, vim.trim(tostring(value)) }
     else
-      -- summary, or an allowed unknown field: a single-line text.
-      local t, err = one_line(value, key)
-      if not t then
+      local normalize = FIELD_NORMALIZERS[key]
+      local stored, err
+      if normalize then
+        stored, err = normalize(value, key, ctx)
+      else
+        stored, err = one_line(value, key)
+      end
+      if stored == nil then
         return nil, err
       end
-      result[#result + 1] = { key, t }
+      result[#result + 1] = { key, stored }
     end
   end
   return result, nil
