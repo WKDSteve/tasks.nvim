@@ -18,10 +18,10 @@ function M.check()
 
   start("tasks.nvim")
 
-  if vim.fn.has("nvim-0.10") == 1 then
+  if vim.fn.has("nvim-0.11") == 1 then
     ok("Neovim " .. tostring(vim.version()))
   else
-    error_("tasks.nvim needs Neovim 0.10+", { "Upgrade Neovim to 0.10+" })
+    error_("tasks.nvim needs Neovim 0.11+", { "Upgrade Neovim to 0.11+" })
   end
 
   -- lib.nvim is a hard dependency; these are the submodules the engine and the front ends call.

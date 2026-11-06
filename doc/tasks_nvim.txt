@@ -30,7 +30,7 @@ blockers, plan or estimate is valid and stays visible everywhere.
 ==============================================================================
 2. REQUIREMENTS                                         *tasks_nvim-requirements*
 
-  Neovim 0.10+ and lib.nvim (required).
+  Neovim 0.11+ and lib.nvim (required).
   Optional: snacks.nvim (dashboard), mdview.nvim (browser preview), ui.nvim
   (your theme preset for the confirmations; lib.nvim ships a copy of the kit), pickers.nvim (`:Tasks folder`), cascade.nvim (form),
   git (dates for `--stale=refs`).
