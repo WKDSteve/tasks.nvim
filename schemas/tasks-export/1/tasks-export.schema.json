@@ -1261,7 +1261,7 @@
           "$ref": "#/$defs/Digest"
         },
         "sort": {
-          "enum": ["default", "prio-effort", "severity", "frecency", "roi", "due"]
+          "enum": ["default", "prio-effort", "severity", "frecency", "roi", "due", "created-desc", "created-asc", "updated-desc", "updated-asc", "remind", "title"]
         },
         "total": {
           "type": "integer",

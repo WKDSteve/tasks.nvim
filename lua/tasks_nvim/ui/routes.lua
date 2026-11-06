@@ -536,6 +536,13 @@ local LIST_FLAGS = {
       severity = "critical first, then high, medium, low",
       frecency = "most opened or changed in the dashboard first",
       roi = "highest value per effort first",
+      due = "earliest due date first, without one last",
+      ["created-desc"] = "newest first, without a date last",
+      ["created-asc"] = "oldest first, without a date last",
+      ["updated-desc"] = "last changed first, without a date last",
+      ["updated-asc"] = "longest unchanged first, without a date last",
+      remind = "next reminder first, without one last",
+      title = "alphabetical, regardless of case",
     },
   },
   {

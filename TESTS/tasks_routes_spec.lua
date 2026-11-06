@@ -1737,6 +1737,12 @@ return function(H)
         "--sort=frecency",
         "--sort=roi",
         "--sort=due",
+        "--sort=created-desc",
+        "--sort=created-asc",
+        "--sort=updated-desc",
+        "--sort=updated-asc",
+        "--sort=remind",
+        "--sort=title",
       })
       ok(vim.tbl_contains(complete("TaskT tasks --to="), "--to=mdview"))
       ok(vim.tbl_contains(complete("TaskT task preview lib.nvim/al"), "lib.nvim/alpha"))

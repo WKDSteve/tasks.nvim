@@ -131,6 +131,9 @@ order)`) picks the order:
 | `prio-effort` | status rank, prio, **effort ascending**, area, slug: important and small first; a task without (valid) effort comes last of its prio |
 | `severity` | **severity** (`critical`, `high`, `medium`, `low`, none last), then the default order |
 | `roi` | **value per effort**, highest first (`model.roi`); tasks without a figure after the ones with one, then the default order |
+| `created-desc`, `created-asc`, `updated-desc`, `updated-asc` | that date, either way; a task without a valid one comes last in **both** directions, a tie is the default order |
+| `remind` | the next reminder first, a task without one last, a tie is the default order |
+| `title` | alphabetical regardless of case, a tie is the default order |
 | `frecency` | tasks the dashboard opened or changed, **highest score first** (see below), then the default order; ignores the status rank on purpose |
 
 `prio-effort` and `severity` keep the status rank in front on purpose, so `doing` / `decision`

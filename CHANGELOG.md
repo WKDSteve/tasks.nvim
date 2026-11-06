@@ -7,6 +7,7 @@ the version is not tagged yet (the repository is not published).
 
 ### Added
 
+- `list --sort=`: `created-desc`, `created-asc`, `updated-desc`, `updated-asc`, `remind` and `title`, also in `lists save`, and the contract's `list` and `order`. A missing date comes last in both directions.
 - `check` warns `effort-without-plan`: an open task bigger than L that is in no plan.
 
 - Spec for ticking in the `:Tasks new` form: the checkbox toggle of cascade.nvim when it is there (also when it throws or does nothing), the form's own toggle otherwise, on the choice lists and on the scaffold lines. The help (`g?`) names both.

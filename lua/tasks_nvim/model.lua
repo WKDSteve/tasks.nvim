@@ -295,7 +295,20 @@ M.SEVERITIES = { "low", "medium", "high", "critical" }
 
 ---The listing orders `sort` knows. `default` is what the index uses.
 ---@type string[]
-M.SORTS = { "default", "prio-effort", "severity", "frecency", "roi", "due" }
+M.SORTS = {
+  "default",
+  "prio-effort",
+  "severity",
+  "frecency",
+  "roi",
+  "due",
+  "created-desc",
+  "created-asc",
+  "updated-desc",
+  "updated-asc",
+  "remind",
+  "title",
+}
 
 ---@type integer[]
 M.PRIOS = { 1, 2, 3 }
@@ -1324,6 +1337,39 @@ local function compare_due(a, b)
   return M.compare(a, b)
 end
 
+---By a date field in either direction. A task without the date comes last in both; a tie is the default order.
+---@param field string
+---@param newest_first boolean
+---@return fun(a: Tasks.Task, b: Tasks.Task): boolean
+local function by_date(field, newest_first)
+  return function(a, b)
+    local da = M.is_date(a[field]) and a[field] or nil
+    local db = M.is_date(b[field]) and b[field] or nil
+    if da and db and da ~= db then
+      if newest_first then
+        return da > db
+      end
+      return da < db
+    end
+    if (da ~= nil) ~= (db ~= nil) then
+      return da ~= nil
+    end
+    return M.compare(a, b)
+  end
+end
+
+---Alphabetical regardless of case; a tie is the default order.
+---@param a Tasks.Task
+---@param b Tasks.Task
+---@return boolean
+local function compare_title(a, b)
+  local ta, tb = tostring(a.title or ""):lower(), tostring(b.title or ""):lower()
+  if ta ~= tb then
+    return ta < tb
+  end
+  return M.compare(a, b)
+end
+
 ---`frecency` here is only the fallback (no scores known: the default order);
 ---`M.sort` builds the real comparator from the scores it is given.
 ---@type table<string, fun(a: Tasks.Task, b: Tasks.Task): boolean>
@@ -1334,6 +1380,12 @@ local COMPARATORS = {
   roi = M.compare_roi,
   frecency = M.compare,
   due = compare_due,
+  ["created-desc"] = by_date("created", true),
+  ["created-asc"] = by_date("created", false),
+  ["updated-desc"] = by_date("updated", true),
+  ["updated-asc"] = by_date("updated", false),
+  remind = by_date("remind", false),
+  title = compare_title,
 }
 
 ---Highest frecency score first; equal (or no) scores fall back to the default order.

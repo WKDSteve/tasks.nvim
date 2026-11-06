@@ -460,17 +460,22 @@ function M.sort_from_stored(value)
   return order or "default"
 end
 
+---What `o` cycles through. Not all of `model.SORTS`: twelve presses to get back is no shortcut, and the orders by
+---date and title stay reachable through `--sort=` and a saved list.
+---@type string[]
+local CYCLE = vim.list_slice(model.SORTS, 1, 6)
+
 ---The next sort order after `cur`, wrapping around (`o` key); an unknown or
 ---missing one counts as the default and so moves on to the second.
 ---@param cur string|nil
 ---@return string
 function M.cycle_sort(cur)
-  for i, s in ipairs(model.SORTS) do
+  for i, s in ipairs(CYCLE) do
     if s == (cur or "default") then
-      return model.SORTS[i % #model.SORTS + 1]
+      return CYCLE[i % #CYCLE + 1]
     end
   end
-  return model.SORTS[2]
+  return CYCLE[2]
 end
 
 ---@param f Tasks.Filter|nil

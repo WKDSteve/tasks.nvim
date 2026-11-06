@@ -88,7 +88,10 @@ return function(H)
   end
 
   -- ── sort: prio, then effort ascending ───────────────────────────────────
-  eq(model.SORTS, { "default", "prio-effort", "severity", "frecency", "roi", "due" })
+  eq(
+    vim.list_slice(model.SORTS, 1, 6),
+    { "default", "prio-effort", "severity", "frecency", "roi", "due" }
+  )
   eq(model.parse_sort(nil), "default")
   eq(model.parse_sort(""), "default")
   eq(model.parse_sort("prio-effort"), "prio-effort")

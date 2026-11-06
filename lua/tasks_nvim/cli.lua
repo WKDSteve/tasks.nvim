@@ -65,11 +65,14 @@ commands:
        [--stale=<days>|refs] [--stale-refs] [--blocked] [--reminders] [--ready|--waiting] [--unestimated] [--quick-win]
        [--overdue] [--due-before=YYYY-MM-DD] [--starts-after=YYYY-MM-DD]
        [--sheet=red,stale,never,inbox,manual,green,unknown|any]
-       [--sort=default|prio-effort|severity|frecency|roi|due] [--format=tsv|ids|json] [--done]   open tasks, sorted; one line each
+       [--sort=default|prio-effort|severity|frecency|roi|due|created-desc|created-asc|updated-desc|updated-asc|remind|title]
+       [--format=tsv|ids|json] [--done]   open tasks, sorted; one line each
        (--format=json: the tasks.list document in plan order or that of --sort, with [--limit=1..100] [--offset=N]; --done: the finished tasks)
        (categories: @CATEGORIES@; --category=bug also finds kind=bug;
         --sort=prio-effort: small first within a prio; --sort=severity: critical first;
         --sort=roi: most value per effort first, tasks without value or effort last;
+        --sort=created-desc|created-asc|updated-desc|updated-asc: by that date, a task without it last either way;
+        --sort=remind: next reminder first, without one last; --sort=title: alphabetical, regardless of case;
         --actor=me also finds status=decision and the tag needs-user; none = nobody classified it;
         --sort=frecency: what the dashboard opened or changed most, from the frecency file)
        (--ready: nothing open blocks it; --waiting: an open blocker; --unestimated: no effort or no value;
