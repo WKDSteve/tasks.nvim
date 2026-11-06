@@ -72,6 +72,11 @@ return function(H)
   )
   config.merge({ vaults = { main = 3 } })
   ok(#config.ignored() == 1, "a non-string folder is reported")
+  config.merge({ vaults = { ["my vault"] = main } })
+  ok(
+    #config.ignored() == 1 and config.ignored()[1]:find("my vault", 1, true),
+    "a name with a space is reported"
+  )
   config.merge({ vaults = { main = main } })
   eq(#config.ignored(), 0)
   eq(config.get().vaults.main, vim.fs.normalize(main))

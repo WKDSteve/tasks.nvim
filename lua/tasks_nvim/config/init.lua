@@ -98,6 +98,12 @@ local function check(kind, value)
         if type(name) ~= "string" or type(path) ~= "string" then
           return false, nil, "a table of name = folder (strings)"
         end
+        -- the name is typed after `:TasksVault switch`, so it is a plain word (no spaces)
+        if not require("tasks_nvim.vault").valid_area(name) then
+          return false,
+            nil,
+            ("a table whose names are plain words (letters, digits, _ . -), not '%s'"):format(name)
+        end
         kept[name] = vim.fs.normalize(path)
       end
       return true, kept, nil
