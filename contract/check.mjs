@@ -156,6 +156,13 @@ mutate("an estimate without its range", "estimate", (d) => delete d.range);
 mutate("an estimate that counts assumptions as text", "estimate", (d) => (d.assumed = "two"));
 mutate("a body without its etag", "bodies-page", (d) => delete d.items[0].etag);
 mutate("a body page with a field nobody defined", "bodies-page", (d) => (d.items[0].path = "x"));
+mutate("a waits_for that is no key", "list-waits-for", (d) => (d.items[0].waits_for = "My Mac"));
+mutate("a waits_for of the filter word none", "list-waits-for", (d) => (d.items[0].waits_for = "none"));
+mutate("a waits_for that is a list of keys", "list-waits-for", (d) => (d.items[0].waits_for = ["mac", "licence"]));
+mutate("a waits overview without the number of parked tasks", "waits", (d) => delete d.parked);
+mutate("a waits key that no task waits for", "waits", (d) => (d.keys[0].count = 0));
+mutate("a waits key without its areas", "waits", (d) => delete d.keys[0].areas);
+mutate("a waits overview with the tasks of a key", "waits", (d) => (d.keys[0].ids = ["lib.nvim/delta"]));
 mutate(
   "an operation outcome nobody defined",
   "result-run",

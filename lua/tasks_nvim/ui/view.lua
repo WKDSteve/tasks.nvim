@@ -150,6 +150,14 @@ local COLUMNS = {
       return model.actor(t) or ""
     end,
   },
+  {
+    -- Appended, never inserted (see Severity): what a parked task waits for from outside.
+    header = "Waits for",
+    csv_only = true,
+    get = function(t)
+      return t.waits_for or ""
+    end,
+  },
 }
 
 ---Where `:Tasks list --to=` puts the tasks: `kind` is `buffer`, `clipboard`, `qf`, `file`, `echo` or `mdview`; `path` only for `file`.

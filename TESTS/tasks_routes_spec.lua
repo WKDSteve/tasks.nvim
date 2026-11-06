@@ -263,8 +263,8 @@ return function(H)
       local csv = lines_of(assert(H.read(csv_path)))
       eq(
         csv[1],
-        "Task,Status,Prio,Effort,Kind,Updated,Title,Tags,Blocked by,Summary,Path,Severity,Value,ROI,Actor",
-        "the CSV columns are appended (Severity, Value, ROI, Actor), never inserted"
+        "Task,Status,Prio,Effort,Kind,Updated,Title,Tags,Blocked by,Summary,Path,Severity,Value,ROI,Actor,Waits for",
+        "the CSV columns are appended (Severity, Value, ROI, Actor, Waits for), never inserted"
       )
       eq(#csv, 3, "header and two rows")
       has(

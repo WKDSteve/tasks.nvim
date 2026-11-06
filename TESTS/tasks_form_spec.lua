@@ -251,8 +251,9 @@ return function(H)
   eq(in_form, FORM_FIELDS, "the fields of the :Tasks new form")
   local engine_new = {}
   for name in pairs(require("tasks_nvim.ops").NEW_FIELDS) do
-    -- the slug comes from the title
-    if name ~= "slug" then
+    -- the slug comes from the title; `waits_for` creates a task that is parked from the start, which no form offers
+    -- (a task is parked with a reason later: `set <id> waits_for=<key>`)
+    if name ~= "slug" and name ~= "waits_for" then
       engine_new[#engine_new + 1] = name
     end
   end

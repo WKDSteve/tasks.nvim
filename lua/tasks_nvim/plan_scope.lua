@@ -300,6 +300,7 @@ local FILTER_KEYS = {
   "tag",
   "category",
   "severity",
+  "waits_for",
   "value",
   "actor",
   "stale",

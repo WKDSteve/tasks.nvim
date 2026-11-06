@@ -1,5 +1,5 @@
 ---@module 'tasks_nvim.cli'
----@brief Command-line front end of the task engine: `list`, `index`, `new`, `set`, `done`, `attach`, `folderize`, `check`, `template`, `areas`, `export`.
+---@brief Command-line front end of the task engine: `list`, `index`, `new`, `set`, `done`, `attach`, `folderize`, `check`, `template`, `areas`, `export`, `waits`, `release`.
 ---@description
 --- `run(argv, io)` parses one command line, calls the engine and prints plain,
 --- tab-separated lines; it returns the exit code and never raises. The
@@ -38,6 +38,7 @@ local plan_view = require("tasks_nvim.plan_view")
 local scan = require("tasks_nvim.scan")
 local staleness = require("tasks_nvim.staleness")
 local vault = require("tasks_nvim.vault")
+local waits = require("tasks_nvim.waits")
 
 local M = {}
 
@@ -62,6 +63,7 @@ usage: nvim --headless -u NONE -l scripts/tasks.lua <command> [args]
 commands:
   list [<area>] [--status=a,b] [--prio=1,2|<=2] [--effort=S,M|<=M] [--kind=k] [--tag=t]
        [--category=c,d] [--severity=high,critical] [--value=4,5|>=4] [--actor=cdx,me,pair,none]
+       [--waits-for=key,key|none]
        [--stale=<days>|refs] [--stale-refs] [--blocked] [--reminders] [--ready|--waiting] [--unestimated] [--quick-win]
        [--overdue] [--due-before=YYYY-MM-DD] [--starts-after=YYYY-MM-DD]
        [--sheet=red,stale,never,inbox,manual,green,unknown|any]
@@ -74,7 +76,8 @@ commands:
         --sort=created-desc|created-asc|updated-desc|updated-asc: by that date, a task without it last either way;
         --sort=remind: next reminder first, without one last; --sort=title: alphabetical, regardless of case;
         --actor=me also finds status=decision and the tag needs-user; none = nobody classified it;
-        --sort=frecency: what the dashboard opened or changed most, from the frecency file)
+        --sort=frecency: what the dashboard opened or changed most, from the frecency file;
+        --waits-for: the parked tasks that wait for one of these keys (`waits_for:`), none = parked without a reason)
        (--ready: nothing open blocks it; --waiting: an open blocker; --unestimated: no effort or no value;
         --quick-win: value and effort at the quick-win thresholds, see `quickwins`;
         --reminders: a reminder (`remind:`) that is due, its date is today or earlier;
@@ -112,11 +115,18 @@ commands:
                                           needs-user) and leave every other task EMPTY; dry run unless --write
   new <area>[,<area>...] <title> [--kind=k] [--prio=1..3] [--effort=XS..XL|0.5d] [--value=1..5] [--actor=cdx|me|pair] [--after=id,id] [--order=2.5] [--plan=id] [--phase=word] [--tags=a,b]
        [--category=c,d] [--scope=a,b] [--severity=low|medium|high|critical] [--due=YYYY-MM-DD] [--start=YYYY-MM-DD] [--refs=path,repo@sha] [--links=https://...,...]
-       [--summary=text] [--slug=slug] [--status=s]
+       [--summary=text] [--slug=slug] [--status=s] [--waits-for=key]
        [--lang=de|en] [--folder]             create a task file (--lang: body headings;
                                                --folder: a folder task that can hold assets;
+                                               --waits-for: created parked, waiting for that key;
                                                scopes: @SCOPES@)
-  set <area>/<slug> key=value ...         change frontmatter (empty value removes the key)
+  set <area>/<slug> key=value ...         change frontmatter (empty value removes the key); waits_for=<key> parks
+                                          the task with that reason, any other status drops the reason again
+  waits [<area>] [--format=tsv|json]      what the parked tasks wait for: per `waits_for` key the number of tasks
+                                          and their areas, then the parked ones without a reason and the total
+                                          (json: the tasks.waits document)
+  release <key> [--dry-run]               bring back what waited for <key>: every parked task with waits_for=<key>
+                                          gets status open and loses the key; --dry-run only names the tasks
   answer <area>/<slug> <q1|#n> <n|clear>  answer a question of the `## Offene Fragen` section: tick option n (1-based),
                                           or take the answer back (clear)
   done <area>/<slug> [--commits=repo@sha,repo@sha] [--done-in=text] [--date=YYYY-MM-DD] [--remind=7d|YYYY-MM-DD]
@@ -193,6 +203,7 @@ local SPECS = {
       "tag",
       "category",
       "severity",
+      "waits-for",
       "value",
       "actor",
       "stale",
@@ -232,6 +243,7 @@ local SPECS = {
       "tag",
       "category",
       "severity",
+      "waits-for",
       "value",
       "actor",
       "stale",
@@ -251,6 +263,7 @@ local SPECS = {
       "tag",
       "category",
       "severity",
+      "waits-for",
       "value",
       "actor",
       "stale",
@@ -266,6 +279,7 @@ local SPECS = {
       "kind",
       "category",
       "severity",
+      "waits-for",
       "value",
       "actor",
       "tag",
@@ -287,6 +301,7 @@ local SPECS = {
       "tag",
       "category",
       "severity",
+      "waits-for",
       "actor",
       "stale",
       "min-value",
@@ -326,10 +341,13 @@ local SPECS = {
       "slug",
       "status",
       "title",
+      "waits-for",
     },
     flag = { "no-index", "folder" },
   },
   set = { value = {}, flag = { "no-index" } },
+  waits = { value = { "format" }, flag = {} },
+  release = { value = {}, flag = { "dry-run", "no-index" } },
   answer = { value = {}, flag = { "no-index" } },
   ["migrate-actor"] = { value = {}, flag = { "write", "no-index" } },
   done = {
@@ -450,6 +468,7 @@ local function filter_option_map(opt)
     tag = opt.tag --[[@as string|nil]],
     category = opt.category --[[@as string|nil]],
     severity = opt.severity --[[@as string|nil]],
+    waits_for = opt["waits-for"] --[[@as string|nil]],
     value = opt.value --[[@as string|nil]],
     actor = opt.actor --[[@as string|nil]],
     stale = opt.stale --[[@as string|nil]],
@@ -600,6 +619,11 @@ function commands.list(ctx)
         cellv(t.updated or t.created),
         cellv(t.title),
       }
+      -- a trailing cell, only for a parked task that names a reason: every other line stays what it was
+      local mark = waits.mark(t)
+      if mark then
+        cells[#cells + 1] = mark
+      end
       if report then
         cells[#cells + 1] = "changed: " .. staleness.describe(report.stale[t.id] or {}, 5)
       end
@@ -831,8 +855,9 @@ function commands.quickwins(ctx)
     ctx.warn("error: " .. tostring(terr))
     return 2
   end
-  if opt.status == nil then
-    -- A parked or blocked task is not something to start: the default is what can be picked up.
+  if opt.status == nil and opt["waits-for"] == nil then
+    -- A parked or blocked task is not something to start: the default is what can be picked up. `--waits-for` asks
+    -- for parked tasks, so it leaves the default out.
     opt.status = "open,doing,decision"
   end
   local scope, code = load_scope(ctx, "quickwins")
@@ -891,6 +916,9 @@ local function def_from_options(opt)
     if opt[key] ~= nil then
       def[key] = tostring(opt[key])
     end
+  end
+  if opt["waits-for"] ~= nil then
+    def.waits_for = tostring(opt["waits-for"])
   end
   def.blocked = opt.blocked == true or nil
   def.reminders = opt.reminders == true or nil
@@ -1263,6 +1291,7 @@ function commands.new(ctx)
     summary = opt.summary --[[@as string|nil]],
     slug = opt.slug --[[@as string|nil]],
     status = opt.status --[[@as string|nil]],
+    waits_for = opt["waits-for"] --[[@as string|nil]],
     folder = opt.folder == true,
     index = not opt["no-index"],
   }
@@ -1321,6 +1350,96 @@ function commands.set(ctx)
   ctx.say(("set\t%s\t%s\t%s"):format(res.id, res.changed and "changed" or "unchanged", res.path))
   report_index(ctx, res)
   return 0
+end
+
+---`waits [<area>] [--format=tsv|json]`: what the parked tasks wait for.
+function commands.waits(ctx)
+  local format = ctx.args.opt.format or "tsv"
+  if format ~= "tsv" and format ~= "json" then
+    ctx.warn("error: --format must be tsv or json")
+    return 2
+  end
+  local area, area_ok = area_arg(ctx, "waits")
+  if not area_ok then
+    return 2
+  end
+  if format == "json" then
+    return contract_cli.waits_json(ctx, area)
+  end
+  local open, skipped, errors = scan.open_tasks({ root = ctx.eo.root, area = area })
+  if not open then
+    ctx.warn("error: " .. tostring(skipped))
+    return 1
+  end
+  local sum = waits.summary(open)
+  for _, k in ipairs(sum.keys) do
+    ctx.say(("%s\t%d\t%s"):format(k.key, k.count, fsio.clean(table.concat(k.areas, ","))))
+  end
+  ctx.say(("parked without a reason: %d"):format(sum.without))
+  if sum.invalid > 0 then
+    ctx.say(("parked with an invalid waits_for: %d (see check)"):format(sum.invalid))
+  end
+  ctx.say(("parked: %d"):format(sum.parked))
+  if type(errors) == "table" and #errors > 0 then
+    for _, e in ipairs(errors) do
+      ctx.warn("warn: cannot read directory " .. e)
+    end
+    return 1
+  end
+  return 0
+end
+
+---`release <key> [--dry-run]`: every parked task that waits for the key goes back to `open`.
+function commands.release(ctx)
+  local args, eo = ctx.args, ctx.eo
+  local key = args.pos[1]
+  if not key or #args.pos > 1 then
+    ctx.warn("error: usage: release <key> [--dry-run]   (the keys: `waits`)")
+    return 2
+  end
+  if not model.is_waits_for(key) then
+    ctx.warn("error: " .. model.waits_for_error(key))
+    return 2
+  end
+  local res, err = require("tasks_nvim.batch").release(key, {
+    root = eo.root,
+    today = eo.today,
+    index = not args.opt["no-index"],
+    dry_run = args.opt["dry-run"] == true,
+  })
+  if not res then
+    ctx.warn("error: " .. tostring(err))
+    return 1
+  end
+  for _, e in ipairs(res.incomplete) do
+    ctx.warn("warn: cannot read directory " .. e .. " (tasks in it were not looked at)")
+  end
+  if #res.ids == 0 then
+    ctx.warn(("error: no parked task waits for '%s' (the keys in use: `waits`)"):format(key))
+    return 1
+  end
+  if res.dry_run then
+    for _, id in ipairs(res.ids) do
+      ctx.say("would-release\t" .. fsio.clean(id))
+    end
+    ctx.say(("release\t%s\tdry-run\t%d task(s); nothing written"):format(key, #res.ids))
+    return #res.incomplete > 0 and 1 or 0
+  end
+  local done = assert(res.result)
+  for _, changed in ipairs(done.changed) do
+    ctx.say("released\t" .. fsio.clean(changed.id))
+  end
+  for _, id in ipairs(done.unchanged) do
+    ctx.say("unchanged\t" .. fsio.clean(id))
+  end
+  for _, f in ipairs(done.failed) do
+    ctx.warn(("error: %s: %s"):format(f.id, f.err))
+  end
+  for _, e in ipairs(done.index_errors) do
+    ctx.warn("warn: index " .. e)
+  end
+  ctx.say(("release\t%s\t%d released, %d failed"):format(key, #done.changed, #done.failed))
+  return (#done.failed > 0 or #res.incomplete > 0) and 1 or 0
 end
 
 function commands.answer(ctx)

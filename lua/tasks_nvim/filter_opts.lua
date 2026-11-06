@@ -42,12 +42,12 @@ end
 
 ---Turn the textual filter options of a front end (`--status=a,b`, `--prio=<=2`,
 ---`--effort=S,M` / `<=M`, `--kind`, `--tag`, `--category`, `--severity`,
----`--stale=<days>`, `--blocked`) into a `Tasks.Filter`.
+---`--waits-for=a,b|none`, `--stale=<days>`, `--blocked`) into a `Tasks.Filter`.
 ---Shared by the headless CLI and the editor commands so both read the same
 ---words the same way. Unknown words are an error, never silently ignored.
 ---`stale` may be a number, a digit string or `refs` (same as `stale_refs`: a
 ---file named in `refs` changed since `updated`); `today` is passed through.
----@param opt { plan?: string, phase?: string, status?: string, prio?: string|integer, effort?: string, kind?: string, tag?: string, category?: string, severity?: string, value?: string|integer, actor?: string, stale?: string|integer, stale_refs?: boolean, blocked?: boolean, reminders?: boolean, overdue?: boolean, due_before?: string, starts_after?: string, unestimated?: boolean, quick_win?: boolean, sheet?: string, today?: string }
+---@param opt { plan?: string, phase?: string, status?: string, prio?: string|integer, effort?: string, kind?: string, tag?: string, category?: string, severity?: string, waits_for?: string, value?: string|integer, actor?: string, stale?: string|integer, stale_refs?: boolean, blocked?: boolean, reminders?: boolean, overdue?: boolean, due_before?: string, starts_after?: string, unestimated?: boolean, quick_win?: boolean, sheet?: string, today?: string }
 ---@return Tasks.Filter|nil filter
 ---@return string|nil err
 function M.parse(opt)
@@ -170,6 +170,23 @@ function M.parse(opt)
         return nil, "unknown severity in --severity: " .. v
       end
     end
+  end
+  if opt.waits_for then
+    -- the keys are the vault's own words, so only their shape is checked; `none`: parked without a reason
+    local list, lerr = listed(opt.waits_for, "waits-for")
+    if not list then
+      return nil, lerr
+    end
+    for _, key in ipairs(list) do
+      if not (model.is_waits_for(key) or key == model.WAITS_FOR_NONE) then
+        return nil,
+          ("invalid key in --waits-for: %s (lower-case words of a-z, 0-9 and -, or %s)"):format(
+            key,
+            model.WAITS_FOR_NONE
+          )
+      end
+    end
+    f.waits_for = list
   end
   if opt.value ~= nil then
     local raw = tostring(opt.value)

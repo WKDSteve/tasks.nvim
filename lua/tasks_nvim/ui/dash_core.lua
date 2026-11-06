@@ -31,6 +31,7 @@ local plan = require("tasks_nvim.plan")
 local plan_scope = require("tasks_nvim.plan_scope")
 local scan = require("tasks_nvim.scan")
 local vault = require("tasks_nvim.vault")
+local waits = require("tasks_nvim.waits")
 
 local M = {}
 
@@ -57,6 +58,7 @@ M.FILTER_DIMS = {
   "kind",
   "category",
   "severity",
+  "waits_for",
   "value",
   "actor",
   "tag",
@@ -343,6 +345,11 @@ function M.parts(t, w, ready)
   if t.severity then
     parts[#parts + 1] = { "  [" .. t.severity .. "]", M.SEVERITY_HL[t.severity] or "Comment" }
   end
+  -- what a parked task waits for from outside
+  local waits_mark = waits.mark(t)
+  if waits_mark then
+    parts[#parts + 1] = { "  [" .. waits_mark .. "]", "Comment" }
+  end
   if t.value then
     parts[#parts + 1] = { "  v" .. t.value, "Comment" }
   end
@@ -385,6 +392,7 @@ function M.search_text(t)
     t.effort or "",
     t.kind or "",
     t.severity or "",
+    waits.mark(t) or "",
     t.value and ("v%d"):format(t.value) or "",
     model.actor(t) or "",
     table.concat(model.categories(t), " "),
@@ -517,6 +525,9 @@ function M.chips(f)
   end
   if f.severity and #f.severity > 0 then
     chips[#chips + 1] = "severity: " .. joined(f.severity)
+  end
+  if f.waits_for and #f.waits_for > 0 then
+    chips[#chips + 1] = "waits for: " .. joined(f.waits_for)
   end
   if quick then
     -- see the effort chip
@@ -665,6 +676,7 @@ function M.set_dim(f, dim, value)
     or dim == "kind"
     or dim == "category"
     or dim == "severity"
+    or dim == "waits_for"
     or dim == "actor"
     or dim == "tag"
     or dim == "plan"
@@ -698,6 +710,15 @@ function M.dim_choices(dim, tasks)
     return { "cdx", "me", "pair", "none" }
   elseif dim == "readiness" then
     return { "ready", "waiting" }
+  elseif dim == "waits_for" then
+    -- the keys the parked tasks of the scope name, then `none` for the ones without a reason
+    local out = {}
+    for _, k in ipairs(waits.summary(tasks).keys) do
+      out[#out + 1] = k.key
+    end
+    table.sort(out)
+    out[#out + 1] = model.WAITS_FOR_NONE
+    return out
   elseif dim == "plan" or dim == "phase" then
     local seen, out = {}, {}
     for _, t in ipairs(tasks) do
@@ -753,6 +774,9 @@ function M.filter_to_options(f)
   end
   if f.severity and #f.severity > 0 then
     o.severity = joined(f.severity)
+  end
+  if f.waits_for and #f.waits_for > 0 then
+    o.waits_for = joined(f.waits_for)
   end
   if f.value_min then
     o.value = ">=" .. f.value_min
@@ -811,6 +835,7 @@ function M.filter_from_stored(opts)
     tag = type(opts.tag) == "string" and opts.tag or nil,
     category = type(opts.category) == "string" and opts.category or nil,
     severity = type(opts.severity) == "string" and opts.severity or nil,
+    waits_for = type(opts.waits_for) == "string" and opts.waits_for or nil,
     value = (type(opts.value) == "string" or type(opts.value) == "number") and opts.value or nil,
     actor = type(opts.actor) == "string" and opts.actor or nil,
     stale = (type(opts.stale) == "string" or type(opts.stale) == "number") and opts.stale or nil,

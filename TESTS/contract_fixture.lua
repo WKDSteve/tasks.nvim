@@ -2,7 +2,7 @@
 -- Never the real vault, never anybody's private area: every name, title and path here is made up. Every date is fixed,
 -- so the bytes of every file (and with them every `etag`, `rev` and `digest`) are the same on every machine and run.
 --
--- What it holds, on purpose: every readiness state (ready, waiting, stuck, freed, parked, decision, a cycle, a
+-- What it holds, on purpose: every readiness state (ready, waiting, stuck, freed, parked with a `waits_for`, decision, a cycle, a
 -- finished blocker), a plan file with phases, a same-file conflict, an absolute `refs:` entry, a hostile title, a
 -- non-ASCII title, steps, a broken task, a task that says `done` inside `ROADMAP/`, and a task with a status nobody knows.
 
@@ -86,7 +86,15 @@ function M.build(H)
   )
 
   -- parked, and a task stuck behind it
-  task(H, root, "lib.nvim", "delta", { { "prio", "3" } }, "parked", "Delta is parked")
+  task(
+    H,
+    root,
+    "lib.nvim",
+    "delta",
+    { { "prio", "3" }, { "waits_for", "mac" } },
+    "parked",
+    "Delta is parked"
+  )
   task(
     H,
     root,

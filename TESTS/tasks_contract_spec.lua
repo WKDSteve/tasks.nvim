@@ -82,6 +82,7 @@ return function(H)
     "tick_step",
     "view_delete",
     "view_save",
+    "waits_for",
   }) do
     table.insert(expected_caps, feature)
   end
@@ -789,6 +790,38 @@ return function(H)
   eq(by_name["cascade.nvim"].open, 4)
   eq(by_name["lib.nvim"].by_status, { blocked = 1, decision = 1, doing = 1, open = 6, parked = 1 })
   golden("areas")
+
+  -- ── waits: what the parked tasks wait for; a task carries the key, `list` and `order` filter by it ──
+  local wt, wt_text = call("waits")
+  eq(wt.kind, "tasks.waits")
+  eq({ wt.parked, wt.without_reason, wt.invalid }, { 1, 0, 0 })
+  eq(wt.keys, { { key = "mac", count = 1, areas = { "lib.nvim" } } })
+  eq(wt.rev, call("snapshot").rev, "the same rev as the snapshot of the same vault")
+  lacks(wt_text, root, "no path of this machine")
+  local wt_area, wt_area_text = call("waits", { area = "cascade.nvim" })
+  eq({ wt_area.parked, wt_area.without_reason }, { 0, 0 }, "of one area")
+  has(wt_area_text, '"keys":[]', "no key is an empty list, not an object")
+  local _, _, wt_code = call("waits", { area = "nowhere" })
+  eq(wt_code, "not_found")
+  golden("waits")
+  for _, t in ipairs(call("snapshot").tasks) do
+    eq(
+      t.waits_for,
+      t.id == "lib.nvim/delta" and "mac" or nil,
+      t.id .. ": only the task that names a key has one"
+    )
+  end
+  local by_key = call("list", { waits_for = { "mac" } })
+  eq(
+    { by_key.total, by_key.items[1].id, by_key.items[1].waits_for },
+    { 1, "lib.nvim/delta", "mac" }
+  )
+  eq(call("list", { waits_for = { "none" } }).total, 0, "no task is parked without a reason")
+  eq(call("list", { waits_for = { "none", "mac" } }).total, 1)
+  eq(call("order", { waits_for = { "mac" } }).ids, { "lib.nvim/delta" })
+  local _, _, key_code = call("list", { waits_for = { "My Mac" } })
+  eq(key_code, "invalid_argument", "a filter word that is no key is refused, not ignored")
+  golden("list-waits-for")
 
   -- ── links: where the areas hang together ──
   local lk = call("links")

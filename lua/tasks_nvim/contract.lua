@@ -7,7 +7,7 @@
 --- the JSON Schemas in `schemas/tasks-export/1/`. The Markdown files stay the single source of truth.
 ---
 --- Documents (`kind`): `tasks.hello`, `tasks.snapshot`, `tasks.list`, `tasks.task`, `tasks.next`, `tasks.areas`, `tasks.finished`, `tasks.links`, `tasks.groupings`, `tasks.views`,
---- `tasks.error`. Every one starts with the same head (`schema`, `plugin`, `kind`, `generated_at`, `vault.id`,
+--- `tasks.waits`, `tasks.error`. Every one starts with the same head (`schema`, `plugin`, `kind`, `generated_at`, `vault.id`,
 --- `engine`); a document that comes from a scan also carries `rev` (what the vault looked like) and `digest` (the hash
 --- of the content: without `generated_at` and `engine`, so two runs on an unchanged vault have the same digest).
 ---
@@ -37,6 +37,7 @@ local plan_scope = require("tasks_nvim.plan_scope")
 local scan = require("tasks_nvim.scan")
 local staleness = require("tasks_nvim.staleness")
 local vault = require("tasks_nvim.vault")
+local waits = require("tasks_nvim.waits")
 
 local M = {}
 
@@ -51,7 +52,8 @@ M.ENGINE_VERSION = "0.1.0-dev"
 ---What this engine can answer; an app shows only what is listed here. Sorted.
 ---`ops` is the write door (`set`, `new`, `reorder`, `done`, `move_area`, `plan_new`, `tick_step`, `add_steps`, `answer`, `append_note`, `reopen`, `set_body`, `view_save`, `view_delete`, `attach`), `if_match` the compare-and-set on a task's
 ---`etag`, `done_preview` what `done` needs first, `reorder` a move inside a group, `move_area_preview` the report of a
----move to another area (the move itself is not there yet).
+---move to another area (the move itself is not there yet). `waits_for` says that a task carries what it waits for
+---(`set` and `new` take the key, `list` and `order` filter by it), `waits` is the overview of those keys.
 ---@type string[]
 M.CAPABILITIES = {
   "add_steps",
@@ -89,6 +91,8 @@ M.CAPABILITIES = {
   "view_delete",
   "view_save",
   "views",
+  "waits",
+  "waits_for",
 }
 
 ---Sizes the contract promises to keep.
@@ -242,6 +246,9 @@ local function task_entry(root, task, node, rank)
     actor = model.actor(task),
     actor_written = task.actor ~= nil and model.is_actor(task.actor) or nil,
     severity = model.is_severity(task.severity) and task.severity or nil,
+    -- only a task that names a valid key, so a document without one reads as before (a value that is no key is the
+    -- `invalid-waits-for` problem of the task)
+    waits_for = model.is_waits_for(task.waits_for) and task.waits_for or nil,
     created = model.is_date(task.created) and task.created or nil,
     updated = model.is_date(task.updated) and task.updated or nil,
     -- the date only; whether it is due is for the reader to say (a digest does not change with the day)
@@ -714,6 +721,21 @@ local function matching_tasks(params, opts)
       want[s] = true
     end
   end
+  if params.waits_for ~= nil then
+    for _, key in ipairs(params.waits_for) do
+      if not (model.is_waits_for(key) or key == model.WAITS_FOR_NONE) then
+        return nil,
+          {
+            code = "invalid_argument",
+            message = ("waits_for: '%s' is no key (lower-case words of a-z, 0-9 and -, or %s)"):format(
+              tostring(key),
+              model.WAITS_FOR_NONE
+            ),
+            retryable = false,
+          }
+      end
+    end
+  end
   local matching = {}
   local ordered = vim.list_slice(view.open, 1)
   table.sort(ordered, function(a, b)
@@ -726,6 +748,10 @@ local function matching_tasks(params, opts)
   end
   if opts and opts.filter and next(opts.filter) ~= nil then
     matching = (model.filter(matching, opts.filter))
+  end
+  if params.waits_for ~= nil and #params.waits_for > 0 then
+    -- the parked tasks that wait for one of the keys (`none`: parked without a reason)
+    matching = (model.filter(matching, { waits_for = params.waits_for }))
   end
   if opts and opts.readiness then
     local kept, kerr = plan_scope.filter_readiness(matching, opts.readiness, view.root, view.shared)
@@ -743,7 +769,7 @@ end
 
 ---A page of tasks in plan order, optionally of one area or status. The command line adds what the dispatcher does not
 ---offer (`opts.filter`: every filter of `list`; `opts.readiness`: `ready` or `waiting`).
----@param params? { area?: string, status?: string[], limit?: integer, offset?: integer }
+---@param params? { area?: string, status?: string[], waits_for?: string[], limit?: integer, offset?: integer }
 ---@param opts? { root?: string, view?: Tasks.ContractView, filter?: Tasks.Filter, readiness?: "ready"|"waiting" }
 ---@return table|nil doc
 ---@return Tasks.ContractError|string|nil err
@@ -795,7 +821,7 @@ end
 
 ---The ids of the open tasks in the order of `sort` (one of `model.SORTS`; none or "default" is the plan's order), all in
 ---one document: a reader that lays tasks it already holds along an order does not page through `list` for it.
----@param params? { area?: string, status?: string[], sort?: string }
+---@param params? { area?: string, status?: string[], waits_for?: string[], sort?: string }
 ---@param opts? { root?: string, view?: Tasks.ContractView, scores?: table<string, number> }
 ---@return table|nil doc
 ---@return Tasks.ContractError|string|nil err
@@ -1556,6 +1582,10 @@ function M.next(params, opts)
       for_me = pick.empty.for_me,
       blocked_status = pick.empty.blocked_status,
       parked = pick.empty.parked,
+      -- only when a parked task names what it waits for, so a document without one reads as before
+      waits_for = (pick.empty.waits_for and next(pick.empty.waits_for) ~= nil) and json.object(
+        vim.deepcopy(pick.empty.waits_for)
+      ) or nil,
       unlisted = pick.empty.unlisted,
       unreadable = pick.empty.unreadable,
     })
@@ -1582,6 +1612,52 @@ function M.areas(opts)
   doc.areas = areas_of(view)
   doc.area_groups = area_groups_of(view)
   return seal(doc, nil), nil
+end
+
+---What the parked tasks wait for: per `waits_for` key how many tasks and in which areas, the parked ones without a
+---reason, those whose `waits_for` is no key, and all parked ones. Of one area (or area group) or of the vault. The same
+---`rev` as the snapshot of the same vault.
+---@param params? { area?: string }
+---@param opts? { root?: string, view?: Tasks.ContractView }
+---@return table|nil doc
+---@return Tasks.ContractError|string|nil err
+function M.waits(params, opts)
+  params = params or {}
+  local view, err = opts and opts.view or nil, nil
+  if not view then
+    view, err = M.view(opts)
+  end
+  if not view then
+    return nil, err
+  end
+  local tasks = view.open
+  if params.area ~= nil then
+    local scope = vault.area_scope(view.root, params.area)
+    if not scope then
+      return nil,
+        {
+          code = "not_found",
+          message = "unknown area: " .. tostring(params.area),
+          retryable = false,
+        }
+    end
+    tasks = vim.tbl_filter(function(t)
+      return scope.set[t.area] == true
+    end, view.open)
+  end
+  local sum = waits.summary(tasks)
+  local doc = M.head("tasks.waits", view.root)
+  doc.parked = sum.parked
+  doc.without_reason = sum.without
+  doc.invalid = sum.invalid
+  doc.keys = json.memo(vim.tbl_map(function(k)
+    return json.object({ key = k.key, count = k.count, areas = k.areas })
+  end, sum.keys))
+  doc.incomplete = view.errors
+  local entries = vim.tbl_map(function(t)
+    return { id = t.id, etag = t.etag or etag_of(t.path) }
+  end, view.open)
+  return seal(doc, rev_of(view, entries)), nil
 end
 
 ---The Monday of the week a day falls in (`YYYY-MM-DD`). Plain day arithmetic (`os.time` has no answer for a year the

@@ -334,13 +334,17 @@ local function check_lang(lang)
 end
 
 ---Frontmatter keys in the order concept section 3 shows them.
----@param meta { title: string, status: string, kind?: string, prio?: integer|string, effort?: string, value?: integer|string, actor?: string, after?: string[], order?: number|string, plan?: string, phase?: string, tags?: string[], category?: string[], scope?: string[], severity?: string, due?: string, start?: string, refs?: string[], links?: string[], created: string, updated: string }
+---@param meta { title: string, status: string, kind?: string, prio?: integer|string, effort?: string, value?: integer|string, actor?: string, after?: string[], order?: number|string, plan?: string, phase?: string, tags?: string[], category?: string[], scope?: string[], severity?: string, waits_for?: string, due?: string, start?: string, refs?: string[], links?: string[], created: string, updated: string }
 ---@return table[] pairs
 local function meta_pairs(meta)
   local pairs_ = {
     { "title", meta.title },
     { "status", meta.status },
   }
+  if meta.waits_for then
+    -- right below the status it explains
+    pairs_[#pairs_ + 1] = { "waits_for", meta.waits_for }
+  end
   if meta.kind then
     pairs_[#pairs_ + 1] = { "kind", meta.kind }
   end
@@ -622,6 +626,7 @@ end
 local SETTABLE = {
   "title",
   "status",
+  "waits_for",
   "kind",
   "prio",
   "effort",
@@ -787,6 +792,12 @@ local FIELD_NORMALIZERS = {
     return model.resolve_remind(value, (ctx.opts and ctx.opts.today) or model.today())
   end,
   severity = one_of("severity", model.is_severity, model.SEVERITIES),
+  waits_for = function(value)
+    if not model.is_waits_for(value) then
+      return nil, model.waits_for_error(value)
+    end
+    return value
+  end,
   links = list_or_remove(link_list),
   category = list_or_remove(category_list),
   scope = list_or_remove(scope_list),
@@ -900,6 +911,61 @@ local function normalize_patch(patch, opts)
   return result, nil
 end
 
+---The `status` and the `waits_for` a normalised patch sets (nil: the patch does not name the key).
+---@param pairs_ table[]
+---@return any status
+---@return any waits
+local function status_and_waits(pairs_)
+  local status, waits
+  for _, kv in ipairs(pairs_) do
+    if kv[1] == "status" then
+      status = kv[2]
+    elseif kv[1] == "waits_for" then
+      waits = kv[2]
+    end
+  end
+  return status, waits
+end
+
+---What `set` and `new` say to a reason given together with a status other than `parked`.
+---@param status any
+---@return string
+local function waits_for_status_error(status)
+  return ("waits_for goes with status parked, not %s (leave the status out: the task is parked with the reason)"):format(
+    tostring(status)
+  )
+end
+
+---`waits_for` says why a task is `parked`, so the two keys move together in one write: a patch that takes the task out
+---of `parked` drops the key the file holds, and a patch that gives a reason to a task that is not parked parks it. A
+---patch that names both is taken as written (one that contradicts itself was refused before).
+---@param text string     # The file as it is now.
+---@param pairs_ table[]  # The normalised patch.
+---@return table[] pairs  # `pairs_` itself when nothing is added.
+local function couple_waits_for(text, pairs_)
+  local status, waits = status_and_waits(pairs_)
+  local leaves = status ~= nil and status ~= "parked" and waits == nil
+  local gives = waits ~= nil and waits ~= M.REMOVE and status == nil
+  if not (leaves or gives) then
+    return pairs_
+  end
+  local parsed = fm.parse(text)
+  local meta = parsed and parsed.meta or {}
+  local extra
+  if leaves and meta.waits_for ~= nil then
+    extra = { "waits_for", M.REMOVE }
+  elseif gives and meta.status ~= "parked" then
+    extra = { "status", "parked" }
+  end
+  if not extra then
+    return pairs_
+  end
+  local out = vim.list_slice(pairs_, 1)
+  out.typed = pairs_.typed
+  out[#out + 1] = extra
+  return out
+end
+
 ---A one-id `blocked_by`/`after` is written as a plain scalar. Where the file holds the key as a YAML block list
 ---(Obsidian's Properties editor writes those), the list stays a list: a one-element list keeps the style.
 ---@param text string
@@ -1007,13 +1073,22 @@ function M.new(area, opts)
   if not title then
     return nil, terr
   end
-  local status = opts.status or "open"
+  -- a task that names what it waits for starts parked
+  local status = opts.status or (opts.waits_for ~= nil and "parked" or "open")
   if not model.is_open_status(status) then
     return nil,
       ("unknown status '%s' (expected %s)"):format(
         tostring(status),
         table.concat(model.OPEN_STATUSES, ", ")
       )
+  end
+  if opts.waits_for ~= nil then
+    if not model.is_waits_for(opts.waits_for) then
+      return nil, model.waits_for_error(opts.waits_for)
+    end
+    if status ~= "parked" then
+      return nil, waits_for_status_error(status)
+    end
   end
   local kind = opts.kind or "task"
   if not model.is_kind(kind) then
@@ -1184,6 +1259,7 @@ function M.new(area, opts)
     meta_pairs({
       title = title,
       status = status,
+      waits_for = opts.waits_for,
       kind = kind,
       prio = prio,
       effort = opts.effort,
@@ -1439,6 +1515,12 @@ function M.set(id, patch, opts)
   if not pairs_ then
     return nil, perr
   end
+  do
+    local status, waits = status_and_waits(pairs_)
+    if waits ~= nil and waits ~= M.REMOVE and status ~= nil and status ~= "parked" then
+      return nil, waits_for_status_error(status)
+    end
+  end
   -- due and start together: a patch that touches one of them must leave a file that does not start after it is due.
   -- A patch that touches neither is not judged on them: a file that is wrong already (written by hand) stays editable.
   do
@@ -1458,7 +1540,10 @@ function M.set(id, patch, opts)
   ---@param cur string
   ---@return table[]
   local function written(cur)
-    return keep_block_lists(cur, link_forms(cur, pairs_, pairs_.typed, mode, resolver))
+    return keep_block_lists(
+      cur,
+      link_forms(cur, couple_waits_for(cur, pairs_), pairs_.typed, mode, resolver)
+    )
   end
 
   -- A link in the vault is a way out of it: `fm.update` would write through it into a file outside the vault.
@@ -1501,10 +1586,6 @@ function M.set(id, patch, opts)
     return result, nil
   end
 
-  local keys = {}
-  for _, kv in ipairs(pairs_) do
-    keys[#keys + 1] = kv[1]
-  end
   -- the day a finished task was finished is not the day its reminder was set
   if task.location ~= "backlog" then
     pairs_[#pairs_ + 1] = { "updated", today }
@@ -1522,6 +1603,13 @@ function M.set(id, patch, opts)
       return nil, e, info
     end
     result.etag_before = fsio.etag(cur)
+    -- every key this write touches, the one `couple_waits_for` adds included: the inverse puts it back
+    local keys = {}
+    for _, kv in ipairs(couple_waits_for(cur, pairs_)) do
+      if kv[1] ~= "updated" then
+        keys[#keys + 1] = kv[1]
+      end
+    end
     result.before = values_of(
       model.parse_text(cur, {
         path = task.path,
@@ -2015,12 +2103,17 @@ function M.reopen(id, opts)
       ),
       { code = "conflict", id = id, expected = opts.if_match, actual = etag }
   end
-  local new_text, uerr = fm.update_text(old_text, {
+  local reopened = {
     { "status", status },
     { "done_in", M.REMOVE },
     { "remind", M.REMOVE },
     { "updated", today },
-  })
+  }
+  if status ~= "parked" then
+    -- a reason to wait belongs to `parked` only
+    table.insert(reopened, 2, { "waits_for", M.REMOVE })
+  end
+  local new_text, uerr = fm.update_text(old_text, reopened)
   if not new_text then
     return nil, "cannot update " .. finished.path .. ": " .. tostring(uerr)
   end
@@ -2208,7 +2301,8 @@ local function plan_done(id, opts)
     return nil, "date must be YYYY-MM-DD"
   end
 
-  local patch = { { "status", "done" } }
+  -- a finished task waits for nothing
+  local patch = { { "status", "done" }, { "waits_for", M.REMOVE } }
   if opts.done_in ~= nil then
     local list, lerr = string_list(opts.done_in, "done_in")
     if not list then

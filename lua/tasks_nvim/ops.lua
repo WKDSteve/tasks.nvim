@@ -212,6 +212,7 @@ local NEW_FIELDS = {
   category = true,
   scope = true,
   severity = true,
+  waits_for = true,
   value = true,
   actor = true,
   summary = true,

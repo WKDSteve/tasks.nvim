@@ -13,7 +13,7 @@
 ---  - `compare` / `sort`: status rank, then prio, then area, then slug; the orders
 ---    `prio-effort` (small first within a prio), `severity` (critical first) and
 ---    `frecency` (what the dashboard touches most, from `tasks.frecency`)
----  - `filter`: status, prio, effort, kind, tag, category, severity, area, blocked, stale
+---  - `filter`: status, prio, effort, kind, tag, category, severity, area, blocked, stale, waits_for
 ---
 --- Not its job: finding files (`scan`), rendering (`index`), writing (`mutate`).
 
@@ -430,6 +430,35 @@ end
 ---@return boolean
 function M.is_severity(s)
   return type(s) == "string" and SEVERITY_RANK[s] ~= nil
+end
+
+---The longest `waits_for` key, in characters.
+M.WAITS_FOR_MAX = 40
+
+---What `--waits-for` calls a parked task that names no reason.
+M.WAITS_FOR_NONE = "none"
+
+---A `waits_for` key: what a parked task waits for from outside (`mac`, `budget-2027`). One lower-case slug of at most
+---`WAITS_FOR_MAX` characters; the words are the vault's own, there is no fixed list. `none` is no key: it is what the
+---filter calls a parked task without one.
+---@param s any
+---@return boolean
+function M.is_waits_for(s)
+  return type(s) == "string"
+    and #s <= M.WAITS_FOR_MAX
+    and s ~= M.WAITS_FOR_NONE
+    and s:match("^[a-z0-9][a-z0-9-]*$") ~= nil
+end
+
+---The message for a `waits_for` value that is no key.
+---@param value any
+---@return string
+function M.waits_for_error(value)
+  return ("invalid waits_for '%s' (one lower-case word of a-z, 0-9 and -, at most %d characters, not `%s`)"):format(
+    tostring(value),
+    M.WAITS_FOR_MAX,
+    M.WAITS_FOR_NONE
+  )
 end
 
 ---The most days an effort may name (ten years). A larger number is no effort: a sum of such numbers could not be
@@ -988,6 +1017,23 @@ function M.parse_text(text, ctx)
       end
     end
 
+    -- what a parked task waits for from outside; only `parked` gives the key a meaning
+    local waits_for = as_text(meta.waits_for, "waits_for", bad)
+    if waits_for then
+      task.waits_for = waits_for
+      if not M.is_waits_for(waits_for) then
+        bad("invalid-waits-for", M.waits_for_error(waits_for))
+      elseif M.is_status(task.status) and task.status ~= "parked" then
+        hints[#hints + 1] = {
+          code = "waits-for-without-parked",
+          msg = ("waits_for '%s' on a task that is %s: only a parked task waits (set status=parked or remove the key)"):format(
+            waits_for,
+            task.status
+          ),
+        }
+      end
+    end
+
     for _, field in ipairs({ "created", "updated", "remind", "due", "start" }) do
       local date = as_text(meta[field], field, bad)
       if date then
@@ -1513,6 +1559,7 @@ function M.filter(tasks, f)
   local category = to_set(f.category)
   local effort, severity = to_set(f.effort), to_set(f.severity)
   local value, actor = to_set(f.value), to_set(f.actor)
+  local waits_for = to_set(f.waits_for)
   local plan_set, phase_set = to_set(f.plan), to_set(f.phase)
   local sheet_set = to_set(f.sheet)
   local effort_max = f.effort_max and M.effort_days(f.effort_max) or nil
@@ -1573,6 +1620,10 @@ function M.filter(tasks, f)
       -- `none` matches the tasks nobody classified (not even by derivation).
       local who = M.actor(t) or "none"
       keep = actor[who] == true
+    end
+    if keep and waits_for then
+      -- only a parked task waits; `none` matches the parked ones that name no reason
+      keep = t.status == "parked" and waits_for[t.waits_for or M.WAITS_FOR_NONE] == true
     end
     if keep and plan_set and not (t.plan and plan_set[t.plan]) then
       keep = false

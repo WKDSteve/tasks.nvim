@@ -16,6 +16,8 @@
 ---  - `overdue` (warning): an open task (not `parked`) whose `due` date is before today (`opts.today`)
 ---  - `severity-without-bug-or-security` (warning): `severity` on a task that is
 ---    neither `kind: bug` nor in the bug/security category
+---  - `invalid-waits-for` (error): `waits_for` is not one key (a lower-case word of a-z, 0-9 and -, at most 40
+---    characters); `waits-for-without-parked` (warning): `waits_for` on a task that is not `parked`
 ---  - `slug`: the filename is not a kebab-case slug, or the file is nested
 ---    anywhere but as `<slug>/<slug>.md` (a folder task)
 ---  - `slug-conflict`: the same slug exists as a file and as a folder task

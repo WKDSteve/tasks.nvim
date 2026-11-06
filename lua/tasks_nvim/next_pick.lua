@@ -64,6 +64,7 @@ local M = {}
 ---@field for_me integer                        # Open tasks that are yours (actor me) and not startable.
 ---@field blocked_status integer                # `status: blocked` with nothing blocking (set them to open).
 ---@field parked integer
+---@field waits_for? table<string, integer>     # Of the parked ones: how many wait for each `waits_for` key.
 ---@field unlisted integer                      # Tasks whose `status` is none of the known ones: neither open nor done.
 ---@field unreadable integer                    # Folders that could not be read: "everything is done" cannot be said.
 
@@ -228,6 +229,7 @@ function M.pick(opts)
     unlisted = opts.unlisted or 0,
     unreadable = opts.unreadable or 0,
   }
+  local parked = {}
   for _, id in ipairs(built.ids) do
     local node = built.nodes[id]
     local state = node.state
@@ -237,11 +239,13 @@ function M.pick(opts)
       empty.blocked_status = empty.blocked_status + 1
     elseif state == "parked" then
       empty.parked = empty.parked + 1
+      parked[#parked + 1] = node.task
     end
     if model.actor(node.task) == "me" and state ~= "ready" and state ~= "decision" then
       empty.for_me = empty.for_me + 1
     end
   end
+  empty.waits_for = require("tasks_nvim.waits").counts(parked)
   if #opts.tasks == 0 and empty.unlisted == 0 and empty.unreadable == 0 then
     empty.kind = "all_done"
   elseif not opts.actor and #result.cdx > 0 then

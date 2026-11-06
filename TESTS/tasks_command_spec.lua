@@ -32,10 +32,12 @@ return function(H)
       "task planfile",
       "task preview",
       "task quickwins",
+      "task release",
       "task set",
       "task sheet-ai",
       "task sheet-run",
       "task template",
+      "task waits",
       "tasks",
       "tasks index",
     },
@@ -58,10 +60,12 @@ return function(H)
     "planfile",
     "preview",
     "quickwins",
+    "release",
     "set",
     "sheet-ai",
     "sheet-run",
     "template",
+    "waits",
   }, "the flat grammar of `:Tasks`: no two routes share a path")
   eq(#routes.routes({ flat = true }), #routes.routes(), "same number of routes")
 

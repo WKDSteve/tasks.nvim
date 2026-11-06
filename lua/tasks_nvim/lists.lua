@@ -67,6 +67,7 @@ end
 ---@field kind? string
 ---@field category? string
 ---@field severity? string
+---@field waits_for? string
 ---@field value? string|integer
 ---@field actor? string
 ---@field tag? string
@@ -99,6 +100,7 @@ local FIELDS = {
   kind = "string",
   category = "string",
   severity = "string",
+  waits_for = "string",
   value = "stringnum",
   actor = "string",
   tag = "string",
@@ -125,6 +127,7 @@ M.FIELD_ORDER = {
   "kind",
   "category",
   "severity",
+  "waits_for",
   "value",
   "actor",
   "tag",
@@ -192,6 +195,7 @@ local function option_map(def)
     kind = def.kind,
     category = def.category,
     severity = def.severity,
+    waits_for = def.waits_for,
     value = def.value,
     actor = def.actor,
     tag = def.tag,
@@ -336,6 +340,7 @@ function M.from_filter(filter, sort, area, desc)
     kind = joined(f.kind),
     category = joined(f.category),
     severity = joined(f.severity),
+    waits_for = joined(f.waits_for),
     actor = joined(f.actor),
     tag = joined(f.tag),
     plan = joined(f.plan),

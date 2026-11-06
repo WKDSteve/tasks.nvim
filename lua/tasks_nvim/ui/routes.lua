@@ -476,6 +476,12 @@ local LIST_FLAGS = {
     desc = "Only tasks with one of these severities",
   },
   {
+    name = "waits-for",
+    type = "STRING",
+    values = { model.WAITS_FOR_NONE },
+    desc = "Only parked tasks that wait for one of these keys; none = without a reason",
+  },
+  {
     name = "value",
     type = "STRING",
     values = { "1", "2", "3", "4", "5", ">=4" },
@@ -605,6 +611,7 @@ local FIELD_DESC = {
   category = "Concerns the task serves; several allowed, comma list",
   scope = "What the task touches (usercmd, keymap, ui, ...); several allowed, comma list",
   severity = "How serious a bug or security task is",
+  waits_for = "What the task waits for from outside (one word, e.g. mac); parks the task",
   value = "Expected benefit from 1 (little) to 5 (a lot)",
   actor = "Who can take the task on: an AI session, you or both",
   after = "Tasks it should come after, without waiting (ids)",
@@ -772,6 +779,7 @@ local function nested_routes()
           desc = "Status to start in (default: open)",
           enum_desc = STATUS_VALUES,
         },
+        { key = "waits_for", type = "STRING", desc = FIELD_DESC.waits_for },
         {
           key = "mode",
           type = "STRING",
@@ -1207,6 +1215,39 @@ local function nested_routes()
       desc = "The quick wins (value 4+ and effort S or less by default, both written on the task), best return first, plus the small tasks that miss a value; --report=<file> writes the Markdown",
       run = function(ctx)
         cmd().quickwins(ctx)
+      end,
+    },
+
+    {
+      path = { "task", "waits" },
+      args = {
+        {
+          name = "area",
+          type = "TASK_AREA",
+          allow_all = true,
+          optional = true,
+          desc = "Area to look at, or all (default: all areas)",
+        },
+      },
+      flags = {},
+      desc = "What the parked tasks wait for: per waits_for key the number of tasks and their areas, then the parked ones without a reason and the total",
+      run = function(ctx)
+        cmd().waits(ctx)
+      end,
+    },
+
+    {
+      path = { "task", "release" },
+      args = {
+        { name = "key", type = "STRING", desc = "The waits_for key to release (see waits)" },
+      },
+      flags = {
+        { name = "dry-run", bool = true, desc = "Only name the tasks, write nothing" },
+        { name = "yes", bool = true, desc = "Do not ask before the tasks are changed" },
+      },
+      desc = "Bring back what waited for a key: every parked task with waits_for=<key> gets status open and loses the key; asks first (--yes skips the question, --dry-run only names the tasks)",
+      run = function(ctx)
+        cmd().release(ctx)
       end,
     },
 

@@ -46,7 +46,7 @@
     "listed": 14,
     "unlisted": 2
   },
-  "digest": "sha256:7e94b275d69d8ff9",
+  "digest": "sha256:a1288d2f6ac0d353",
   "engine": {
     "git": "0000000",
     "nvim": "0.0.0",
@@ -160,7 +160,7 @@
       "title": "Old and done"
     }
   ],
-  "rev": "rev:0e27d9",
+  "rev": "rev:9186a3",
   "schema": 1,
   "tasks": [
     {
@@ -455,7 +455,7 @@
       "blocked_by": [],
       "category": [],
       "created": "2026-01-01",
-      "etag": "sha256:6c4aef85fbbd3fff",
+      "etag": "sha256:98c1b0df33935da9",
       "file": "lib.nvim/ROADMAP/tasks/delta.md",
       "folder": false,
       "group": "parked|3",
@@ -477,7 +477,8 @@
       "tags": [],
       "title": "Delta is parked",
       "updated": "2026-01-01",
-      "valid": true
+      "valid": true,
+      "waits_for": "mac"
     },
     {
       "after": [],

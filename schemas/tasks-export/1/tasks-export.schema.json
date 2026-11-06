@@ -53,6 +53,9 @@
       "$ref": "#/$defs/Views"
     },
     {
+      "$ref": "#/$defs/Waits"
+    },
+    {
       "$ref": "#/$defs/DonePreview"
     },
     {
@@ -78,6 +81,13 @@
     },
     "Severity": {
       "enum": ["low", "medium", "high", "critical"]
+    },
+    "WaitsKey": {
+      "description": "What a parked task waits for from outside (`waits_for`): one word of the vault's own, lower-case letters, digits and `-`. `none` is no key (it is what a filter calls a parked task without one).",
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$",
+      "maxLength": 40,
+      "not": { "const": "none" }
     },
     "Category": {
       "enum": ["bug", "security", "performance", "docs", "ruleset", "ux", "bindings", "refactor", "tests", "ci"]
@@ -398,6 +408,10 @@
         },
         "severity": {
           "$ref": "#/$defs/Severity"
+        },
+        "waits_for": {
+          "$ref": "#/$defs/WaitsKey",
+          "description": "What the task waits for from outside, as its file says; meant for a `parked` task (the engine drops it when the status leaves `parked`). Absent for a task that names none, and for a value that is no key (the `invalid-waits-for` problem)."
         },
         "created": {
           "$ref": "#/$defs/Date"
@@ -1195,6 +1209,7 @@
             "kind": { "type": "string" },
             "category": { "type": "string" },
             "severity": { "type": "string" },
+            "waits_for": { "type": "string" },
             "value": { "type": "string" },
             "actor": { "type": "string" },
             "tag": { "type": "string" },
@@ -1952,6 +1967,18 @@
               "type": "integer",
               "minimum": 0
             },
+            "waits_for": {
+              "description": "Of the parked tasks: how many wait for each `waits_for` key. Left out when none of them names one.",
+              "type": "object",
+              "propertyNames": {
+                "$ref": "#/$defs/WaitsKey"
+              },
+              "additionalProperties": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "minProperties": 1
+            },
             "unlisted": {
               "type": "integer",
               "minimum": 0
@@ -2000,6 +2027,70 @@
           "items": {
             "$ref": "#/$defs/Area"
           }
+        }
+      },
+      "unevaluatedProperties": false
+    },
+    "Waits": {
+      "description": "tasks.waits: what the parked tasks wait for, of the vault or of one area (or area group). `keys` are the `waits_for` keys in use, the one with the most tasks first (then by name), each with its number of parked tasks and their areas. `parked` counts every parked task: the ones of `keys`, `without_reason` (parked by choice, no `waits_for`) and `invalid` (a `waits_for` that is no key, the `invalid-waits-for` finding). Same `rev` as the snapshot of the same state.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/Head"
+        }
+      ],
+      "type": "object",
+      "required": ["kind", "rev", "digest", "parked", "without_reason", "invalid", "keys", "incomplete"],
+      "properties": {
+        "kind": {
+          "const": "tasks.waits"
+        },
+        "rev": {
+          "$ref": "#/$defs/Rev"
+        },
+        "digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "parked": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "without_reason": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "invalid": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "keys": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["key", "count", "areas"],
+            "properties": {
+              "key": {
+                "$ref": "#/$defs/WaitsKey"
+              },
+              "count": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "areas": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "incomplete": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Folders that could not be read: the answer may be incomplete."
         }
       },
       "unevaluatedProperties": false

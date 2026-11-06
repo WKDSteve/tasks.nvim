@@ -13,7 +13,7 @@
 ---  - `--capabilities`: the `tasks.hello` document (`call hello`)
 ---  - `list --format=json [--limit=N] [--offset=N]`: the `tasks.list` document of the same filters as the text form; the
 ---    order is the plan's, `--sort` has no meaning there and is refused
----  - `next --format=json`, `areas --format=json|tsv`, `show <id> [--format=json|text]`, `plans [area]`
+---  - `next --format=json`, `areas --format=json|tsv`, `waits --format=json`, `show <id> [--format=json|text]`, `plans [area]`
 ---  - `list --done`: the finished tasks of the Backlogs (tab-separated, like the open ones)
 ---
 --- Reads, except `call ops` (the write door; exit 1 when an operation failed). Not its job: the documents (`contract`),
@@ -209,6 +209,7 @@ local function run_show(ctx)
   field("id", t.id)
   field("title", t.title)
   field("status", t.status)
+  field("waits_for", t.waits_for)
   field("kind", t.kind)
   field("prio", t.prio)
   field("effort", t.effort)
@@ -328,6 +329,15 @@ function M.next_json(ctx, area, count, actor)
     { area = area, actor = actor, n = count - 1 },
     { root = ctx.eo.root }
   )
+  return emit(ctx, doc, err)
+end
+
+---`waits --format=json`: the `tasks.waits` document.
+---@param ctx Tasks.CliCtx
+---@param area string|nil
+---@return integer
+function M.waits_json(ctx, area)
+  local doc, err = contract.waits({ area = area }, { root = ctx.eo.root })
   return emit(ctx, doc, err)
 end
 

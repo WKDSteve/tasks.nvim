@@ -311,6 +311,7 @@ local function filter_note(flags)
     "kind",
     "category",
     "severity",
+    "waits-for",
     "value",
     "actor",
     "tag",
@@ -363,6 +364,7 @@ local function filter_options(flags)
     kind = flags.kind,
     category = flags.category,
     severity = flags.severity,
+    waits_for = flags["waits-for"],
     value = flags.value,
     actor = flags.actor,
     tag = flags.tag,
@@ -519,7 +521,8 @@ function M.quickwins(ctx)
     notify.error("--format must be md, tsv or ids")
     return
   end
-  if flags.status == nil then
+  if flags.status == nil and flags["waits-for"] == nil then
+    -- `--waits-for` asks for parked tasks: the default would hide them
     flags.status = "open,doing,decision"
   end
   local scope = load_scope(ctx)
@@ -813,6 +816,119 @@ function M.next(ctx)
   require("tasks_nvim.ui.next_popup").show(pick, nil)
 end
 
+---`:Tasks waits [<area>|all]`: what the parked tasks wait for -- per `waits_for` key the number of tasks and their
+---areas, then the parked ones without a reason and the total.
+---@param ctx table  composer context
+function M.waits(ctx)
+  if not no_stray_words(ctx) then
+    return
+  end
+  local root = vault_root()
+  if not root then
+    return
+  end
+  local area = ctx.args.area
+  if area == "all" then
+    area = nil
+  end
+  local open, skipped, errors = scan.open_tasks({ root = root, area = area })
+  if not open then
+    notify.error(tostring(skipped))
+    return
+  end
+  local sum = require("tasks_nvim.waits").summary(open)
+  local lines = {}
+  for _, k in ipairs(sum.keys) do
+    lines[#lines + 1] = ("%s: %d  (%s)"):format(k.key, k.count, table.concat(k.areas, ", "))
+  end
+  lines[#lines + 1] = ("parked without a reason: %d"):format(sum.without)
+  if sum.invalid > 0 then
+    lines[#lines + 1] = ("parked with an invalid waits_for: %d (see :Tasks index --check)"):format(
+      sum.invalid
+    )
+  end
+  lines[#lines + 1] = ("parked: %d"):format(sum.parked)
+  if type(errors) == "table" and #errors > 0 then
+    notify.warn("cannot read directory " .. table.concat(errors, ", "))
+  end
+  notify.info(table.concat(lines, "\n"))
+end
+
+---`:Tasks release <key> [--dry-run] [--yes]`: every parked task that waits for `<key>` goes back to `open` and loses
+---the key (`batch.release`). It asks first, with the number of tasks; `--yes` skips the question, `--dry-run` only
+---names the tasks.
+---@param ctx table  composer context
+---@param confirm_fn? fun(msg: string, label: string, cb: fun(yes: boolean))  A stand-in for the dialog (specs).
+function M.release(ctx, confirm_fn)
+  if not no_stray_words(ctx) then
+    return
+  end
+  local key = ctx.args.key
+  if not model.is_waits_for(key) then
+    notify.error(model.waits_for_error(key))
+    return
+  end
+  local root = vault_root()
+  if not root then
+    return
+  end
+  local batch = require("tasks_nvim.batch")
+  local plan, perr = batch.release(key, { root = root, dry_run = true })
+  if not plan then
+    notify.error(tostring(perr))
+    return
+  end
+  if #plan.incomplete > 0 then
+    notify.warn("cannot read directory " .. table.concat(plan.incomplete, ", "))
+  end
+  if #plan.ids == 0 then
+    notify.warn(("no parked task waits for '%s' (the keys in use: :Tasks waits)"):format(key))
+    return
+  end
+  if ctx.flags["dry-run"] then
+    notify.info(
+      ("release %s would set %d task(s) to open:\n%s"):format(
+        key,
+        #plan.ids,
+        table.concat(plan.ids, "\n")
+      )
+    )
+    return
+  end
+  local function run()
+    local res, err = batch.release(key, { root = root })
+    if not res then
+      notify.error(tostring(err))
+      return
+    end
+    local done = res.result or { changed = {}, failed = {}, index_errors = {} }
+    for _, changed in ipairs(done.changed) do
+      refresh_buffers(changed.path)
+    end
+    for _, f in ipairs(done.failed) do
+      notify.error(("%s: %s"):format(f.id, f.err))
+    end
+    for _, e in ipairs(done.index_errors) do
+      notify.warn("index " .. e)
+    end
+    notify.info(("release %s: %d task(s) set to open"):format(key, #done.changed))
+  end
+  if ctx.flags.yes then
+    run()
+    return
+  end
+  local ask = confirm_fn or confirm.yesno
+  ask(
+    ("Set the %d parked task(s) that wait for '%s' to open?"):format(#plan.ids, key),
+    "release",
+    function(yes)
+      if yes then
+        run()
+      end
+    end
+  )
+end
+
 ---`:Tasks list --stale=refs` deliveries waiting for their background check.
 local ref_checks = 0
 
@@ -838,6 +954,7 @@ function M.list(ctx)
     kind = flags.kind,
     category = flags.category,
     severity = flags.severity,
+    waits_for = flags["waits-for"],
     value = flags.value,
     actor = flags.actor,
     tag = flags.tag,
@@ -1453,6 +1570,7 @@ function M.task_new(ctx)
     "scope",
     "severity",
     "status",
+    "waits_for",
   }) do
     if ctx.kv[key] ~= nil and ctx.kv[key] ~= "" then
       given[key] = ctx.kv[key]
@@ -1479,6 +1597,7 @@ function M.task_new(ctx)
       due = ctx.kv.due,
       start = ctx.kv.start,
       status = values.status,
+      waits_for = values.waits_for,
       web_links = values.links,
       -- a list: a string would be split at the commas of a file name (`a,b.lua`)
       refs = source and source.ref and { source.ref } or nil,

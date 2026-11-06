@@ -1,0 +1,29 @@
+{
+  "digest": "sha256:7041cc03ad545b4c",
+  "engine": {
+    "git": "0000000",
+    "nvim": "0.0.0",
+    "version": "0.1.0-test"
+  },
+  "generated_at": "2026-01-01T00:00:00Z",
+  "incomplete": [],
+  "invalid": 0,
+  "keys": [
+    {
+      "areas": [
+        "lib.nvim"
+      ],
+      "count": 1,
+      "key": "mac"
+    }
+  ],
+  "kind": "tasks.waits",
+  "parked": 1,
+  "plugin": "tasks.nvim",
+  "rev": "rev:9186a3",
+  "schema": 1,
+  "vault": {
+    "id": "vault"
+  },
+  "without_reason": 0
+}

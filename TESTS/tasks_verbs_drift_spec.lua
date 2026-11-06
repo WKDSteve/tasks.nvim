@@ -76,6 +76,7 @@ return function(H)
         "unestimated",
         "value",
         "waiting",
+        "waits-for",
       },
     },
     ["new"] = {
@@ -104,6 +105,8 @@ return function(H)
         "tags",
         "title",
         "value",
+        -- `waits_for=<key>` in the editor, as every field of `new` there
+        "waits-for",
       },
     },
     ["next"] = { composer = {}, cli = { "format" } },
@@ -112,6 +115,8 @@ return function(H)
       composer = { "force", "phase", "to" },
       cli = { "max-effort", "min-value", "stale-refs" },
     },
+    -- the editor asks before it changes many tasks (`--yes` skips the question)
+    ["release"] = { composer = { "yes" }, cli = { "no-index" } },
     ["set"] = { composer = {}, cli = { "no-index" } },
     -- the editor takes testing.nvim's path from setup({ sheet_run = { testing_cli } })
     ["sheet-run"] = { composer = {}, cli = { "testing-cli" } },
@@ -121,6 +126,8 @@ return function(H)
       composer = { "force", "to" },
       cli = { "effort", "kind", "lang", "prio", "tags", "title" },
     },
+    -- the JSON form is the contract's document; the editor shows the text
+    ["waits"] = { composer = {}, cli = { "format" } },
   }
 
   -- the composer side: the first word of each flat route and the names of its options

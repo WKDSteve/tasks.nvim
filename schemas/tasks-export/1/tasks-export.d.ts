@@ -20,6 +20,7 @@ export type TasksExport =
   | Links
   | Groupings
   | Views
+  | Waits
   | DonePreview
   | Result
   | Error;
@@ -475,6 +476,12 @@ export type Next = Head & {
     for_me: number;
     blocked_status: number;
     parked: number;
+    /**
+     * Of the parked tasks: how many wait for each `waits_for` key. Left out when none of them names one.
+     */
+    waits_for?: {
+      [k: string]: number;
+    };
     unlisted: number;
     unreadable: number;
   };
@@ -585,6 +592,30 @@ export type Views = Head & {
 };
 export type GroupField =
   "status" | "prio" | "actor" | "kind" | "effort" | "value" | "tags" | "plan" | "phase" | "area" | "state" | "cross";
+/**
+ * tasks.waits: what the parked tasks wait for, of the vault or of one area (or area group). `keys` are the `waits_for` keys in use, the one with the most tasks first (then by name), each with its number of parked tasks and their areas. `parked` counts every parked task: the ones of `keys`, `without_reason` (parked by choice, no `waits_for`) and `invalid` (a `waits_for` that is no key, the `invalid-waits-for` finding). Same `rev` as the snapshot of the same state.
+ */
+export type Waits = Head & {
+  kind: "tasks.waits";
+  rev: Rev;
+  digest: Digest;
+  parked: number;
+  without_reason: number;
+  invalid: number;
+  keys: {
+    key: WaitsKey;
+    count: number;
+    areas: string[];
+  }[];
+  /**
+   * Folders that could not be read: the answer may be incomplete.
+   */
+  incomplete: string[];
+};
+/**
+ * What a parked task waits for from outside (`waits_for`): one word of the vault's own, lower-case letters, digits and `-`. `none` is no key (it is what a filter calls a parked task without one).
+ */
+export type WaitsKey = string;
 /**
  * tasks.donepreview: what finishing a task would do, with nothing written, and the `confirm` token that `done` needs for exactly this version of the file.
  */
@@ -734,6 +765,10 @@ export interface TaskEntry {
    */
   actor_written?: boolean;
   severity?: Severity;
+  /**
+   * What the task waits for from outside, as its file says; meant for a `parked` task (the engine drops it when the status leaves `parked`). Absent for a task that names none, and for a value that is no key (the `invalid-waits-for` problem).
+   */
+  waits_for?: string;
   created?: Date;
   updated?: Date;
   /**
@@ -861,6 +896,7 @@ export interface NamedList {
     kind?: string;
     category?: string;
     severity?: string;
+    waits_for?: string;
     value?: string;
     actor?: string;
     tag?: string;

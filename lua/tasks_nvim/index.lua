@@ -21,6 +21,7 @@ local fsio = require("tasks_nvim.fsio")
 local model = require("tasks_nvim.model")
 local scan = require("tasks_nvim.scan")
 local vault = require("tasks_nvim.vault")
+local waits = require("tasks_nvim.waits")
 
 local M = {}
 
@@ -119,6 +120,13 @@ local function summary_cell(task, max)
       ids[#ids + 1] = "`" .. truncate(id, M.MAX_TITLE) .. "`"
     end
     local note = "(blockiert durch " .. table.concat(ids, ", ") .. ")"
+    text = text == "" and note or (text .. " " .. note)
+  end
+  -- Only a parked task that names a reason gets the note: every other row stays byte for byte what it was, so the
+  -- indexes of a vault without the field are not stale.
+  local key = waits.key_of(task)
+  if key then
+    local note = "(wartet auf `" .. key .. "`)"
     text = text == "" and note or (text .. " " .. note)
   end
   return text == "" and EN_DASH or cell(text)

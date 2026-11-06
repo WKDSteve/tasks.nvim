@@ -1,6 +1,6 @@
 {
   "client_op_id": "golden-dry",
-  "digest": "sha256:07e583530cc1cff5",
+  "digest": "sha256:2dbe9a21d50f6a9f",
   "dry_run": true,
   "engine": {
     "git": "0000000",
@@ -44,7 +44,7 @@
     },
     {
       "changed_ids": [],
-      "etag_before": "sha256:6c4aef85fbbd3fff",
+      "etag_before": "sha256:98c1b0df33935da9",
       "id": "lib.nvim/delta",
       "n": 4,
       "ok": true,

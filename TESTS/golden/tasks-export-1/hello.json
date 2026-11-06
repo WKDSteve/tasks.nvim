@@ -34,7 +34,9 @@
     "tick_step",
     "view_delete",
     "view_save",
-    "views"
+    "views",
+    "waits",
+    "waits_for"
   ],
   "engine": {
     "git": "0000000",

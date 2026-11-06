@@ -13,6 +13,7 @@
 local estimate = require("tasks_nvim.estimate")
 local fsio = require("tasks_nvim.fsio")
 local model = require("tasks_nvim.model")
+local waits = require("tasks_nvim.waits")
 
 local M = {}
 
@@ -62,6 +63,11 @@ local function hint(node)
     parts[#parts + 1] = "stuck"
   elseif node.state == "freed" then
     parts[#parts + 1] = "status says blocked, nothing blocks it"
+  end
+  -- a parked task that names what it waits for from outside
+  local mark = waits.mark(node.task)
+  if mark then
+    parts[#parts + 1] = mark
   end
   return table.concat(parts, "; ")
 end
@@ -131,17 +137,23 @@ function M.markdown(plan, opts)
     end
     lines[#lines + 1] = ""
   end
-  vim.list_extend(lines, {
-    ("%d task%s \194\183 %d ready now \194\183 %d waiting for a decision"):format(
-      #tasks,
-      #tasks == 1 and "" or "s",
-      #plan.ready,
-      #plan.decisions
-    ),
-    "",
-    estimate.describe(sums),
-    "",
-  })
+  local head = ("%d task%s \194\183 %d ready now \194\183 %d waiting for a decision"):format(
+    #tasks,
+    #tasks == 1 and "" or "s",
+    #plan.ready,
+    #plan.decisions
+  )
+  -- Only when a parked task names what it waits for: a plan without such a task reads as before (a generated block
+  -- in a document must not change by itself).
+  local reasons = waits.counts(tasks)
+  if next(reasons) ~= nil then
+    local parked = 0
+    for _, t in ipairs(tasks) do
+      parked = parked + (t.status == "parked" and 1 or 0)
+    end
+    head = head .. " \194\183 " .. waits.parked_text(parked, reasons)
+  end
+  vim.list_extend(lines, { head, "", estimate.describe(sums), "" })
   if plan.critical.days > 0 then
     local text = ("Critical path: %s d over %d task%s"):format(
       estimate.fmt_days(plan.critical.days),
@@ -645,7 +657,8 @@ function M.empty_text(empty)
     waiting[#waiting + 1] = ("%d marked blocked with nothing blocking"):format(empty.blocked_status)
   end
   if empty.parked > 0 then
-    waiting[#waiting + 1] = ("%d parked"):format(empty.parked)
+    -- "30 parked (25 waiting for mac)" when some of them name what they wait for
+    waiting[#waiting + 1] = waits.parked_text(empty.parked, empty.waits_for)
   end
   if (empty.unreadable or 0) > 0 then
     waiting[#waiting + 1] = ("%d folder(s) could not be read, the list may be incomplete"):format(

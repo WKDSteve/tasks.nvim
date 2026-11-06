@@ -6,6 +6,8 @@
 ---  - `set_many`: one `mutate.set` per step without its own index write; a step that carries `expect` is
 ---    refused when the task no longer has that value (it was changed since the list was drawn, ERR-30);
 ---  - `done_many`: `done_flow.run` one after the other (rule R6);
+---  - `release`: every parked task that waits for one `waits_for` key goes back to `open` (`set_many` of the steps
+---    `tasks_nvim.waits` plans);
 ---  - after the last task ONE index regeneration per area that changed.
 ---
 --- A failing task never stops the others. No notifications and no windows: the result says what happened and the
@@ -13,11 +15,14 @@
 
 local done_flow = require("tasks_nvim.done_flow")
 local index = require("tasks_nvim.index")
+local model = require("tasks_nvim.model")
 local mutate = require("tasks_nvim.mutate")
 local next_pick = require("tasks_nvim.next_pick")
 local planner = require("tasks_nvim.plan")
 local plan_scope = require("tasks_nvim.plan_scope")
+local scan = require("tasks_nvim.scan")
 local vault = require("tasks_nvim.vault")
+local waits = require("tasks_nvim.waits")
 
 local M = {}
 
@@ -70,7 +75,6 @@ end
 ---@param count? integer  presses to advance (`3p` is three); default 1
 ---@return Tasks.CycleStep[]
 function M.plan_cycle(tasks, field, count)
-  local model = require("tasks_nvim.model")
   local plan = {}
   local presses = math.max(1, math.floor(count or 1))
   -- The first press brings any value (a status nobody knows, a prio of 9) into the cycle; from then on it is periodic,
@@ -120,7 +124,6 @@ end
 ---@return Tasks.ActorProposal[] proposals
 ---@return integer left_empty   # Open tasks without an actor that stay unclassified.
 function M.plan_actor_migration(tasks)
-  local model = require("tasks_nvim.model")
   local proposals, left = {}, 0
   for _, t in ipairs(tasks) do
     if t.actor == nil then
@@ -478,6 +481,45 @@ function M.set_many(steps, opts)
     res.index_errors = reindex(res.areas, opts.root)
   end
   return res
+end
+
+---@class Tasks.ReleaseResult
+---@field key string
+---@field ids string[]                  # The parked tasks that wait for the key, sorted.
+---@field dry_run boolean               # Nothing was written.
+---@field result? Tasks.BatchSetResult  # What `set_many` did (a real run with at least one task).
+---@field incomplete string[]           # Folders that could not be read: tasks in them were not looked at.
+
+---Bring back what waited for `key`: every parked task with `waits_for: <key>` gets `status: open`, loses the key and
+---gets `updated` in one write each (`mutate.set`), the index of every touched area is written once. A task that
+---changed since the scan is refused (`result.failed`), never overwritten. `opts.dry_run` only names the tasks.
+---@param key string
+---@param opts? { root?: string, today?: string, index?: boolean, dry_run?: boolean }
+---@return Tasks.ReleaseResult|nil res
+---@return string|nil err
+function M.release(key, opts)
+  opts = opts or {}
+  if not model.is_waits_for(key) then
+    return nil, model.waits_for_error(key)
+  end
+  local open, skipped, errors = scan.open_tasks({ root = opts.root })
+  if not open then
+    return nil, tostring(skipped)
+  end
+  local steps = waits.release_steps(open, key)
+  ---@type Tasks.ReleaseResult
+  local res = {
+    key = key,
+    ids = vim.tbl_map(function(step)
+      return step.id
+    end, steps),
+    dry_run = opts.dry_run == true,
+    incomplete = type(errors) == "table" and errors or {},
+  }
+  if not res.dry_run and #steps > 0 then
+    res.result = M.set_many(steps, { root = opts.root, today = opts.today, index = opts.index })
+  end
+  return res, nil
 end
 
 ---@class Tasks.BatchDoneResult
