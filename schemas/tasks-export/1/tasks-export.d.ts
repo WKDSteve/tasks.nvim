@@ -905,6 +905,7 @@ export interface NamedList {
     phase?: string;
     blocked?: true;
     reminders?: true;
+    overdue?: true;
     unestimated?: true;
     stale_refs?: true;
     quick_win?: true;

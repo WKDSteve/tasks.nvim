@@ -29,6 +29,7 @@ the version is not tagged yet (the repository is not published).
 
 ### Fixed
 
+- `tasks.lists`: the schema took no `overdue` in the options of a stored list, so a list saved with `--overdue` made the document invalid.
 - `tasks-ops/1` dry run: an `after` (or `blocked_by` of a `set`) on a task an earlier `new` of the same request would create was refused as `after-dangling`, though the real run accepts it; the dry run now counts those tasks as existing, so both judge the request alike: also for a bare `[[slug]]` to one of them, for a repeated title (the dry run reports the `-2` id the real run takes) and for a circle that runs through one of them (a hard stage gate). Operations on such a task (`set`, `done`, `tick_step`, `answer`, `append_note`, `add_steps`, `set_body`, `reopen`, `attach`) see the file `new` would write and answer as the real run does (`would_change`, `would_done` with the version `new` writes, so its confirm token holds as long as no earlier operation of the request changes that task); `reorder` and `move_area` of it are still `not_found` in a dry run.
 - The `## Plan` section is found when its heading has more than one space or a tab after `##` (`##  Plan`): progress, `tick_all` and `add_steps` missed its steps before.
 - The `:Tasks estimate --walk` value buttons "1".."5" are picked by their own digit key (the kit binds digits by position, `5` used to pick the fifth button, "3"); this needs a lib.nvim with the digit-label fix.

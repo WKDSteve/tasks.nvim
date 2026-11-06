@@ -113,6 +113,12 @@ mutate("a views_rev that is no rev", "snapshot", (d) => (d.views_rev = "views:3"
 mutate("schema 2", "hello", (d) => (d.schema = 2));
 mutate("a list with an option the engine does not have", "lists-builtin", (d) => (d.lists[0].options.colour = "red"));
 mutate("a list from a source of its own", "lists-builtin", (d) => (d.lists[0].source = "cloud"));
+// every option a stored list can carry (lists.FIELD_ORDER) is one the schema takes
+{
+  const copy = structuredClone(docs["lists-builtin"]);
+  copy.lists[0].options.overdue = true;
+  report(validate(copy), "accepted: a list with the switch overdue");
+}
 mutate("a grouping by a field the engine does not have", "groupings", (d) => (d.fields[0].field = "colour"));
 mutate("a grouping that is written by an operation the engine does not have", "groupings", (d) => (d.fields[0].mode = "drag"));
 mutate("a view drawn in a way the engine does not have", "views", (d) => (d.views[0].display = "cube"));
