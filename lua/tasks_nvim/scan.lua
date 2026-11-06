@@ -462,6 +462,7 @@ end
 ---@class Tasks.RemindersOpts : Tasks.ScanOpts
 ---@field area? string   # One area (default: all of them).
 ---@field areas? { name: string }[]  # The areas to look at, already listed (`vault.areas`): the scan does not list the vault again.
+---@field buckets? ("FEATURES"|"TASKS")[]  # `backlog_reminders` only: the Backlog buckets to read (default: both). The startup hint reads one per step.
 
 ---The open tasks that carry a `remind:` line, one area (`opts.area`) or all of them. The files are not parsed to find
 ---them: only a file that has the line is.
@@ -525,7 +526,7 @@ function M.backlog_reminders(opts)
   local wanted = area_set(root, opts.area)
   for _, area in ipairs(opts.areas or vault.areas(root)) do
     if not wanted or wanted[area.name] then
-      for _, bucket in ipairs({ "FEATURES", "TASKS" }) do
+      for _, bucket in ipairs(opts.buckets or { "FEATURES", "TASKS" }) do
         local dir = vault.backlog_dir(root, area.name, bucket)
         local escape = vault.leaves(root, dir)
         if escape then

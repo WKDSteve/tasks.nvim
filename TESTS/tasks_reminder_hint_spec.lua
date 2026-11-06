@@ -49,7 +49,51 @@ return function(H)
   )
   vim.schedule = real_schedule
   eq(stepped, { 1, 1, { "lib.nvim/old-done" } }, "the same answer")
-  ok(ticks >= 3, "an area per turn (two areas, then the end), not one go: " .. ticks)
+  -- three parts per area (open tasks, FEATURES, TASKS), then the end
+  ok(
+    ticks >= 3 * #vault.areas(root) + 1,
+    "a part of an area per turn, not an area or all in one go: " .. ticks
+  )
+
+  -- a Backlog bucket on its own: the finished fixture task lives in TASKS
+  eq(
+    #assert(scan.backlog_reminders({ root = root, area = "lib.nvim", buckets = { "TASKS" } })),
+    1,
+    "the bucket that holds it"
+  )
+  eq(
+    #assert(scan.backlog_reminders({ root = root, area = "lib.nvim", buckets = { "FEATURES" } })),
+    0,
+    "the other bucket does not"
+  )
+
+  -- the steps ask for one part each, and together they see everything once
+  do
+    local real_open, real_backlog = scan.open_reminders, scan.backlog_reminders
+    local calls = {}
+    scan.open_reminders = function(opts, ...)
+      calls[#calls + 1] = "open"
+      return real_open(opts, ...)
+    end
+    scan.backlog_reminders = function(opts, ...)
+      calls[#calls + 1] = table.concat(opts.buckets or { "ALL" }, "+")
+      return real_backlog(opts, ...)
+    end
+    local seen
+    hint.count_in_steps({ root = root, today = "2026-02-01" }, function(...)
+      seen = { ... }
+    end)
+    ok(
+      vim.wait(2000, function()
+        return seen ~= nil
+      end, 10),
+      "the steps finish (parts)"
+    )
+    scan.open_reminders, scan.backlog_reminders = real_open, real_backlog
+    eq(seen, { 1, 1, { "lib.nvim/old-done" } }, "the same answer in parts")
+    eq(#calls, 3 * #vault.areas(root), "every area x (open, FEATURES, TASKS)")
+    ok(not vim.tbl_contains(calls, "ALL"), "no step reads both buckets at once")
+  end
 
   -- the vault is listed once for all the steps, not twice per area (2 313 runs x 15 ms in the telemetry)
   do

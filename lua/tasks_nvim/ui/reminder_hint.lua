@@ -43,22 +43,31 @@ local function areas_of(opts)
   return root, root and vault.areas(root) or {}
 end
 
----Add what is due in one area to `total`.
+---The parts of one area the startup scan takes in separate steps: its open tasks, then each Backlog bucket.
+local PARTS = { "open", "FEATURES", "TASKS" }
+
+---Add what is due in one part of an area to `total` (`part` nil: all of it).
 ---@param total Tasks.RemindersDue
 ---@param root string
 ---@param area { name: string }
 ---@param today string
-local function add_area(total, root, area, today)
+---@param part? "open"|"FEATURES"|"TASKS"
+local function add_area(total, root, area, today, part)
   local scan = require("tasks_nvim.scan")
   local scan_opts = { root = root, areas = { area } }
-  for _, task in ipairs(scan.open_reminders(scan_opts) or {}) do
-    if is_due(task, today) then
-      total.open = total.open + 1
+  if part == nil or part == "open" then
+    for _, task in ipairs(scan.open_reminders(scan_opts) or {}) do
+      if is_due(task, today) then
+        total.open = total.open + 1
+      end
     end
   end
-  for _, task in ipairs(scan.backlog_reminders(scan_opts) or {}) do
-    if is_due(task, today) then
-      total.done[#total.done + 1] = task
+  if part ~= "open" then
+    scan_opts.buckets = part and { part } or nil
+    for _, task in ipairs(scan.backlog_reminders(scan_opts) or {}) do
+      if is_due(task, today) then
+        total.done[#total.done + 1] = task
+      end
     end
   end
 end
@@ -99,8 +108,9 @@ function M.count(opts)
   return summary(total)
 end
 
----The same answer, one area per turn of the event loop. `on_done` is called once: with the numbers, or with `nil` when
----a step failed (a scan that fails is silence, not an error).
+---The same answer, one part of an area per turn of the event loop (its open tasks, then each Backlog bucket: the
+---largest area held the editor for 75 to 120 ms when it was taken whole). `on_done` is called once: with the numbers,
+---or with `nil` when a step failed (a scan that fails is silence, not an error).
 ---@param opts? Tasks.ScanOpts
 ---@param on_done fun(open: integer|nil, done: integer, done_ids: string[])
 ---@return nil
@@ -115,11 +125,12 @@ function M.count_in_steps(opts, on_done)
   local at = 0
   local function step()
     at = at + 1
-    if at > #areas then
+    local area = areas[math.ceil(at / #PARTS)]
+    if not area then
       on_done(summary(total))
       return
     end
-    if not pcall(add_area, total, root, areas[at], today) then
+    if not pcall(add_area, total, root, area, today, PARTS[(at - 1) % #PARTS + 1]) then
       on_done(nil, 0, {})
       return
     end
