@@ -1,5 +1,5 @@
 ---@module 'tasks_nvim.attach_source'
----@brief Where `attach` gets its file from when none is named: the clipboard image or the newest screenshot.
+---@brief Where `attach` gets its file from when none is named: the clipboard image, the newest screenshot, or an upload.
 ---@description
 --- `attach <id> --clipboard` stores the image on the clipboard, `attach <id> --latest[=<folder>]` the newest
 --- image of a screenshot folder that is at most `attach.max_age_s` seconds old (older: the caller is told
@@ -10,12 +10,16 @@
 --- Without `--name` the asset is called `<slug>-YYYY-MM-DD-HHMM.<ext>`; a name that is taken gets `-2`, `-3`,
 --- ... -- an existing asset is never replaced. A name given by the caller is used as it is (taken: an error,
 --- as in `mutate.attach`).
+---
+--- `upload` takes a file the caller put into its own folder for this (`upload_dir`, the hub's): the file is named by
+--- the caller's plain file name, and only that folder is looked into. The asset is called `name` (a page's choice, so
+--- a name that is taken gets a counter here too). The file stays where it is: the caller takes it away.
 
 local mutate = require("tasks_nvim.mutate")
 
 local M = {}
 
----@alias Tasks.AttachMode "clipboard"|"latest"
+---@alias Tasks.AttachMode "clipboard"|"latest"|"upload"
 
 ---@class Tasks.AttachSourceOpts
 ---@field root? string
@@ -27,6 +31,8 @@ local M = {}
 ---@field index? boolean
 ---@field now? number                        # Epoch seconds (specs).
 ---@field clipboard? Lib.ClipboardImage.Opts # Passed to `clipboard_image.save` (specs).
+---@field upload_dir? string                 # `upload`: the folder of the caller the file lies in.
+---@field upload? string                     # `upload`: the plain name of the file in that folder.
 
 ---The folders screenshots usually land in, per system.
 ---@param os_name? "windows"|"macos"|"linux"
@@ -79,6 +85,17 @@ function M.default_name(id, ext, now)
   return ("%s-%s.%s"):format(slug, os.date("%Y-%m-%d-%H%M", now), ext)
 end
 
+---Is `name` one plain file name: no folder, nothing that climbs out of one?
+---@param name any
+---@return boolean
+function M.plain_upload_name(name)
+  return type(name) == "string"
+    and name ~= ""
+    and name ~= "."
+    and name ~= ".."
+    and not name:find("[/\\:%z]")
+end
+
 ---`name` with a counter before the extension: `a.png` -> `a-2.png`.
 ---@param name string
 ---@param n integer
@@ -120,8 +137,16 @@ function M.attach(id, mode, opts)
     end
     src, source = found.path, found.path
     ext = (found.path:match("%.([%w]+)$") or "png"):lower()
+  elseif mode == "upload" then
+    if not opts.upload_dir or not M.plain_upload_name(opts.upload) then
+      return nil, "attach: no upload was given"
+    end
+    src, source = opts.upload_dir .. "/" .. opts.upload, "upload"
+    if not require("tasks_nvim.fsio").is_file(src) then
+      return nil, "attach: the upload is not there"
+    end
   else
-    return nil, "attach source must be 'clipboard' or 'latest'"
+    return nil, "attach source must be 'clipboard' or 'latest' or 'upload'"
   end
 
   local base = {
@@ -130,10 +155,10 @@ function M.attach(id, mode, opts)
     index = opts.index,
   }
   local res, aerr
-  if opts.name then
+  if opts.name and mode ~= "upload" then
     res, aerr = mutate.attach(id, src, vim.tbl_extend("force", base, { name = opts.name }))
   else
-    local name = M.default_name(id, ext, opts.now)
+    local name = opts.name or M.default_name(id, ext, opts.now)
     for n = 1, 50 do
       local try = n == 1 and name or with_counter(name, n)
       res, aerr = mutate.attach(id, src, vim.tbl_extend("force", base, { name = try }))

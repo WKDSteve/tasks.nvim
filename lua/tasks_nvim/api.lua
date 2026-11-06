@@ -162,6 +162,7 @@ local methods = {
       dry_run = "boolean",
       ops = "object_list",
       attach_dirs = "string_list",
+      upload_dir = "string",
     },
     run = function(params, opts)
       -- The folders `attach` may take the newest image from, named by the caller that runs the engine for a page (the
@@ -186,6 +187,19 @@ local methods = {
         params.attach_dirs = nil
         opts = vim.tbl_extend("force", {}, opts or {})
         opts.attach = vim.tbl_extend("force", opts.attach or {}, { dirs = dirs, dirs_given = true })
+      end
+      -- The folder `attach` with `from: upload` takes its file from, named by the caller that runs the engine for a
+      -- page (the hub, a folder of its own; its door refuses the field from a page).
+      if params.upload_dir ~= nil then
+        if not absolute(params.upload_dir) then
+          return nil,
+            errors.fail("invalid_argument", "upload_dir: the folder must be an absolute path")
+        end
+        local dir = params.upload_dir
+        params = vim.tbl_extend("force", {}, params)
+        params.upload_dir = nil
+        opts = vim.tbl_extend("force", {}, opts or {})
+        opts.attach = vim.tbl_extend("force", opts.attach or {}, { upload_dir = dir })
       end
       return ops.run(params, opts)
     end,

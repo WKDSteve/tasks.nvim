@@ -196,4 +196,79 @@ return function(H)
     eq(doc.kind, "tasks.error", vim.inspect(doc))
     eq(doc.code, "invalid_argument", vim.inspect(doc))
   end
+
+  -- ── an upload: a file from the caller's folder ──────────────────────────────
+  local inbox = H.tmpdir() .. "/uploads"
+  vim.fn.mkdir(inbox, "p")
+  local function put(file, text)
+    local fd = assert(io.open(inbox .. "/" .. file, "wb"))
+    fd:write(text)
+    fd:close()
+  end
+  local u = new_task("Attach by upload")
+  put("abc123", "a file of any kind")
+  local up = one(
+    { { op = "attach", id = u.id, from = "upload", upload = "abc123", name = "report.pdf" } },
+    nil,
+    { upload_dir = inbox }
+  )
+  eq(up.ok, true, vim.inspect(up))
+  eq(up.asset, "assets/report.pdf")
+  local uploaded = assert(scan.find(u.id, { root = root }))
+  eq(uploaded.folder, true, "a plain task became a folder task")
+  ok(fsio.is_file(vim.fs.dirname(uploaded.path) .. "/assets/report.pdf"), "the asset is there")
+  ok(fsio.is_file(inbox .. "/abc123"), "the file stays: the caller takes it away")
+
+  -- A name that is taken gets a counter: the name is the page's, and what is there is not replaced.
+  local again = one(
+    { { op = "attach", id = u.id, from = "upload", upload = "abc123", name = "report.pdf" } },
+    nil,
+    { upload_dir = inbox }
+  )
+  eq(again.asset, "assets/report-2.pdf", vim.inspect(again))
+
+  -- A dry run looks at nothing.
+  local v = new_task("Attach by upload, dry")
+  local dry_upload = one(
+    { { op = "attach", id = v.id, from = "upload", upload = "not-there", name = "x.txt" } },
+    { dry_run = true },
+    { upload_dir = inbox }
+  )
+  eq(dry_upload.outcome, "would_change", vim.inspect(dry_upload))
+  eq(assert(scan.find(v.id, { root = root })).folder, false, "nothing was attached")
+
+  -- What is wrong is refused, and names no path.
+  for _, bad in ipairs({
+    { { from = "upload", upload = "abc123", name = "x.txt" }, nil, "no upload folder" },
+    { { from = "upload", name = "x.txt" }, inbox, "plain file name" },
+    { { from = "upload", upload = "../abc123", name = "x.txt" }, inbox, "plain file name" },
+    { { from = "upload", upload = "a\\b", name = "x.txt" }, inbox, "plain file name" },
+    { { from = "upload", upload = "C:abc", name = "x.txt" }, inbox, "plain file name" },
+    { { from = "upload", upload = "abc123" }, inbox, "needs a name" },
+    { { from = "upload", upload = "gone", name = "x.txt" }, inbox, "the upload is not there" },
+    { { from = "clipboard", upload = "abc123" }, inbox, "belongs to from" },
+  }) do
+    local op = vim.tbl_extend("force", { op = "attach", id = v.id }, bad[1])
+    local res = one({ op }, nil, bad[2] and { upload_dir = bad[2] } or {})
+    eq(res.ok, false, vim.inspect(res))
+    local why = res.error or {}
+    eq(why.code, "invalid_argument", vim.inspect(res))
+    ok(tostring(why.message):find(bad[3], 1, true), vim.inspect(res))
+    ok(not tostring(why.message):find(inbox, 1, true), "no path: " .. tostring(why.message))
+  end
+  eq(assert(scan.find(v.id, { root = root })).folder, false, "nothing was attached")
+
+  -- The front door takes the folder as a request field, absolute only.
+  local bad_dir = front({
+    upload_dir = "uploads",
+    ops = { { op = "attach", id = v.id, from = "upload", upload = "abc123", name = "x.txt" } },
+  })
+  eq(bad_dir.kind, "tasks.error", vim.inspect(bad_dir))
+  eq(bad_dir.code, "invalid_argument", vim.inspect(bad_dir))
+  local by_door = front({
+    upload_dir = inbox,
+    ops = { { op = "attach", id = v.id, from = "upload", upload = "abc123", name = "x.txt" } },
+  })
+  eq(by_door.kind, "tasks.result", vim.inspect(by_door))
+  eq(by_door.results[1].asset, "assets/x.txt", vim.inspect(by_door))
 end

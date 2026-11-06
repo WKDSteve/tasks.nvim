@@ -48,7 +48,9 @@
 ---    vault: a delete without it could take away a change made elsewhere); the answer has an `inverse` (the view made again)
 ---  - `attach` { id, from, name? }: the clipboard image (`from` `clipboard`) or the newest screenshot of the configured folders
 ---    (`latest`) becomes an asset of the task (a plain task becomes a folder task); the answer has `asset`, `link` and no
----    `inverse`. A request names no path of this machine; a dry run reads neither the clipboard nor a folder
+---    `inverse`. A request names no path of this machine; a dry run reads neither the clipboard nor a folder.
+---    `from` `upload` takes the file `upload` (a plain name) from the folder the caller of the engine named with
+---    `upload_dir`, and the asset is called `name`
 ---
 --- Rules the door keeps:
 ---  - **the shape is checked first**, for the whole request: an unknown operation or field, a wrong type, too many
@@ -178,7 +180,7 @@ local FIELDS = {
     if_match = "string",
   },
   view_delete = { id = "string", if_match = "string" },
-  attach = { id = "string", from = "string", name = "string" },
+  attach = { id = "string", from = "string", name = "string", upload = "string" },
   plan_new = {
     area = "string",
     title = "string",
@@ -1314,8 +1316,22 @@ local function do_attach(op, ctx)
   if op.id == nil then
     return refuse("invalid_argument", "attach needs id")
   end
-  if op.from ~= "clipboard" and op.from ~= "latest" then
-    return refuse("invalid_argument", "attach needs from: 'clipboard' or 'latest'")
+  if op.from ~= "clipboard" and op.from ~= "latest" and op.from ~= "upload" then
+    return refuse("invalid_argument", "attach needs from: 'clipboard', 'latest' or 'upload'")
+  end
+  -- A file the caller of the engine put into its folder; no other way there. The answer names no path.
+  if op.from == "upload" then
+    if not (ctx.attach and ctx.attach.upload_dir) then
+      return refuse("invalid_argument", "attach: no upload folder was given")
+    end
+    if not require("tasks_nvim.attach_source").plain_upload_name(op.upload) then
+      return refuse("invalid_argument", "attach: upload must be a plain file name")
+    end
+    if type(op.name) ~= "string" or op.name == "" then
+      return refuse("invalid_argument", "attach: an upload needs a name")
+    end
+  elseif op.upload ~= nil then
+    return refuse("invalid_argument", "attach: upload belongs to from: 'upload'")
   end
   -- The caller named the folders, and none: only the clipboard (the folders of the system are not looked into).
   if
@@ -1354,6 +1370,7 @@ local function do_attach(op, ctx)
       ctx.attach or {},
       {
         name = op.name,
+        upload = op.upload,
       }
     )
   )
@@ -1362,6 +1379,9 @@ local function do_attach(op, ctx)
     -- machine: the page did not name them, and the person's user name is in their paths.
     if op.from == "latest" and ctx.attach and ctx.attach.dirs_given then
       return refuse("invalid_argument", "attach: no new image in the screenshot folders of the hub")
+    end
+    if op.from == "upload" and tostring(err):find("the upload is not there", 1, true) then
+      return refuse("invalid_argument", "attach: the upload is not there")
     end
     return mutate_failure(ctx, err)
   end
