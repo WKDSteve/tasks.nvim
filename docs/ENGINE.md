@@ -266,6 +266,7 @@ finished task with the same id under another date, is refused.
 | `symlink-task` (error) | the task file is a symbolic link or a junction: it is not read (the vault must not point outside itself); the task is invalid and has no `etag` |
 | `unknown-status`, `unknown-kind`, `unknown-category`, `unknown-severity`, `bad-prio`, `bad-effort`, `bad-value`, `bad-actor`, `bad-date`, `bad-link` | a field has a value outside its enum / format (`bad-link`: a `links` entry that is no `http://` / `https://` address) |
 | `start-after-due` | the `start` date is later than the `due` date |
+| `effort-without-plan` (warning) | an open task that is not `parked` is bigger than L (`XL`, or more than `3d`) and has no `plan:`; it belongs in a plan, nothing is converted |
 | `overdue` (warning) | an open task that is not `parked` has a `due` date before today (`tasks.check` takes the day from the request, so a golden stays the same all year). It changes with the calendar, not with a commit: under `tasks ci --strict` (warnings fail) a task turns the run red on the day after its `due` |
 | `blocked-by-cycle` (error) | the hard edges form a circle; one finding per cycle, the members named (a task that blocks only itself is `blocked-by-self`) |
 | `doing-while-blocked`, `blocked-without-blocker`, `blocker-freed`, `blocked-by-parked` (warnings) | the status runs behind what the blockers say; each is a warning because a status may trail the facts for a moment, a cycle may not |

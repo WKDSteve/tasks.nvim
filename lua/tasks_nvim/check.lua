@@ -12,6 +12,7 @@
 ---  - `unknown-status`, `unknown-kind`, `unknown-category`, `unknown-severity`,
 ---    `bad-prio`, `bad-effort`, `bad-date`, `bad-link` (a `links` entry that is no http(s) address)
 ---  - `start-after-due`: the `start` date is later than the `due` date
+---  - `effort-without-plan` (warning): an open task (not `parked`) bigger than L and in no plan
 ---  - `overdue` (warning): an open task (not `parked`) whose `due` date is before today (`opts.today`)
 ---  - `severity-without-bug-or-security` (warning): `severity` on a task that is
 ---    neither `kind: bug` nor in the bug/security category
@@ -692,6 +693,16 @@ function M.run(opts)
     for _, t in ipairs(by_area[name] and by_area[name].tasks or {}) do
       if t.status ~= "parked" and model.is_date(t.due) and t.due < today then
         add(findings, "warn", "overdue", t, ("due %s is before today (%s)"):format(t.due, today))
+      end
+      local days = model.effort_days(t.effort)
+      if t.status ~= "parked" and days and days > model.effort_days("L") and not t.plan then
+        add(
+          findings,
+          "warn",
+          "effort-without-plan",
+          t,
+          ("effort %s is over L: this belongs in a plan (`plan:`)"):format(t.effort)
+        )
       end
     end
   end

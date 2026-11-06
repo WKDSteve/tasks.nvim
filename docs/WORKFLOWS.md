@@ -36,6 +36,7 @@ Every scenario carries a tag:
 | **area** | one project inside the vault: `<vault>/<area>/ROADMAP/tasks/*.md` (open) and `.../Backlog/` (done) |
 | **id** | `<area>/<slug>`, the same everywhere (commands, `blocked_by`, exports) |
 | **status** | `doing`, `decision` (waits for you), `blocked`, `open`, `parked`; `done` only in `Backlog/` |
+| **effort** | a size (`XS`..`XL`) or days (`3d`, `0.5d`): both are valid and nothing converts one to the other; ordering and `<=` filters put them on one scale (XS 0.25, S 0.5, M 1, L 3, XL 5 days). Bigger than L belongs in a plan (`check` says `effort-without-plan`) |
 | **folder task** | `tasks/<slug>/<slug>.md` that can hold `assets/` (screenshots, logs) |
 
 ## Scenarios that work today

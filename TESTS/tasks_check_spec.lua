@@ -126,6 +126,26 @@ return function(H)
   end, { "bad-effort" }, function()
     remove(tasks .. "bad-effort.md")
   end)
+  -- Days are as valid as sizes; what is bigger than L belongs in a plan.
+  for _, big in ipairs({ "XL", "3.5d", "13.5d" }) do
+    expect("over L without a plan: " .. big, function()
+      F.task(H, root, "lib.nvim", "too-big", F.meta("T", "open", { { "effort", big } }))
+    end, { "warn:effort-without-plan" }, function()
+      remove(tasks .. "too-big.md")
+    end)
+  end
+  for _, fine in ipairs({ "L", "3d", "0.5d" }) do
+    expect("not over L: " .. fine, function()
+      F.task(H, root, "lib.nvim", "fine", F.meta("T", "open", { { "effort", fine } }))
+    end, {}, function()
+      remove(tasks .. "fine.md")
+    end)
+  end
+  expect("over L but parked", function()
+    F.task(H, root, "lib.nvim", "waiting", F.meta("T", "parked", { { "effort", "13.5d" } }))
+  end, {}, function()
+    remove(tasks .. "waiting.md")
+  end)
   expect("bad date", function()
     F.task(H, root, "lib.nvim", "bad-date", F.meta("T", "parked", { { "created", "2026-02-30" } }))
   end, { "bad-date" }, function()
