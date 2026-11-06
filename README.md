@@ -63,7 +63,7 @@ sessions that run without an editor. Nothing is stored anywhere but in the files
   marks, bulk status/priority/finish, export, live refresh when files change.
 - **Folder tasks** with an `assets/` folder for screenshots and logs.
 - **The vault itself**: `:TasksVault open|clipboard|paste|link|find|grep|tree|cdx <area> [backlog|features|tasks|roadmap|all]`,
-  `new` for a dated note in the Backlog and `create` for a new vault folder ([docs/COMMANDS.md](docs/COMMANDS.md#tasksvault-the-vault-itself)).
+  `new` for a dated note in the Backlog, `create` for a new vault folder and `switch <name>` between named vaults ([docs/COMMANDS.md](docs/COMMANDS.md#tasksvault-the-vault-itself)).
 - **Export** to a buffer, the clipboard, the quickfix list, a file (CSV or Markdown) or a browser preview.
 - **Headless CLI** with the same rules and a CI gate (`check`, `index --check`, `md_lint`).
 - **A machine contract** for apps, agents and pipelines: `tasks call snapshot` and friends answer with versioned JSON
@@ -127,7 +127,8 @@ Every key is optional.
 
 ```lua
 require("tasks_nvim").setup({
-  vault = "~/vault",         -- one folder per area; $TASKS_VAULT when unset
+  vault = "~/vault",         -- one folder per area, or a name from `vaults`; $TASKS_VAULT when unset
+  vaults = {},               -- named vaults, e.g. { main = "~/vault", work = "~/work-vault" }; :TasksVault switch <name>
   extra_areas = { "ALL" },   -- folders that are areas although they hold neither ROADMAP/ nor Backlog/
   dashboard = { watch = true, debounce_ms = 250, backend = "auto" },            -- live refresh; backend: auto | snacks | kit | select
   staleness = { git_timeout_ms = 20000, budget_ms = 30000, repo_bases = {} },   -- --stale=refs

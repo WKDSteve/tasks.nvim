@@ -604,12 +604,38 @@ function M.status(ctx)
   end
   local names = vault.area_names(root)
   local here = ops.area_of_buffer(root)
+  local active = vault.active_name()
+  local all = vault.vault_names()
   notify.info(
-    ("Vault: %s\n%d area%s%s\n:TasksVault open|clipboard|paste|link|find|grep|tree|cdx|new <area> [backlog|features|tasks|roadmap|all]"):format(
+    ("Vault: %s%s%s\n%d area%s%s\n:TasksVault open|clipboard|paste|link|find|grep|tree|cdx|new <area> [backlog|features|tasks|roadmap|all]"):format(
+      active and (active .. " = ") or "",
       root,
+      #all > 1 and ("  (switch: " .. table.concat(all, ", ") .. ")") or "",
       #names,
       #names == 1 and "" or "s",
       here and (", this buffer: " .. here) or ""
+    )
+  )
+end
+
+---`:TasksVault switch <name>`: work on another named vault in this session.
+---@param ctx table
+---@return nil
+function M.switch(ctx)
+  local name = ctx.args and ctx.args.name
+  if type(name) ~= "string" or name == "" then
+    notify.warn(":TasksVault switch <name>  (" .. table.concat(vault.vault_names(), ", ") .. ")")
+    return
+  end
+  local root, err = vault.switch(name)
+  if not root then
+    notify.warn(tostring(err))
+    return
+  end
+  notify.info(
+    ("Vault: %s = %s\nDashboards opened from now on use it; an open one keeps its vault."):format(
+      name,
+      root
     )
   )
 end

@@ -717,7 +717,17 @@ second word (`:TasksVault clipboard ALL all`). Part words are never completed to
 | `cdx` | a ready prompt for Claude Code that names the folder, into the `+` register (`--rel`, `--file` as above) |
 | `new feature\|task <title...> [--area=]` | a dated note `Backlog/FEATURES\|TASKS/<date>_<slug>.md`, its README row, opened |
 | `create [<dir>] [<area>...] [--force] [--yes]` | a vault folder with the named areas; lists what happens first (see below) |
-| `status` (and the bare `:TasksVault`) | the vault in use, its areas and the area of this buffer |
+| `switch <name>` | work on another named vault in this session (see below) |
+| `status` (and the bare `:TasksVault`) | the vault in use (with its name), its areas and the area of this buffer |
+
+**Several vaults.** `setup({ vaults = { main = "~/tasks-vault", tricentis = "~/tricentis-vault" }, vault = "main" })` names
+them; `vault` may be a name (a path stays valid and names nothing; without `vault` the first name, sorted, is active).
+`:TasksVault switch <name>` completes the names and changes the vault of the running session: every command after it
+(`:Tasks`, the dashboard opened next, `:checkhealth tasks_nvim`) works on the new one. A dashboard that is open keeps the
+vault it was opened on, so close and reopen it. An unknown name, or a folder that is gone, is refused and the active
+vault stays. Areas of the same name in two vaults are separate (`lib.nvim` in each). `:TasksVault status` and
+`:checkhealth` show which vault is active. Choosing the vault by the working directory is not built (`vault` plus
+`switch` only).
 
 **No vault.** The command exists even then, because `create` is what makes one. Every other verb answers with the same
 single notice (what to do: `:TasksVault create <dir>`, or `vault` in `setup()`, or `$TASKS_VAULT`) and does nothing

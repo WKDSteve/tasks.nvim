@@ -603,9 +603,15 @@ return function(H)
     "new",
     "create",
     "status",
+    "switch",
   }) do
     ok(vim.tbl_contains(verbs_found, verb), "the verb " .. verb .. " completes")
   end
+  -- `switch` completes the names of setup({ vaults }), by prefix
+  vault.configure({ vaults = { main = root, other = root }, vault = "main" })
+  eq(complete("TasksVault switch "), { "main", "other" }, "vault names complete")
+  eq(complete("TasksVault switch o"), { "other" }, "by prefix")
+  vault.configure({ vaults = {}, vault = root })
   local areas = complete("TasksVault clipboard ")
   ok(vim.tbl_contains(areas, "lib.nvim"), "areas complete")
   ok(vim.tbl_contains(areas, "features"), "and parts")
@@ -627,6 +633,7 @@ return function(H)
     "open",
     "paste",
     "status",
+    "switch",
     "tree",
   }, "the routes of :TasksVault, no two sharing a path")
 

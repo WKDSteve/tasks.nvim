@@ -66,7 +66,12 @@ function M.check()
     warn(tostring(err), { "setup({ vault = <dir> }) or set $TASKS_VAULT" })
   else
     local areas = vault.areas(root)
-    ok(("vault %s: %d area(s)"):format(root, #areas))
+    local active = vault.active_name()
+    ok(("vault %s%s: %d area(s)"):format(active and (active .. " = ") or "", root, #areas))
+    local names = vault.vault_names()
+    if #names > 1 then
+      info("named vaults: " .. table.concat(names, ", ") .. " (:TasksVault switch <name>)")
+    end
     local extras = vault.extra_areas()
     if #extras > 0 then
       info("extra areas: " .. table.concat(extras, ", "))

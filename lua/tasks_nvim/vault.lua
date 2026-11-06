@@ -46,18 +46,94 @@ local override_root
 ---@type string|nil
 local configured_root
 
+---The named vaults of `configure({ vaults })`: name -> normalised path.
+---@type table<string, string>
+local named = {}
+
+---The name of the active named vault (`nil`: the vault is a plain path, `$TASKS_VAULT` or none).
+---@type string|nil
+local active_name
+
 ---Apply the user's options (called by `tasks_nvim.setup`). Only the keys that are present change anything.
----@param opts? { vault?: string, extra_areas?: string[] }
+---
+---`vaults = { main = "<dir>", other = "<dir>" }` names several vaults; `vault` then may be one of the
+---names (a path of that spelling is only taken when no name matches). Without `vault` the first name
+---(sorted) is active. A name that is not a plain word or a path that is not a string is dropped.
+---@param opts? { vault?: string, vaults?: table<string, string>, extra_areas?: string[] }
 ---@return nil
 function M.configure(opts)
   opts = opts or {}
+  local vaults_given = type(opts.vaults) == "table"
+  if vaults_given then
+    named = {}
+    for name, path in pairs(opts.vaults) do
+      if M.valid_area(name) and type(path) == "string" and path ~= "" then
+        named[name] = fsio.norm(path)
+      end
+    end
+    -- a name the new set no longer has must not stay "active" (the root it set stays until `vault` says otherwise)
+    if active_name and not named[active_name] then
+      active_name = nil
+    end
+  end
   if opts.vault ~= nil then
-    configured_root = (type(opts.vault) == "string" and opts.vault ~= "") and fsio.norm(opts.vault)
-      or nil
+    local want = opts.vault
+    if type(want) == "string" and named[want] then
+      active_name, configured_root = want, named[want]
+    else
+      active_name = nil
+      configured_root = (type(want) == "string" and want ~= "") and fsio.norm(want) or nil
+    end
+  end
+  if vaults_given and opts.vault == nil then
+    local first = M.vault_names()[1]
+    if first then
+      active_name, configured_root = first, named[first]
+    end
   end
   if type(opts.extra_areas) == "table" then
     M.EXTRA_AREAS = vim.deepcopy(opts.extra_areas)
   end
+end
+
+---The names of the configured vaults, sorted.
+---@return string[]
+function M.vault_names()
+  local out = {}
+  for name in pairs(named) do
+    out[#out + 1] = name
+  end
+  table.sort(out)
+  return out
+end
+
+---The name of the active vault, `nil` when it is a plain path, `$TASKS_VAULT` or none.
+---@return string|nil
+function M.active_name()
+  return active_name
+end
+
+---Make a named vault the one this session works on. Dashboards opened later follow; one that is open
+---keeps the vault it was opened on (it holds its root).
+---@param name string
+---@return string|nil root  the new root
+---@return string|nil err   unknown name, or the folder is gone (the active vault is then unchanged)
+function M.switch(name)
+  local path = named[name]
+  if not path then
+    local names = M.vault_names()
+    return nil,
+      ("unknown vault '%s'%s"):format(
+        tostring(name),
+        #names > 0 and (" (known: " .. table.concat(names, ", ") .. ")") or " (setup() names none)"
+      )
+  end
+  local root, err = M.root({ root = path })
+  if not root then
+    return nil, err
+  end
+  active_name, configured_root = name, path
+  return root, nil
 end
 
 ---The named extras: `configure({ extra_areas })` plus `$TASKS_EXTRA_AREAS` (comma separated; the

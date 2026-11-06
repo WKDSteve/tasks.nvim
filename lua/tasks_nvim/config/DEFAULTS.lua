@@ -53,6 +53,7 @@
 
 ---@class Tasks.Opts
 ---@field vault string|nil          Vault folder (one folder per area). `nil`: `$TASKS_VAULT` is read.
+---@field vaults table<string, string>  Named vaults (`{ main = "<dir>", other = "<dir>" }`). `vault` may then be one of the names (without it the first name, sorted, is active); `:TasksVault switch <name>` changes the active one for the session.
 ---@field extra_areas string[]      Folders that are areas although they hold neither `ROADMAP/` nor `Backlog/`.
 ---@field links "plain"|"wikilink"   How `set`, `new`, the dashboard and the moves write a task or plan reference (`blocked_by`, `after`, `plan`): `plain` ids (`<area>/<slug>`) or Obsidian wikilinks (`"[[<slug>]]"`, to a finished task its file name `"[[YYYY-MM-DD_<slug>]]"`, the vault path with the id as alias when the slug is in several areas). A value a file already holds keeps its form; both are always read. The headless CLI has no `setup`: `$TASKS_LINKS=wikilink` switches it there (Neovim reads it too while `setup()` names no `links`; a `links` set here wins).
 ---@field dashboard Tasks.DashboardConfig
@@ -77,6 +78,7 @@
 ---@type Tasks.Opts
 return {
   vault = nil,
+  vaults = {},
   extra_areas = {},
   links = "plain",
   dashboard = { watch = true, debounce_ms = 250, backend = "auto" },

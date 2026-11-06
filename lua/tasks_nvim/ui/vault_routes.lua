@@ -5,6 +5,7 @@
 ---  - `open|clipboard|paste|link|find|grep|tree|cdx [<area>|<part>] [<part>]` + `--rel` `--file` where they apply
 ---  - `new feature|task <title...> [--area=<area>]`
 ---  - `create [<dir>] [<area>...] [--force]`
+---  - `switch <name>` (a vault from `setup({ vaults })`; `VAULT_NAME` completes it)
 ---  - `status` (also the bare `:TasksVault`)
 ---
 --- Argument type registered here:
@@ -63,6 +64,15 @@ function M.register_types()
         vim.list_extend(names, ops.PART_NAMES)
       end
       return prefix_ci(names, arg_lead)
+    end,
+  })
+  composer.register_type("VAULT_NAME", {
+    desc = "Name of a vault from setup({ vaults })",
+    validate = function(raw)
+      return true, raw, nil
+    end,
+    complete = function(arg_lead)
+      return prefix_ci(vault.vault_names(), arg_lead)
     end,
   })
 end
@@ -213,6 +223,20 @@ function M.routes()
       desc = "Create a vault folder (with the areas named after it): lists what happens and the setup() step that is left to you, then uses it for this session",
       run = function(ctx)
         cmd().create(ctx)
+      end,
+    },
+    {
+      path = { "switch" },
+      args = {
+        {
+          name = "name",
+          type = "VAULT_NAME",
+          desc = "Name of a vault from setup({ vaults = { ... } })",
+        },
+      },
+      desc = "Work on another named vault in this session (dashboards opened later follow; an open one keeps its vault)",
+      run = function(ctx)
+        cmd().switch(ctx)
       end,
     },
     {
