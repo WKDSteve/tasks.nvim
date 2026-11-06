@@ -34,6 +34,7 @@ lowercase word `all` is the keyword; `ALL` with capitals is the area of that nam
 | `--category=a,b` | any of `bug security performance docs ruleset ux bindings refactor tests ci` (`bug` also finds every `kind: bug`; a tag spelled like a category counts) |
 | `--effort=S,M` / `--effort=<=M` | the written effort (`XS S M L XL`, or days like `0.5d`; sizes are case-insensitive), or "this or smaller" (`<=S`, `<=M`, `<=1d`; sizes and days share one scale, a task without effort never matches) |
 | `--severity=a,b` | any of `low medium high critical` (the optional `severity` of a bug / security task; a task without one never matches) |
+| `--waits-for=a,b` | the **parked** tasks that wait for one of these keys (`waits_for:`, see [`:Tasks waits`](#tasks-waits-areaall-and-tasks-release-key---dry-run---yes)); `none` finds the parked tasks without a reason. Only a parked task matches, also where a default would hide parked tasks (`quickwins`) |
 | `--value=4,5` / `--value=>=4` | the written `value` (1-5, the expected benefit), or "this or more"; a task without a value never matches |
 | `--actor=a,b` | any of `cdx me pair none`: who can do it. `me` also finds `status: decision` and the tag `needs-user` (derived, nothing to migrate); `none` finds the tasks nobody classified |
 | `--tag=a,b` | any of these tags |
@@ -49,7 +50,7 @@ lowercase word `all` is the keyword; `ALL` with capitals is the area of that nam
 | `--sheet=` | the state of the test-sheet block that `testing sheets report --tasks` (testing.nvim) wrote into the task, by its worst sheet: `red` (failed or does not load), `stale`, `never` (never ran), `inbox` (green, waiting for your judgement), `manual`, `green`, `unknown` (no states line, none of these words in it, or broken block markers; `show` says which); `any` is every task with the block. A comma list; a task without the block never matches. Nothing is run: it is what the last report wrote. Headless `list` and `:Tasks list --sheet=` (the dashboard opens with only those tasks; its line shows `[sheet: <state>]` and `show` the counts) |
 | `--sort=default` / `prio-effort` / `severity` / `frecency` / `roi` / `due` / `created-desc` / `created-asc` / `updated-desc` / `updated-asc` / `remind` / `title` (`due`: earliest `due:` first, tasks without one last; the dates: a task without the date last in both directions, a tie in the default order; `title`: alphabetical regardless of case; not with `--done`; the dashboard's `o` cycle stops after `due`, a saved list can use any of them) | the order (`roi`: highest `value / effort` first, tasks without both numbers after the ones with a figure, each group in the default order): `default` is status, prio, area, slug; `prio-effort` is status, prio, then effort ascending (important and small first, no effort last of its prio); `severity` is `critical` first, then `high`, `medium`, `low`, no severity last, each group in the default order; `frecency` is what the dashboard opened or changed most first (see below), the rest in the default order |
 | `--to=` | where the list goes: `buffer` (default), `clipboard`, `qf`, `file:<path>`, `echo`, `mdview` (Markdown written to a temp file and shown in the browser by [mdview.nvim](https://github.com/WKDSteve/mdview.nvim); see [Browser preview](#browser-preview-mdview)) |
-| `--format=md` / `--format=csv` | table (default) or CSV with the extra columns tags, blocked by, summary, path, severity, value, roi, actor; a `file:` target ending in `.csv` implies `csv`. A CSV cell that starts with `=`, `+`, `-`, `@` or a tab gets a leading `'`, so a title like `=HYPERLINK(...)` is text, not a formula, when the file is opened in a spreadsheet |
+| `--format=md` / `--format=csv` | table (default) or CSV with the extra columns tags, blocked by, summary, path, severity, value, roi, actor, waits for; a `file:` target ending in `.csv` implies `csv`. A CSV cell that starts with `=`, `+`, `-`, `@` or a tab gets a leading `'`, so a title like `=HYPERLINK(...)` is text, not a formula, when the file is opened in a spreadsheet |
 
 ```vim
 :Tasks list                                    " everything open, in a scratch buffer
@@ -258,7 +259,8 @@ signature of `ui.form.open`) and `ui.cmd.explorer_open(dir)`.
 
 ### `:Tasks new <area> [title...] [kind= prio= effort= tags= status=]`
 
-Besides these keys `value=`, `actor=`, `after=`, `order=`, `plan=` and `phase=` are accepted.
+Besides these keys `value=`, `actor=`, `after=`, `order=`, `plan=`, `phase=` and `waits_for=` are accepted
+(`waits_for=mac` creates the task parked, waiting for that key; the form does not offer it).
 
 Creates `<area>/ROADMAP/tasks/<slug>.md` (slug from the title; a taken slug gets `-2`,
 `-3`; a slug used in `Backlog/` counts as taken), regenerates the index and opens the
@@ -287,13 +289,25 @@ opens with the same title and ref filled in.
 ### `:Tasks set <id> key=value ...`
 
 Changes frontmatter of an *open* task and sets `updated` -- but only when something really
-changed (an identical value rewrites nothing). Settable: `title status kind prio effort tags
+changed (an identical value rewrites nothing). Settable: `title status waits_for kind prio effort tags
 category scope severity value actor summary blocked_by after order plan phase refs rules done_in commits created remind due start`. A value may contain spaces
 (`title=Fix the thing status=doing`: a word that does not start with a known `key=`
 continues the value before it); an empty value removes the key (`kind=`). `status=done` is
 refused: finishing moves the file, see `task done`. A *finished* task takes `remind=` only (a date, or `+7d` / `+2w` from today;
 an empty value takes the reminder away) and nothing else: the startup line names the finished tasks whose reminder is due, so
 there is a way to clear it. A buffer showing the file is reloaded when it has no unsaved changes.
+
+`waits_for=<key>` says **why a task is parked**: something outside is missing (a machine, a licence, somebody else's
+decision). The key is one word of your own (lower-case letters, digits and `-`, at most 40 characters; `none` is
+reserved). It belongs to `status: parked`, and the engine keeps the two together in one write: `waits_for=mac` on a task
+that is not parked parks it, and any status other than `parked` (`set`, the dashboard's `s`, a batch, `done`, a reopen)
+drops the key. `status=open waits_for=mac` in one command contradicts itself and is refused; `waits_for=` alone removes
+the reason and leaves the task parked by choice.
+
+```vim
+:Tasks set lib.nvim/port-the-installer waits_for=mac     " parked, and it says why
+:Tasks set lib.nvim/port-the-installer status=open       " back in play; the reason is gone
+```
 
 `blocked_by`, `after` and `plan` take ids and Obsidian wikilinks alike (`blocked_by=lib.nvim/a,[[b]]`,
 `plan=[[lib.nvim/big|Big]]`): `[[<area>/<slug>]]`, with an alias or a heading, the vault path of the file
@@ -450,7 +464,8 @@ The order is fixed: freed by the task you just finished, then the same area, the
 before `decision`; the effective prio; the earlier `due` date (undated after dated); the return on effort; the smaller effort; the id. Tasks written `cdx` are not
 "your next task": they are listed apart ("an AI session could take ..."); `--actor=cdx` asks for that queue instead.
 When there is nothing, the answer says which kind of nothing: **never** "all done" while work is only waiting
-("Nothing can be started. Still open: 4 for you, 6 blocked, 3 parked.").
+("Nothing can be started. Still open: 4 for you, 6 blocked, 3 parked."). Parked tasks that name what they wait for are
+broken down: "30 parked (25 waiting for mac, 3 for licence)".
 The headless `next` (text) also lists the **reminders that are due** -- `remind: <id> <title> <date>` for the open
 tasks, oldest first, and one line with the number of finished tasks that carry one (`list --done --reminders` lists
 them) -- so a session that asks what to do next also sees what is to be looked at again. `--today=YYYY-MM-DD` pins the
@@ -513,13 +528,43 @@ nvim --headless -u NONE -l scripts/tasks.lua lists rename worth worthy
 nvim --headless -u NONE -l scripts/tasks.lua lists delete worthy
 ```
 
+### `:Tasks waits [<area>|all]` and `:Tasks release <key> [--dry-run] [--yes]`
+
+Tasks that cannot be worked on because something outside is missing are parked **with a reason**
+(`:Tasks set <id> waits_for=<key>`, see [`set`](#tasks-set-id-keyvalue-)). `waits` is the overview: per key the number
+of parked tasks and their areas (most tasks first), then the parked tasks without a reason and the total.
+
+```
+mac: 25  (cascade.nvim, lib.nvim)
+licence: 3  (lib.nvim)
+parked without a reason: 2
+parked: 30
+```
+
+`:Tasks list --waits-for=mac` lists the group (in the dashboard: the `waits_for` entry of the `f` menu, with the keys in
+use and `none`), `--waits-for=none` the tasks parked by choice. A parked task shows its reason as `[waits: mac]` in the
+dashboard, as ``(wartet auf `mac`)`` in the generated `ROADMAP/TASKS.md` and as `waits: mac` in the plan's note column.
+
+`release <key>` brings the whole group back when the thing is there: every parked task with `waits_for: <key>` gets
+`status: open`, loses the key and gets `updated`, the index of every touched area is written once. It asks first and
+names the number of tasks (`--yes` skips the question); `--dry-run` only names them. A task that changed since the list
+was read is refused, not overwritten, and named. Headless:
+
+```sh
+nvim --headless -u NONE -l scripts/tasks.lua waits                  # mac<TAB>25<TAB>cascade.nvim,lib.nvim ...
+nvim --headless -u NONE -l scripts/tasks.lua waits --format=json    # the tasks.waits document
+nvim --headless -u NONE -l scripts/tasks.lua list --waits-for=mac
+nvim --headless -u NONE -l scripts/tasks.lua release mac --dry-run  # would-release<TAB><id> per task
+nvim --headless -u NONE -l scripts/tasks.lua release mac            # released<TAB><id> per task; exit 1 when none waits
+```
+
 ### `:Tasks quickwins [<area>|all] [filters] [--to=] [--format=md|tsv|ids] [--by-actor] [--paths] [--report=<file>]`
 
 The quick wins: a task with **both** numbers written, a value of at least `quick_wins.min_value` (default 4) and an
 effort of at most `quick_wins.max_effort` (default `S`), best return on effort first. The report also names what the
 rule cannot see, never as a quick win: the small tasks **without a value** ("one number away") and the high-value tasks
 **without an effort**. By default only what can be picked up is looked at (`--status=open,doing,decision`; a parked or
-blocked task is not offered, name it with `--status=`). `--value`, `--effort` and `--quick-win` do not exist here: they
+blocked task is not offered, name it with `--status=`; `--waits-for=<key>` asks for parked tasks and so leaves the default out). `--value`, `--effort` and `--quick-win` do not exist here: they
 are the definition. `--by-actor` splits the table into "for me", "pair", "for an AI session" and "unclassified",
 `--paths` adds a column with the absolute path of each task file. `--to=` delivers it like `list` does (default: a scratch
 buffer).

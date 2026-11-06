@@ -38,7 +38,8 @@ lua/tasks_nvim/
 ├── plan_view.lua   a plan as Markdown / tsv / ids, the next-task texts
 ├── estimate.lua  sums of effort and value that name what is missing (pure)
 ├── next_pick.lua the best ready task, the reason, the honest empty answers (pure)
-├── batch.lua     several `set` / `done` steps with one index write per area
+├── batch.lua     several `set` / `done` steps with one index write per area; `release` of a `waits_for` key
+├── waits.lua     what the parked tasks wait for: counts per `waits_for` key, the texts, the release steps (pure)
 ├── soft.lua      the one probe for soft dependencies (mdview, snacks, cascade, ...)
 ├── form.lua      the Markdown form of `task new` (template, parse, validate, tick rules)
 ├── check.lua     rule checker
@@ -215,6 +216,34 @@ format stays as it is (an extra column would make every index stale at once, and
 reports that as an error); the dashboard, the CSV export and `--sort=severity` use it. The
 `list` TSV columns are unchanged as well.
 
+### Parked with a reason (`waits_for`)
+
+`waits_for: mac` (optional) says what a **parked** task waits for from outside: a machine, a licence, a decision of
+somebody else. Exactly one key, a word of the vault's own -- lower-case letters, digits and `-`, at most 40 characters
+(`model.is_waits_for`; `none` is reserved, it is what the filter calls a parked task without a reason). `parked` without
+the key stays valid: set aside by choice.
+
+| | |
+|---|---|
+| a value that is no key | the error `invalid-waits-for` |
+| the key on a task that is not `parked` (written by hand) | the warning `waits-for-without-parked` |
+| `set waits_for=<key>` on a task that is not parked | the task is parked in the same write (`new --waits-for=<key>` creates it parked) |
+| the status leaves `parked` (`set`, the dashboard's cycle, `batch.set_many`, the `set` of `tasks-ops/1`, `done`, `reopen`) | the key is removed in the same write; the `inverse` of the operation names both keys, so an undo brings the reason back |
+| `status=<not parked>` and `waits_for=<key>` in one patch | refused: it contradicts itself |
+
+`--waits-for=a,b` filters (`model.filter`: only parked tasks match, `none` = parked without the key); `tasks_nvim.waits`
+counts (`summary`: per key the tasks and their areas, the parked ones without a reason, those with an invalid key) and
+words the numbers (`parked_text`: "30 parked (25 waiting for mac)", used by `next` and the plan header);
+`batch.release(key)` sets every parked task of a key to `open` through `set_many`, each step guarded by the key it was
+planned from.
+
+Where it shows: `[waits: mac]` in a dashboard line, a trailing cell `waits: mac` in the `list` TSV (a line of a task
+without a reason is unchanged), the column `Waits for` appended to the CSV, `waits: mac` in the note column of the plan
+and "N parked (...)" in its header -- both only when a parked task names a reason, so a generated plan block without one
+does not change -- and ``(wartet auf `mac`)`` in the summary cell of `ROADMAP/TASKS.md`. **The index of a task without
+`waits_for` is byte for byte what it was** (no new column, nothing reordered): introducing the field makes no index
+stale. The template (`tasks template`) and the `:Tasks new` form do not carry the key.
+
 ### Folder tasks
 
 A task is a file `tasks/<slug>.md` **or** a folder `tasks/<slug>/<slug>.md` (same name) that
@@ -275,6 +304,8 @@ finished task with the same id under another date, is refused.
 | `doing-while-blocked`, `blocked-without-blocker`, `blocker-freed`, `blocked-by-parked` (warnings) | the status runs behind what the blockers say; each is a warning because a status may trail the facts for a moment, a cycle may not |
 | `actor-cdx-waits-on-me` (warning) | a task written `actor: cdx` waits on an open task that only you can do (`model.actor` = `me`) |
 | `severity-without-bug-or-security` (warning) | `severity` on a task that is neither `kind: bug` nor in the bug / security category |
+| `invalid-waits-for` (error) | `waits_for` is not one key: a lower-case word of a-z, 0-9 and `-`, at most 40 characters, not `none` |
+| `waits-for-without-parked` (warning) | `waits_for` on a task that is not `parked`: only a parked task waits (the engine drops the key when the status leaves `parked`; this is a file edited by hand) |
 | `slug` | filename is not a kebab-case ASCII slug, or the file lies in a subfolder of `tasks/` other than `<slug>/<slug>.md` |
 | `slug-conflict` | the same slug exists as a file and as a folder task |
 | `asset-dangling` (warning) | a folder task links `assets/<file>` that is not there |
@@ -395,7 +426,9 @@ nvim --headless -u NONE -l scripts/tasks.lua check
 | `attach <area>/<slug> <file> [--name=n] [--no-index]` | copy a file to `<slug>/assets/` (a plain task becomes a folder task), print the Markdown link |
 | `attach <area>/<slug> --clipboard\|--latest[=<folder>] [--name=n] [--no-index]` | the same for the image on the clipboard (PNG) or the newest image of the screenshot folder(s) (`attach.screenshot_dirs`) modified within `attach.max_age_s` (300 s); named `<slug>-<date>-<HHMM>.<ext>`, a taken name gets `-2`; older: an error that names the file, nothing guessed |
 | `folderize <area>/<slug> [--no-index]` | turn a plain task file into a folder task |
-| `set <area>/<slug> key=value ... [--no-index]` | change frontmatter; an empty value removes the key |
+| `set <area>/<slug> key=value ... [--no-index]` | change frontmatter; an empty value removes the key. `waits_for=<key>` parks the task with that reason, a status other than `parked` drops it |
+| `waits [area] [--format=tsv\|json]` | what the parked tasks wait for: `<key>\t<count>\t<areas>` per `waits_for` key (most tasks first), then `parked without a reason: N` and `parked: N`; `json`: the `tasks.waits` document |
+| `release <key> [--dry-run] [--no-index]` | every parked task with `waits_for: <key>` gets `status: open` and loses the key (`released\t<id>` each, `would-release\t<id>` in a dry run); exit 1 when no task waits for the key or one could not be written |
 | `done <area>/<slug> [--commits=repo@sha,...] [--done-in=text] [--date=YYYY-MM-DD] [--no-index]` | finish and move to `Backlog/` |
 | `check [area]` | rule check |
 | `ci [--strict] [--no-lint] [--md-lint=<file>]` | the CI gate: check + `index --check` + md_lint of the generated indexes (see above) |

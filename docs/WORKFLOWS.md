@@ -143,6 +143,25 @@ that is not there is reported by `check` as `asset-dangling`.
 `--stale=refs` dates every `refs:` path by its last commit (file modification time when git does not know it) and
 lists the task with the file that changed: the signal to re-read a task before acting on it.
 
+### 8a. Set tasks aside with a reason — works today
+
+Some tasks cannot be worked on for a long time because something outside is missing: you have no Mac, a licence is
+not bought, another team has to decide. `parked` alone does not say why, and thirty parked tasks look like thirty
+forgotten ones. Park them **with a reason**, a word of your own:
+
+```vim
+:Tasks set lib.nvim/port-the-installer waits_for=mac    " parks the task and says why
+:Tasks new lib.nvim "Notarize the build" waits_for=mac  " created parked
+:Tasks waits                                             " mac: 25 (...), parked without a reason: 5, parked: 30
+:Tasks list --waits-for=mac                              " the group; --waits-for=none: parked by choice
+:Tasks release mac                                       " the Mac is there: all of them back to open
+```
+
+`next` then says "30 parked (25 waiting for mac)" instead of a bare number, the dashboard marks each of them
+`[waits: mac]`, and the generated overview says ``(wartet auf `mac`)``. The reason belongs to `parked`: any other status
+drops it, so nothing "waits for mac" while it is being worked on. `release` asks first (`--dry-run` names the tasks);
+headless it is `scripts/tasks.lua waits`, `list --waits-for=mac`, `release mac [--dry-run]`.
+
 ### 9. A dashboard session — works today
 
 `:Tasks list [area]` without `--to=` opens the dashboard (needs snacks.nvim; without it a plain selection list).
@@ -424,6 +443,7 @@ The design lives with the author's notes; the tasks for it are ordinary tasks in
 | capture with attributes | `:Tasks new` (form) or `new <area> "title" kind= prio= effort= tags= category= severity=` |
 | change attributes | `:Tasks set <id> key=value ...` |
 | say "A waits for B" | `:Tasks set <A> blocked_by=[<B>]` |
+| set a task aside until something outside is there | `:Tasks set <id> waits_for=<key>` (parks it); `:Tasks waits`, `:Tasks list --waits-for=<key>`, `:Tasks release <key>` |
 | see the work | `:Tasks list [area] [filters] [--sort=]` |
 | see what is stale | `:Tasks list --stale=60`, `--stale=refs` |
 | finish | `:Tasks done <id> [done_in=...]` |
@@ -448,5 +468,6 @@ The design lives with the author's notes; the tasks for it are ordinary tasks in
 | two tasks wait on each other | `check`: `blocked-by-cycle` (an error) naming the members; the plan leaves them out of the stages | remove one `blocked_by` |
 | a task waits on a `parked` task | `check` warns `blocked-by-parked`; the plan marks it stuck and `next` never offers it | un-park the blocker or drop the edge |
 | `next` says nothing can be started | "Still open: 4 for you, 6 blocked, 3 parked" -- not "all done" | decide what waits for you (`:Tasks list --actor=me`) |
+| many tasks are parked and nobody knows why | "30 parked (25 waiting for mac)"; `:Tasks waits` lists the reasons | give the rest a reason (`set <id> waits_for=<key>`) or un-park them; `:Tasks release <key>` when the thing is there |
 | no vault configured | "vault not found" | `setup({ vault = ... })` or `$TASKS_VAULT` |
 | `--stale=refs` is slow | it runs `git log` per repo, synchronously | narrow with `--status=` first |

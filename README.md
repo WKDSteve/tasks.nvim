@@ -57,6 +57,8 @@ sessions that run without an editor. Nothing is stored anywhere but in the files
   documents you name (`<!-- GENERATED:plan scope=... -->`)
 - **Rank and filter**: status, priority, effort, value (and a derived return on effort), who can do it (`cdx` / `me` / `pair`), kind, category, severity, tags, blockers, staleness
   (`--stale=60`, or `--stale=refs`: files a task names that changed since it was last updated).
+- **Set aside with a reason**: `waits_for=mac` parks a task and says what it waits for; `:Tasks waits` counts the
+  reasons ("30 parked, 25 waiting for mac"), `--waits-for=` lists a group, `:Tasks release mac` brings it back.
 - **Finish safely**: `:Tasks done` moves the file to `Backlog/`, adds a row to its README, regenerates the index,
   and restores everything byte for byte if a step fails.
 - **Dashboard** (needs [snacks.nvim](https://github.com/folke/snacks.nvim); a plain list without it): filter chips,

@@ -115,6 +115,7 @@ A wrong key or value is ignored with a message and listed in
       Filters: --status= --prio= --effort= --kind= --category= --severity=
                --value=4,5|>=4 --actor=cdx|me|pair|none
                --tag= --stale=<days>|refs --blocked --reminders
+               --waits-for=<key>,...|none (parked tasks by their reason)
 
   :Tasks new [{area} [{title}...]] [kind= prio= effort= value= actor=
               tags= category= severity= status=] [--folder]
@@ -122,7 +123,16 @@ A wrong key or value is ignored with a message and listed in
 
   :Tasks set {id} {key}={value} ...      Change frontmatter; an empty value
                                          removes the key. A finished task takes
-                                         `remind=` only.
+                                         `remind=` only. `waits_for={key}` parks
+                                         the task and says what it waits for;
+                                         any other status drops the reason.
+  :Tasks waits [{area}|all]              What the parked tasks wait for: tasks
+                                         and areas per `waits_for` key, the
+                                         parked ones without a reason, the total.
+  :Tasks release {key} [--dry-run] [--yes]
+                                         Set every parked task that waits for
+                                         {key} to open (asks first; `--dry-run`
+                                         only names them).
   :Tasks done {id} [done_in= commits= date=] [--yes]
                                          `commits=repo@sha,...` lists the commits
                                          made for the task (added to its own).
@@ -207,6 +217,13 @@ cancel (asks when text was typed), `g?` help.
 
 Only `title` and `status` are required. Unknown keys are kept when a file is
 rewritten. Full reference: docs/ENGINE.md.
+
+                                                          *tasks_nvim-waits_for*
+A parked task may say what it waits for from outside: `waits_for: mac` (one
+word of your own: lower-case letters, digits and `-`). `:Tasks set {id}
+waits_for=mac` parks the task with that reason, any other status drops it;
+`:Tasks waits` counts the reasons, `:Tasks list --waits-for=mac` lists a group
+and `:Tasks release mac` sets it back to open.
 
                                                           *tasks_nvim-wikilinks*
 `blocked_by`, `after` and `plan` also take Obsidian wikilinks, in quotes as
