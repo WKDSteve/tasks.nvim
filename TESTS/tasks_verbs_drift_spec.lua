@@ -37,6 +37,8 @@ return function(H)
     },
     ["estimate"] = { composer = { "list", "walk" }, cli = { "stale-refs" } },
     ["folderize"] = { composer = {}, cli = { "no-index" } },
+    -- `--staged` is for the shell around a commit; the editor has no staging step of its own.
+    ["index"] = { composer = {}, cli = { "staged" } },
     ["list"] = {
       composer = { "force", "list", "to" },
       cli = {
