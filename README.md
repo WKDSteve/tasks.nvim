@@ -19,8 +19,9 @@
 [![Neovim](https://img.shields.io/badge/Neovim-0.11%2B-57A143?logo=neovim&logoColor=white)](https://neovim.io)
 [![Lua](https://img.shields.io/badge/Lua-5.1%2FLuaJIT-2C2D72?logo=lua&logoColor=white)](https://www.lua.org)
 ![Status](https://img.shields.io/badge/status-alpha-red)
+[![wkd](https://img.shields.io/badge/wkd-family-c6ff3d)](https://wkdsteve.github.io/wkd/p/tasks/)
 
-> Part of the [wkd](https://wkdsteve.github.io/wkd/) family of plugins. It pairs with
+> Part of the [wkd](https://wkdsteve.github.io/wkd/) family of plugins ([page of this plugin](https://wkdsteve.github.io/wkd/p/tasks/)). It pairs with
 > [rules.nvim](https://github.com/WKDSteve/rules.nvim) (the work list of a rule check becomes tasks: `import --from-rules`, see
 > [COMMANDS.md](docs/COMMANDS.md#headless-import---from-rules-and-bootstrap-rulesnvim)) and
 > builds on [lib.nvim](https://github.com/WKDSteve/lib.nvim).
