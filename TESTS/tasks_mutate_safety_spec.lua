@@ -118,7 +118,7 @@ return function(H)
   local plain_text = H.read(plain.path)
   local index_path = root .. "/lib.nvim/ROADMAP/TASKS.md"
   local index_before = H.read(index_path)
-  with_stub(fsio, "copy", function()
+  with_stub(fsio, "copy_whole", function()
     return false, "stubbed copy failure"
   end, function()
     local res, err = mutate.attach(plain.id, asset_file("a.png"), o)
@@ -136,7 +136,7 @@ return function(H)
   local plain2 = assert(mutate.new("lib.nvim", vim.tbl_extend("force", o, { title = "Plain two" })))
   local real_rename = fsio.rename
   local renames = 0
-  with_stub(fsio, "copy", function()
+  with_stub(fsio, "copy_whole", function()
     return false, "stubbed copy failure"
   end, function()
     with_stub(fsio, "rename", function(from, to)
