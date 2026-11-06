@@ -21,6 +21,9 @@ return function(H)
 
   local _, init_code = git({ "init", "-q" })
   eq(init_code, 0, "git init")
+  -- A Windows runner sets autocrlf: the checkout would differ from the render by its line endings and
+  -- every run would read as "written". The blob comes out the same either way (`hash-object --path`).
+  git({ "config", "core.autocrlf", "false" })
 
   F.task(H, root, "lib.nvim", "own-task", F.meta("Own task", "open"))
   -- Every file there is so far, the own task among them; the foreign one comes after.
