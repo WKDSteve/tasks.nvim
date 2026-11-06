@@ -452,6 +452,66 @@ return function(H)
     "a second draft of the same task takes the same buffer"
   )
   eq(vim.api.nvim_buf_get_name(0), "tasks://sheet-ai/draft/lib.nvim/live", "keeping its name")
+  -- `ask`: the document goes to ai.nvim after a yes, the answer comes back below the marker.
+  do
+    local saved_ai = package.loaded["ai"]
+    local reqs = {}
+    local reply = { true, { text = "first line\r\nsecond line" } }
+    package.loaded["ai"] = {
+      ask = function(req, cb)
+        reqs[#reqs + 1] = req
+        cb(reply[1], reply[2])
+      end,
+    }
+    local function ask_step(yes)
+      local dialog = answer_dialog(yes)
+      quiet(function()
+        cmd.task_sheet_ai({ args = { step = "ask" }, flags = {}, rest = {} }, nil, dialog)
+      end)
+      vim.wait(100, function()
+        return false
+      end)
+    end
+    local function below_marker()
+      local all = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+      for i = #all, 1, -1 do
+        if all[i]:find("Paste the AI's answer", 1, true) then
+          return table.concat(vim.list_slice(all, i + 1), "\n")
+        end
+      end
+    end
+    local before = below_marker()
+    ask_step(false)
+    eq(#reqs, 0, "ask, no: nothing is sent")
+    eq(below_marker(), before, "and the buffer stays")
+    has(asked[#asked], "Send this hand-over", "it asked first")
+    ask_step(true)
+    eq(#reqs, 1, "ask, yes: sent once")
+    has(reqs[1].prompt, "# Draft a test sheet", "the document")
+    ok(not reqs[1].prompt:find("Paste the AI's answer", 1, true), "without the marker")
+    eq(next(reqs[1].context), nil, "and no context of the editor: exactly the document leaves")
+    eq(below_marker(), "first line\nsecond line", "the answer below the marker, by line")
+    reply = { false, { message = "no key" } }
+    ask_step(true)
+    eq(below_marker(), "first line\nsecond line", "a failure leaves the buffer as it was")
+    package.loaded["ai"] = saved_ai
+    vim.api.nvim_buf_set_lines(0, -1 - 2, -1, false, {})
+
+    -- Outside a hand-over buffer it refuses and sends nothing.
+    vim.cmd("new")
+    local sent = #reqs
+    quiet(function()
+      cmd.task_sheet_ai(
+        { args = { step = "ask" }, flags = {}, rest = {} },
+        nil,
+        answer_dialog(true)
+      )
+    end)
+    eq(#reqs, sent, "ask outside a hand-over sends nothing")
+    vim.cmd("bwipeout!")
+    asked = {}
+  end
+
   vim.api.nvim_buf_set_lines(0, -1, -1, false, { "```lua", "return { id = 'x' }", "```" })
   seen = nil
   quiet(function()

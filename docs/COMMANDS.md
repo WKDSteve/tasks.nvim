@@ -338,9 +338,14 @@ Whether a sheet may run is testing.nvim's decision: the workspace trust of the r
 [--dry-run]`, with the exit code of `testing sheets run` (0 green, 1 red or not written, 2 refused or no sheet, 3
 testing.nvim or the engine not reached).
 
-### `:Tasks sheet-ai draft|explain|accept|bug [<id>]`
+### `:Tasks sheet-ai draft|explain|ask|accept|bug [<id>]`
 
-Stage 0 of the AI link for a live-check task (no model is called; ai.nvim's headless entry comes later):
+The AI link for a live-check task. Without `ask` no model is called. ai.nvim's headless entry, and with it the way
+from the app, comes later:
+
+* `ask` (in a hand-over buffer, needs ai.nvim) sends the document above the marker to ai.nvim after you confirm, and
+  puts the answer below the marker, replacing what is there. Exactly the document leaves the machine: no buffer,
+  selection or diagnostics of ai.nvim's context. Nothing is written but the buffer: `accept` and `bug` still ask.
 
 * `draft` puts a hand-over document into a scratch buffer of its own (`tasks://sheet-ai/draft/<id>`) and onto the
   clipboard: the task, the rules of the sheet format and the skeleton (testing.nvim's `testing sheets prompt draft`).

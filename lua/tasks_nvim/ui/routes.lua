@@ -860,8 +860,8 @@ local function nested_routes()
         {
           name = "step",
           type = "STRING",
-          values = { "draft", "explain", "accept", "bug" },
-          desc = "draft, explain (hand-over to an AI), accept (its sheet), bug (its bug task)",
+          values = { "draft", "explain", "ask", "accept", "bug" },
+          desc = "draft, explain, ask (through ai.nvim), accept (its sheet), bug (its bug task)",
         },
         {
           name = "id",

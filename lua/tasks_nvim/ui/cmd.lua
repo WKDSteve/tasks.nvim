@@ -1746,6 +1746,64 @@ local function pasted_answer()
   return table.concat(lines, "\n")
 end
 
+---`:Tasks sheet-ai ask`, in a hand-over buffer: send the document above the marker to ai.nvim and put the answer below
+---it, where `accept` and `bug` read it. Runs in the editor; the headless way (and with it the app) waits for
+---`ai.nvim/headless-jsonl-entry`.
+---
+---What leaves the machine is exactly the document: no context of ai.nvim's is asked for. The person confirms first,
+---since this sends text to a provider and may cost money. Nothing is written but the buffer.
+---@param step string The step of the hand-over buffer, `draft` or `explain`.
+---@param confirm_fn fun(msg: string, label: string, cb: fun(yes: boolean))
+local function ask_model(step, confirm_fn)
+  local buf = vim.api.nvim_get_current_buf()
+  local function marker_line()
+    local all = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+    for i = #all, 1, -1 do
+      if all[i]:match("^<!%-%- Paste the AI's answer below this line") then
+        return i, all
+      end
+    end
+  end
+  local marker, lines = marker_line()
+  if not marker then
+    notify.error("sheet-ai ask: no hand-over in this buffer; run :Tasks sheet-ai draft first")
+    return
+  end
+  local has_ai, ai = pcall(require, "ai")
+  if not has_ai then
+    notify.error("sheet-ai ask: ai.nvim is not available; paste the document into an AI by hand")
+    return
+  end
+  local doc = vim.trim(table.concat(vim.list_slice(lines, 1, marker - 1), "\n"))
+  confirm_fn(("Send this hand-over (%d characters) to the AI?"):format(#doc), "send", function(yes)
+    if not yes then
+      return
+    end
+    notify.info("sheet-ai ask: waiting for the answer ...")
+    ai.ask({ prompt = doc, context = {} }, function(ok, res)
+      vim.schedule(function()
+        if not ok then
+          local why = type(res) == "table" and res.message or tostring(res)
+          notify.error("sheet-ai ask: " .. tostring(why))
+        elseif not vim.api.nvim_buf_is_valid(buf) then
+          notify.warn("sheet-ai ask: the hand-over buffer is gone, the answer with it")
+        elseif not marker_line() then
+          -- Edited away while the answer was on its way: there is no safe place for it.
+          notify.warn("sheet-ai ask: the marker line is gone, the answer was not inserted")
+        else
+          local answer = vim.split(tostring(res.text or ""), "\r?\n")
+          vim.api.nvim_buf_set_lines(buf, (marker_line()), -1, false, answer)
+          notify.info(
+            ("sheet-ai ask: answered, read it, then :Tasks sheet-ai %s"):format(
+              step == "draft" and "accept" or "bug"
+            )
+          )
+        end
+      end)
+    end)
+  end)
+end
+
 ---`:Tasks sheet-ai draft|explain|accept|bug [<id>]`: stage 0 of the AI link for a live-check task. `draft` and
 ---`explain` put a hand-over document (testing.nvim's `testing sheets prompt`) into a scratch buffer and onto the
 ---clipboard; the person pastes it into an AI and the answer back below it. `accept` writes the sheet of that answer
@@ -1755,8 +1813,22 @@ end
 ---@param confirm_fn? fun(msg: string, label: string, cb: fun(yes: boolean)) A stand-in for the dialog (specs).
 function M.task_sheet_ai(ctx, system, confirm_fn)
   local step = ctx.args.step
-  if #ctx.rest > 0 or not require("tasks_nvim.sheet_run").AI[step] and step ~= "bug" then
-    notify.error("usage: :Tasks sheet-ai draft|explain|accept|bug [<id>]")
+  if
+    #ctx.rest > 0
+    or not require("tasks_nvim.sheet_run").AI[step] and step ~= "bug" and step ~= "ask"
+  then
+    notify.error("usage: :Tasks sheet-ai draft|explain|ask|accept|bug [<id>]")
+    return
+  end
+  if step == "ask" then
+    local handed = vim.api.nvim_buf_get_name(0):match("^tasks://sheet%-ai/(%a+)/")
+    if not handed then
+      notify.error("sheet-ai ask: run it in a hand-over buffer (:Tasks sheet-ai draft|explain)")
+      return
+    end
+    ask_model(handed, confirm_fn or function(msg, label, cb)
+      require("tasks_nvim.ui.confirm").yesno(msg, label, cb)
+    end)
     return
   end
   local id = ai_task_id(ctx)
