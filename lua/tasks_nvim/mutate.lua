@@ -2841,7 +2841,7 @@ function M.attach(id, src, opts)
     path, folderized = dest, true
   end
   local asset = fsio.dirname(path) .. "/" .. M.ASSETS_DIR .. "/" .. name
-  local copied, cerr = fsio.copy(src, asset)
+  local copied, cerr = fsio.copy_whole(src, asset)
   if not copied then
     local why = fsio.is_copy_exists(cerr) and ("asset exists: " .. asset .. " (pass --name=)")
       or ("cannot copy to " .. asset .. ": " .. tostring(cerr))

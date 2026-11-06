@@ -476,6 +476,47 @@ function M.copy(from, to)
   return true, nil
 end
 
+---Copy a file so that the target is whole or not there: first to `<to>.part`, then into place. A process killed during a
+---large copy leaves the `.part` (the next copy of that name replaces it), never a target of the full size that holds
+---only a part (a copy reserves the size first). Fails when the target exists, as `copy`.
+---@param from string
+---@param to string
+---@return boolean ok
+---@return string|nil err  `COPY_EXISTS` when the target was already there
+function M.copy_whole(from, to)
+  drop_cache()
+  local ok, perr = ensure_parent(to)
+  if not ok then
+    return false, perr
+  end
+  if uv.fs_lstat(to) then
+    return false, M.COPY_EXISTS
+  end
+  local part = to .. ".part"
+  uv.fs_unlink(part)
+  local copied, err = uv.fs_copyfile(from, part, { excl = true })
+  if not copied then
+    uv.fs_unlink(part)
+    return false, tostring(err)
+  end
+  -- A hard link does not replace what came meanwhile; a file system without links gets the look above and a rename.
+  local linked, lerr = uv.fs_link(part, to)
+  if linked then
+    uv.fs_unlink(part)
+    return true, nil
+  end
+  if tostring(lerr):match("^EEXIST") then
+    uv.fs_unlink(part)
+    return false, M.COPY_EXISTS
+  end
+  local renamed, rerr = uv.fs_rename(part, to)
+  if not renamed then
+    uv.fs_unlink(part)
+    return false, tostring(rerr)
+  end
+  return true, nil
+end
+
 ---Create a folder and its parents.
 ---@param path string
 ---@return boolean ok

@@ -271,4 +271,17 @@ return function(H)
   })
   eq(by_door.kind, "tasks.result", vim.inspect(by_door))
   eq(by_door.results[1].asset, "assets/x.txt", vim.inspect(by_door))
+
+  -- ── a copy is whole or not there ────────────────────────────────────────────
+  local target = inbox .. "/whole.bin"
+  put("source", "the content")
+  -- What a killed copy left: it is not taken for the file, and the next copy goes over it.
+  put("whole.bin.part", "half")
+  ok(fsio.copy_whole(inbox .. "/source", target))
+  eq(vim.fn.readblob(target), "the content")
+  eq(vim.uv.fs_stat(target .. ".part"), nil, "no part stays")
+  local copied, cerr = fsio.copy_whole(inbox .. "/source", target)
+  eq(copied, false)
+  ok(fsio.is_copy_exists(cerr), tostring(cerr))
+  eq(vim.uv.fs_stat(target .. ".part"), nil, "none from a copy that was refused")
 end
