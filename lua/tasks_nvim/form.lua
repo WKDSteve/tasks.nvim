@@ -445,9 +445,11 @@ function M.validate(parsed, areas, root, lang)
     local scope = vim.deepcopy(parsed.ticks.scope or {})
     local extra = {}
     for _, word in ipairs(vim.split(trim(parsed.other), "[,%s]+", { trimempty = true })) do
-      if model.is_scope(word) then
-        if not vim.tbl_contains(scope, word) then
-          scope[#scope + 1] = word
+      -- Scopes are lower case: `UI` typed here means the scope, not a new tag. The same rule as `splitOther` of the app.
+      local lower = word:lower()
+      if model.is_scope(lower) then
+        if not vim.tbl_contains(scope, lower) then
+          scope[#scope + 1] = lower
         end
       elseif not vim.tbl_contains(extra, word) then
         extra[#extra + 1] = word

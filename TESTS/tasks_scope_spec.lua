@@ -91,6 +91,9 @@ return function(H)
   local w = validated("ui", { "ui" })
   eq(w.opts.scope, "ui", "a word ticked and typed counts once")
   eq(#w.notes, 0)
+  local u = validated("UI, Keymap, Shiny", { "ui" })
+  eq(u.opts.scope, "ui,keymap", "a scope word counts in any case, stored in lower case")
+  eq(u.opts.tags, "Shiny", "a tag stays as typed")
   local t = form.validate(
     form.parse(
       vim.list_extend(form.template({ area = "lib.nvim", title = "T", other = "oddity" }), {})
