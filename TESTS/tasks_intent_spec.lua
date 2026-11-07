@@ -501,4 +501,50 @@ return function(H)
   has(cli_run({ "intent", huge }).err, "larger than 65536 bytes")
   ok(cli_run({ "intent", H.tmpdir() .. "/nope.json" }).code ~= 0, "a missing file")
   eq(cli_run({ "intent" }).code, 2)
+
+  -- ── two processes take the same finding at once: one task ──────────────────
+  local lib = vim.env.LIB_NVIM_DIR
+  if lib and lib ~= "" then
+    local race_file = H.tmpdir() .. "/race.json"
+    H.write(
+      race_file,
+      own(function(d)
+        d.finding.fp = "dddddddddddddddd"
+      end)
+    )
+    local script = vim.fs.dirname(vim.fs.dirname(debug.getinfo(1, "S").source:sub(2)))
+      .. "/scripts/tasks.lua"
+    local procs = {}
+    for i = 1, 4 do
+      procs[i] = vim.system({
+        vim.v.progpath,
+        "--headless",
+        "-u",
+        "NONE",
+        "-l",
+        script,
+        "intent",
+        race_file,
+        "--yes",
+        "--vault=" .. root,
+      }, { text = true, env = { LIB_NVIM_DIR = lib } })
+    end
+    local created, existed = 0, 0
+    for i = 1, 4 do
+      local r = procs[i]:wait(60000)
+      local out = (r.stdout or "") .. (r.stderr or "")
+      if out:find("created\t", 1, true) then
+        created = created + 1
+      elseif out:find("exists\t", 1, true) then
+        existed = existed + 1
+      end
+    end
+    eq(created, 1, "exactly one process makes the task")
+    eq(created + existed, 4, "the others find it")
+    eq(
+      #find.by_refs({ "testing-finding:dddddddddddddddd" }, { root = root }),
+      1,
+      "one task holds the ref"
+    )
+  end
 end

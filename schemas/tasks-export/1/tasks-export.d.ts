@@ -505,6 +505,10 @@ export type Next = Head & {
     vault: number;
   };
   /**
+   * Ready tasks left out because their `start` day has not come yet; absent when none.
+   */
+  later?: number;
+  /**
    * Ready tasks left out because somebody else has claimed them (capability `claims`); absent when none.
    */
   claimed?: number;

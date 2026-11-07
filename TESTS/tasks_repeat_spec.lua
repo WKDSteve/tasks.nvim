@@ -182,6 +182,28 @@ return function(H)
   eq(nxt.remind, "2027-01-05", "the reminder machinery brings it back on its day")
   eq(nxt.repeat_every, "8w", "it is a routine still")
   eq(nxt.created, "2026-11-10")
+  eq(nxt.start, "2027-01-05", "the round is not ready before its due day")
+  -- `next` and `list --ready` leave it out until then, and say so
+  local next_pick = require("tasks_nvim.next_pick")
+  local early = assert(next_pick.pick_from_vault({ root = root, today = "2026-11-11" }))
+  ok(early.task == nil or early.task.id ~= next_id, "not offered before its start day")
+  ok((early.later or 0) >= 1, "and counted: " .. tostring(early.later))
+  local on_day = assert(next_pick.pick_from_vault({ root = root, today = "2027-01-05", n = 50 }))
+  local offered = { on_day.task and on_day.task.id }
+  for _, t in ipairs(on_day.alternatives) do
+    offered[#offered + 1] = t.id
+  end
+  ok(vim.tbl_contains(offered, next_id), "offered on its day")
+  local plan_scope = require("tasks_nvim.plan_scope")
+  local open = assert(scan.all({ root = root }))
+  local function ready_ids(today)
+    local kept = assert(plan_scope.filter_readiness(open, "ready", root, nil, today))
+    return vim.tbl_map(function(t)
+      return t.id
+    end, kept)
+  end
+  ok(not vim.tbl_contains(ready_ids("2026-11-11"), next_id), "list --ready: not yet")
+  ok(vim.tbl_contains(ready_ids("2027-01-05"), next_id), "list --ready: on the day")
   eq(nxt.title, "Routine sweep")
   eq(nxt.blocked_by, {}, "what blocked the finished round is met")
   local next_text = H.read(nxt.path)

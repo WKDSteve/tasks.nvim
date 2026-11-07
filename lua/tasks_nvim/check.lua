@@ -507,7 +507,7 @@ end
 
 ---A `doing` task nobody has claimed for this long (days since `updated`) is told: a forgotten `doing` looks like work
 ---of a moment ago.
-M.DOING_UNCLAIMED_DAYS = 2
+M.DOING_UNCLAIMED_DAYS = 7
 
 ---The claims (`tasks_nvim.claims`): one that ran out (`claim-expired`), one for a task that is not open any more
 ---(`claim-orphan`: the file lives outside the vault's data, so nothing else would notice) and a `doing` task that

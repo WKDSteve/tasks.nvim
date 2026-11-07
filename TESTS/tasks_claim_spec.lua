@@ -395,4 +395,50 @@ return function(H)
     end
     eq(winners, 1, "exactly one process wins the claim")
   end
+
+  -- ── reorder, the finish with an override, `list --ready` ───────────────────
+  local batch = require("tasks_nvim.batch")
+  local ro_a = task("ro-a", "open", { { "prio", "2" } })
+  local ro_b = task("ro-b", "open", { { "prio", "2" } })
+  assert(claims.acquire(ro_a, with({ by = "chat-1" })))
+  local _, rerr2, rinfo2 = batch.reorder(ro_a, { after = ro_b }, with({ by = "chat-2" }))
+  has(rerr2, "is claimed by chat-1", "reorder asks the claim too")
+  eq(rinfo2.code, "conflict")
+  local door_reorder = ops({ { op = "reorder", id = ro_a, after = ro_b, by = "ui-2" } })
+  eq(door_reorder.results[1].ok, false, "also through the door")
+  has(door_reorder.results[1].error.message, "is claimed by chat-1")
+
+  local fin = task("fin")
+  assert(claims.acquire(fin, with({ by = "chat-1" })))
+  local fin_flow = assert(
+    require("tasks_nvim.done_flow").run(
+      fin,
+      with({ by = "chat-2", force = true, note = "chat-1 died", pick_next = false })
+    )
+  )
+  has(
+    H.read(fin_flow.done.to),
+    "claim of chat-1 overridden by chat-2: chat-1 died",
+    "the override is in the finished task"
+  )
+  eq(claims.read(root, fin), nil)
+
+  local ready_a, ready_b = task("ready-a"), task("ready-b")
+  assert(claims.acquire(ready_a, with({ by = "chat-1" })))
+  local plan_scope = require("tasks_nvim.plan_scope")
+  local open_tasks = assert(scan.all({ root = root }))
+  local function ready_for(by)
+    local kept = assert(plan_scope.filter_readiness(open_tasks, "ready", root, nil, TODAY, by))
+    local ids = {}
+    for _, t in ipairs(kept) do
+      ids[t.id] = true
+    end
+    return ids
+  end
+  ok(not ready_for("chat-2")[ready_a], "list --ready: not ready for another name")
+  ok(ready_for("chat-2")[ready_b], "an unclaimed task is")
+  ok(ready_for("chat-1")[ready_a], "the owner sees his own")
+  local listed = run({ "list", "lib.nvim", "--ready", "--format=ids", "--by=chat-2" })
+  ok(not listed.out:find(ready_a, 1, true), "the CLI list: " .. listed.out)
+  ok(listed.out:find(ready_b, 1, true))
 end

@@ -63,6 +63,7 @@ return function(H)
       composer = { "force", "list", "to" },
       cli = {
         "all",
+        "by",
         "done",
         "due-before",
         "limit",

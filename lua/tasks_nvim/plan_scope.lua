@@ -133,9 +133,11 @@ end
 ---@param which "ready"|"waiting"
 ---@param root? string
 ---@param shared? Tasks.PlanShared   # The pass over the vault the caller already made.
+---@param today? string  # `YYYY-MM-DD`: a task whose `start` is after it is not ready yet (default: today).
+---@param by? string  # Who asks: a task somebody ELSE has claimed is not ready for them (default: the name of the caller).
 ---@return Tasks.Task[]|nil kept
 ---@return string|nil err
-function M.filter_readiness(tasks, which, root, shared)
+function M.filter_readiness(tasks, which, root, shared, today, by)
   local index, everything
   if shared then
     index = shared.index
@@ -146,9 +148,27 @@ function M.filter_readiness(tasks, which, root, shared)
     end
   end
   local kept = {}
+  today = today or model.today()
+  -- the claims of other names (read once; nothing is made when there are none)
+  local foreign = {}
+  if which == "ready" then
+    local claims = require("tasks_nvim.claims")
+    local vault_root = root or (shared and shared.root) or vault.root()
+    if vault_root then
+      local who, now = by or claims.default_name(), claims.now()
+      for claimed_id, claim in pairs(claims.list(vault_root)) do
+        if claims.state(claim, who, now) == "foreign" then
+          foreign[claimed_id] = true
+        end
+      end
+    end
+  end
   for _, t in ipairs(tasks) do
     local state = plan.classify(t, index)
-    local is_ready = state == "ready" or state == "decision"
+    -- the earliest day to begin (`start`) has not come: not ready yet, however free of blockers it is
+    local is_ready = (state == "ready" or state == "decision")
+      and not model.not_started(t, today)
+      and not foreign[t.id]
     local is_waiting = state == "waiting" or state == "stuck"
     if (which == "ready" and is_ready) or (which == "waiting" and is_waiting) then
       kept[#kept + 1] = t

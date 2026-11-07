@@ -296,6 +296,10 @@ function M.reorder(id, spec, opts)
   if not node then
     return nil, "no such open task: " .. id, { code = "not_found" }
   end
+  local free, gerr, ginfo = require("tasks_nvim.claims").guard(opts.root or "", id, opts)
+  if not free then
+    return nil, gerr, ginfo
+  end
   if node.stage == nil then
     -- in a dependency cycle, or behind one: the plan leaves it out of its stages, so it has no neighbours to go next to
     return nil,

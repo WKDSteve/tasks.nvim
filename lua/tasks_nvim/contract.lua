@@ -1735,6 +1735,8 @@ function M.next(params, opts)
   doc.open = json.object({ area = pick.open.area, vault = pick.open.vault })
   -- ready tasks left out because somebody else works on them (capability `claims`)
   doc.claimed = (pick.claimed or 0) > 0 and pick.claimed or nil
+  -- ready tasks whose `start` day has not come (not offered)
+  doc.later = (pick.later or 0) > 0 and pick.later or nil
   if pick.empty then
     doc.empty = json.object({
       kind = pick.empty.kind,

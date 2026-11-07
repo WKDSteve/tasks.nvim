@@ -225,6 +225,21 @@ function M.list(root)
   return out
 end
 
+---Make the folder of the claims and its `.gitignore` of `*` (what the claim files and the lock of `intent` live in).
+---@param root string
+---@return boolean|nil ok
+---@return string|nil err
+function M.ensure_dir(root)
+  local ignore = root .. "/" .. M.DIR .. "/.gitignore"
+  if not fsio.is_file(ignore) then
+    local ok, err = fsio.write_atomic(ignore, "*\n")
+    if not ok then
+      return nil, "cannot write " .. ignore .. ": " .. tostring(err)
+    end
+  end
+  return true, nil
+end
+
 ---Write the claim of a task (the folder and its `.gitignore` are made on the first claim).
 ---@param root string
 ---@param id string
@@ -508,8 +523,55 @@ function M.release(id, opts)
   return { id = id, released = had, status = back }, nil
 end
 
+---The claim an override would pass: the claim of somebody else that is valid now, when the caller (or the request around
+---it) said `force` with a `note`. `nil` when nothing is overridden.
+---@param root string
+---@param id string
+---@param opts? { by?: string, force?: boolean, note?: string, now?: string }
+---@return Tasks.Claim|nil claim
+function M.overridden(root, id, opts)
+  opts = opts or {}
+  local who = M.identity or {}
+  local force, note = opts.force or who.force, opts.note or who.note
+  if not (force and type(note) == "string" and vim.trim(note) ~= "") then
+    return nil
+  end
+  local claim = M.read(root, id)
+  local by = opts.by or who.by or M.default_name()
+  if claim and M.state(claim, by, opts.now or M.now()) == "foreign" then
+    return claim
+  end
+  return nil
+end
+
+---After a finish that went past somebody's claim: the note goes into the finished file (`path`, in the Backlog), which
+---`record_override` cannot reach (it edits open tasks).
+---@param path string
+---@param before Tasks.Claim
+---@param opts { by?: string, note?: string, today?: string }
+---@return boolean noted
+function M.record_override_in_file(path, before, opts)
+  local who = M.identity or {}
+  local by = opts.by or who.by or M.default_name()
+  local note = opts.note or who.note or ""
+  local text = fsio.read(path)
+  if not text then
+    return false
+  end
+  local line = ("claim of %s overridden by %s: %s"):format(before.by, by, vim.trim(note))
+  local new_text = require("tasks_nvim.steps").add_note(
+    text,
+    line,
+    opts.today or require("tasks_nvim.model").today()
+  )
+  if not new_text then
+    return false
+  end
+  return fsio.write_atomic(path, new_text) == true
+end
+
 ---After a write that went past somebody's claim (`force`): say so in the notes of the task, in the words of the one who
----did it. `before` is the claim as it was; a task that is no longer open (a finish) keeps no such line.
+---did it. `before` is the claim as it was; a task that is no longer open (a finish) uses `record_override_in_file`.
 ---@param id string
 ---@param before Tasks.Claim|nil
 ---@param opts { by?: string, force?: boolean, note?: string, root?: string, today?: string, now?: string }

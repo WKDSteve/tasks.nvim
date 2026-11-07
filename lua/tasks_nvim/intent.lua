@@ -470,42 +470,64 @@ function M.run(input, opts)
       ("intent refused: finding.area '%s' is no area of this vault"):format(tostring(area))
   end
   local ref = M.finding_ref(finding)
-  local matches = finder.by_refs({ ref }, { root = root })
-  if #matches > 0 then
-    local first = matches[1]
-    return {
-      action = doc.action,
-      outcome = "exists",
-      id = first.id,
-      area = first.area,
-      status = first.status,
-      location = first.location,
-      matches = matches,
-    },
-      nil
-  end
-  local proposal = { action = doc.action, area = area, title = finding.title }
-  if not opts.yes then
-    proposal.outcome = "would_create"
+  ---Look for the finding, and make the task unless it is there. With `yes` this runs under a lock of the vault, so two
+  ---processes that take the same finding at once make one task, not two.
+  ---@return Tasks.IntentResult|nil
+  ---@return string|nil err
+  local function take()
+    local matches = finder.by_refs({ ref }, { root = root })
+    if #matches > 0 then
+      local first = matches[1]
+      return {
+        action = doc.action,
+        outcome = "exists",
+        id = first.id,
+        area = first.area,
+        status = first.status,
+        location = first.location,
+        matches = matches,
+      },
+        nil
+    end
+    local proposal = { action = doc.action, area = area, title = finding.title }
+    if not opts.yes then
+      proposal.outcome = "would_create"
+      return proposal, nil
+    end
+    local made, err = require("tasks_nvim.mutate").new(area, {
+      root = root,
+      today = opts.today,
+      title = finding.title,
+      kind = "bug",
+      tags = { "testing" },
+      refs = M.refs_of(finding),
+      summary = first_line(finding.excerpt or "", 300),
+      body = M.body_of(finding, opts.lang or "de"),
+      lang = opts.lang,
+    })
+    if not made then
+      return nil, tostring(err)
+    end
+    proposal.outcome = "created"
+    proposal.id = made.id
     return proposal, nil
   end
-  local made, err = require("tasks_nvim.mutate").new(area, {
-    root = root,
-    today = opts.today,
-    title = finding.title,
-    kind = "bug",
-    tags = { "testing" },
-    refs = M.refs_of(finding),
-    summary = first_line(finding.excerpt or "", 300),
-    body = M.body_of(finding, opts.lang or "de"),
-    lang = opts.lang,
-  })
-  if not made then
-    return nil, tostring(err)
+  if not opts.yes then
+    return take()
   end
-  proposal.outcome = "created"
-  proposal.id = made.id
-  return proposal, nil
+  -- the lock file lives in `.claims/` (ignored by git, made beside the claims)
+  local claims = require("tasks_nvim.claims")
+  local ok_dir, derr = claims.ensure_dir(root)
+  if not ok_dir then
+    return nil, tostring(derr)
+  end
+  local fsio = require("tasks_nvim.fsio")
+  local result, lerr =
+    fsio.with_lock(root .. "/" .. claims.DIR .. "/intent", take, { wait_ms = 10000 })
+  if result == nil then
+    return nil, tostring(lerr)
+  end
+  return result, nil
 end
 
 return M

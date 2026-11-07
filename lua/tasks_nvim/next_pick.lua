@@ -32,6 +32,7 @@ local vault = require("tasks_nvim.vault")
 local M = {}
 
 ---@class Tasks.NextOpts
+---@field today? string                       # `YYYY-MM-DD`: a ready task whose `start` is after it is left out, counted in `later`.
 ---@field foreign? table<string, boolean>     # Ids somebody else has claimed: not offered, counted in `claimed`.
 ---@field tasks Tasks.Task[]                    # Every open task of the vault.
 ---@field plans? Tasks.PlanFile[]               # The open plan files (their stage order and gates count).
@@ -56,6 +57,7 @@ local M = {}
 ---@field open { area: integer, vault: integer }
 ---@field empty? Tasks.NextEmpty
 ---@field incomplete? string[]                  # Folders that could not be read: the answer may be incomplete.
+---@field later? integer                      # Ready tasks left out because their `start` day has not come.
 ---@field claimed? integer                    # Ready tasks left out because somebody else has claimed them (`foreign` of the options).
 ---@field reminders? { open: Tasks.Task[], done: integer }  # Reminders that are due: the open tasks (oldest date first) and how many finished tasks carry one (`pick_from_vault` with `reminders = true` only).
 
@@ -150,7 +152,10 @@ function M.pick(opts)
   local candidates = {}
   for _, id in ipairs(built.ready) do
     local node = built.nodes[id]
-    if opts.foreign and opts.foreign[id] then
+    if model.not_started(node.task, opts.today or model.today()) then
+      -- free of blockers, but "the earliest day to begin" is still ahead: not offered, counted
+      result.later = (result.later or 0) + 1
+    elseif opts.foreign and opts.foreign[id] then
       -- somebody is working on it: it stays a blocker for others, it is no candidate for this caller
       result.claimed = (result.claimed or 0) + 1
     elseif wanted(node.task, opts.actor) then
@@ -324,6 +329,7 @@ function M.pick_from_vault(opts)
     end
   end
   local result = M.pick({
+    today = opts.today,
     foreign = foreign,
     tasks = open,
     is_done = scan.finished_lookup({ root = opts.root }),

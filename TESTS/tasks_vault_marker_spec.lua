@@ -188,6 +188,64 @@ return function(H)
   eq(old[1].code, "vault-marker-outdated")
   has(old[1].message, "layout version 1, this engine writes 2")
 
+  -- ── the vault's own body template (`TEMPLATES/task.md`, needs the marker file) ────────────────
+  local mutate = require("tasks_nvim.mutate")
+  local tpl_root = F.vault(H)
+  local tdir = tpl_root
+  local topts = { root = tpl_root, today = "2026-11-07", index = false }
+  local plain_task =
+    assert(mutate.new("lib.nvim", vim.tbl_extend("force", topts, { title = "Plain" })))
+  has(H.read(plain_task.path), "## Kontext", "no template: the built-in sections")
+  H.write(
+    tdir .. "/TEMPLATES/task.md",
+    "---\nignored: yes\n---\n\n## Warum\n\n{title} am {date}\n\n## Fertig\n\n- [ ] ok\n"
+  )
+  local custom =
+    assert(mutate.new("lib.nvim", vim.tbl_extend("force", topts, { title = "Custom 100%" })))
+  local ctext = H.read(custom.path)
+  has(ctext, "## Warum")
+  has(ctext, "Custom 100% am 2026-11-07", "{title} and {date}, a % in the title stays")
+  ok(not ctext:find("ignored: yes", 1, true), "the frontmatter of the template is dropped")
+  ok(not ctext:find("## Kontext", 1, true), "in place of the built-in sections")
+  H.write(tdir .. "/TEMPLATES/task-bug.md", "\n## Fehlerbild\n\n{title}\n")
+  local bug = assert(
+    mutate.new("lib.nvim", vim.tbl_extend("force", topts, { title = "A bug", kind = "bug" }))
+  )
+  has(H.read(bug.path), "## Fehlerbild", "task-<kind>.md comes first")
+  local other = assert(
+    mutate.new(
+      "lib.nvim",
+      vim.tbl_extend("force", topts, { title = "A feature", kind = "feature" })
+    )
+  )
+  has(H.read(other.path), "## Warum", "task.md for the other kinds")
+  local given = assert(
+    mutate.new(
+      "lib.nvim",
+      vim.tbl_extend("force", topts, { title = "Given", body = "My own text." })
+    )
+  )
+  has(H.read(given.path), "My own text.", "a body of the caller wins")
+  ok(not H.read(given.path):find("## Warum", 1, true))
+  H.write(tdir .. "/TEMPLATES/task.md", "   \n")
+  H.write(tdir .. "/TEMPLATES/task-bug.md", "   \n")
+  has(
+    H.read(
+      assert(mutate.new("lib.nvim", vim.tbl_extend("force", topts, { title = "Empty tpl" }))).path
+    ),
+    "## Kontext",
+    "an empty template is not used"
+  )
+  H.write(tdir .. "/TEMPLATES/task.md", "## Warum\n")
+  vim.fn.delete(marker.path(tpl_root))
+  has(
+    H.read(
+      assert(mutate.new("lib.nvim", vim.tbl_extend("force", topts, { title = "No marker" }))).path
+    ),
+    "## Kontext",
+    "without the marker file the vault's templates are not read"
+  )
+
   -- ── the writer ─────────────────────────────────────────────────────────────
   local fresh = H.tmpdir() .. "/fresh"
   vim.fn.mkdir(fresh, "p")

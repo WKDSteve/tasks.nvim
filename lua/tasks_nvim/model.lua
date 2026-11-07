@@ -536,6 +536,14 @@ function M.add_interval(date, n, unit)
   return ("%04d-%02d-%02d"):format(ny, nm, math.min(d, last))
 end
 
+---Whether the earliest day to begin (`start`) of a task is still to come on `today`.
+---@param task { start?: string }
+---@param today string  YYYY-MM-DD
+---@return boolean
+function M.not_started(task, today)
+  return M.is_date(task.start) and M.is_date(today) and task.start > today
+end
+
 ---The due date of the round after a finished one.
 ---With `repeat_from` `done` (the default) it counts from `done_date`; with `due` from the finished round's due date and
 ---goes on by whole intervals until the date is after `today` (a rhythm that fell behind skips the missed rounds). A

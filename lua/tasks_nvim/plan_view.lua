@@ -619,6 +619,9 @@ function M.next_lines(pick)
   for _, t in ipairs(pick.cdx) do
     out[#out + 1] = ("cdx: %s\t%s"):format(fsio.clean(t.id), fsio.clean(t.title))
   end
+  if (pick.later or 0) > 0 then
+    out[#out + 1] = ("later: %d task(s) not before their start day"):format(pick.later)
+  end
   if (pick.claimed or 0) > 0 then
     out[#out + 1] = ("claimed: %d task(s) left out, somebody else works on them (`claim` shows who)"):format(
       pick.claimed

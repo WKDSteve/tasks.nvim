@@ -411,6 +411,40 @@ local function meta_pairs(meta)
   return pairs_
 end
 
+---The body template of the vault, when the vault has a marker file `tasks-vault.json` and a template in its `TEMPLATES/`
+---folder: `task-<kind>.md`, else `task.md`. The frontmatter of the file, if it has one, is dropped; `{title}` and `{date}`
+---are replaced. A template that is no regular file, a link, empty or over 20000 characters is not used.
+---@param root string
+---@param kind string
+---@param title string
+---@param today string
+---@return string|nil body
+function M.vault_template(root, kind, title, today)
+  if not require("tasks_nvim.vault_marker").read(root) then
+    return nil
+  end
+  for _, name in ipairs({ "task-" .. kind .. ".md", "task.md" }) do
+    local path = root .. "/TEMPLATES/" .. name
+    if fsio.is_file(path) and not fsio.is_link(path) then
+      local text = fsio.read(path)
+      if text then
+        local parsed = fm.parse(text)
+        local body = vim.trim(fsio.lf(parsed and parsed.has_block and parsed.body or text))
+        if body ~= "" and #body <= 20000 then
+          body = body:gsub("{title}", function()
+            return title
+          end)
+          body = body:gsub("{date}", function()
+            return today
+          end)
+          return body
+        end
+      end
+    end
+  end
+  return nil
+end
+
 ---The task template as text, with every field present and visible placeholders.
 ---An unknown `lang` falls back to German (the CLI validates it before).
 ---@param opts? { title?: string, kind?: string, prio?: integer, effort?: string, tags?: string[], today?: string, lang?: Tasks.Lang, with_plan?: boolean }
@@ -1276,6 +1310,13 @@ function M.new(area, opts)
 
   local lead = summary and (summary .. "\n\n") or ""
   local body = "\n" .. lead .. NEW_BODY_SECTIONS[lang]
+  if opts.body == nil then
+    -- the vault's own body (`<vault>/TEMPLATES/task.md`, needs the marker file), in place of the built-in sections
+    local own = M.vault_template(root, kind, title, today)
+    if own then
+      body = "\n" .. lead .. own .. "\n"
+    end
+  end
   if opts.body ~= nil then
     -- the text the caller wrote replaces the sections of the template (it may carry its own)
     if type(opts.body) ~= "string" then

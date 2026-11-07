@@ -295,18 +295,18 @@ the other cases; the CLI verb is `unclaim` because `release <key>` is the verb o
   is allowed, `check` warns `claim-expired`. A chat that died blocks nothing for longer than its duration. Time is UTC
   and always passed in (`opts.now`), so the specs need no waiting.
 - **The guard.** A valid claim of **another** name refuses `set`, the text edits (`tick_step`, `add_steps`, `answer`,
-  `append_note`, `set_body`), `done` and its preview, `attach`, `folderize` and `move_area` (reordering and the
-  reference rewrites of a move do not ask). The answer is `conflict` and the message names the owner and the time
+  `append_note`, `set_body`), `done` and its preview, `attach`, `folderize`, `reorder` and `move_area` (the reference
+  rewrites of a move do not ask). The answer is `conflict` and the message names the owner and the time
   (`... is claimed by chat-1 since ... until ...`). `--force --note=<why>` passes it (without a note it is refused) and, on `set`,
-  `attach` and `folderize`, writes `claim of X overridden by Y: <why>` into the notes. Reading (`show`, `list`, the documents) is free.
+  `attach`, `folderize` and `done`, writes `claim of X overridden by Y: <why>` into the notes (also of a finished task). Reading (`show`, `list`, the documents) is free.
   The guard runs under the task file's lock, the one `set` and `done` hold, so reserving and changing never interleave;
   two processes that claim at once have exactly one winner.
-- **`next`** leaves out the ready tasks of other names and says how many (`claimed: 2 task(s) left out ...`); the owner
+- **`next`** and **`list --ready`** (also the ready filter of the dashboard and the contract) leave out the ready tasks of other names and says how many (`claimed: 2 task(s) left out ...`); the owner
   sees his own (`--by`), and `doing` of an unclaimed task ranks as before.
 - **`check`**: `claim-expired`, `claim-orphan` (a claim file of a task that is not open: delete it) and `doing-unclaimed`
-  (`doing` for two days or more since `updated`, nobody claimed it), all warnings.
+  (`doing` for seven days or more since `updated`, nobody claimed it), all warnings.
 - **Not built / limits.** The store is a file per claim on one machine: a vault synced by something that is no git
-  (OneDrive, Obsidian Sync) does not carry `.claims/` between machines on purpose. Not claimed: plans, areas, reorder.
+  (OneDrive, Obsidian Sync) does not carry `.claims/` between machines on purpose. Not claimed: plans, areas.
   The editor has no `:Tasks claim` yet (the CLI and the ops door have). The module is `tasks_nvim.claims`; its store
   functions (`read`, `list`, `write`, `remove`) are the one place to replace for another backend (a frontmatter field).
 
@@ -320,9 +320,10 @@ that were missed). `new --repeat=8w [--repeat-from=due]`, `set <id> repeat=2w` (
 `done` (the `done_flow`, so the editor, the dashboard's `D`, a batch and the CLI alike) writes the finished round to
 `Backlog/` as always and then starts the next one:
 
-- a new open task with the same title, fields and body; `status` is `open`, `created` and `updated` are today, `due` and
-  `remind` are the next date (the reminder machinery shows it on its day: the start line and `next`), and `commits`,
-  `done_in`, `waits_for`, `blocked_by` and `start` are gone (they belong to the finished round);
+- a new open task with the same title, fields and body; `status` is `open`, `created` and `updated` are today, `due`,
+  `remind` and `start` are the next date (the reminder shows it on its day, and the round is **not ready before it**: `next`
+  and `list --ready` leave a task out whose `start` day has not come, `next` says `later: N task(s) ...`), and `commits`,
+  `done_in`, `waits_for` and `blocked_by` are gone (they belong to the finished round);
 - every ticked box in the body (`- [x]`, also the steps of `## Plan`) is open again; the finished round keeps its ticks;
 - the slug is `<base>-<due>` (`sweep` becomes `sweep-2027-01-05`, the round after it `sweep-2027-03-02`): an open task and
   a finished one may not share an id (`duplicate-id`), so every round has its own. Anything that names the routine by id
@@ -334,8 +335,9 @@ that were missed). `new --repeat=8w [--repeat-from=due]`, `set <id> repeat=2w` (
 The next round of a folder task is a plain task file: its assets stay with the finished round.
 
 `check`: `bad-repeat` (error, also a `repeat_from` that is neither word), `repeat-without-due` (warning: the first round has
-no deadline) and `repeat-from-without-repeat` (warning). Not built: a round that is not "ready" before its due day (the
-reminder is what brings it back), deleting with a warning, a history of the rounds beyond the Backlog files.
+no deadline) and `repeat-from-without-repeat` (warning). Not built: deleting with a warning, a history of the rounds beyond
+the Backlog files. `start` counts for every task, not only for rounds: a task whose earliest day to begin is ahead is not offered by `next`
+and not listed by `list --ready` (a clock-dependent answer, `--today` fixes the day).
 
 ### Folder tasks
 
@@ -419,6 +421,10 @@ message names the key or the version, never a path. `hello` is the one call that
 The engine writes the file once: `:TasksVault create` and `init-vault` make it for a new vault (`--lang` is its `lang`), never over a
 file that is there (also not a refused one). Nobody else writes it: a person edits it like a task file.
 
+- `TEMPLATES/task.md` of the vault is the body of a new task (`new` without `--body`), `TEMPLATES/task-<kind>.md` for
+  that kind first; only with the marker file; the frontmatter of the template is dropped, `{title}` and `{date}` are replaced,
+  an empty, linked or over 20000 characters template is not used.
+
 ### Findings of `check`
 
 | Code | Meaning |
@@ -449,7 +455,7 @@ file that is there (also not a refused one). Nobody else writes it: a person edi
 | `duplicate-id` | an open and a finished task share an id |
 | `frontmatter-warning` (warning) | a frontmatter line was kept but not understood |
 | `area-groups-invalid` (error) | `<vault>/area-groups.json` cannot be read or parsed, or one of its groups (or one of `setup({ area_groups })`) is malformed; whole-vault runs only, area `""` |
-| `claim-expired`, `claim-orphan`, `doing-unclaimed` (warnings) | a claim that ran out, a claim file of a task that is not open, a `doing` task nobody claimed for two days. See [Claims](#claims) |
+| `claim-expired`, `claim-orphan`, `doing-unclaimed` (warnings) | a claim that ran out, a claim file of a task that is not open, a `doing` task nobody claimed for seven days. See [Claims](#claims) |
 | `bad-repeat` (error), `repeat-without-due`, `repeat-from-without-repeat` (warnings) | `repeat` is no interval (or `repeat_from` is neither `done` nor `due`); a routine with no `due` date; `repeat_from` on a task that is no routine. See [Routines](#routines-repeat) |
 | `vault-marker-missing`, `vault-marker-outdated` (warnings) | the vault has no `tasks-vault.json`, or it names an older layout version than this engine writes; vault-wide, so the finding has `area: ""` and `file: tasks-vault.json` and a check of one area leaves it out |
 | `area-groups-config` (warning) | a group of `setup({ area_groups })` is malformed (the file is fine; a `setup()` group that replaces one of the file by name is no finding) |

@@ -225,6 +225,7 @@ local SPECS = {
       "sheet",
       "due-before",
       "starts-after",
+      "by",
     },
     flag = {
       "blocked",
@@ -625,8 +626,14 @@ function commands.list(ctx)
       return 2
     end
     -- The same definition of "ready" as the plan, the dashboard and `next`.
-    local kept, kerr =
-      plan_scope.filter_readiness(filtered, args.opt.ready and "ready" or "waiting", eo.root)
+    local kept, kerr = plan_scope.filter_readiness(
+      filtered,
+      args.opt.ready and "ready" or "waiting",
+      eo.root,
+      nil,
+      eo.today,
+      args.opt.by --[[@as string|nil]]
+    )
     if not kept then
       ctx.warn("error: " .. tostring(kerr))
       return 1

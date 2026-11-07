@@ -1995,6 +1995,11 @@
           },
           "additionalProperties": false
         },
+        "later": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Ready tasks left out because their `start` day has not come yet; absent when none."
+        },
         "claimed": {
           "type": "integer",
           "minimum": 1,

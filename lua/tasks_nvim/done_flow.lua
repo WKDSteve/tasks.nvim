@@ -274,7 +274,8 @@ local function start_next_round(routine, opts)
     { "commits", mutate.REMOVE },
     { "done_in", mutate.REMOVE },
     { "blocked_by", mutate.REMOVE },
-    { "start", mutate.REMOVE },
+    -- the round is not ready before its due day: `next` and `list --ready` honour `start`
+    { "start", due },
     { "remind", due },
     { "due", due },
     { "created", today },
@@ -377,6 +378,13 @@ end
 function M.run(id, opts)
   opts = opts or {}
   local routine = not opts.last and not opts.drafts and read_routine(id, opts) or nil
+  -- a claim of somebody else that this finish goes past (force and a note): written into the finished task afterwards
+  local passed
+  do
+    local claims = require("tasks_nvim.claims")
+    local root = vault.root(opts)
+    passed = root and claims.overridden(root, id, opts) or nil
+  end
   -- Step a is part of the finish itself: the ticked text is what `mutate.done` writes as the finished copy.
   local done, err, info =
     mutate.done(id, vim.tbl_extend("force", opts, { tick_steps = opts.chain ~= false }))
@@ -396,6 +404,9 @@ function M.run(id, opts)
   flow.steps_ticked = done.steps_ticked or 0
   if done.already then
     return flow, nil
+  end
+  if passed and done.to then
+    require("tasks_nvim.claims").record_override_in_file(done.to, passed, opts)
   end
   -- the routine first: the plan below must see the open next round, or it would close a plan that goes on
   if routine then
