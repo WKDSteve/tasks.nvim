@@ -162,8 +162,18 @@ return function(H)
   lacks(run({ "plan", "--project=ALL/mobile,ALL/other" }).out, "**Mobile**")
   -- a filter built by hand reads the plan files itself
   local open = assert(scan.open_tasks({ root = root }))
-  local kept = model.filter(open, { project = "ALL/mobile", ref_opts = { root = root } })
-  eq(#kept, 3)
+  local held = { project = "ALL/mobile", ref_opts = { root = root } }
+  eq(#model.filter(open, held), 3)
+  -- the filter outlives the files (the dashboard keeps one): a plan that leaves its project leaves the answer, too
+  local plan_path = root .. "/cascade.nvim/ROADMAP/plans/basis.md"
+  local plan_text = H.read(plan_path)
+  local without = plan_text
+    :gsub("project: ALL/mobile" .. string.char(10), "")
+    :gsub("phase: basis" .. string.char(10), "")
+  H.write(plan_path, without)
+  eq(#model.filter(open, held), 2, "the filter read the plan files again")
+  H.write(plan_path, plan_text)
+  eq(#model.filter(open, held), 3)
 
   -- ── the dashboard: a chip in its header, stored and read back ──
   local core = require("tasks_nvim.ui.dash_core")

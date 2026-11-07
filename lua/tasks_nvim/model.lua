@@ -1723,10 +1723,10 @@ function M.filter(tasks, f)
   local project_set = to_set(f.project)
   local plan_projects = f.plan_projects
   if project_set and not plan_projects then
-    -- a task is in the project of its plan: the plan files tell (read once, kept on the filter)
+    -- a task is in the project of its plan: the plan files tell. Read at each call and not kept on the filter: a
+    -- filter outlives the files (the dashboard holds one), a plan may change its project meanwhile
     local files = require("tasks_nvim.plans").all({ root = f.ref_opts and f.ref_opts.root }) or {}
     plan_projects = require("tasks_nvim.projects").plan_projects(files)
-    f.plan_projects = plan_projects
   end
   local sheet_set = to_set(f.sheet)
   local effort_max = f.effort_max and M.effort_days(f.effort_max) or nil

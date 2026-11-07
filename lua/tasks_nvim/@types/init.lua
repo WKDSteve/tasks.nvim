@@ -78,7 +78,7 @@
 ---@field area? string|string[]
 ---@field plan? string|string[]      # Matches `plan:` (the plan file id; a task without a plan never matches).
 ---@field project? string|string[]   # Matches the project of the task: its own `project:`, else the project its plan names (`plan_projects`); a task of no project never matches.
----@field plan_projects? table<string, string>  # Plan id -> project id, for `project`; read from the plan files on first use when absent (`ref_opts.root`).
+---@field plan_projects? table<string, string>  # Plan id -> project id, for `project`; when absent `model.filter` reads the plan files at each call (`ref_opts.root`).
 ---@field phase? string|string[]     # Matches `phase:` (a task without a phase never matches).
 ---@field blocked? boolean            # status `blocked` or a non-empty `blocked_by`.
 ---@field overdue? boolean           # Only tasks whose `due` date is before today (a task without `due` never matches).
