@@ -1121,6 +1121,10 @@
                 "type": "string",
                 "description": "The stage of that project the plan belongs to."
               },
+              "etag": {
+                "$ref": "#/$defs/Etag",
+                "description": "The version of the plan file, for `if_match` of `plan_set` (capability `projects`); absent for a file that cannot be read."
+              },
               "valid": {
                 "type": "boolean"
               }
@@ -1142,6 +1146,10 @@
               "target": { "type": "string" },
               "phase_order": { "type": "array", "items": { "type": "string" } },
               "gate": { "const": "hard" },
+              "etag": {
+                "$ref": "#/$defs/Etag",
+                "description": "The version of the project file, for `if_match` of `project_set`; absent for a file that cannot be read."
+              },
               "valid": { "type": "boolean" },
               "plans": {
                 "type": "array",

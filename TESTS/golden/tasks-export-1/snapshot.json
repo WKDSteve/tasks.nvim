@@ -46,7 +46,7 @@
     "listed": 14,
     "unlisted": 2
   },
-  "digest": "sha256:af2e066c27246728",
+  "digest": "sha256:94bee8eea6cb2da3",
   "engine": {
     "git": "0000000",
     "nvim": "0.0.0",
@@ -139,6 +139,7 @@
         "lib.nvim",
         "cascade.nvim"
       ],
+      "etag": "sha256:52c589566eb14f77",
       "id": "lib.nvim/the-plan",
       "phase": "first",
       "phase_order": [
@@ -157,6 +158,7 @@
       "areas": [
         "lib.nvim"
       ],
+      "etag": "sha256:22ff5592ef22f003",
       "id": "lib.nvim/the-project",
       "phase_order": [
         "first",

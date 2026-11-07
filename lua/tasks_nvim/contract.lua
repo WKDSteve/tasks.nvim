@@ -203,6 +203,21 @@ local function etag_of(path)
   return fsio.etag(text)
 end
 
+---The version tag of a plan or project file of `view`, read once per view: the snapshot names it beside the file
+---(`etag`, the `if_match` of `plan_set` / `project_set`) and its `rev` covers it.
+---@param view Tasks.ContractView
+---@param path string
+---@return string|nil
+local function file_etag(view, path)
+  view.file_etags = view.file_etags or {}
+  local known = view.file_etags[path]
+  if known == nil then
+    known = etag_of(path) or false
+    view.file_etags[path] = known
+  end
+  return known or nil
+end
+
 ---The most reminders of finished tasks a snapshot carries (the oldest dates first).
 M.REMINDERS_MAX = 100
 
@@ -419,6 +434,7 @@ end
 ---@field errors string[]                   # Folders that could not be read (relative).
 ---@field all Tasks.Task[]
 ---@field shared Tasks.PlanShared           # What `plan_scope` read: the readiness filters ask it again.
+---@field file_etags? table<string, string|false> # The version tags of plan and project files read so far (`file_etag`).
 
 ---Scan the vault once and compute the plan once.
 ---@param opts? { root?: string }
@@ -603,6 +619,7 @@ local function project_entries(view)
       target = f.target,
       phase_order = vim.list_slice(f.phase_order, 1),
       gate = f.gate,
+      etag = file_etag(view, f.path),
       valid = f.valid,
       plans = r.plan_ids,
       rollup = json.object({
@@ -629,11 +646,11 @@ local function rev_of(view, entries)
     lines[#lines + 1] = e.id .. "\t" .. (e.etag or "")
   end
   for _, f in ipairs(view.files) do
-    lines[#lines + 1] = "plan:" .. f.id .. "\t" .. (etag_of(f.path) or "")
+    lines[#lines + 1] = "plan:" .. f.id .. "\t" .. (file_etag(view, f.path) or "")
   end
   -- the project files only when there are some: a vault without projects keeps its revision
   for _, f in ipairs(view.projects or {}) do
-    lines[#lines + 1] = "project:" .. f.id .. "\t" .. (etag_of(f.path) or "")
+    lines[#lines + 1] = "project:" .. f.id .. "\t" .. (file_etag(view, f.path) or "")
   end
   for _, u in ipairs(view.unlisted) do
     lines[#lines + 1] = "unlisted:" .. u.id .. "\t" .. u.status
@@ -768,6 +785,7 @@ function M.build_snapshot(opts)
       gate = f.gate,
       project = f.project,
       phase = f.phase,
+      etag = file_etag(view, f.path),
       valid = f.valid,
     }
   end, view.files)

@@ -197,6 +197,10 @@ export type Snapshot = Head & {
      * The stage of that project the plan belongs to.
      */
     phase?: string;
+    /**
+     * The version of a file: `sha256:` and 16 hex digits of the hash of its bytes.
+     */
+    etag?: string;
     valid: boolean;
   }[];
   /**
@@ -210,6 +214,10 @@ export type Snapshot = Head & {
     target?: string;
     phase_order: string[];
     gate?: "hard";
+    /**
+     * The version of a file: `sha256:` and 16 hex digits of the hash of its bytes.
+     */
+    etag?: string;
     valid: boolean;
     /**
      * The ids of the open plans of the project, sorted.

@@ -7,6 +7,7 @@ the version is not tagged yet (the repository is not published).
 
 ### Added
 
+- `tasks-export/1` (additive): the snapshot's `plans[]` and `projects[]` carry the `etag` of their file, so a reader sends `plan_set` / `project_set` with `if_match` from the start, not only its undo (the `inverse`). The `rev` reads each file once with it.
 - `projects --of=<id> --write=<file>`: a generated marker block (`overview=<id>`) with the plans of a project as a table, refreshed after a finish like the other blocks.
 
 - Projects on the command line: `tasks projects [<area>]` (id, status, location, title, plans finished/all, tasks finished/all, days open), `tasks plans [<area>] --tree` (the plans under their project, indented, with their stage), and the filter `--project=<id>` for `list`, `plan`, `estimate` and `quickwins` (the tasks of a project: in one of its plans or its own; `Tasks.Filter.project`, read from the plan files when the filter is applied) and `new --project=<id>`; a marker block of `plan --write` records the filter. The editor commands (`:Tasks list|plan|estimate|quickwins`) take `--project=` too, the dashboard shows it as `[project: <id>]` and keeps it in its stored filter, and `plan` / `estimate` of ONE project draw its head (title, status, goal, stages) over the tasks (`plan_scope.load` takes `project_id`; a block written with `--write` records the filter only). Not yet: grouping and saved views by project, the table of plans in a project document, the project field of `:Tasks new`.

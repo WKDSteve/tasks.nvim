@@ -122,6 +122,17 @@ return function(H)
   -- ── plan_set: judged as the file would read, a version check, an inverse ──
   local plan_path = root .. "/lib.nvim/ROADMAP/plans/lib-mobile.md"
   local etag = require("tasks_nvim.fsio").etag(H.read(plan_path))
+  -- the snapshot names the version of every plan and project file: a reader sends it as `if_match` at once
+  local function snapshot_entry(list, id)
+    local doc = vim.json.decode((api.call("snapshot", nil, { root = root, today = F.TODAY })))
+    for _, e in ipairs(doc[list]) do
+      if e.id == id then
+        return e
+      end
+    end
+    error(id .. " is not in snapshot." .. list)
+  end
+  eq(snapshot_entry("plans", "lib.nvim/lib-mobile").etag, etag)
   local changed = one({
     {
       op = "plan_set",
@@ -199,17 +210,36 @@ return function(H)
   )
 
   -- ── project_set ──
+  local project_etag = snapshot_entry("projects", "ALL/mobile").etag
+  eq(
+    project_etag,
+    require("tasks_nvim.fsio").etag(H.read(root .. "/ALL/ROADMAP/projects/mobile.md"))
+  )
   local pset = one({
     {
       op = "project_set",
       id = "ALL/mobile",
       patch = { gate = "hard", areas = { "ALL" }, status = "doing" },
+      if_match = project_etag,
     },
   })
   eq(pset.ok, true, vim.inspect(pset))
   project = assert(projects.find("ALL/mobile", { root = root }))
   eq({ project.gate, project.areas, project.status }, { "hard", { "ALL" }, "doing" })
   eq(pset.inverse.patch.gate, vim.NIL, "a key the file did not have is removed by the inverse")
+  -- the version the snapshot named before the change is stale now
+  eq(
+    one({
+      {
+        op = "project_set",
+        id = "ALL/mobile",
+        patch = { status = "parked" },
+        if_match = project_etag,
+      },
+    }).error.code,
+    "conflict"
+  )
+  eq(snapshot_entry("projects", "ALL/mobile").etag, pset.etag_after)
   eq(one({ { op = "project_set", id = "ALL/mobile", patch = { project = "ALL/x" } } }).ok, false)
   eq(one({ { op = "project_set", id = "ALL/mobile", patch = { gate = vim.NIL } } }).ok, true)
 
