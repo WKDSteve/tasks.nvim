@@ -188,4 +188,50 @@ return function(H)
   eq(made.code, 0, made.err)
   local task = assert(scan.find("ALL/own-task", { root = root }))
   eq({ task.project, task.phase, task.plan }, { "ALL/mobile", "basis", nil })
+
+  -- ── the overview block: the plans of a project in a hand-written document ──
+  local doc = root .. "/ALL/overview.md"
+  H.write(
+    doc,
+    table.concat({
+      "# Mobile",
+      "",
+      "before",
+      "",
+      "<!-- GENERATED:plan scope=mobile start -->",
+      "old",
+      "<!-- GENERATED:plan end -->",
+      "",
+      "after",
+      "",
+    }, string.char(10))
+  )
+  local w = run({ "projects", "--of=ALL/mobile", "--write=" .. doc, "--scope=mobile" })
+  eq(w.code, 0, w.err)
+  has(w.out, "written")
+  local written = H.read(doc)
+  has(written, "<!-- GENERATED:plan scope=mobile overview=ALL/mobile start -->")
+  has(written, "| basis | `cascade.nvim/basis` basis | parked | 1 | - |")
+  has(written, "| apps | `lib.nvim/lib-mobile` lib mobile | doing | 1 | 1 |")
+  has(written, "`cascade.nvim/old-plan`")
+  has(written, "Own tasks of the project: 2 open.")
+  has(written, "before")
+  has(written, "after")
+  local at = written:find("| basis", 1, true)
+  assert(at < written:find("| apps", 1, true), "stage order of the project")
+  eq(
+    run({ "projects", "--of=ALL/mobile", "--write=" .. doc, "--scope=mobile" }).out:match("^%a+"),
+    "unchanged"
+  )
+  eq(run({ "projects", "--of=ALL/mobile", "--write=" .. doc, "--scope=mobile", "--check" }).code, 0)
+  eq(run({ "projects", "--of=ALL/ghost", "--write=" .. doc }).code, 1)
+  eq(run({ "projects", "--of=ALL/mobile" }).code, 2, "--of needs --write")
+  -- the refresh after a finish rebuilds it from the marker alone
+  local plan_scope = require("tasks_nvim.plan_scope")
+  H.write(doc, (written:gsub("| 1 | 1 |", "| 9 | 9 |")))
+  local refreshed = assert(plan_scope.refresh_document(doc, root))
+  eq(refreshed.changed, true)
+  eq(refreshed.refreshed, { "mobile" })
+  eq(H.read(doc), written)
+  eq(run({ "projects", "--of=ALL/mobile", "--write=" .. doc, "--scope=mobile", "--check" }).code, 0)
 end

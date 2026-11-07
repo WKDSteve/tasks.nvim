@@ -285,6 +285,84 @@ function M.rollup(project, ctx)
   return out
 end
 
+---One cell of a Markdown table: no pipe, no line break.
+---@param text any
+---@return string
+local function cell(text)
+  return (fsio.clean(tostring(text or "")):gsub("|", "/"))
+end
+
+---The overview of a project as the body of a marker block: its plans in the order of its stages (a plan of no listed
+---stage last), each with status and what is open, then the tasks of the project itself. Open plans come from the plan
+---files, finished ones from the Backlogs. Pure given its inputs.
+---@param project Tasks.PlanFile
+---@param ctx { plans: Tasks.PlanFile[], open: Tasks.Task[], finished?: Tasks.Task[], root?: string }
+---@return string
+function M.overview(project, ctx)
+  local finished = ctx.finished or M.finished_items({ root = ctx.root })
+  local rows = {}
+  for _, f in ipairs(M.plans_of(project.id, ctx.plans)) do
+    local n, days = 0, 0
+    for _, t in ipairs(ctx.open) do
+      if t.plan == f.id then
+        n = n + 1
+        days = days + (model.effort_days(t.effort) or 0)
+      end
+    end
+    rows[#rows + 1] = {
+      id = f.id,
+      title = f.title,
+      phase = f.phase,
+      status = f.status or "-",
+      open = n,
+      days = days,
+    }
+  end
+  for _, item in ipairs(finished) do
+    if item.project == project.id and M.is_finished_plan(item) then
+      rows[#rows + 1] = {
+        id = item.id,
+        title = item.title,
+        phase = item.phase,
+        status = "done",
+        open = 0,
+        days = 0,
+      }
+    end
+  end
+  local rank = {}
+  for i, name in ipairs(project.phase_order or {}) do
+    rank[name] = i
+  end
+  local function key(r)
+    return r.phase and rank[r.phase] or (#(project.phase_order or {}) + 1)
+  end
+  table.sort(rows, function(a, b)
+    if key(a) ~= key(b) then
+      return key(a) < key(b)
+    end
+    return a.id < b.id
+  end)
+  local lines = { "| Stage | Plan | Status | Open | Days |", "|---|---|---|---|---|" }
+  for _, r in ipairs(rows) do
+    lines[#lines + 1] = ("| %s | `%s` %s | %s | %d | %s |"):format(
+      cell(r.phase or "-"),
+      cell(r.id),
+      cell(r.title),
+      cell(r.status),
+      r.open,
+      r.days > 0 and require("tasks_nvim.estimate").fmt_days(r.days) or "-"
+    )
+  end
+  if #rows == 0 then
+    lines[#lines + 1] = "| - | no plans yet | - | 0 | - |"
+  end
+  local own = M.members(project.id, ctx.open)
+  lines[#lines + 1] = ""
+  lines[#lines + 1] = ("Own tasks of the project: %d open."):format(#own)
+  return table.concat(lines, string.char(10)) .. string.char(10)
+end
+
 ---Finish a project: `status: done`, moved to `Backlog/FEATURES/YYYY-MM-DD_<slug>.md` with a row in the Backlog README, as
 ---a plan is (`plans.close`). Whether the project may be finished is the caller's judgement (`done_flow.close_projects`).
 ---@param id string

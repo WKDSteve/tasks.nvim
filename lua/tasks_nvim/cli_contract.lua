@@ -403,11 +403,61 @@ local function run_plans(ctx, helpers)
   return 0
 end
 
+---`projects --of=<id> --write=<file> [--scope=<name>] [--check]`: the marker block that lists the plans of one project
+---in a hand-written document. The marker records `overview=<id>`, so the refresh after a finish builds the same block.
+---@param ctx Tasks.CliCtx
+---@return integer
+local function write_overview(ctx)
+  local opt = ctx.args.opt
+  local id, write_to = opt.of, opt.write
+  if type(id) ~= "string" or type(write_to) ~= "string" then
+    ctx.warn("error: --of=<project> and --write=<file> go together (--scope=<name>, --check)")
+    return 2
+  end
+  local plan_scope = require("tasks_nvim.plan_scope")
+  local root = vault.root({ root = ctx.eo.root })
+  if not root then
+    ctx.warn("error: no vault found")
+    return 1
+  end
+  local shared, serr = plan_scope.shared(root)
+  if not shared then
+    ctx.warn("error: " .. tostring(serr))
+    return 1
+  end
+  local made = plan_scope.overview_body(id, root, shared)
+  if not made.body then
+    ctx.warn("error: " .. tostring(made.skip))
+    return 1
+  end
+  local key = type(opt.scope) == "string" and opt.scope or (id:match("([^/]+)$") or id)
+  local attrs = { overview = id }
+  if id:find("%s") or id:find("--", 1, true) then
+    ctx.warn("error: the project id cannot be recorded in a marker line")
+    return 2
+  end
+  local res, err = plan_scope.write_text_block(fsio.doc_path(write_to), made.body, {
+    key = key,
+    attrs = attrs,
+    check = opt.check == true,
+  })
+  if not res then
+    ctx.warn("error: " .. tostring(err))
+    return 1
+  end
+  ctx.say(("%s\t%s"):format(res.state, write_to))
+  return res.state == "stale" and 1 or 0
+end
+
 ---`projects [<area>]`: the project files with what each adds up to.
 ---@param ctx Tasks.CliCtx
 ---@param helpers Tasks.CliContractHelpers
 ---@return integer
 local function run_projects(ctx, helpers)
+  local opt = ctx.args.opt
+  if opt.write or opt.of or opt.check or opt.scope then
+    return write_overview(ctx)
+  end
   local area, ok = helpers.area_arg(ctx, "projects")
   if not ok then
     return 2
@@ -547,7 +597,7 @@ function M.register(commands, specs, helpers)
   commands.plans = function(ctx)
     return run_plans(ctx, helpers)
   end
-  specs.projects = { value = {}, flag = {} }
+  specs.projects = { value = { "of", "write", "scope" }, flag = { "check" } }
   commands.projects = function(ctx)
     return run_projects(ctx, helpers)
   end

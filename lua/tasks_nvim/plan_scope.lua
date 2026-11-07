@@ -27,6 +27,7 @@ local M = {}
 ---@field area? string
 ---@field for_id? string
 ---@field plan_id? string             # The plan file (`<area>/<slug>`): the tasks that name it with `plan:`.
+---@field overview_id? string         # A block that lists the plans of this project (no task list).
 ---@field project_id? string          # The project file: the tasks of its plans and its own (the project's head is the plan file of the scope).
 ---@field filter? Tasks.Filter
 
@@ -230,6 +231,12 @@ function M.resolve_block(key, root, attrs, shared)
       return nil, tostring(ferr), scan.find_done(attrs.plan, { root = root }) ~= nil
     end
     return { root = root, plan_id = attrs.plan }, nil
+  elseif attrs.overview then
+    local found, ferr = require("tasks_nvim.projects").find(attrs.overview, { root = root })
+    if not found then
+      return nil, tostring(ferr), scan.find_done(attrs.overview, { root = root }) ~= nil
+    end
+    return { root = root, overview_id = attrs.overview }, nil
   elseif attrs["for"] then
     if not shared then
       local err
@@ -414,6 +421,27 @@ local function filter_of(attrs, root)
   return filter, nil
 end
 
+---The body of a block that lists the plans of a project (`overview=<id>` on the marker).
+---@param id string
+---@param root string
+---@param sh Tasks.PlanShared
+---@return { body?: string, skip?: string }
+function M.overview_body(id, root, sh)
+  local projects = require("tasks_nvim.projects")
+  local project, err = projects.find(id, { root = root })
+  if not project then
+    return { skip = tostring(err) }
+  end
+  if #sh.errors > 0 then
+    return {
+      skip = ("a folder could not be read (%s): the block was left as it is"):format(
+        tostring(sh.errors[1])
+      ),
+    }
+  end
+  return { body = projects.overview(project, { plans = sh.files, open = sh.open, root = root }) }
+end
+
 ---The Markdown of a loaded scope, as a block body.
 ---@param scope Tasks.PlanScope
 ---@param attrs table<string, string>
@@ -521,6 +549,9 @@ function M.refresh_document(path, root, closed)
     if not filter then
       return { skip = "its recorded filter is invalid: " .. tostring(ferr) }
     end
+    if scope_opts.overview_id then
+      return M.overview_body(scope_opts.overview_id, root, sh)
+    end
     scope_opts.filter = filter
     local scope, lerr = M.load(scope_opts, sh)
     if not scope then
@@ -606,12 +637,22 @@ function M.write_block(path, scope, opts)
         tostring(scope.errors[1])
       )
   end
+  return M.write_text_block(path, block_body(scope, opts.attrs), opts)
+end
+
+---Put `body` into the block `opts.key` of a document (see `write_block`), with the same checks and the same re-read
+---before the write.
+---@param path string
+---@param body string
+---@param opts { key: string, attrs: table<string, string>, check?: boolean }
+---@return { state: "written"|"unchanged"|"stale"|"current" }|nil result
+---@return string|nil err
+function M.write_text_block(path, body, opts)
   local text, rerr = fsio.read(path)
   if not text then
     return nil, ("cannot read %s: %s"):format(path, tostring(rerr))
   end
-  local fresh, err, changed =
-    plan_view.replace_block(text, opts.key, block_body(scope, opts.attrs), opts.attrs)
+  local fresh, err, changed = plan_view.replace_block(text, opts.key, body, opts.attrs)
   if not fresh then
     return nil, tostring(err)
   end
