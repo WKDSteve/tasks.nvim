@@ -76,6 +76,7 @@ return function(H)
     "move_area",
     "move_area_preview",
     "plan_new",
+    "projects",
     "reminders",
     "reopen",
     "reorder",

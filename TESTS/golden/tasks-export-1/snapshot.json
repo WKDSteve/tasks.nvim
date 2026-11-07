@@ -46,7 +46,7 @@
     "listed": 14,
     "unlisted": 2
   },
-  "digest": "sha256:a1288d2f6ac0d353",
+  "digest": "sha256:af2e066c27246728",
   "engine": {
     "git": "0000000",
     "nvim": "0.0.0",
@@ -140,16 +140,45 @@
         "cascade.nvim"
       ],
       "id": "lib.nvim/the-plan",
+      "phase": "first",
       "phase_order": [
         "build",
         "test"
       ],
+      "project": "lib.nvim/the-project",
       "status": "doing",
       "title": "The plan",
       "valid": true
     }
   ],
   "plugin": "tasks.nvim",
+  "projects": [
+    {
+      "areas": [
+        "lib.nvim"
+      ],
+      "id": "lib.nvim/the-project",
+      "phase_order": [
+        "first",
+        "second"
+      ],
+      "plans": [
+        "lib.nvim/the-plan"
+      ],
+      "rollup": {
+        "days_open": 1,
+        "own_open": 0,
+        "plans_done": 0,
+        "plans_parked": 0,
+        "plans_total": 1,
+        "tasks_done": 1,
+        "tasks_open": 2
+      },
+      "status": "doing",
+      "title": "The project",
+      "valid": true
+    }
+  ],
   "reminders": [
     {
       "area": "lib.nvim",
@@ -160,7 +189,7 @@
       "title": "Old and done"
     }
   ],
-  "rev": "rev:9186a3",
+  "rev": "rev:e56dd1",
   "schema": 1,
   "tasks": [
     {

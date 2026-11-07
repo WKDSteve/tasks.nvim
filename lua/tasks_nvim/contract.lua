@@ -84,6 +84,7 @@ M.CAPABILITIES = {
   "order",
   "plan_for",
   "plan_new",
+  "projects",
   "reminders",
   "reopen",
   "reorder",
@@ -296,6 +297,7 @@ local function task_entry(root, task, node, rank)
     ["repeat"] = model.is_repeat(task.repeat_every) and task.repeat_every or nil,
     repeat_from = model.is_repeat_from(task.repeat_from) and task.repeat_from or nil,
     plan = task.plan,
+    project = task.project,
     phase = task.phase,
     done_in = task.done_in,
     -- only when the task lists commits, so a document without them reads as before
@@ -407,6 +409,7 @@ end
 ---@field unlisted { id: string, status: string, code: string }[]
 ---@field plan Tasks.Plan
 ---@field files Tasks.PlanFile[]
+---@field projects Tasks.PlanFile[]         # The open project files.
 ---@field rank table<string, integer>       # 1-based position in plan order.
 ---@field errors string[]                   # Folders that could not be read (relative).
 ---@field all Tasks.Task[]
@@ -471,6 +474,7 @@ function M.build_view(opts)
     unlisted = unlisted,
     plan = built,
     files = shared.files,
+    projects = shared.projects,
     rank = rank,
     errors = rel_errors,
     all = all,
@@ -573,6 +577,43 @@ local function area_groups_of(view)
   return #out > 0 and out or nil
 end
 
+---`snapshot.projects`: the project files with what each adds up to (`projects.rollup`) and its plans. The finished
+---items of the Backlogs are read once, and only when there is a project at all.
+---@param view Tasks.ContractView
+---@return table[]
+local function project_entries(view)
+  local out = {}
+  local finished
+  for _, f in ipairs(view.projects or {}) do
+    finished = finished or require("tasks_nvim.projects").finished_items({ root = view.root })
+    local r = require("tasks_nvim.projects").rollup(
+      f,
+      { plans = view.files, open = view.open, finished = finished }
+    )
+    out[#out + 1] = {
+      id = f.id,
+      title = f.title,
+      status = f.status,
+      areas = vim.list_slice(f.areas, 1),
+      target = f.target,
+      phase_order = vim.list_slice(f.phase_order, 1),
+      gate = f.gate,
+      valid = f.valid,
+      plans = r.plan_ids,
+      rollup = json.object({
+        plans_total = r.plans_total,
+        plans_done = r.plans_done,
+        plans_parked = r.plans_parked,
+        tasks_open = r.tasks_open,
+        tasks_done = r.tasks_done,
+        own_open = r.own_open,
+        days_open = r.days_open,
+      }),
+    }
+  end
+  return out
+end
+
 ---`rev`: what the vault looked like, from every task and plan file by id and version tag.
 ---@param view Tasks.ContractView
 ---@param entries table[]
@@ -584,6 +625,10 @@ local function rev_of(view, entries)
   end
   for _, f in ipairs(view.files) do
     lines[#lines + 1] = "plan:" .. f.id .. "\t" .. (etag_of(f.path) or "")
+  end
+  -- the project files only when there are some: a vault without projects keeps its revision
+  for _, f in ipairs(view.projects or {}) do
+    lines[#lines + 1] = "project:" .. f.id .. "\t" .. (etag_of(f.path) or "")
   end
   for _, u in ipairs(view.unlisted) do
     lines[#lines + 1] = "unlisted:" .. u.id .. "\t" .. u.status
@@ -716,9 +761,12 @@ function M.build_snapshot(opts)
       target = f.target,
       phase_order = vim.list_slice(f.phase_order, 1),
       gate = f.gate,
+      project = f.project,
+      phase = f.phase,
       valid = f.valid,
     }
   end, view.files)
+  doc.projects = project_entries(view)
   doc.tasks = json.memo(entries)
   doc.incomplete = vim.list_extend(vim.list_slice(view.errors, 1), reminder_errors)
   local sums = estimate.rollup(view.open)
@@ -2296,6 +2344,7 @@ function M.done_preview(id, opts)
   doc.readme = json.object({ state = pv.readme, row = pv.readme_row })
   doc.plan = pv.plan_id
   doc.closes_plan = pv.closes_plan
+  doc.closes_project = pv.closes_project
   doc.next_round = pv.next_round and json.object({ due = pv.next_round.due }) or nil
   doc.freed = vim.list_slice(pv.freed, 1)
   doc.etag = pv.etag

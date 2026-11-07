@@ -1,6 +1,6 @@
 {
   "client_op_id": "golden-run",
-  "digest": "sha256:d2efaa2dc2698719",
+  "digest": "sha256:f8ebd2595eb2ecff",
   "dry_run": false,
   "engine": {
     "git": "0000000",
@@ -117,6 +117,7 @@
       "op": "done",
       "outcome": "done",
       "plans_closed": [],
+      "projects_closed": [],
       "steps_ticked": 0,
       "to": "lib.nvim/Backlog/TASKS/2026-01-02_delta.md"
     },

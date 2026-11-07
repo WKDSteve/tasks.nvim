@@ -461,6 +461,10 @@
         "plan": {
           "type": "string"
         },
+        "project": {
+          "type": "string",
+          "description": "The project the task belongs to directly, instead of a plan (capability `projects`)."
+        },
         "phase": {
           "type": "string"
         },
@@ -850,6 +854,7 @@
         "unlisted",
         "plan",
         "plans",
+        "projects",
         "tasks",
         "incomplete",
         "estimate"
@@ -1108,8 +1113,62 @@
               "gate": {
                 "const": "hard"
               },
+              "project": {
+                "type": "string",
+                "description": "The project the plan belongs to (capability `projects`)."
+              },
+              "phase": {
+                "type": "string",
+                "description": "The stage of that project the plan belongs to."
+              },
               "valid": {
                 "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "projects": {
+          "type": "array",
+          "description": "The open project files (capability `projects`): a project groups plans and may hold tasks of its own.",
+          "items": {
+            "type": "object",
+            "required": ["id", "title", "areas", "phase_order", "valid", "plans", "rollup"],
+            "properties": {
+              "id": { "type": "string" },
+              "title": { "type": "string" },
+              "status": { "enum": ["planning", "doing", "parked", "done"] },
+              "areas": { "type": "array", "items": { "type": "string" } },
+              "target": { "type": "string" },
+              "phase_order": { "type": "array", "items": { "type": "string" } },
+              "gate": { "const": "hard" },
+              "valid": { "type": "boolean" },
+              "plans": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "The ids of the open plans of the project, sorted."
+              },
+              "rollup": {
+                "type": "object",
+                "required": [
+                  "plans_total",
+                  "plans_done",
+                  "plans_parked",
+                  "tasks_open",
+                  "tasks_done",
+                  "own_open",
+                  "days_open"
+                ],
+                "properties": {
+                  "plans_total": { "type": "integer", "minimum": 0 },
+                  "plans_done": { "type": "integer", "minimum": 0 },
+                  "plans_parked": { "type": "integer", "minimum": 0 },
+                  "tasks_open": { "type": "integer", "minimum": 0 },
+                  "tasks_done": { "type": "integer", "minimum": 0 },
+                  "own_open": { "type": "integer", "minimum": 0 },
+                  "days_open": { "type": "number", "minimum": 0 }
+                },
+                "additionalProperties": false
               }
             },
             "additionalProperties": false
@@ -2991,6 +3050,13 @@
             "type": "string"
           }
         },
+        "projects_closed": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The projects this finish closed after the plan (capability `projects`)."
+        },
         "notes": {
           "type": "array",
           "items": {
@@ -3118,6 +3184,10 @@
         },
         "closes_plan": {
           "description": "The plan this finish closes: the task is its last open member.",
+          "type": "string"
+        },
+        "closes_project": {
+          "description": "The project this finish closes after that: no other plan (a parked one does not count) and no task of its own is open (capability `projects`).",
           "type": "string"
         },
         "next_round": {

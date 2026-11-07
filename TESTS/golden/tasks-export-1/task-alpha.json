@@ -1,7 +1,7 @@
 {
   "body": "\nThe body of alpha.\n\n## Plan\n\n- [x] 1. first\n- [ ] 2. second\n- [ ] 3. third (dropped)\n\n\n## Offene Fragen\n\n### Which format? [q1]\nA line of text.\n- [ ] Section (empfohlen)\n- [ ] Frontmatter\n\n### Settled already [q2]\n- [x] Yes\n- [ ] No\n\n\u003c!-- testing:sheets:begin -->\n## Test sheets\n\n- **One** (`one`): automated part green, waiting for your judgement\n\u003c!-- testing:sheets:states one=inbox two=green -->\n\u003c!-- testing:sheets:end -->\n",
   "body_truncated": false,
-  "digest": "sha256:51aa863bb0c68415",
+  "digest": "sha256:c1e61cce443c8f97",
   "engine": {
     "git": "0000000",
     "nvim": "0.0.0",
@@ -54,7 +54,7 @@
       "title": "Settled already"
     }
   ],
-  "rev": "rev:91ce5f",
+  "rev": "rev:dd693a",
   "schema": 1,
   "steps": [
     {

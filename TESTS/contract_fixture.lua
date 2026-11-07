@@ -138,11 +138,21 @@ function M.build(H)
   -- a plan with phases; two tasks of it, a task that waits on `alpha` from another area, a finished blocker
   H.write(
     root .. "/lib.nvim/ROADMAP/plans/the-plan.md",
-    "---\ntitle: The plan\nstatus: doing\nareas: [lib.nvim, cascade.nvim]\nphase_order: [build, test]\ncreated: "
+    "---\ntitle: The plan\nstatus: doing\nareas: [lib.nvim, cascade.nvim]\nphase_order: [build, test]\nproject: lib.nvim/the-project\nphase: first\ncreated: "
       .. DATE
       .. "\nupdated: "
       .. DATE
       .. "\n---\n\nA plan of the fixture vault.\n"
+  )
+  -- a project that holds the plan (and nothing else): the level above plans
+  vim.fn.mkdir(root .. "/lib.nvim/ROADMAP/projects", "p")
+  H.write(
+    root .. "/lib.nvim/ROADMAP/projects/the-project.md",
+    "---\ntitle: The project\nstatus: doing\nareas: [lib.nvim]\nphase_order: [first, second]\ncreated: "
+      .. DATE
+      .. "\nupdated: "
+      .. DATE
+      .. "\n---\n\nA project of the fixture vault.\n"
   )
   task(H, root, "cascade.nvim", "zeta", {
     { "prio", "2" },

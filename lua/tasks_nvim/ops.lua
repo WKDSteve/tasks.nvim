@@ -1102,6 +1102,7 @@ local function do_done(op, ctx)
     etag_before = etag,
     steps_ticked = flow.steps_ticked,
     plans_closed = flow.plans_closed,
+    projects_closed = flow.projects_closed,
     notes = notes,
     changed_ids = done.already and {} or changed,
   }

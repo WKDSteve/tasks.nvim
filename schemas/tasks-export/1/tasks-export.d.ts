@@ -189,7 +189,41 @@ export type Snapshot = Head & {
     target?: string;
     phase_order: string[];
     gate?: "hard";
+    /**
+     * The project the plan belongs to (capability `projects`).
+     */
+    project?: string;
+    /**
+     * The stage of that project the plan belongs to.
+     */
+    phase?: string;
     valid: boolean;
+  }[];
+  /**
+   * The open project files (capability `projects`): a project groups plans and may hold tasks of its own.
+   */
+  projects: {
+    id: string;
+    title: string;
+    status?: "planning" | "doing" | "parked" | "done";
+    areas: string[];
+    target?: string;
+    phase_order: string[];
+    gate?: "hard";
+    valid: boolean;
+    /**
+     * The ids of the open plans of the project, sorted.
+     */
+    plans: string[];
+    rollup: {
+      plans_total: number;
+      plans_done: number;
+      plans_parked: number;
+      tasks_open: number;
+      tasks_done: number;
+      own_open: number;
+      days_open: number;
+    };
   }[];
   /**
    * In plan order.
@@ -709,6 +743,10 @@ export type DonePreview = Head & {
    */
   closes_plan?: string;
   /**
+   * The project this finish closes after that: no other plan (a parked one does not count) and no task of its own is open (capability `projects`).
+   */
+  closes_project?: string;
+  /**
    * Present when the task is a routine (`repeat`): the due date of the round the finish starts.
    */
   next_round?: {
@@ -873,6 +911,10 @@ export interface TaskEntry {
    */
   repeat_from?: "done" | "due";
   plan?: string;
+  /**
+   * The project the task belongs to directly, instead of a plan (capability `projects`).
+   */
+  project?: string;
   phase?: string;
   done_in?: string;
   commits?: string[];
@@ -1214,6 +1256,10 @@ export interface ResultEntry {
   to?: string;
   steps_ticked?: number;
   plans_closed?: string[];
+  /**
+   * The projects this finish closed after the plan (capability `projects`).
+   */
+  projects_closed?: string[];
   notes?: string[];
   move?: MovePlan;
   /**
