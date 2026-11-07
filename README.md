@@ -132,6 +132,7 @@ Every key is optional.
 require("tasks_nvim").setup({
   vault = "~/vault",         -- one folder per area, or a name from `vaults`; $TASKS_VAULT when unset
   vaults = {},               -- named vaults, e.g. { main = "~/vault", work = "~/work-vault" }; :TasksVault switch <name>
+  vault_rules = {},          -- vault by cwd at setup, e.g. { { match = "~/work", vault = "work" } }
   extra_areas = { "ALL" },   -- folders that are areas although they hold neither ROADMAP/ nor Backlog/
   dashboard = { watch = true, debounce_ms = 250, backend = "auto" },            -- live refresh; backend: auto | snacks | kit | select
   staleness = { git_timeout_ms = 20000, budget_ms = 30000, repo_bases = {} },   -- --stale=refs

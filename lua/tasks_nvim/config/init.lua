@@ -18,12 +18,13 @@ local state = vim.deepcopy(DEFAULTS)
 ---@type table<string, boolean>
 local given = {}
 
----@alias Tasks.ConfigType "string"|"vaults"|"boolean"|"string_list"|"posint"|"keymap"|"backend"|"value"|"effort"|"lists"|"area_groups"|"finished_window"|"links"|"form_mode"
+---@alias Tasks.ConfigType "string"|"vaults"|"vault_rules"|"boolean"|"string_list"|"posint"|"keymap"|"backend"|"value"|"effort"|"lists"|"area_groups"|"finished_window"|"links"|"form_mode"
 
 ---@type table<string, Tasks.ConfigType|table<string, Tasks.ConfigType>>
 local SCHEMA = {
   vault = "string",
   vaults = "vaults",
+  vault_rules = "vault_rules",
   extra_areas = "string_list",
   links = "links",
   dashboard = { watch = "boolean", debounce_ms = "posint", backend = "backend" },
@@ -109,6 +110,23 @@ local function check(kind, value)
       return true, kept, nil
     end
     return false, nil, "a table of name = folder"
+  elseif kind == "vault_rules" then
+    if type(value) == "table" and vim.islist(value) then
+      local kept = {}
+      for _, rule in ipairs(value) do
+        if
+          type(rule) ~= "table"
+          or type(rule.match) ~= "string"
+          or rule.match == ""
+          or type(rule.vault) ~= "string"
+        then
+          return false, nil, "a list of { match = <folder>, vault = <name> }"
+        end
+        kept[#kept + 1] = { match = vim.fs.normalize(rule.match), vault = rule.vault }
+      end
+      return true, kept, nil
+    end
+    return false, nil, "a list of { match = <folder>, vault = <name> }"
   elseif kind == "string_list" then
     if is_string_list(value) then
       return true, vim.deepcopy(value), nil

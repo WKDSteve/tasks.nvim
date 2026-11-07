@@ -777,8 +777,9 @@ them; `vault` may be a name (a path stays valid and names nothing; without `vaul
 closed and opened again on the new vault (with the filter remembered for that vault, and its area when the new vault has
 one of that name); with several names configured its title starts with `[<name>]`. An unknown name, or a folder that is gone, is refused and the active
 vault stays. Areas of the same name in two vaults are separate (`lib.nvim` in each). `:TasksVault status` and
-`:checkhealth` show which vault is active. Choosing the vault by the working directory is not built (`vault` plus
-`switch` only).
+`:checkhealth` show which vault is active. `vault_rules = { { match = "~/work", vault = "work" } }` picks the vault by
+the working directory when `setup()` runs: the first rule whose folder is the cwd or lies above it wins over `vault`; a
+rule for a name `vaults` does not have is skipped, and without a match `vault` decides. `switch` changes it later.
 
 **No vault.** The command exists even then, because `create` is what makes one. Every other verb answers with the same
 single notice (what to do: `:TasksVault create <dir>`, or `vault` in `setup()`, or `$TASKS_VAULT`) and does nothing

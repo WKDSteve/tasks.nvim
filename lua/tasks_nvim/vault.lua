@@ -59,7 +59,10 @@ local active_name
 ---`vaults = { main = "<dir>", other = "<dir>" }` names several vaults; `vault` then may be one of the
 ---names (a path of that spelling is only taken when no name matches). Without `vault` the first name
 ---(sorted) is active. A name that is not a plain word or a path that is not a string is dropped.
----@param opts? { vault?: string, vaults?: table<string, string>, extra_areas?: string[] }
+---
+---`vault_rules = { { match = "<dir>", vault = "<name>" } }` picks the vault by the working directory:
+---the first rule whose `match` is the cwd or a folder above it wins over `vault` (the cwd is read once, here).
+---@param opts? { vault?: string, vaults?: table<string, string>, vault_rules?: Tasks.VaultRule[], extra_areas?: string[], cwd?: string }
 ---@return nil
 function M.configure(opts)
   opts = opts or {}
@@ -91,9 +94,43 @@ function M.configure(opts)
       active_name, configured_root = first, named[first]
     end
   end
+  if type(opts.vault_rules) == "table" and #opts.vault_rules > 0 then
+    local picked = M.for_cwd(opts.cwd or vim.uv.cwd(), opts.vault_rules)
+    if picked then
+      active_name, configured_root = picked, named[picked]
+    end
+  end
   if type(opts.extra_areas) == "table" then
     M.EXTRA_AREAS = vim.deepcopy(opts.extra_areas)
   end
+end
+
+---@class Tasks.VaultRule
+---@field match string  A folder; the rule applies when the working directory is that folder or lies below it.
+---@field vault string  The name of a vault of `vaults`.
+
+---The named vault a working directory selects: the first rule whose folder contains `cwd` and whose vault is
+---named. A rule for a name `vaults` does not have is skipped (the next rule may still match).
+---@param cwd? string
+---@param rules Tasks.VaultRule[]
+---@return string|nil name
+function M.for_cwd(cwd, rules)
+  if type(cwd) ~= "string" or cwd == "" or type(rules) ~= "table" then
+    return nil
+  end
+  for _, rule in ipairs(rules) do
+    if
+      type(rule) == "table"
+      and type(rule.match) == "string"
+      and rule.match ~= ""
+      and type(rule.vault) == "string"
+      and named[rule.vault]
+      and fsio.is_inside(rule.match, cwd)
+    then
+      return rule.vault
+    end
+  end
+  return nil
 end
 
 ---The names of the configured vaults, sorted.

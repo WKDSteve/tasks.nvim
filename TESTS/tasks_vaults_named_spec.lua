@@ -90,6 +90,43 @@ return function(H)
   eq(vault.vault_names(), {})
   eq(vault.active_name(), nil)
 
+  -- ── vault_rules: the working directory picks the vault ─────────────────────
+  local rules = {
+    { match = "/work/tri", vault = "other" },
+    { match = "/work", vault = "main" },
+    { match = "/elsewhere", vault = "missing" },
+  }
+  vault.configure({ vaults = { main = main, other = second } })
+  eq(vault.for_cwd("/work/tri/sub", rules), "other", "the first matching rule wins")
+  eq(vault.for_cwd("/work/other", rules), "main", "a folder below a match")
+  eq(vault.for_cwd("/worker", rules), nil, "a text prefix is no folder prefix")
+  eq(vault.for_cwd("/elsewhere", rules), nil, "a rule for an unnamed vault is skipped")
+  eq(vault.for_cwd(nil, rules), nil)
+  vault.configure({
+    vaults = { main = main, other = second },
+    vault = "main",
+    vault_rules = rules,
+    cwd = "/work/tri",
+  })
+  eq(vault.active_name(), "other", "a matching rule wins over `vault`")
+  vault.configure({
+    vaults = { main = main, other = second },
+    vault = "main",
+    vault_rules = rules,
+    cwd = "/nowhere",
+  })
+  eq(vault.active_name(), "main", "no match keeps `vault`")
+  config.merge({ vault_rules = "x" })
+  ok(
+    #config.ignored() == 1 and config.ignored()[1]:find("vault_rules", 1, true),
+    "a non-list is reported"
+  )
+  config.merge({ vault_rules = { { match = "/a" } } })
+  ok(#config.ignored() == 1, "a rule without a vault is reported")
+  config.merge({ vault_rules = { { match = "/a", vault = "main" } } })
+  eq(#config.ignored(), 0)
+  eq(config.get().vault_rules[1].vault, "main")
+
   -- ── the handler ────────────────────────────────────────────────────────────
   local notes = {}
   local notify_mod = require("lib.nvim.notify")

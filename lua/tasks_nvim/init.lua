@@ -30,6 +30,7 @@ local M = {}
 ---@class Tasks.SetupOpts
 ---@field vault? string          # The vault folder (one folder per area), or a name of `vaults`; without it `$TASKS_VAULT` is read.
 ---@field vaults? table<string, string>  # Named vaults, `{ main = "<dir>", other = "<dir>" }`; `:TasksVault switch <name>` changes the active one.
+---@field vault_rules? Tasks.VaultRule[]  # Pick the vault by the working directory at setup: `{ { match = "~/work", vault = "work" } }`.
 ---@field extra_areas? string[]  # Folders that are areas although they hold neither `ROADMAP/` nor `Backlog/`.
 ---@field dashboard? { watch?: boolean, debounce_ms?: integer }
 ---@field staleness? { git_timeout_ms?: integer, budget_ms?: integer, repo_bases?: string[] }
