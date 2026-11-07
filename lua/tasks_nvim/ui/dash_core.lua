@@ -353,6 +353,10 @@ function M.parts(t, w, ready)
   if t.value then
     parts[#parts + 1] = { "  v" .. t.value, "Comment" }
   end
+  -- the steps of the task's own `## Plan` section: the subtasks, "3/5"
+  if t.plan_steps and t.plan_steps.total > 0 then
+    parts[#parts + 1] = { ("  %d/%d"):format(t.plan_steps.ticked, t.plan_steps.total), "Comment" }
+  end
   local actor = model.actor(t)
   if actor then
     parts[#parts + 1] = { "  [" .. actor .. "]", M.ACTOR_HL[actor] or "Comment" }

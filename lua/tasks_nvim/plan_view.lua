@@ -241,7 +241,15 @@ function M.markdown(plan, opts)
     for _, id in ipairs(stage) do
       local node = plan.nodes[id]
       lines[#lines + 1] = row({
-        id .. " -- " .. fsio.clean(node.task.title),
+        id
+          .. " -- "
+          .. fsio.clean(node.task.title)
+          .. (
+            node.task.plan_steps
+              and node.task.plan_steps.total > 0
+              and (" (%d/%d)"):format(node.task.plan_steps.ticked, node.task.plan_steps.total)
+            or ""
+          ),
         node.task.status or "?",
         node.task.effort or "-",
         waits_text(node),

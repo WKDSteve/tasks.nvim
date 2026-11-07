@@ -214,6 +214,13 @@ return function(H)
   has(md.out, "**" .. made.id .. "** -- 0/1 steps")
   has(md.out, "- [ ] 1. only step")
   lacks(run({ "plan", "lib.nvim" }).out, "only step", "steps only with --with-steps")
+  -- the counter sits in the stage table and on the dashboard line, whatever the view
+  has(run({ "plan", "lib.nvim" }).out, "With steps (0/1)")
+  local dash = require("tasks_nvim.ui.dash_core")
+  local task = assert(require("tasks_nvim.scan").find(made.id, { root = root }))
+  has(dash.line(task, { area = 10, effort = 4, status = 8 }), "  0/1")
+  task.plan_steps = nil
+  lacks(dash.line(task, { area = 10, effort = 4, status = 8 }), "0/1")
   local tpl = run({ "template", "--with-plan" })
   has(tpl.out, "## Plan")
   lacks(run({ "template" }).out, "## Plan")

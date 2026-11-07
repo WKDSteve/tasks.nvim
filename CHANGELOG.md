@@ -7,6 +7,8 @@ the version is not tagged yet (the repository is not published).
 
 ### Added
 
+- The steps of a task (`## Plan`) show as `3/5` on the dashboard line and behind the title in the stage tables of `plan`.
+
 - `tasks-export/1` (additive): the snapshot's `plans[]` and `projects[]` carry the `etag` of their file, so a reader sends `plan_set` / `project_set` with `if_match` from the start, not only its undo (the `inverse`). The `rev` reads each file once with it.
 - `projects --of=<id> --write=<file>`: a generated marker block (`overview=<id>`) with the plans of a project as a table, refreshed after a finish like the other blocks.
 
