@@ -204,7 +204,17 @@ export type Effort = string;
 export type Actor = "cdx" | "me" | "pair";
 export type Severity = "low" | "medium" | "high" | "critical";
 export type Category =
-  "bug" | "security" | "performance" | "docs" | "ruleset" | "ux" | "bindings" | "refactor" | "tests" | "ci";
+  | "bug"
+  | "security"
+  | "performance"
+  | "docs"
+  | "ruleset"
+  | "ux"
+  | "bindings"
+  | "refactor"
+  | "tests"
+  | "ci"
+  | "learning";
 export type Scope =
   "usercmd" | "keymap" | "config" | "ui" | "api" | "docs" | "tests" | "health" | "migration" | "multi-repo";
 /**

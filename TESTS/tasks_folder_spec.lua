@@ -51,6 +51,7 @@ return function(H)
     "refactor",
     "tests",
     "ci",
+    "learning",
   })
   ok(model.is_category("security"))
   ok(not model.is_category("Security"))
@@ -133,6 +134,13 @@ return function(H)
   eq(ids(model.filter(list, { category = { "security" } })), { "a/t1" })
   eq(ids(model.filter(list, { category = { "bug" } })), { "a/t2" }, "kind bug counts as bug")
   eq(ids(model.filter(list, { category = { "docs", "security" } })), { "a/t1", "a/t3" })
+  local learn = parse(F.meta("E", "open", { { "category", "[learning]" } }))
+  learn.slug, learn.id = "t5", "a/t5"
+  eq(
+    ids(model.filter({ list[1], learn }, { category = { "learning" } })),
+    { "a/t5" },
+    "learning is a concern like the others"
+  )
   eq(#model.filter(list, {}), 4)
   local f = assert(require("tasks_nvim.filter_opts").parse({ category = "bug,docs" }))
   eq(f.category, { "bug", "docs" })

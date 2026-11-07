@@ -42,7 +42,8 @@ M.KINDS = { "feature", "task", "bug", "idea", "research" }
 ---`kind: bug` implies `bug`, a tag of the same name counts as well. The one list the form, `new --category`,
 ---`set category=`, `check` and the `hello` enums read. New words go at the end: the order is the output order of
 ---`model.categories`. `ux` = what the user sees or does (a new user-facing feature), `bindings` = keymaps,
----commands, shortcuts; `refactor`, `tests`, `ci` = internal work on the code, the test suite, the pipeline.
+---commands, shortcuts; `refactor`, `tests`, `ci` = internal work on the code, the test suite, the pipeline; `learning` = work done to learn
+---and get better (a protocol, a terminal), not out of need.
 ---@type string[]
 M.CATEGORIES = {
   "bug",
@@ -55,6 +56,7 @@ M.CATEGORIES = {
   "refactor",
   "tests",
   "ci",
+  "learning",
 }
 
 ---What a task touches (the `scope` list): the surfaces of a plugin or an app, several allowed. Independent of

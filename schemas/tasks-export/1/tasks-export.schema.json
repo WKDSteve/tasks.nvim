@@ -90,7 +90,7 @@
       "not": { "const": "none" }
     },
     "Category": {
-      "enum": ["bug", "security", "performance", "docs", "ruleset", "ux", "bindings", "refactor", "tests", "ci"]
+      "enum": ["bug", "security", "performance", "docs", "ruleset", "ux", "bindings", "refactor", "tests", "ci", "learning"]
     },
     "ScaffoldRows": {
       "description": "Acceptance lines by word of a list (a kind, a category or a scope).",

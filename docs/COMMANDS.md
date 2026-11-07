@@ -31,7 +31,7 @@ lowercase word `all` is the keyword; `ALL` with capitals is the area of that nam
 | `--status=a,b` | one or more of `doing decision blocked open parked` |
 | `--prio=1,2` / `--prio=<=2` | exact prios, or "at most" |
 | `--kind=a,b` | `feature task bug idea research` |
-| `--category=a,b` | any of `bug security performance docs ruleset ux bindings refactor tests ci` (`bug` also finds every `kind: bug`; a tag spelled like a category counts) |
+| `--category=a,b` | any of `bug security performance docs ruleset ux bindings refactor tests ci learning` (`bug` also finds every `kind: bug`; a tag spelled like a category counts) |
 | `--effort=S,M` / `--effort=<=M` | the written effort (`XS S M L XL`, or days like `0.5d`; sizes are case-insensitive), or "this or smaller" (`<=S`, `<=M`, `<=1d`; sizes and days share one scale, a task without effort never matches) |
 | `--severity=a,b` | any of `low medium high critical` (the optional `severity` of a bug / security task; a task without one never matches) |
 | `--waits-for=a,b` | the **parked** tasks that wait for one of these keys (`waits_for:`, see [`:Tasks waits`](#tasks-waits-areaall-and-tasks-release-key---dry-run---yes)); `none` finds the parked tasks without a reason. Only a parked task matches, also where a default would hide parked tasks (`quickwins`) |

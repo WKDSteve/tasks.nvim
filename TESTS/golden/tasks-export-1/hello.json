@@ -59,7 +59,8 @@
       "bindings",
       "refactor",
       "tests",
-      "ci"
+      "ci",
+      "learning"
     ],
     "effort": [
       "XS",
