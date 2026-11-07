@@ -36,6 +36,7 @@ local M = {}
 ---@field foreign? table<string, boolean>     # Ids somebody else has claimed: not offered, counted in `claimed`.
 ---@field tasks Tasks.Task[]                    # Every open task of the vault.
 ---@field plans? Tasks.PlanFile[]               # The open plan files (their stage order and gates count).
+---@field projects? Tasks.PlanFile[]            # The open project files (the stage order of their plans counts, softly).
 ---@field is_done? (fun(id: string): boolean)|table<string, boolean>  # Finished ids (default: none known).
 ---@field done? { id: string, area: string }    # The task that was just finished.
 ---@field area? string                          # Area that ranks first (default: the finished task's).
@@ -90,7 +91,7 @@ end
 ---@param opts Tasks.NextOpts
 ---@return Tasks.NextPick
 function M.pick(opts)
-  local index = plan.index(opts.tasks, opts.is_done, opts.plans)
+  local index = plan.index(opts.tasks, opts.is_done, opts.plans, opts.projects)
   local built = plan.build(opts.tasks, index)
   local done = opts.done
   local home = opts.area or (done and done.area) or nil
@@ -334,6 +335,7 @@ function M.pick_from_vault(opts)
     tasks = open,
     is_done = scan.finished_lookup({ root = opts.root }),
     plans = require("tasks_nvim.plans").all({ root = opts.root }) or {},
+    projects = require("tasks_nvim.projects").all({ root = opts.root }) or {},
     unlisted = unlisted,
     unreadable = type(errors) == "table" and #errors or 0,
     done = opts.done,

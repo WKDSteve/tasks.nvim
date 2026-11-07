@@ -196,8 +196,8 @@ end
 ---@field by_slug table<string, string[]>  # slug -> the ids of that slug, sorted
 ---@field path_of table<string, string>    # id -> the vault path of its file, without `.md` (an open file first)
 
----Every task and plan id of the vault by slug, from the folder listings alone (nothing is read): open tasks (file and
----folder tasks), plan files, and the finished ones in `Backlog/TASKS` and `Backlog/FEATURES`.
+---Every task, plan and project id of the vault by slug, from the folder listings alone (nothing is read): open tasks (file and
+---folder tasks), plan files, project files, and the finished ones in `Backlog/TASKS` and `Backlog/FEATURES`.
 ---@param root string
 ---@return Tasks.LinkIndex
 function M.build_index(root)
@@ -234,6 +234,12 @@ function M.build_index(root)
       local slug = e.name:match("^(.+)%.md$")
       if e.kind == "file" and slug then
         add(area, slug, area .. "/ROADMAP/plans/" .. slug)
+      end
+    end
+    for _, e in ipairs(entries(vault.projects_dir(root, area))) do
+      local slug = e.name:match("^(.+)%.md$")
+      if e.kind == "file" and slug then
+        add(area, slug, area .. "/ROADMAP/projects/" .. slug)
       end
     end
     for _, bucket in ipairs({ "FEATURES", "TASKS" }) do
@@ -291,7 +297,7 @@ end
 
 ---@class Tasks.LinkProblem
 ---@field code "wikilink-dangling"|"wikilink-ambiguous"
----@field field string           # `blocked_by`, `after` or `plan` (a task's), `target` (a plan file's)
+---@field field string           # `blocked_by`, `after`, `plan` or `project` (a task's), `target` or `project` (a plan file's)
 ---@field raw string             # the value as written
 ---@field candidates string[]    # the ids the slug names (empty for a dangling one)
 
@@ -311,8 +317,8 @@ function M.resolve(tasks, resolver)
       for _, p in ipairs(pending) do
         local ids = resolver.candidates(p.slug)
         if #ids == 1 then
-          if p.field == "plan" then
-            t.plan = ids[1]
+          if p.field == "plan" or p.field == "project" then
+            t[p.field] = ids[1]
           else
             t[p.field][p.index] = ids[1]
           end

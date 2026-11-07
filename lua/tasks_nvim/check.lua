@@ -35,6 +35,11 @@
 ---    plan does not list, a target that exists nowhere; a broken plan file is reported with its own codes
 ---    (`plan-bad-status`, `plan-bad-area`, `plan-bad-target`, `plan-bad-gate`, ...)
 ---  - `bad-after`, `bad-order`, `after-self`, `after-dangling` (errors): the soft edge `after` and the sort hint `order`
+---  - `plan-project-unknown`, `plan-phase-without-project`, `task-plan-and-project`, `project-unknown` (errors): a plan or a
+---    task names a project nobody wrote, a plan has a `phase:` but no project, a task has both `plan:` and `project:`;
+---    `plan-project-done`, `plan-project-phase`, `project-done`, `project-phase`, `project-area`, `project-gate-soft`,
+---    `project-target-unknown` (warnings); a broken project file is reported with its own codes (`project-bad-status`,
+---    `project-bad-area`, `project-nested`, ...)
 ---  - `wikilink-dangling`, `wikilink-ambiguous` (errors): a bare `[[slug]]` in `blocked_by`, `after` or `plan` (or
 ---    in the `target` of a plan file) names no task or plan, or one in several areas (the candidates are named); a wikilink that resolves is checked as its id
 ---    with the codes above
@@ -65,6 +70,7 @@ local IMAGE_EXT =
 local model = require("tasks_nvim.model")
 local plan = require("tasks_nvim.plan")
 local plans = require("tasks_nvim.plans")
+local projects = require("tasks_nvim.projects")
 local index = require("tasks_nvim.index")
 local scan = require("tasks_nvim.scan")
 local vault = require("tasks_nvim.vault")
@@ -321,7 +327,8 @@ local function plan_findings(findings, open_ids, names, scan_opts, is_finished)
   for _, t in pairs(open_ids) do
     all[#all + 1] = t
   end
-  local blockers = plan.index(all, is_finished, plans.all(scan_opts) or {})
+  local blockers =
+    plan.index(all, is_finished, plans.all(scan_opts) or {}, projects.all(scan_opts) or {})
   local built = plan.build(all, blockers)
 
   for _, members in ipairs(built.cycles) do
@@ -468,6 +475,155 @@ local function plan_file_findings(findings, open_ids, names, scan_opts, is_finis
             "plan-phase",
             t,
             ("phase '%s' is not in the phase_order of %s"):format(t.phase, t.plan)
+          )
+        end
+      end
+    end
+  end
+end
+
+---Project files, the plans that name one (`project:`, `phase:`) and the tasks that name one themselves, reported for
+---the checked areas. A project nobody wrote is an error (a typo); a project that is finished already, a stage the
+---project does not list, an area the project does not list and a gate that is not enforced across plans are warnings.
+---A task has `plan:` or `project:`, never both; a project is not part of another project.
+---@param findings Tasks.Finding[]
+---@param open_ids table<string, Tasks.Task>
+---@param names string[]
+---@param scan_opts { root: string }
+---@param is_finished fun(id: string): boolean
+local function project_findings(findings, open_ids, names, scan_opts, is_finished)
+  local checked = {}
+  for _, n in ipairs(names) do
+    checked[n] = true
+  end
+  local project_files = projects.all(scan_opts) or {}
+  local by_id = {}
+  for _, file in ipairs(project_files) do
+    by_id[file.id] = file
+    if checked[file.area] then
+      for i, msg in ipairs(file.errors) do
+        add(findings, "error", file.error_codes[i] or "frontmatter-invalid", file, msg)
+      end
+      for _, p in ipairs(file.link_problems or {}) do
+        add(findings, "error", p.code, file, link_problem_message(p))
+      end
+      if file.target and not open_ids[file.target] and not is_finished(file.target) then
+        add(
+          findings,
+          "warn",
+          "project-target-unknown",
+          file,
+          "target " .. file.target .. " does not exist"
+        )
+      end
+      if file.gate == "hard" then
+        add(
+          findings,
+          "warn",
+          "project-gate-soft",
+          file,
+          "gate: hard does not hold across the plans of a project yet: the stages only order them"
+        )
+      end
+    end
+  end
+  for _, file in ipairs(plans.all(scan_opts) or {}) do
+    if checked[file.area] then
+      if file.phase and not file.project then
+        add(
+          findings,
+          "error",
+          "plan-phase-without-project",
+          file,
+          "phase " .. file.phase .. " names a stage of a project, but the plan has no project:"
+        )
+      end
+      local project = file.project and by_id[file.project]
+      if file.project and not project then
+        if is_finished(file.project) then
+          add(
+            findings,
+            "warn",
+            "plan-project-done",
+            file,
+            "project " .. file.project .. " is finished, the plan is still open"
+          )
+        else
+          add(
+            findings,
+            "error",
+            "plan-project-unknown",
+            file,
+            "project " .. file.project .. " is no project file (ROADMAP/projects/<slug>.md)"
+          )
+        end
+      elseif
+        project
+        and file.phase
+        and #project.phase_order > 0
+        and not vim.tbl_contains(project.phase_order, file.phase)
+      then
+        add(
+          findings,
+          "warn",
+          "plan-project-phase",
+          file,
+          ("phase '%s' is not in the phase_order of %s"):format(file.phase, file.project)
+        )
+      end
+    end
+  end
+  for _, t in pairs(open_ids) do
+    if checked[t.area] and t.project then
+      if t.plan then
+        add(
+          findings,
+          "error",
+          "task-plan-and-project",
+          t,
+          "a task has plan: or project:, not both (a task of a plan belongs to its project through it)"
+        )
+      end
+      local project = by_id[t.project]
+      if not project then
+        if is_finished(t.project) then
+          add(
+            findings,
+            "warn",
+            "project-done",
+            t,
+            "project " .. t.project .. " is finished, the task is still open"
+          )
+        else
+          add(
+            findings,
+            "error",
+            "project-unknown",
+            t,
+            "project " .. t.project .. " is no project file (ROADMAP/projects/<slug>.md)"
+          )
+        end
+      else
+        if #project.areas > 0 and not vim.tbl_contains(project.areas, t.area) then
+          add(
+            findings,
+            "warn",
+            "project-area",
+            t,
+            ("the project %s does not list the area %s"):format(t.project, t.area)
+          )
+        end
+        if
+          t.phase
+          and #project.phase_order > 0
+          and not vim.tbl_contains(project.phase_order, t.phase)
+        then
+          add(
+            findings,
+            "warn",
+            "project-phase",
+            t,
+            ("phase '%s' is not in the phase_order of %s"):format(t.phase, t.project)
           )
         end
       end
@@ -816,6 +972,7 @@ function M.run(opts)
     end
   end
   plan_file_findings(findings, open_ids, names, scan_opts, is_finished)
+  project_findings(findings, open_ids, names, scan_opts, is_finished)
   view_findings(findings, root, names)
   if not opts.area then
     area_group_findings(findings, root)

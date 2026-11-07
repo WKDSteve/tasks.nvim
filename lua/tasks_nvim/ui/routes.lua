@@ -619,7 +619,8 @@ local FIELD_DESC = {
   after = "Tasks it should come after, without waiting (ids)",
   order = "Tie-breaker within a stage; 2.5 sorts between 2 and 3",
   plan = "Plan file this task belongs to (area/slug)",
-  phase = "Stage of that plan the task belongs to",
+  project = "Project this task belongs to directly, instead of a plan (area/slug)",
+  phase = "Stage of that plan (or project) the task belongs to",
 }
 
 ---The values worth a word of their own in the option float, per `key=`.

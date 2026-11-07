@@ -608,18 +608,19 @@ local function id_list(value, what, resolver, kept)
   return list, typed
 end
 
----A `plan:` value: a plan id or a wikilink to one (see `id_list`).
+---A `plan:` value (or `project:`, named by `what`): a plan id or a wikilink to one (see `id_list`).
 ---@param value any
 ---@param resolver? Tasks.LinkResolver
+---@param what? string  # The field, for the message: `plan` (default) or `project`.
 ---@return string|nil id
 ---@return string|table<string, string> err_or_typed
-local function plan_ref(value, resolver)
+local function plan_ref(value, resolver, what)
   local text = vim.trim(tostring(value))
   local q = text:sub(1, 1)
   if (q == '"' or q == "'") and #text >= 2 and text:sub(-1) == q then
     text = vim.trim(text:sub(2, -2))
   end
-  local id, err = wikilinks.typed_id(text, "plan", resolver)
+  local id, err = wikilinks.typed_id(text, what or "plan", resolver)
   if not id then
     return nil, err --[[@as string]]
   end
@@ -682,6 +683,7 @@ local SETTABLE = {
   "after",
   "order",
   "plan",
+  "project",
   "phase",
   "refs",
   "links",
@@ -867,6 +869,15 @@ local FIELD_NORMALIZERS = {
   plan = function(value, key, ctx)
     local needs = tostring(value):find("[[", 1, true)
     local id, typed = plan_ref(value, needs and ctx.resolver() or nil)
+    if not id then
+      return nil, typed --[[@as string]]
+    end
+    ctx.typed[key] = typed
+    return id
+  end,
+  project = function(value, key, ctx)
+    local needs = tostring(value):find("[[", 1, true)
+    local id, typed = plan_ref(value, needs and ctx.resolver() or nil, "project")
     if not id then
       return nil, typed --[[@as string]]
     end
@@ -1060,7 +1071,10 @@ local function link_forms(text, pairs_, typed, mode, resolver)
   local out = {}
   for i, kv in ipairs(pairs_) do
     local key, value = kv[1], kv[2]
-    if (key == "blocked_by" or key == "after" or key == "plan") and value ~= M.REMOVE then
+    if
+      (key == "blocked_by" or key == "after" or key == "plan" or key == "project")
+      and value ~= M.REMOVE
+    then
       local form = wikilinks.forms(meta[key], mode, resolver, typed[key])
       if type(value) == "table" then
         local list = {}
@@ -1372,11 +1386,12 @@ function M.new(area, opts)
   local n = 1
   while true do
     local slug = n == 1 and base or (base .. "-" .. n)
-    -- A slug is taken by a file or a folder task of that name, in either form, and by an open plan: plans and tasks
-    -- share one id namespace (a finished plan lands in the Backlog and would read as a finished task of that id).
+    -- A slug is taken by a file or a folder task of that name, in either form, and by an open plan or project: plans,
+    -- projects and tasks share one id namespace (a finished plan lands in the Backlog and would read as a finished task of that id).
     local in_use = fsio.is_dir(vault.task_dir(root, area, slug))
       or fsio.is_file(vault.task_path(root, area, slug))
       or fsio.is_file(vault.plan_path(root, area, slug))
+      or fsio.is_file(vault.project_path(root, area, slug))
     -- `reserved`: ids a dry run counts as made already (earlier `new` ops of the request)
     in_use = in_use or (opts.reserved ~= nil and opts.reserved[area .. "/" .. slug] ~= nil)
     if not taken[slug] and not in_use then
@@ -2206,6 +2221,7 @@ function M.reopen(id, opts)
     fsio.is_file(target)
     or fsio.is_dir(vault.task_dir(root, area, slug))
     or fsio.is_file(vault.plan_path(root, area, slug))
+    or fsio.is_file(vault.project_path(root, area, slug))
   then
     return nil,
       ("there is an open task or plan of this name already: %s"):format(id),

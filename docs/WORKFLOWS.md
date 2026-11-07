@@ -33,7 +33,7 @@ Every scenario carries a tag:
 | Word | Meaning |
 | --- | --- |
 | **vault** | the folder that holds the areas (`setup({ vault = ... })` or `$TASKS_VAULT`) |
-| **area** | one project inside the vault: `<vault>/<area>/ROADMAP/tasks/*.md` (open) and `.../Backlog/` (done) |
+| **area** | one unit of work inside the vault (a repo, a plugin, an app): `<vault>/<area>/ROADMAP/tasks/*.md` (open) and `.../Backlog/` (done) |
 | **id** | `<area>/<slug>`, the same everywhere (commands, `blocked_by`, exports) |
 | **status** | `doing`, `decision` (waits for you), `blocked`, `open`, `parked`; `done` only in `Backlog/` |
 | **effort** | a size (`XS`..`XL`) or days (`3d`, `0.5d`): both are valid and nothing converts one to the other; ordering and `<=` filters put them on one scale (XS 0.25, S 0.5, M 1, L 3, XL 5 days). Bigger than L belongs in a plan (`check` says `effort-without-plan`) |
@@ -377,6 +377,29 @@ on two machines never collide). Stages follow `phase_order` as a soft hint; `--g
 a stage waits until the earlier stage is finished -- `list --ready`, `next` and the plan all see it). `check` catches a
 task that names a plan nobody wrote (`plan-unknown`), another area than the plan lists, a stage the plan does not
 list.
+
+#### A project over several plans -- the files and `check` work today; the commands and views are still to come
+
+Several plans can make one undertaking: "mobile apps for the app families" is one plan per app. The levels are fixed:
+**project, plan, task** (the steps of a task are its subtasks). A project is a file `<area>/ROADMAP/projects/<slug>.md`
+in the shape of a plan file (goal, definition of done, `areas`, `phase_order`, `status`); it holds **no list** either:
+
+```yaml
+# lib.nvim/ROADMAP/plans/lib-mobile.md
+project: ALL/mobile        # a plan belongs to at most one project (an id or "[[mobile]]")
+phase: apps                # optional: its stage in the project's phase_order
+```
+
+A task of the project itself (one that belongs to no single plan: "decide group B") says `project: ALL/mobile` instead of
+`plan:`, never both (`check`: `task-plan-and-project`). `:Tasks set <id> project=ALL/mobile` writes it. The stages of the
+project order its plans and own tasks softly: what is in a later stage follows what is in the nearest earlier one in
+`next` and the plan. A hard gate across plans does not exist yet (`project-gate-soft`).
+
+`check` catches a plan or task that names a project nobody wrote (`plan-project-unknown`, `project-unknown`), a stage the
+project does not list (`plan-project-phase`, `project-phase`), a `phase:` without a project (`plan-phase-without-project`),
+a project that is finished while the plan is not (`plan-project-done`, `project-done`), a task in an area the project
+does not list (`project-area`), and a project inside a project (`project-nested`). `tasks_nvim.projects.rollup` adds a
+project up: plans (open, finished, parked), tasks (open, finished, its own) and the days still open.
 
 ### 17. "This one should come after that one" -- works today
 

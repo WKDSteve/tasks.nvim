@@ -46,6 +46,7 @@ local M = {}
 ---@field open Tasks.Task[]           # Every open task of the vault.
 ---@field errors string[]             # Folders that could not be read.
 ---@field files Tasks.PlanFile[]      # Every open plan file.
+---@field projects Tasks.PlanFile[]   # Every open project file.
 ---@field finished? table<string, boolean>  # Slugs of every Backlog file (filled when a block name is looked up).
 
 ---Every open task of the vault and a finished-id lookup: what `plan.ready` and `plan.classify` need, whatever the
@@ -76,9 +77,10 @@ function M.shared(root, scanned)
   end
   local finished = scan.finished_lookup({ root = root })
   local files = plans.all({ root = root }) or {}
+  local project_files = require("tasks_nvim.projects").all({ root = root }) or {}
   local index = plan.index(open, function(id)
     return done_here[id] == true or finished(id)
-  end, files)
+  end, files, project_files)
   -- which file a ref means (the files two tasks "both change" are the same file, not the same name)
   index.file_key = require("tasks_nvim.staleness").file_key({ root = root })
   return {
@@ -87,6 +89,7 @@ function M.shared(root, scanned)
     open = open,
     errors = type(errors) == "table" and errors or {},
     files = files,
+    projects = project_files,
   },
     nil
 end

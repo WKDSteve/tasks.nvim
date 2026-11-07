@@ -55,7 +55,8 @@ sessions that run without an editor. Nothing is stored anywhere but in the files
 - **Undertakings**: an optional plan file per undertaking (goal, boundaries, stage names; no task list: tasks join with
   `plan:` / `phase:`), soft edges (`after`), a sort hint (`order`), a `## Plan` section with checkbox steps per task;
   finishing a task ticks its steps, finishes a plan with its last member and refreshes generated blocks in the
-  documents you name (`<!-- GENERATED:plan scope=... -->`)
+  documents you name (`<!-- GENERATED:plan scope=... -->`); above the plans an optional **project**
+  (`ROADMAP/projects/<slug>.md`, plans name it with `project:` / `phase:`, own tasks with `project:`)
 - **Rank and filter**: status, priority, effort, value (and a derived return on effort), who can do it (`cdx` / `me` / `pair`), kind, category, severity, tags, blockers, staleness
   (`--stale=60`, or `--stale=refs`: files a task names that changed since it was last updated).
 - **Set aside with a reason**: `waits_for=mac` parks a task and says what it waits for; `:Tasks waits` counts the

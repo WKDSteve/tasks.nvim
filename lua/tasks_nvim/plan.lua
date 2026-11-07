@@ -101,8 +101,9 @@ local NO_PRIO = 99
 ---@param all_open Tasks.Task[]
 ---@param is_done? (fun(id: string): boolean)|table<string, boolean>  # A predicate or a set of finished ids.
 ---@param plans? Tasks.PlanFile[]  # The open plan files: their `phase_order` gives the stages an order.
+---@param projects? Tasks.PlanFile[]  # The open project files: their `phase_order` orders their plans (and own tasks), softly.
 ---@return Tasks.PlanIndex
-function M.index(all_open, is_done, plans)
+function M.index(all_open, is_done, plans, projects)
   local open = {}
   for _, t in ipairs(all_open) do
     open[t.id] = t
@@ -148,6 +149,57 @@ function M.index(all_open, is_done, plans)
               for _, e in ipairs(earlier) do
                 if not vim.tbl_contains(target[id], e) then
                   table.insert(target[id], e)
+                end
+              end
+            end
+          end
+          earlier = members
+        end
+      end
+    end
+  end
+
+  -- A project file with a `phase_order` orders what belongs to it: a plan names its stage (`phase:`), a task of the
+  -- project itself too. The tasks of a stage follow those of the nearest earlier stage that has any. Always a soft
+  -- edge (it only moves the task to a later stage): a hard gate across plans is a later step (`check` says so, see
+  -- `project-gate-soft`).
+  local stage_of_plan = {}
+  for _, file in ipairs(plans or {}) do
+    if file.project and file.phase then
+      stage_of_plan[file.id] = { project = file.project, phase = file.phase }
+    end
+  end
+  for _, file in ipairs(projects or {}) do
+    if #file.phase_order > 0 and file.status ~= "done" then
+      local rank = {}
+      for i, name in ipairs(file.phase_order) do
+        rank[name] = i
+      end
+      ---@type table<integer, string[]>
+      local by_rank = {}
+      for _, t in ipairs(all_open) do
+        local name
+        if t.project == file.id then
+          name = t.phase
+        elseif t.plan and stage_of_plan[t.plan] and stage_of_plan[t.plan].project == file.id then
+          name = stage_of_plan[t.plan].phase
+        end
+        local r = name and rank[name]
+        if r then
+          by_rank[r] = by_rank[r] or {}
+          table.insert(by_rank[r], t.id)
+        end
+      end
+      local earlier ---@type string[]|nil
+      for r = 1, #file.phase_order do
+        local members = by_rank[r]
+        if members then
+          if earlier then
+            for _, id in ipairs(members) do
+              index.phase_edges[id] = index.phase_edges[id] or {}
+              for _, e in ipairs(earlier) do
+                if not vim.tbl_contains(index.phase_edges[id], e) then
+                  table.insert(index.phase_edges[id], e)
                 end
               end
             end

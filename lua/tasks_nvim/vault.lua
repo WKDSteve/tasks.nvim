@@ -2,7 +2,7 @@
 ---@brief Where the task vault is, which areas it has, and every path the task system uses.
 ---@description
 --- The vault is a folder you name (`setup({ vault = ... })`, `$TASKS_VAULT` or `--vault`): one
---- folder per project ("area"), each with `ROADMAP/` (open) and `Backlog/` (done).
+--- folder per area (the units of work: a repo, a plugin, an app), each with `ROADMAP/` (open) and `Backlog/` (done).
 --- This module is the only place that knows that layout.
 ---
 --- Key responsibilities:
@@ -359,6 +359,24 @@ end
 ---@return string
 function M.plan_path(root, area, slug)
   return M.plans_dir(root, area) .. "/" .. slug .. ".md"
+end
+
+---`<area>/ROADMAP/projects`: the project files of the area (optional). A project groups plans (`project:` in a plan
+---file) and may hold tasks of its own (`project:` in a task).
+---@param root string
+---@param area string
+---@return string
+function M.projects_dir(root, area)
+  return root .. "/" .. area .. "/ROADMAP/projects"
+end
+
+---`<area>/ROADMAP/projects/<slug>.md`
+---@param root string
+---@param area string
+---@param slug string
+---@return string
+function M.project_path(root, area, slug)
+  return M.projects_dir(root, area) .. "/" .. slug .. ".md"
 end
 
 ---`<area>/ROADMAP/TASKS.md`, the generated index.

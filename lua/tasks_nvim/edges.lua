@@ -180,7 +180,7 @@ function M.validate(id, proposal, opts)
         open[#open + 1] = pending[pid]
       end
     end
-    local after_index = plan.index(open, index.is_done, shared.files)
+    local after_index = plan.index(open, index.is_done, shared.files, shared.projects)
     local built = plan.build(open, after_index)
     for _, members in ipairs(built.cycles) do
       if #members > 1 and has(members, id) then

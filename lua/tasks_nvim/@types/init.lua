@@ -40,6 +40,7 @@
 ---@field after string[]              # Task ids (soft edges: "should come after", never an error), read like `blocked_by`.
 ---@field order? number               # Sort hint inside a stage (a fraction like 2.5 slots a task in between).
 ---@field plan? string                # The plan file (`<area>/<slug>`) this task belongs to (a wikilink read as its id; a bare `[[slug]]` that names no single id leaves it unset, see `link_problems`).
+---@field project? string             # The project (`<area>/<slug>`) this task belongs to directly, instead of a plan (a wikilink read as its id; a task has `plan:` or `project:`, `check` says `task-plan-and-project` for both).
 ---@field phase? string               # The stage of that plan (a kebab-case word).
 ---@field wikilinks? { field: string, index?: integer, slug: string, raw: string }[]  # Bare `[[slug]]` references `parse_text` could not settle without the vault; `scan` resolves them (`tasks_nvim.wikilinks.resolve`) and clears the field.
 ---@field link_problems? Tasks.LinkProblem[]  # The bare `[[slug]]` references that name no id or several (`check`: `wikilink-dangling`, `wikilink-ambiguous`).

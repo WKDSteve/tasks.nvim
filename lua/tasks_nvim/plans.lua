@@ -7,7 +7,12 @@
 ---
 --- Frontmatter (flat): `title`, `status` (`planning`, `doing`, `parked`, `done`), `areas` (the areas whose tasks may
 --- belong), `target` (a task: "done when this is"), `phase_order` (stage names, in order), `gate` (`hard`: a stage
---- may not begin before the earlier ones are finished; absent: the order is only a soft hint), `created`, `updated`.
+--- may not begin before the earlier ones are finished; absent: the order is only a soft hint), `created`, `updated`,
+--- and, for a plan that belongs to a project (`tasks_nvim.projects`), `project` (the project's id or a wikilink) and
+--- `phase` (a stage of that project's `phase_order`).
+---
+--- A project file has the same shape (`parse` with `kind = "project"`); it has no `project:` or `phase:` itself: the
+--- levels are fixed (project, plan, task), a project in a project is a mistake (`project-nested`).
 ---
 --- A plan is finished like a task (rule R6, moved to `Backlog/FEATURES/` with a row in the Backlog README) when its
 --- last member task is done: `close` does it. Plans are optional: without a plan file and without `plan:` the world
@@ -40,6 +45,10 @@ M.STATUSES = { "planning", "doing", "parked", "done" }
 ---@field target? string             # The task id; a wikilink in the file (`[[<slug>]]`, `[[<area>/<slug>]]`, a vault path) is read as its id.
 ---@field target_raw? string         # `target` as the file writes it (an id or a wikilink).
 ---@field link_problems? Tasks.LinkProblem[]  # A bare `[[slug]]` target that names no id or several (`check`: `wikilink-dangling`, `wikilink-ambiguous`); `target` is nil then.
+---@field kind "plan"|"project"      # Which kind of file this is (a project file is read by the same parser).
+---@field project? string             # A plan only: the project it belongs to (an id; a wikilink in the file is read as its id).
+---@field project_raw? string         # `project` as the file writes it (an id or a wikilink).
+---@field phase? string               # A plan only: its stage in the project's `phase_order`.
 ---@field phase_order string[]
 ---@field gate? string                # `hard` or nil.
 ---@field created? string
@@ -58,20 +67,26 @@ end
 ---Read one plan file's text. Always returns a plan; a broken file carries `errors` (`valid = false`). A bare
 ---`[[slug]]` target is settled by `ctx.link_resolver` (without one it names nothing: `wikilink-dangling`).
 ---@param text string
----@param ctx { path: string, area: string, slug?: string, location?: "roadmap"|"backlog", link_resolver?: Tasks.LinkResolver }
+---@param ctx { path: string, area: string, slug?: string, location?: "roadmap"|"backlog", kind?: "plan"|"project", link_resolver?: Tasks.LinkResolver }
 ---@return Tasks.PlanFile
 function M.parse(text, ctx)
   local slug = ctx.slug or model.slug_of(ctx.path, ctx.location or "roadmap")
+  local file_kind = ctx.kind or "plan"
   local errors, codes = {}, {}
   ---@param code string
   ---@param msg string
   local function bad(code, msg)
+    -- the codes of a project file say `project-...` where a plan's say `plan-...`
+    if file_kind == "project" and code:sub(1, 5) == "plan-" then
+      code = "project-" .. code:sub(6)
+    end
     errors[#errors + 1] = msg
     codes[#codes + 1] = code
   end
   ---@type Tasks.PlanFile
   local plan = {
     id = ctx.area .. "/" .. slug,
+    kind = file_kind,
     area = ctx.area,
     slug = slug,
     path = fsio.norm(ctx.path),
@@ -158,6 +173,52 @@ function M.parse(text, ctx)
         plan.gate = "hard"
       else
         bad("plan-bad-gate", "gate must be `hard` or absent, got '" .. fsio.clean(gate) .. "'")
+      end
+    end
+    local project = model.field_text(meta.project, "project", bad)
+    if file_kind == "project" then
+      if meta.project ~= nil or meta.phase ~= nil then
+        bad("project-nested", "a project is not part of another project: no project: or phase:")
+      end
+    else
+      if project then
+        plan.project_raw = vim.trim(project)
+        -- an id or an Obsidian wikilink, read like `target`
+        local pkind, value = wikilinks.read(vim.trim(project))
+        if pkind == "bad" then
+          bad("plan-bad-project", "project: " .. value)
+        elseif pkind == "slug" then
+          local ids = ctx.link_resolver and ctx.link_resolver.candidates(value) or {}
+          if #ids == 1 then
+            plan.project = ids[1]
+          else
+            plan.link_problems = plan.link_problems or {}
+            table.insert(plan.link_problems, {
+              code = #ids == 0 and "wikilink-dangling" or "wikilink-ambiguous",
+              field = "project",
+              raw = vim.trim(project),
+              candidates = vim.list_slice(ids, 1),
+            })
+          end
+        else
+          local _, pslug, pid_err = vault.parse_id(value)
+          if pid_err or not pslug then
+            bad(
+              "plan-bad-project",
+              "project: " .. (pid_err or ("expected <area>/<slug>, got " .. value))
+            )
+          else
+            plan.project = value
+          end
+        end
+      end
+      local phase = model.field_text(meta.phase, "phase", bad)
+      if phase then
+        if vault.valid_slug(phase) then
+          plan.phase = phase
+        else
+          bad("bad-phase", "phase: '" .. fsio.clean(phase) .. "' is no kebab-case word")
+        end
       end
     end
     for _, field in ipairs({ "created", "updated" }) do
@@ -506,6 +567,7 @@ function M.new(area, opts)
     local held = backlog_taken[slug] ~= nil
       or fsio.is_file(vault.task_path(root, area, slug))
       or fsio.is_dir(vault.task_dir(root, area, slug))
+      or fsio.is_file(vault.project_path(root, area, slug))
       or (opts.dry_run and (fsio.is_file(path) or fsio.is_dir(path)))
     if not held and opts.dry_run then
       return { id = area .. "/" .. slug, path = path, slug = slug, renamed = n > 1 }, nil

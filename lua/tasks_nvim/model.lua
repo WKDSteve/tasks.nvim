@@ -1243,6 +1243,28 @@ function M.parse_text(text, ctx)
         end
       end
     end
+    -- `project:` is the other way to belong somewhere: a task of the project itself, in no plan of it
+    local project_ref = as_text(meta.project, "project", bad)
+    if project_ref then
+      local form, value = wikilinks.read(project_ref)
+      if form == "id" then
+        task.project = value
+      elseif form == "slug" then
+        pending[#pending + 1] = { field = "project", slug = value, raw = project_ref }
+      elseif form == "bad" then
+        bad("bad-project", "project: " .. value)
+      else
+        local _, project_slug, project_err = vault.parse_id(project_ref)
+        if project_err or not project_slug then
+          bad(
+            "bad-project",
+            "project: " .. (project_err or ("expected <area>/<slug>, got " .. project_ref))
+          )
+        else
+          task.project = project_ref
+        end
+      end
+    end
     task.wikilinks = #pending > 0 and pending or nil
     local phase = as_text(meta.phase, "phase", bad)
     if phase then
