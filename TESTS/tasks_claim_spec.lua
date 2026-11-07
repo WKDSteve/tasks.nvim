@@ -269,7 +269,8 @@ return function(H)
   end
   eq(entry.claim.by, "chat-1")
   eq(entry.claim.expired, false)
-  eq(entry.claim["until"]:match("^%d%d%d%d%-%d%d%-%d%dT"), claims.now():sub(1, 11))
+  -- a timestamp of the engine, not the day of `now`: a claim of four hours lies on the next UTC day late in the evening
+  ok(entry.claim["until"]:match("^%d%d%d%d%-%d%d%-%d%dT") ~= nil, "`until` is a timestamp")
   for _, t in ipairs(snap.tasks) do
     if t.id == n_a then
       ok(t.claim ~= nil)
