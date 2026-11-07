@@ -144,7 +144,8 @@ end
 ---whose status is not `done`, valid or not: a typo in `status:` must not make the plan look finished. A scan that
 ---could not list every folder cannot say that no member is open: the plans stay and a note says so.
 ---@param plan_ids string[]
----@param opts? { root?: string, date?: string, today?: string, checkpoint_dir?: string }
+---`opts.dry_run` names what would be closed and writes nothing.
+---@param opts? { root?: string, date?: string, today?: string, checkpoint_dir?: string, dry_run?: boolean }
 ---@return Tasks.ClosedPlans
 function M.close_plans(plan_ids, opts)
   opts = opts or {}
@@ -203,12 +204,17 @@ function M.close_plans(plan_ids, opts)
     end
     if open == 0 then
       local summary = plans.summary(file, { root = opts.root, date = opts.date or opts.today })
-      local closed, cerr = plans.close(file.id, {
-        root = opts.root,
-        date = opts.date,
-        today = opts.today,
-        checkpoint_dir = opts.checkpoint_dir,
-      })
+      local closed, cerr
+      if opts.dry_run then
+        closed = { id = file.id }
+      else
+        closed, cerr = plans.close(file.id, {
+          root = opts.root,
+          date = opts.date,
+          today = opts.today,
+          checkpoint_dir = opts.checkpoint_dir,
+        })
+      end
       if not closed then
         out.notes[#out.notes + 1] = ("the plan %s could not be closed: %s"):format(
           file.id,
@@ -241,8 +247,9 @@ end
 ---left. A parked plan does not hold a project open (it is named in the summary); a plan or task of any other status
 ---does. A project that nothing finished is never asked about: an empty project does not close by itself. The scan
 ---guards are those of `close_plans`: an incomplete scan closes nothing.
+---`opts.dry_run` names what would be closed and writes nothing.
 ---@param project_ids string[]
----@param opts? { root?: string, date?: string, today?: string, checkpoint_dir?: string }
+---@param opts? { root?: string, date?: string, today?: string, checkpoint_dir?: string, dry_run?: boolean }
 ---@return Tasks.ClosedProjects
 function M.close_projects(project_ids, opts)
   opts = opts or {}
@@ -316,12 +323,17 @@ function M.close_projects(project_ids, opts)
       finished = finished or projects.finished_items({ root = opts.root })
       local rollup =
         projects.rollup(file, { plans = open_plans, open = open_tasks, finished = finished })
-      local closed, cerr = projects.close(file.id, {
-        root = opts.root,
-        date = opts.date,
-        today = opts.today,
-        checkpoint_dir = opts.checkpoint_dir,
-      })
+      local closed, cerr
+      if opts.dry_run then
+        closed = { id = file.id }
+      else
+        closed, cerr = projects.close(file.id, {
+          root = opts.root,
+          date = opts.date,
+          today = opts.today,
+          checkpoint_dir = opts.checkpoint_dir,
+        })
+      end
       if not closed then
         out.notes[#out.notes + 1] = ("the project %s could not be closed: %s"):format(
           file.id,

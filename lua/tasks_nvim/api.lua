@@ -54,6 +54,7 @@ local methods = {
       area = "string",
       status = "string_list",
       waits_for = "string_list",
+      project = "string_list",
       limit = "integer",
       offset = "integer",
       sort = "string",
@@ -81,7 +82,13 @@ local methods = {
     end,
   },
   order = {
-    params = { area = "string", status = "string_list", waits_for = "string_list", sort = "string" },
+    params = {
+      area = "string",
+      status = "string_list",
+      waits_for = "string_list",
+      project = "string_list",
+      sort = "string",
+    },
     run = function(params, opts)
       return contract.order(params, opts)
     end,

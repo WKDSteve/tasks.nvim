@@ -1,0 +1,130 @@
+{
+  "client_op_id": "golden-projects",
+  "digest": "sha256:94d552775d12cba8",
+  "dry_run": false,
+  "engine": {
+    "git": "0000000",
+    "nvim": "0.0.0",
+    "version": "0.1.0-test"
+  },
+  "generated_at": "2026-01-01T00:00:00Z",
+  "kind": "tasks.result",
+  "ok": false,
+  "plugin": "tasks.nvim",
+  "results": [
+    {
+      "changed_ids": [
+        "lib.nvim/golden-project"
+      ],
+      "file": "lib.nvim/ROADMAP/projects/golden-project.md",
+      "id": "lib.nvim/golden-project",
+      "n": 1,
+      "ok": true,
+      "op": "project_new",
+      "outcome": "created",
+      "renamed": false,
+      "slug": "golden-project"
+    },
+    {
+      "changed_ids": [
+        "lib.nvim/the-plan"
+      ],
+      "etag_after": "sha256:0e1f5adb0bc65bc3",
+      "etag_before": "sha256:52c589566eb14f77",
+      "file": "lib.nvim/ROADMAP/plans/the-plan.md",
+      "id": "lib.nvim/the-plan",
+      "inverse": {
+        "id": "lib.nvim/the-plan",
+        "if_match": "sha256:0e1f5adb0bc65bc3",
+        "op": "plan_set",
+        "patch": {
+          "phase": "first"
+        }
+      },
+      "n": 2,
+      "ok": true,
+      "op": "plan_set",
+      "outcome": "changed"
+    },
+    {
+      "changed_ids": [],
+      "error": {
+        "code": "invalid_argument",
+        "details": {
+          "problems": [
+            {
+              "code": "plan-project-phase",
+              "key": "phase",
+              "message": "phase 'nope' is not in the phase_order of lib.nvim/the-project (first, second)",
+              "target": "nope"
+            }
+          ]
+        },
+        "message": "phase 'nope' is not in the phase_order of lib.nvim/the-project (first, second)",
+        "retryable": false
+      },
+      "n": 3,
+      "ok": false,
+      "op": "plan_set",
+      "outcome": "failed"
+    },
+    {
+      "changed_ids": [
+        "lib.nvim/the-project"
+      ],
+      "etag_after": "sha256:44da9be92932c4ad",
+      "etag_before": "sha256:22ff5592ef22f003",
+      "file": "lib.nvim/ROADMAP/projects/the-project.md",
+      "id": "lib.nvim/the-project",
+      "inverse": {
+        "id": "lib.nvim/the-project",
+        "if_match": "sha256:44da9be92932c4ad",
+        "op": "project_set",
+        "patch": {
+          "gate": null
+        }
+      },
+      "n": 4,
+      "ok": true,
+      "op": "project_set",
+      "outcome": "changed"
+    },
+    {
+      "changed_ids": [],
+      "error": {
+        "code": "invalid_argument",
+        "details": {
+          "holding": [
+            "cascade.nvim/eta",
+            "cascade.nvim/zeta"
+          ]
+        },
+        "message": "lib.nvim/the-plan still has 2 open tasks",
+        "retryable": false
+      },
+      "n": 5,
+      "ok": false,
+      "op": "plan_close",
+      "outcome": "failed"
+    },
+    {
+      "changed_ids": [
+        "cascade.nvim/golden-project-task"
+      ],
+      "etag_after": "sha256:aeb42d7ca9bfdb7a",
+      "file": "cascade.nvim/ROADMAP/tasks/golden-project-task.md",
+      "id": "cascade.nvim/golden-project-task",
+      "index": {
+        "action": "written"
+      },
+      "n": 6,
+      "ok": true,
+      "op": "new",
+      "outcome": "created"
+    }
+  ],
+  "schema": 1,
+  "vault": {
+    "id": "vault"
+  }
+}

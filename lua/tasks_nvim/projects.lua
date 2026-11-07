@@ -146,6 +146,48 @@ function M.members(project_id, tasks)
   return out
 end
 
+---Which project a task belongs to: the one it names itself (`project:`), else the one its plan names.
+---@param task Tasks.Task
+---@param plan_projects table<string, string>  # Plan id -> project id (`plan_projects`).
+---@return string|nil
+function M.project_of(task, plan_projects)
+  return task.project or (task.plan and plan_projects[task.plan]) or nil
+end
+
+---Plan id -> the project it names, over the open plan files.
+---@param files Tasks.PlanFile[]
+---@return table<string, string>
+function M.plan_projects(files)
+  local out = {}
+  for _, f in ipairs(files) do
+    if f.project then
+      out[f.id] = f.project
+    end
+  end
+  return out
+end
+
+---The tasks of the projects `ids`: in one of their plans, or their own.
+---@param tasks Tasks.Task[]
+---@param ids string[]
+---@param files Tasks.PlanFile[]  # The open plan files.
+---@return Tasks.Task[]
+function M.filter(tasks, ids, files)
+  local want = {}
+  for _, id in ipairs(ids) do
+    want[id] = true
+  end
+  local plan_projects = M.plan_projects(files)
+  local out = {}
+  for _, t in ipairs(tasks) do
+    local project = M.project_of(t, plan_projects)
+    if project and want[project] then
+      out[#out + 1] = t
+    end
+  end
+  return out
+end
+
 ---A finished item of a Backlog is a plan file (a closed plan lands in `Backlog/FEATURES/`) when `plans.close` marked it
 ---(`closed_kind: plan`). A plan closed before the mark existed is told by the keys only a plan file has (`areas`,
 ---`phase_order`, `gate`, `target`); a finished task never has them.

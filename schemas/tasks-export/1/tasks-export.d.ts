@@ -1184,6 +1184,11 @@ export interface ResultEntry {
     | "done"
     | "move_area"
     | "plan_new"
+    | "plan_set"
+    | "plan_close"
+    | "project_new"
+    | "project_set"
+    | "project_close"
     | "tick_step"
     | "add_steps"
     | "answer"
@@ -1212,6 +1217,8 @@ export interface ResultEntry {
     | "moved"
     | "deleted"
     | "would_delete"
+    | "closed"
+    | "would_close"
     | "blocked"
     | "failed";
   etag_before?: Etag;
@@ -1278,7 +1285,17 @@ export interface ResultEntry {
  * The operation that undoes a change: send it as a new operation (its `if_match` is the version the change left). A key the change added is `null` in the patch of a `set`.
  */
 export interface Inverse {
-  op: "set" | "reorder" | "tick_step" | "answer" | "set_body" | "move_area" | "view_save" | "view_delete";
+  op:
+    | "set"
+    | "reorder"
+    | "tick_step"
+    | "answer"
+    | "set_body"
+    | "move_area"
+    | "view_save"
+    | "view_delete"
+    | "plan_set"
+    | "project_set";
   id: string;
   /**
    * `tick_step`: the number of the step.

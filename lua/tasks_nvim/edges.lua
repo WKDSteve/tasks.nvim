@@ -13,6 +13,8 @@
 ---  - `plan-unknown`: the plan names no plan file (a finished plan is fine)
 ---  - `plan-phase`: the plan lists stages (`phase_order`) and the phase is not one of them; `check` warns, a change
 ---    that has not happened yet is refused
+---  - `project-unknown`: the project names no project file (a finished project is fine); `task-plan-and-project`: the
+---    task would have both `plan:` and `project:`; `project-phase`: the project lists stages and the phase is not one
 ---
 --- Pure over one pass of the vault (`plan_scope.shared`); nothing is written. Not its job: the format of the values
 --- (`mutate` checks them), the write.
@@ -27,6 +29,7 @@ local M = {}
 ---@field blocked_by? string[]
 ---@field after? string[]
 ---@field plan? string|false
+---@field project? string|false
 ---@field phase? string|false
 
 ---A task an earlier `new` of the same dry-run request would create: not on disk yet, but a node of the graph.
@@ -42,7 +45,7 @@ local M = {}
 
 ---@class Tasks.EdgeProblem
 ---@field code string        # The `check` code of the same fault.
----@field key string         # `blocked_by`, `after`, `plan` or `phase`.
+---@field key string         # `blocked_by`, `after`, `plan`, `project` or `phase`.
 ---@field target? string     # The id, plan or phase that is wrong.
 ---@field message string
 ---@field members? string[]  # For a cycle: the tasks on it, the task first.
@@ -153,6 +156,59 @@ function M.validate(id, proposal, opts)
         table.concat(file.phase_order, ", ")
       ),
     }
+  end
+
+  -- project: the other way to belong to something, never together with a plan; the phase then is a stage of it
+  local project_id = task.project
+  if proposal.project ~= nil then
+    project_id = proposal.project or nil
+  end
+  if proposal.project ~= nil or proposal.plan ~= nil then
+    if plan_id and project_id then
+      problems[#problems + 1] = {
+        code = "task-plan-and-project",
+        key = proposal.project ~= nil and "project" or "plan",
+        target = project_id,
+        message = "a task has plan: or project:, not both",
+      }
+    end
+  end
+  if project_id and proposal.project ~= nil then
+    local project_file
+    for _, f in ipairs(shared.projects or {}) do
+      if f.id == project_id then
+        project_file = f
+      end
+    end
+    if not project_file and not index.is_done(project_id) then
+      problems[#problems + 1] = {
+        code = "project-unknown",
+        key = "project",
+        target = project_id,
+        message = "project " .. project_id .. " is no project file (ROADMAP/projects/<slug>.md)",
+      }
+    end
+  end
+  if
+    project_id
+    and not plan_id
+    and phase
+    and (proposal.project ~= nil or proposal.phase ~= nil)
+  then
+    for _, f in ipairs(shared.projects or {}) do
+      if f.id == project_id and #f.phase_order > 0 and not has(f.phase_order, phase) then
+        problems[#problems + 1] = {
+          code = "project-phase",
+          key = "phase",
+          target = phase,
+          message = ("phase '%s' is not in the phase_order of %s (%s)"):format(
+            phase,
+            project_id,
+            table.concat(f.phase_order, ", ")
+          ),
+        }
+      end
+    end
   end
 
   -- a circle through the task: judged on the whole graph with the change applied

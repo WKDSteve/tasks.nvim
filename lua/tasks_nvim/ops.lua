@@ -36,8 +36,18 @@
 ---    the old id); without it the open task moves to the other area under the same slug and every `blocked_by`, `after`,
 ---    `refs` and plan `target` that named the old id names the new one, all or nothing (`moves.move`); the answer has an
 ---    `inverse` (`move_area` back, with the version of the moved file)
----  - `plan_new` { area, title, areas?, target?, phases?, gate?, status?, summary?, slug? }: make a plan file; a dry run names
----    the id it would get and whether the slug had to be changed (`plans.new`)
+---  - `plan_new` { area, title, areas?, target?, phases?, gate?, status?, summary?, slug?, project?, phase? }: make a plan file
+---    (`project` and `phase` put it into a project and a stage of it); a dry run names the id it would get and whether the
+---    slug had to be changed (`plans.new`)
+---  - `project_new` { area, title, areas?, target?, phases?, gate?, status?, summary?, slug? }: make a project file under
+---    `ROADMAP/projects/` (the same as `plan_new`, without `project` and `phase`)
+---  - `plan_set` / `project_set` { id, patch, if_match? }: change the frontmatter of an open plan or project file (`title`,
+---    `status`, `areas`, `target`, `phase_order`, `gate`; a plan also `project`, `phase`); `null` or an empty value removes a
+---    key; the change is judged as the file would read afterwards, a fault it brings refuses it with `problems`; the answer
+---    has an `inverse`. A plan is finished with `plan_close`, not by `status: done`
+---  - `plan_close` / `project_close` { id }: finish a plan or project by hand: refused (`invalid_argument`, the holders are in
+---    `details.holding`) while a task of the plan, or a task of its own or a plan other than a parked one of the project, is
+---    open; `plan_close` goes on to the project when the plan was its last; no `inverse`
 ---
 ---  - `view_save` { id | area (slug?), view, if_match? }: make or replace a saved view of the tasks (`tasks_nvim.views`: a small
 ---    file at `<area>/ROADMAP/views/<slug>.md`). `view` is `{ title, display, group_by, group_by2?, collapsed?, select? }`; with
@@ -118,6 +128,11 @@ M.OPS = {
   "done",
   "move_area",
   "plan_new",
+  "plan_set",
+  "plan_close",
+  "project_new",
+  "project_set",
+  "project_close",
   "tick_step",
   "add_steps",
   "answer",
@@ -207,7 +222,24 @@ local FIELDS = {
     status = "string",
     summary = "string",
     slug = "string",
+    project = "string",
+    phase = "string",
   },
+  project_new = {
+    area = "string",
+    title = "string",
+    areas = "strings",
+    target = "string",
+    phases = "strings",
+    gate = "string",
+    status = "string",
+    summary = "string",
+    slug = "string",
+  },
+  plan_set = { id = "string", patch = "object", if_match = "string" },
+  project_set = { id = "string", patch = "object", if_match = "string" },
+  plan_close = { id = "string" },
+  project_close = { id = "string" },
 }
 
 for _, name in ipairs({
@@ -254,6 +286,7 @@ local NEW_FIELDS = {
   slug = true,
   after = true,
   plan = true,
+  project = true,
   phase = true,
   due = true,
   start = true,
@@ -263,7 +296,7 @@ local NEW_FIELDS = {
 M.NEW_FIELDS = NEW_FIELDS
 
 ---The keys of `NEW_FIELDS` that are relations: judged by `edges.validate` before the file is made.
-local NEW_RELATIONS = { "after", "plan", "phase" }
+local NEW_RELATIONS = { "after", "plan", "project", "phase" }
 
 -- ── what a front end may write ───────────────────────────────────────────────
 
@@ -445,7 +478,7 @@ local function proposal_of(pairs_)
     local key, value = kv[1], kv[2]
     if key == "blocked_by" or key == "after" then
       proposal[key] = value == vim.NIL and {} or (type(value) == "table" and value or { value })
-    elseif key == "plan" or key == "phase" then
+    elseif key == "plan" or key == "project" or key == "phase" then
       -- `false` removes the relation (`x and false or y` would yield `y`, so spell it out)
       if value == vim.NIL then
         proposal[key] = false
@@ -949,6 +982,7 @@ local function do_new(op, ctx)
       blocked_by = {},
       after = proposal.after,
       plan = proposal.plan or nil,
+      project = proposal.project or nil,
       phase = proposal.phase or nil,
     }
   else
@@ -1207,12 +1241,15 @@ local function do_move_area(op, ctx)
   }
 end
 
+---Make a plan file or a project file (`kind`).
 ---@param op table
 ---@param ctx Tasks.OpsCtx
+---@param kind "plan"|"project"
 ---@return table entry
-local function do_plan_new(op, ctx)
+local function new_file(op, ctx, kind)
+  local name = kind .. "_new"
   if op.area == nil or op.title == nil then
-    return refuse("invalid_argument", "plan_new needs area and title")
+    return refuse("invalid_argument", name .. " needs area and title")
   end
   for _, key in ipairs({
     "area",
@@ -1224,6 +1261,8 @@ local function do_plan_new(op, ctx)
     "status",
     "areas",
     "phases",
+    "project",
+    "phase",
   }) do
     if has_control(op[key]) then
       return refuse("invalid_argument", key .. " contains a control character")
@@ -1245,6 +1284,7 @@ local function do_plan_new(op, ctx)
   local r, err, info = require("tasks_nvim.plans").new(op.area, {
     root = ctx.root,
     today = ctx.today,
+    kind = kind,
     title = op.title,
     areas = op.areas,
     target = op.target,
@@ -1253,9 +1293,14 @@ local function do_plan_new(op, ctx)
     status = op.status,
     summary = op.summary,
     slug = op.slug,
+    project = op.project,
+    phase = op.phase,
     dry_run = ctx.dry,
   })
   if not r then
+    if info and info.code == "invalid_argument" then
+      return refuse("invalid_argument", tostring(err))
+    end
     return mutate_failure(ctx, err, info)
   end
   return {
@@ -1267,6 +1312,202 @@ local function do_plan_new(op, ctx)
     renamed = r.renamed,
     changed_ids = ctx.dry and {} or { r.id },
   }
+end
+
+---@param op table
+---@param ctx Tasks.OpsCtx
+---@return table entry
+local function do_plan_new(op, ctx)
+  return new_file(op, ctx, "plan")
+end
+
+---@param op table
+---@param ctx Tasks.OpsCtx
+---@return table entry
+local function do_project_new(op, ctx)
+  return new_file(op, ctx, "project")
+end
+
+---Change the frontmatter of a plan file or a project file (`kind`).
+---@param op table
+---@param ctx Tasks.OpsCtx
+---@param kind "plan"|"project"
+---@return table entry
+local function set_file(op, ctx, kind)
+  local name = kind .. "_set"
+  if op.id == nil or op.patch == nil then
+    return refuse("invalid_argument", name .. " needs id and patch")
+  end
+  for key, value in pairs(op.patch) do
+    if has_control(key) or has_control(value) then
+      return refuse("invalid_argument", "the patch contains a control character")
+    end
+    local over = over_limit(key, value)
+    if over then
+      return refuse("payload_too_large", over)
+    end
+  end
+  local r, err, info = require("tasks_nvim.plans").set(op.id, op.patch, {
+    root = ctx.root,
+    today = ctx.today,
+    kind = kind,
+    if_match = op.if_match,
+    dry_run = ctx.dry,
+    link_resolver = link_resolver(ctx),
+  })
+  if not r then
+    if info and info.code == "invalid_argument" then
+      return refuse(
+        "invalid_argument",
+        tostring(err),
+        info.problems and { problems = info.problems } or nil
+      )
+    end
+    if info and info.code == "not_found" then
+      return refuse("not_found", tostring(err))
+    end
+    return mutate_failure(ctx, err, info)
+  end
+  local entry = {
+    ok = true,
+    id = r.id,
+    outcome = r.changed and (ctx.dry and "would_change" or "changed") or "unchanged",
+    file = rel(ctx, r.path),
+    etag_before = r.etag_before,
+    etag_after = (not ctx.dry) and r.etag_after or nil,
+    changed_ids = (r.changed and not ctx.dry) and { r.id } or {},
+  }
+  if r.changed and not ctx.dry then
+    entry.inverse = json.object({
+      op = name,
+      id = r.id,
+      patch = json.object(r.before),
+      if_match = r.etag_after,
+    })
+  end
+  return entry
+end
+
+---@param op table
+---@param ctx Tasks.OpsCtx
+---@return table entry
+local function do_plan_set(op, ctx)
+  return set_file(op, ctx, "plan")
+end
+
+---@param op table
+---@param ctx Tasks.OpsCtx
+---@return table entry
+local function do_project_set(op, ctx)
+  return set_file(op, ctx, "project")
+end
+
+---Finish a plan (`plan_close`, then the project it belonged to when it was the last) or a project by hand.
+---@param op table
+---@param ctx Tasks.OpsCtx
+---@param kind "plan"|"project"
+---@return table entry
+local function close_file(op, ctx, kind)
+  local name = kind .. "_close"
+  if op.id == nil then
+    return refuse("invalid_argument", name .. " needs id")
+  end
+  local opts = { root = ctx.root, today = ctx.today, date = ctx.today, dry_run = ctx.dry }
+  local plans_closed, projects_closed, notes = {}, {}, {}
+  if kind == "plan" then
+    local file, ferr = require("tasks_nvim.plans").find(op.id, { root = ctx.root })
+    if not file then
+      local held = scan.find_done(op.id, { root = ctx.root })
+      if held then
+        return { ok = true, id = op.id, outcome = "unchanged", changed_ids = {} }
+      end
+      return refuse("not_found", tostring(ferr))
+    end
+    local res = done_flow.close_plans({ op.id }, opts)
+    if #res.closed == 0 then
+      local holding = res.refused[op.id]
+      if holding then
+        return refuse(
+          "invalid_argument",
+          ("%s still has %d open task%s"):format(op.id, #holding, #holding == 1 and "" or "s"),
+          { holding = holding }
+        )
+      end
+      return refuse("internal", tostring(res.notes[1] or (op.id .. " was not closed")))
+    end
+    plans_closed = res.closed
+    vim.list_extend(notes, res.notes)
+    if not ctx.dry then
+      local project_ids = {}
+      for _, plan_id in ipairs(res.closed) do
+        project_ids[#project_ids + 1] = res.projects[plan_id]
+      end
+      local pres = done_flow.close_projects(project_ids, opts)
+      projects_closed = pres.closed
+      vim.list_extend(notes, pres.notes)
+      done_flow.refresh_marker_docs({ root = ctx.root, closed = res.summaries })
+    end
+  else
+    local file, ferr = require("tasks_nvim.projects").find(op.id, { root = ctx.root })
+    if not file then
+      local held = scan.find_done(op.id, { root = ctx.root })
+      if held then
+        return { ok = true, id = op.id, outcome = "unchanged", changed_ids = {} }
+      end
+      return refuse("not_found", tostring(ferr))
+    end
+    local res = done_flow.close_projects({ op.id }, opts)
+    if #res.closed == 0 then
+      local holding = res.refused[op.id]
+      if holding then
+        return refuse(
+          "invalid_argument",
+          ("%s still has %d open task%s or plan%s"):format(
+            op.id,
+            #holding,
+            #holding == 1 and "" or "s",
+            #holding == 1 and "" or "s"
+          ),
+          { holding = holding }
+        )
+      end
+      return refuse("internal", tostring(res.notes[1] or (op.id .. " was not closed")))
+    end
+    projects_closed = res.closed
+    vim.list_extend(notes, res.notes)
+  end
+  local changed = {}
+  if not ctx.dry then
+    vim.list_extend(changed, plans_closed)
+    vim.list_extend(changed, projects_closed)
+  end
+  local redacted = {}
+  for _, note in ipairs(notes) do
+    redacted[#redacted + 1] = contract.redact(ctx.root, note)
+  end
+  return {
+    ok = true,
+    id = op.id,
+    outcome = ctx.dry and "would_close" or "closed",
+    plans_closed = plans_closed,
+    projects_closed = projects_closed,
+    notes = redacted,
+    changed_ids = changed,
+  }
+end
+
+---@param op table
+---@param ctx Tasks.OpsCtx
+---@return table entry
+local function do_plan_close(op, ctx)
+  return close_file(op, ctx, "plan")
+end
+
+---@param op table
+---@param ctx Tasks.OpsCtx
+---@return table entry
+local function do_project_close(op, ctx)
+  return close_file(op, ctx, "project")
 end
 
 ---The answer of a view operation that failed: the engine's words and the code that says why.
@@ -1570,6 +1811,11 @@ local HANDLERS = {
   done = do_done,
   move_area = do_move_area,
   plan_new = do_plan_new,
+  plan_set = do_plan_set,
+  plan_close = do_plan_close,
+  project_new = do_project_new,
+  project_set = do_project_set,
+  project_close = do_project_close,
   tick_step = do_tick_step,
   add_steps = do_add_steps,
   answer = do_answer,

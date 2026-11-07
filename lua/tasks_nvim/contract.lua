@@ -50,7 +50,7 @@ M.PLUGIN = "tasks.nvim"
 M.ENGINE_VERSION = "0.1.0-dev"
 
 ---What this engine can answer; an app shows only what is listed here. Sorted.
----`ops` is the write door (`set`, `new`, `reorder`, `done`, `move_area`, `plan_new`, `tick_step`, `add_steps`, `answer`, `append_note`, `reopen`, `set_body`, `view_save`, `view_delete`, `attach`), `if_match` the compare-and-set on a task's
+---`ops` is the write door (`set`, `new`, `reorder`, `done`, `move_area`, `plan_new`, `plan_set`, `plan_close`, `project_new`, `project_set`, `project_close`, `tick_step`, `add_steps`, `answer`, `append_note`, `reopen`, `set_body`, `view_save`, `view_delete`, `attach`), `if_match` the compare-and-set on a task's
 ---`etag`, `done_preview` what `done` needs first, `reorder` a move inside a group, `move_area_preview` the report of a
 ---move to another area (the move itself is not there yet). `waits_for` says that a task carries what it waits for
 ---(`set` and `new` take the key, `list` and `order` filter by it), `waits` is the overview of those keys.
@@ -82,8 +82,13 @@ M.CAPABILITIES = {
   "next",
   "ops",
   "order",
+  "plan_close",
   "plan_for",
   "plan_new",
+  "plan_set",
+  "project_close",
+  "project_new",
+  "project_set",
   "projects",
   "reminders",
   "reopen",
@@ -844,6 +849,19 @@ local function matching_tasks(params, opts)
       end
     end
   end
+  if params.project ~= nil then
+    for _, id in ipairs(params.project) do
+      local area, slug = vault.parse_id(tostring(id))
+      if not (area and slug) then
+        return nil,
+          {
+            code = "invalid_argument",
+            message = ("project: '%s' is no project id (<area>/<slug>)"):format(tostring(id)),
+            retryable = false,
+          }
+      end
+    end
+  end
   local matching = {}
   local ordered = vim.list_slice(view.open, 1)
   table.sort(ordered, function(a, b)
@@ -861,6 +879,10 @@ local function matching_tasks(params, opts)
     -- the parked tasks that wait for one of the keys (`none`: parked without a reason)
     matching = (model.filter(matching, { waits_for = params.waits_for }))
   end
+  if params.project ~= nil and #params.project > 0 then
+    -- the tasks of the projects: in one of their plans, or their own (an empty list narrows nothing)
+    matching = require("tasks_nvim.projects").filter(matching, params.project, view.files)
+  end
   if opts and opts.readiness then
     local kept, kerr = plan_scope.filter_readiness(matching, opts.readiness, view.root, view.shared)
     if not kept then
@@ -877,7 +899,7 @@ end
 
 ---A page of tasks in plan order, optionally of one area or status. The command line adds what the dispatcher does not
 ---offer (`opts.filter`: every filter of `list`; `opts.readiness`: `ready` or `waiting`).
----@param params? { area?: string, status?: string[], waits_for?: string[], limit?: integer, offset?: integer }
+---@param params? { area?: string, status?: string[], waits_for?: string[], project?: string[], limit?: integer, offset?: integer }
 ---@param opts? { root?: string, view?: Tasks.ContractView, filter?: Tasks.Filter, readiness?: "ready"|"waiting" }
 ---@return table|nil doc
 ---@return Tasks.ContractError|string|nil err
@@ -929,7 +951,7 @@ end
 
 ---The ids of the open tasks in the order of `sort` (one of `model.SORTS`; none or "default" is the plan's order), all in
 ---one document: a reader that lays tasks it already holds along an order does not page through `list` for it.
----@param params? { area?: string, status?: string[], waits_for?: string[], sort?: string }
+---@param params? { area?: string, status?: string[], waits_for?: string[], project?: string[], sort?: string }
 ---@param opts? { root?: string, view?: Tasks.ContractView, scores?: table<string, number> }
 ---@return table|nil doc
 ---@return Tasks.ContractError|string|nil err

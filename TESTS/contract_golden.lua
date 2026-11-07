@@ -127,6 +127,40 @@ G.cases = {
     end,
   },
   {
+    -- projects through the door: made, a stage changed (with its inverse), refused changes, a gate, a task of the
+    -- project itself, and a close that something holds open
+    name = "result-projects",
+    method = "ops",
+    fresh = true,
+    request = function()
+      return encode({
+        client_op_id = "golden-projects",
+        ops = {
+          {
+            op = "project_new",
+            area = "lib.nvim",
+            title = "Golden project",
+            phases = { "first", "second" },
+          },
+          {
+            op = "plan_set",
+            id = "lib.nvim/the-plan",
+            patch = { phase = "second" },
+          },
+          { op = "plan_set", id = "lib.nvim/the-plan", patch = { phase = "nope" } },
+          { op = "project_set", id = "lib.nvim/the-project", patch = { gate = "hard" } },
+          { op = "plan_close", id = "lib.nvim/the-plan" },
+          {
+            op = "new",
+            area = "cascade.nvim",
+            title = "Golden project task",
+            fields = { project = "lib.nvim/the-project", phase = "second" },
+          },
+        },
+      })
+    end,
+  },
+  {
     -- `add_steps` for real: appended below the last step of a plan, a section made for a task without one, a step that
     -- is a list line refused (nothing written)
     name = "result-add-steps",

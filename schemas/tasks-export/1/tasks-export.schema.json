@@ -2791,7 +2791,7 @@
       "required": ["op", "id"],
       "properties": {
         "op": {
-          "enum": ["set", "reorder", "tick_step", "answer", "set_body", "move_area", "view_save", "view_delete"]
+          "enum": ["set", "reorder", "tick_step", "answer", "set_body", "move_area", "view_save", "view_delete", "plan_set", "project_set"]
         },
         "id": {
           "type": "string"
@@ -2942,7 +2942,7 @@
           "minimum": 1
         },
         "op": {
-          "enum": ["set", "new", "reorder", "done", "move_area", "plan_new", "tick_step", "add_steps", "answer", "append_note", "reopen", "set_body", "view_save", "view_delete", "attach", "claim", "release"]
+          "enum": ["set", "new", "reorder", "done", "move_area", "plan_new", "plan_set", "plan_close", "project_new", "project_set", "project_close", "tick_step", "add_steps", "answer", "append_note", "reopen", "set_body", "view_save", "view_delete", "attach", "claim", "release"]
         },
         "id": {
           "type": "string"
@@ -2964,6 +2964,8 @@
             "moved",
             "deleted",
             "would_delete",
+            "closed",
+            "would_close",
             "blocked",
             "failed"
           ]

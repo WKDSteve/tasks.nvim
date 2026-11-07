@@ -335,7 +335,7 @@ local function check_lang(lang)
 end
 
 ---Frontmatter keys in the order concept section 3 shows them.
----@param meta { title: string, status: string, kind?: string, prio?: integer|string, effort?: string, value?: integer|string, actor?: string, after?: string[], order?: number|string, plan?: string, phase?: string, tags?: string[], category?: string[], scope?: string[], severity?: string, waits_for?: string, due?: string, start?: string, refs?: string[], links?: string[], created: string, updated: string }
+---@param meta { title: string, status: string, kind?: string, prio?: integer|string, effort?: string, value?: integer|string, actor?: string, after?: string[], order?: number|string, plan?: string, project?: string, phase?: string, tags?: string[], category?: string[], scope?: string[], severity?: string, waits_for?: string, due?: string, start?: string, refs?: string[], links?: string[], created: string, updated: string }
 ---@return table[] pairs
 local function meta_pairs(meta)
   local pairs_ = {
@@ -369,6 +369,9 @@ local function meta_pairs(meta)
   end
   if meta.plan then
     pairs_[#pairs_ + 1] = { "plan", meta.plan }
+  end
+  if meta.project then
+    pairs_[#pairs_ + 1] = { "project", meta.project }
   end
   if meta.phase then
     pairs_[#pairs_ + 1] = { "phase", meta.phase }
@@ -1214,6 +1217,14 @@ function M.new(area, opts)
     end
     plan = wikilinks.forms(nil, mode, resolver, typed --[[@as table<string, string>]])(id)
   end
+  local project
+  if opts.project ~= nil then
+    local id, typed = plan_ref(opts.project, resolver, "project")
+    if not id then
+      return nil, typed --[[@as string]]
+    end
+    project = wikilinks.forms(nil, mode, resolver, typed --[[@as table<string, string>]])(id)
+  end
   if opts.phase ~= nil and not vault.valid_slug(tostring(opts.phase)) then
     return nil, "phase must be a kebab-case word, got '" .. tostring(opts.phase) .. "'"
   end
@@ -1356,6 +1367,7 @@ function M.new(area, opts)
       after = after,
       order = order,
       plan = plan,
+      project = project,
       phase = opts.phase,
       tags = tags,
       category = category,

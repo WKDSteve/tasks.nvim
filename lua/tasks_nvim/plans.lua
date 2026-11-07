@@ -427,6 +427,7 @@ M.MAX_SLUG = 200
 ---@param opts Tasks.NewPlanOpts
 ---@return { id: string, path: string, slug: string, renamed: boolean, ambiguous?: Tasks.NewAmbiguity }|nil result  # `renamed`: the slug asked for (or made of the title) was taken; `ambiguous`: the bare `[[slug]]` links the new plan made ambiguous (`wikilinks.new_ambiguity`)
 ---@return string|nil err
+---@return table|nil info  # `{ code = "invalid_argument" }` for a project or stage that is wrong
 function M.new(area, opts)
   local root, rerr = vault.root(opts)
   if not root then
@@ -499,6 +500,55 @@ function M.new(area, opts)
   if opts.gate ~= nil and opts.gate ~= "hard" then
     return nil, "gate must be `hard` or absent"
   end
+  -- a project file is made the same way (`opts.kind = "project"`); a plan may name its project and its stage there
+  local file_kind = opts.kind == "project" and "project" or "plan"
+  local project_text, phase_text
+  if opts.project ~= nil or opts.phase ~= nil then
+    if file_kind == "project" then
+      return nil,
+        "a project is not part of another project: no project or phase",
+        { code = "invalid_argument" }
+    end
+    if opts.project == nil then
+      return nil,
+        "phase names a stage of a project: give the project, too",
+        { code = "invalid_argument" }
+    end
+    local raw = vim.trim(tostring(opts.project))
+    link_resolver = link_resolver or wikilinks.resolver(root)
+    local pid, perr2 = wikilinks.typed_id(raw, "project", link_resolver)
+    if not pid then
+      return nil, perr2, { code = "invalid_argument" }
+    end
+    local project_file = require("tasks_nvim.projects").find(pid, { root = root })
+    if not project_file then
+      return nil, "no such open project: " .. pid, { code = "invalid_argument" }
+    end
+    if opts.phase ~= nil then
+      local phase = vim.trim(tostring(opts.phase))
+      if not vault.valid_slug(phase) then
+        return nil,
+          "phase must be a kebab-case word, got '" .. phase .. "'",
+          { code = "invalid_argument" }
+      end
+      if
+        #project_file.phase_order > 0 and not vim.tbl_contains(project_file.phase_order, phase)
+      then
+        return nil,
+          ("phase '%s' is not in the phase_order of %s (%s)"):format(
+            phase,
+            pid,
+            table.concat(project_file.phase_order, ", ")
+          ),
+          { code = "invalid_argument" }
+      end
+      phase_text = phase
+    end
+    project_text = wikilinks.is_wikilink(raw) and raw
+      or wikilinks.render(pid, wikilinks.mode(opts), link_resolver)
+  end
+  local dir_of = file_kind == "project" and vault.projects_dir or vault.plans_dir
+  local path_of = file_kind == "project" and vault.project_path or vault.plan_path
   local today = opts.today or model.today()
   if not model.is_date(today) then
     return nil, "today is not a date (YYYY-MM-DD): " .. tostring(today)
@@ -523,6 +573,12 @@ function M.new(area, opts)
   end
   if opts.gate then
     pairs_[#pairs_ + 1] = { "gate", opts.gate }
+  end
+  if project_text then
+    pairs_[#pairs_ + 1] = { "project", project_text }
+  end
+  if phase_text then
+    pairs_[#pairs_ + 1] = { "phase", phase_text }
   end
   pairs_[#pairs_ + 1] = { "created", today }
   pairs_[#pairs_ + 1] = { "updated", today }
@@ -551,9 +607,9 @@ function M.new(area, opts)
   end
 
   if not opts.dry_run then
-    local mkdir_ok, mkerr = fsio.mkdirp(vault.plans_dir(root, area))
+    local mkdir_ok, mkerr = fsio.mkdirp(dir_of(root, area))
     if not mkdir_ok then
-      return nil, "cannot create " .. vault.plans_dir(root, area) .. ": " .. tostring(mkerr)
+      return nil, "cannot create " .. dir_of(root, area) .. ": " .. tostring(mkerr)
     end
   end
   local backlog_taken, berr = scan.backlog_slugs(area, { root = root })
@@ -563,11 +619,13 @@ function M.new(area, opts)
   local n = 1
   while n < 1000 do
     local slug = n == 1 and base or (base .. "-" .. n)
-    local path = vault.plan_path(root, area, slug)
+    local path = path_of(root, area, slug)
+    -- plans, projects and tasks share one id namespace
     local held = backlog_taken[slug] ~= nil
       or fsio.is_file(vault.task_path(root, area, slug))
       or fsio.is_dir(vault.task_dir(root, area, slug))
       or fsio.is_file(vault.project_path(root, area, slug))
+      or fsio.is_file(vault.plan_path(root, area, slug))
       or (opts.dry_run and (fsio.is_file(path) or fsio.is_dir(path)))
     if not held and opts.dry_run then
       return { id = area .. "/" .. slug, path = path, slug = slug, renamed = n > 1 }, nil
@@ -596,13 +654,234 @@ function M.new(area, opts)
   return nil, "no free file name for plan " .. base
 end
 
+---The keys `set` may change in a plan file or a project file.
+---@type table<string, string[]>
+M.SET_KEYS = {
+  plan = { "title", "status", "areas", "target", "phase_order", "gate", "project", "phase" },
+  project = { "title", "status", "areas", "target", "phase_order", "gate" },
+}
+
+---Change the frontmatter of an open plan file or project file (`opts.kind = "project"`). `patch` maps a key of
+---`SET_KEYS` to its new value; `nil`, `vim.NIL`, an empty text or an empty list removes the key (not `title` and
+---`status`). A plan finishes with `close`, not by `status: done`. The file is judged as it would read afterwards: a
+---fault the change brings (a bad status, a gate that is not `hard`, a phase without a project, a project that is none,
+---a stage the project does not list) refuses it and nothing is written; a fault the file had already is not the
+---change's. `opts.if_match` is the version tag the caller read.
+---@param id string
+---@param patch table<string, any>
+---@param opts? { root?: string, today?: string, kind?: "plan"|"project", if_match?: string, dry_run?: boolean, link_resolver?: Tasks.LinkResolver }
+---@return { id: string, path: string, etag_before: string, etag_after: string, changed: boolean, before: table<string, any> }|nil result
+---@return string|nil err
+---@return table|nil info  # `{ code = "not_found"|"invalid_argument"|"conflict", problems? }`
+function M.set(id, patch, opts)
+  opts = opts or {}
+  local root, rerr = vault.root(opts)
+  if not root then
+    return nil, rerr
+  end
+  local file_kind = opts.kind == "project" and "project" or "plan"
+  local finder = file_kind == "project" and require("tasks_nvim.projects").find or M.find
+  local file, ferr = finder(id, { root = root, link_resolver = opts.link_resolver })
+  if not file then
+    return nil, ferr, { code = "not_found" }
+  end
+  local mutate = require("tasks_nvim.mutate")
+  local allowed = {}
+  for _, key in ipairs(M.SET_KEYS[file_kind]) do
+    allowed[key] = true
+  end
+  local keys = vim.tbl_keys(patch)
+  table.sort(keys)
+  if #keys == 0 then
+    return nil, "the patch is empty", { code = "invalid_argument" }
+  end
+  local resolver = opts.link_resolver or wikilinks.resolver(root)
+  local pairs_ = {}
+  for _, key in ipairs(keys) do
+    if not allowed[key] then
+      return nil,
+        ("unknown field '%s' (settable: %s)"):format(
+          tostring(key),
+          table.concat(M.SET_KEYS[file_kind], ", ")
+        ),
+        { code = "invalid_argument" }
+    end
+    local value = patch[key]
+    local remove = value == nil
+      or value == vim.NIL
+      or value == ""
+      or (type(value) == "table" and #value == 0)
+    if remove then
+      if key == "title" or key == "status" then
+        return nil, key .. " cannot be removed", { code = "invalid_argument" }
+      end
+      pairs_[#pairs_ + 1] = { key, mutate.REMOVE }
+    elseif key == "areas" or key == "phase_order" then
+      local items = type(value) == "table" and value
+        or vim.split(tostring(value), ",", { plain = true })
+      local list = {}
+      for _, item in ipairs(items) do
+        local text = vim.trim(tostring(item))
+        if text ~= "" then
+          if text:find("[,%[%]\"'#\r\n]") then
+            return nil,
+              key .. " item '" .. text .. "' must not contain , [ ] quotes # or a line break",
+              { code = "invalid_argument" }
+          end
+          list[#list + 1] = text
+        end
+      end
+      pairs_[#pairs_ + 1] = { key, list }
+    else
+      if type(value) ~= "string" then
+        return nil, key .. " must be a text", { code = "invalid_argument" }
+      end
+      local text = vim.trim(value)
+      if text:find("[\r\n]") then
+        return nil, key .. " must be one line", { code = "invalid_argument" }
+      end
+      if key == "status" and text == "done" then
+        return nil,
+          "a plan or project is finished with close, not with status done",
+          { code = "invalid_argument" }
+      end
+      if key == "project" then
+        local pid, perr = wikilinks.typed_id(text, "project", resolver)
+        if not pid then
+          return nil, perr, { code = "invalid_argument" }
+        end
+        pairs_[#pairs_ + 1] = { key, wikilinks.is_wikilink(text) and text or pid }
+      else
+        pairs_[#pairs_ + 1] = { key, text }
+      end
+    end
+  end
+
+  -- the relation of a plan to its project, as it would be afterwards
+  if file_kind == "plan" and (patch.project ~= nil or patch.phase ~= nil) then
+    local project_id, phase = file.project, file.phase
+    for _, kv in ipairs(pairs_) do
+      if kv[1] == "project" then
+        project_id = kv[2] ~= mutate.REMOVE and wikilinks.typed_id(kv[2], "project", resolver)
+          or nil
+      elseif kv[1] == "phase" then
+        phase = kv[2] ~= mutate.REMOVE and kv[2] or nil
+      end
+    end
+    local problem
+    if phase and not project_id then
+      problem = {
+        code = "plan-phase-without-project",
+        key = "phase",
+        target = phase,
+        message = "phase " .. phase .. " names a stage of a project, but the plan has no project",
+      }
+    elseif project_id then
+      local project_file = require("tasks_nvim.projects").find(project_id, { root = root })
+      if not project_file then
+        problem = {
+          code = "plan-project-unknown",
+          key = "project",
+          target = project_id,
+          message = "no such open project: " .. project_id,
+        }
+      elseif
+        phase
+        and #project_file.phase_order > 0
+        and not vim.tbl_contains(project_file.phase_order, phase)
+      then
+        problem = {
+          code = "plan-project-phase",
+          key = "phase",
+          target = phase,
+          message = ("phase '%s' is not in the phase_order of %s (%s)"):format(
+            phase,
+            project_id,
+            table.concat(project_file.phase_order, ", ")
+          ),
+        }
+      end
+    end
+    if problem then
+      return nil, problem.message, { code = "invalid_argument", problems = { problem } }
+    end
+  end
+
+  local today = opts.today or model.today()
+  local result = { id = file.id, path = file.path }
+  local ok, werr, winfo = fsio.with_lock(file.path, function()
+    local cur, rd_err = fsio.read(file.path)
+    if not cur then
+      return nil, "cannot read " .. file.path .. ": " .. tostring(rd_err)
+    end
+    local etag = fsio.etag(cur)
+    result.etag_before = etag
+    if opts.if_match ~= nil and opts.if_match ~= etag then
+      return nil,
+        ("%s is not the version the change was made on (it is %s, the change was made on %s)"):format(
+          file.id,
+          etag,
+          tostring(opts.if_match)
+        ),
+        { code = "conflict", id = file.id, expected = opts.if_match, actual = etag }
+    end
+    local parsed = fm.parse(cur)
+    local before = {}
+    for _, kv in ipairs(pairs_) do
+      local old = parsed and parsed.has_block and fm.get(parsed, kv[1]) or nil
+      before[kv[1]] = old == nil and vim.NIL or old
+    end
+    result.before = before
+    local text, uerr = fm.update_text(cur, pairs_)
+    if not text then
+      return nil,
+        "cannot change " .. file.path .. ": " .. tostring(uerr),
+        { code = "invalid_argument" }
+    end
+    if text ~= cur then
+      text = fm.update_text(text, { { "updated", today } }) or text
+      -- judged as it would read: only the faults the change brings are its own
+      local after = M.parse(text, {
+        path = file.path,
+        area = file.area,
+        slug = file.slug,
+        kind = file_kind,
+        link_resolver = resolver,
+      })
+      local known = {}
+      for _, code in ipairs(file.error_codes) do
+        known[code] = true
+      end
+      for i, code in ipairs(after.error_codes) do
+        if not known[code] then
+          return nil, after.errors[i], { code = "invalid_argument" }
+        end
+      end
+    end
+    result.etag_after = fsio.etag(text)
+    result.changed = text ~= cur
+    if opts.dry_run or not result.changed then
+      return true
+    end
+    local wrote, wr_err = fsio.write_atomic(file.path, text)
+    if not wrote then
+      return nil, "cannot write " .. file.path .. ": " .. tostring(wr_err)
+    end
+    return true
+  end)
+  if not ok then
+    return nil, werr, winfo
+  end
+  return result, nil
+end
+
 ---Finish a plan: `status: done`, moved to `Backlog/FEATURES/YYYY-MM-DD_<slug>.md`, a row in the Backlog README. The
 ---finished copy is created first and the plan file is not removed before it is written; a failing step puts back what
 ---THIS run changed (never a finished copy another run created: two closes of one plan may overlap, and the later
 ---one must not delete the earlier one's result). A finished copy a killed run left behind (same text) is resumed.
 ---A plan whose id is already held by an open task or a finished item is refused (one id namespace).
----@param id string
 ---`opts.kind = "project"` finishes a project file (`ROADMAP/projects/`) the same way.
+---@param id string
 ---@param opts? { root?: string, date?: string, today?: string, checkpoint_dir?: string, kind?: "plan"|"project" }
 ---@return { id: string, from: string, to: string, readme: string }|nil result
 ---@return string|nil err
