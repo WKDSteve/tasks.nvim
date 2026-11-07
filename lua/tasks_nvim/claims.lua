@@ -203,7 +203,8 @@ function M.list(root)
     if not area then
       break
     end
-    if kind == "directory" and vault.valid_area(area) then
+    -- a file system that does not say the type (`nil`) is asked by listing the entry
+    if (kind == "directory" or kind == nil) and vault.valid_area(area) then
       local files = uv.fs_scandir(base .. "/" .. area)
       while files do
         local name = uv.fs_scandir_next(files)
