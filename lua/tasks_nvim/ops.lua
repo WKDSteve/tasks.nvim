@@ -298,14 +298,39 @@ end
 
 local has_control = contract_ops.has_control
 
+---The namespaces a ref `<ns>:<key>` may name through the door: what other tools put into `refs:` to find their task again
+---(`testing-finding:<fp>` of testing.nvim, `rules-target:<folder>` of rules.nvim; `find` looks them up). A namespace that
+---is not listed here is refused like any other colon.
+---@type table<string, boolean>
+M.REF_NAMESPACES = { ["rules-target"] = true, ["testing-finding"] = true }
+
+---Longest key of a namespaced ref.
+M.MAX_NAMESPACE_KEY = 200
+
 ---Why a `refs` entry may not be written by a front end that is not the author, or nil: a plain relative path (with an
----optional line or range suffix), a `repo@commit` or an id. No `..`, no drive or network prefix, no absolute path,
+---optional line or range suffix), a `repo@commit`, an id, or a ref of a registered namespace (`<ns>:<key>`, a key of
+---letters, digits and `. _ / -` with no `..` segment). No `..`, no drive or network prefix, no absolute path,
 ---no control character, no colon but the position suffix.
 ---@param ref string
 ---@return string|nil reason
 local function bad_ref(ref)
   if ref:find("%c") then
     return "a control character"
+  end
+  local ns, key = ref:match("^([%a][%w-]*):(.+)$")
+  if ns and M.REF_NAMESPACES[ns] then
+    if #key > M.MAX_NAMESPACE_KEY or not key:match("^[%w._/-]+$") then
+      return "a key of this namespace that is not letters, digits and . _ / -"
+    end
+    for seg in key:gmatch("[^/]+") do
+      if seg == ".." then
+        return "a '..' segment"
+      end
+    end
+    if key:match("^/") then
+      return "an absolute path"
+    end
+    return nil
   end
   if ref:match("^%a:") then
     return "a drive prefix"

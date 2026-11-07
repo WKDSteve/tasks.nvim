@@ -68,10 +68,12 @@ M.CAPABILITIES = {
   "eff_prio",
   "estimate",
   "etag",
+  "find",
   "finished",
   "groupings",
   "hello",
   "if_match",
+  "intent",
   "links",
   "list",
   "lists",
@@ -112,6 +114,8 @@ M.ERROR_PATTERNS = {
   -- a task somebody else has claimed (`tasks_nvim.claims`): the message names the owner and the time; the shared
   -- vocabulary has no word of its own for it
   { code = "conflict", find = { " is claimed by " } },
+  -- an intent `wkd-intent/1` the engine refused (`tasks_nvim.intent`): nothing was written, the message names every problem
+  { code = "invalid_argument", find = { "intent refused: ", "find: " } },
   { code = "not_found", find = { "vault not found", "unknown area" } },
   {
     code = "invalid_argument",
@@ -624,6 +628,8 @@ function M.hello(opts)
   local doc = M.head("tasks.hello", root)
   if root then
     local status = require("tasks_nvim.vault_marker").status(root)
+    -- the intents tasks takes (`wkd-intent/1`, appkit/schemas/wkd-intent/1): a sender offers only what is named here
+    doc.intents = json.object(require("tasks_nvim.intent").handshake())
     doc.marker = json.object({
       present = status.present,
       layout_version = status.layout_version,
@@ -1573,6 +1579,104 @@ function M.check(params, opts)
     doc.incomplete = view.errors
     return seal(doc, rev_of(view, entries)), nil
   end)
+end
+
+---One match of `find` or `intent` as the documents carry it.
+---@param m Tasks.FindMatch
+---@return table
+local function match_entry(m)
+  return json.object({
+    ref = m.ref,
+    id = m.id,
+    area = m.area,
+    status = m.status,
+    location = m.location,
+  })
+end
+
+---Which tasks name these refs, open or finished: `tasks.find` (`matches`: ref, id, area, status, location).
+---@param params { refs?: string[] }
+---@param opts? { root?: string }
+---@return table|nil doc
+---@return Tasks.ContractError|nil err
+function M.find(params, opts)
+  params = params or {}
+  local refs = params.refs
+  local finder = require("tasks_nvim.find")
+  if type(refs) ~= "table" or #refs == 0 then
+    return nil,
+      {
+        code = "invalid_argument",
+        message = "find needs refs: a list of one or more",
+        retryable = false,
+      }
+  end
+  if #refs > finder.MAX_REFS then
+    return nil,
+      {
+        code = "invalid_argument",
+        message = ("find: at most %d refs"):format(finder.MAX_REFS),
+        retryable = false,
+      }
+  end
+  for _, ref in ipairs(refs) do
+    if type(ref) ~= "string" or ref == "" or #ref > 300 or ref:find("%c") then
+      return nil,
+        {
+          code = "invalid_argument",
+          message = "find: a ref is empty, longer than 300 bytes or holds a control character",
+          retryable = false,
+        }
+    end
+  end
+  local root, err = vault.root(opts)
+  if not root then
+    return nil, err
+  end
+  return fsio.read_scope(function()
+    local doc = M.head("tasks.find", root)
+    doc.matches = vim.tbl_map(match_entry, finder.by_refs(refs, { root = root }))
+    return seal(doc, nil), nil
+  end)
+end
+
+---Take an intent `wkd-intent/1`: check it, say what tasks would do (`would_create`, `exists`, `shown`, `not_found`), and with
+---`yes` do it (`created`). `tasks.intent`. The check is the target's side of the schema; a refused intent is
+---`invalid_argument` with every problem in the message and nothing written.
+---@param params { intent?: table, yes?: boolean, lang?: string }
+---@param opts? { root?: string, today?: string }
+---@return table|nil doc
+---@return Tasks.ContractError|string|nil err
+function M.intent(params, opts)
+  params = params or {}
+  if params.intent == nil then
+    return nil, { code = "invalid_argument", message = "intent needs an intent", retryable = false }
+  end
+  local root, err = vault.root(opts)
+  if not root then
+    return nil, err
+  end
+  local result, ierr = require("tasks_nvim.intent").run(params.intent, {
+    root = root,
+    today = opts and opts.today,
+    yes = params.yes == true,
+    lang = params.lang,
+  })
+  if not result then
+    return nil, ierr
+  end
+  local doc = M.head("tasks.intent", root)
+  doc.action = result.action
+  doc.outcome = result.outcome
+  doc.id = result.id
+  doc.area = result.area
+  doc.title = result.title and clip(redact(root, result.title), 300) or nil
+  doc.status = result.status
+  doc.location = result.location
+  if result.matches then
+    doc.matches = vim.tbl_map(match_entry, result.matches)
+  end
+  return seal(doc, nil), nil
 end
 
 ---What to start next.

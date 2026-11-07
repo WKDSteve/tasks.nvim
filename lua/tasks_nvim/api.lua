@@ -135,6 +135,18 @@ local methods = {
       return contract.links(opts)
     end,
   },
+  find = {
+    params = { refs = "string_list" },
+    run = function(params, opts)
+      return contract.find(params, opts)
+    end,
+  },
+  intent = {
+    params = { intent = "object", yes = "boolean", lang = "string" },
+    run = function(params, opts)
+      return contract.intent(params, opts)
+    end,
+  },
   waits = {
     params = { area = "string" },
     run = function(params, opts)

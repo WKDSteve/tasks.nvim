@@ -56,6 +56,12 @@
       "$ref": "#/$defs/Waits"
     },
     {
+      "$ref": "#/$defs/Find"
+    },
+    {
+      "$ref": "#/$defs/Intent"
+    },
+    {
       "$ref": "#/$defs/DonePreview"
     },
     {
@@ -667,6 +673,17 @@
             "type": "string"
           },
           "description": "What it can answer; show only what is listed."
+        },
+        "intents": {
+          "type": "object",
+          "required": ["schema", "actions", "modes"],
+          "properties": {
+            "schema": { "const": "wkd-intent/1" },
+            "actions": { "type": "array", "items": { "type": "string" } },
+            "modes": { "type": "array", "items": { "type": "string" } }
+          },
+          "additionalProperties": false,
+          "description": "The intents tasks takes (`wkd-intent/1`, appkit/schemas/wkd-intent/1): a sender offers only these actions and modes. Additive; capability `intent`."
         },
         "marker": {
           "type": "object",
@@ -2076,6 +2093,48 @@
             "$ref": "#/$defs/Area"
           }
         }
+      },
+      "unevaluatedProperties": false
+    },
+    "FindMatch": {
+      "description": "A task that names a ref: the ref, the task (id, area, status) and where it is, `open` (ROADMAP) or `done` (Backlog). Never a path.",
+      "type": "object",
+      "required": ["ref", "id", "area", "status", "location"],
+      "properties": {
+        "ref": { "type": "string" },
+        "id": { "type": "string" },
+        "area": { "type": "string" },
+        "status": { "type": "string" },
+        "location": { "enum": ["open", "done"] }
+      },
+      "additionalProperties": false
+    },
+    "Find": {
+      "description": "tasks.find: the tasks, open and finished, whose `refs` name one of the refs asked for (capability `find`). Open tasks first, then by id.",
+      "allOf": [{ "$ref": "#/$defs/Head" }],
+      "type": "object",
+      "required": ["kind", "matches"],
+      "properties": {
+        "kind": { "const": "tasks.find" },
+        "matches": { "type": "array", "items": { "$ref": "#/$defs/FindMatch" } }
+      },
+      "unevaluatedProperties": false
+    },
+    "Intent": {
+      "description": "tasks.intent: what tasks did with an intent `wkd-intent/1` (capability `intent`): `would_create` (a dry run), `created` (with `yes`), `exists` (a task holds the ref `testing-finding:<fp>` already: `matches`), `shown` or `not_found` (`tasks.show`). A refused intent is an error (`invalid_argument`, every problem in the message), nothing written.",
+      "allOf": [{ "$ref": "#/$defs/Head" }],
+      "type": "object",
+      "required": ["kind", "action", "outcome"],
+      "properties": {
+        "kind": { "const": "tasks.intent" },
+        "action": { "enum": ["tasks.new", "tasks.show"] },
+        "outcome": { "enum": ["would_create", "created", "exists", "shown", "not_found"] },
+        "id": { "type": "string" },
+        "area": { "type": "string" },
+        "title": { "type": "string" },
+        "status": { "type": "string" },
+        "location": { "enum": ["open", "done"] },
+        "matches": { "type": "array", "items": { "$ref": "#/$defs/FindMatch" } }
       },
       "unevaluatedProperties": false
     },

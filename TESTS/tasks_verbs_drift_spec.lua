@@ -24,6 +24,8 @@ return function(H)
     "export",
     "import",
     "init-vault",
+    -- `intent` takes a document of another app; the editor fills `:Tasks new` from it later
+    "intent",
     "migrate-actor",
     "plan-new",
     "plans",

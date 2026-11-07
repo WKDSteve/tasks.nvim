@@ -582,6 +582,18 @@ nvim --headless -u NONE -l scripts/tasks.lua quickwins --min-value=3 --max-effor
 `setup({ quick_wins = { min_value = 3, max_effort = "M" } })`: every place that names quick wins (`:Tasks estimate`, the
 plan header, `--quick-win`, this report) follows it.
 
+### Headless: `intent` (an intent from another app)
+
+```
+nvim --headless -u NONE -l scripts/tasks.lua intent finding.json          # what it would do
+nvim --headless -u NONE -l scripts/tasks.lua intent finding.json --yes    # make the task
+cat finding.json | nvim --headless -u NONE -l scripts/tasks.lua intent - --yes
+```
+
+Takes an intent `wkd-intent/1` (`tasks.new` from a testing finding, `tasks.show`), checks it as untrusted input and prints
+`would_create`, `exists` (a task holds the ref `testing-finding:<fp>` already), `shown`, `not_found` or, with `--yes`, `created`.
+Details and limits: [ENGINE.md](ENGINE.md#taking-an-intent-wkd-intent1).
+
 ### Headless: `claim` and `unclaim` (reserve a task while you work on it)
 
 ```

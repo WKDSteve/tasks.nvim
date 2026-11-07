@@ -135,6 +135,8 @@ commands:
                                           finish: move to Backlog/; prints the tasks it freed and what to start
                                           next; --unblock sets the freed tasks that still say blocked to open;
                                           a routine (`repeat: 8w`) starts its next round (--last: it ends for good)
+  intent <file|-> [--yes] [--lang=de|en]   take an intent `wkd-intent/1` (tasks.new, tasks.show): checked as untrusted input,
+                                          prints what it would do (would_create, exists, shown), --yes creates the task
   claim <area>/<slug> [--by=<name>] [--for=4h] [--renew] [--force --note=<why>]
                                           reserve a task while you work on it (status doing); the same name renews,
                                           an expired claim is taken over, one of somebody else is refused
@@ -357,6 +359,7 @@ local SPECS = {
   set = { value = { "by", "note" }, flag = { "no-index", "force" } },
   claim = { value = { "by", "for", "note" }, flag = { "renew", "force" } },
   unclaim = { value = { "by", "note", "status" }, flag = { "force" } },
+  intent = { value = { "lang" }, flag = { "yes" } },
   waits = { value = { "format" }, flag = {} },
   release = { value = {}, flag = { "dry-run", "no-index" } },
   answer = { value = {}, flag = { "no-index" } },
@@ -1713,6 +1716,50 @@ function commands.attach(ctx)
     ctx.say(("folderized\t%s\t%s"):format(res.id, res.path))
   end
   report_index(ctx, res)
+  return 0
+end
+
+---`intent <file|-> [--yes]`: take an intent `wkd-intent/1`. Without `--yes` nothing is written.
+function commands.intent(ctx)
+  local args, eo = ctx.args, ctx.eo
+  local source = args.pos[1]
+  if not source or #args.pos > 1 then
+    ctx.warn("error: usage: intent <file|-> [--yes] [--lang=de|en]")
+    return 2
+  end
+  local intent = require("tasks_nvim.intent")
+  local text
+  if source == "-" then
+    text = ((ctx.io and ctx.io.stdin) or io.stdin):read(intent.MAX_BYTES + 1)
+  else
+    local handle, oerr = io.open(source, "rb")
+    if not handle then
+      ctx.warn("error: cannot read " .. source .. ": " .. tostring(oerr))
+      return 1
+    end
+    -- one byte more than the limit: enough to see that it is too big, never the whole of a huge file
+    text = handle:read(intent.MAX_BYTES + 1)
+    handle:close()
+  end
+  local res, err = intent.run(text or "", {
+    root = eo.root,
+    today = eo.today,
+    yes = args.opt.yes == true,
+    lang = args.opt.lang --[[@as "de"|"en"|nil]],
+  })
+  if not res then
+    ctx.warn("error: " .. tostring(err))
+    return 1
+  end
+  if res.outcome == "would_create" then
+    ctx.say(("would_create\t%s\t%s"):format(res.area, fsio.clean(res.title)))
+  elseif res.outcome == "created" then
+    ctx.say(("created\t%s"):format(res.id))
+  elseif res.outcome == "exists" or res.outcome == "shown" then
+    ctx.say(("%s\t%s\t%s\t%s"):format(res.outcome, res.id, res.status, res.location))
+  else
+    ctx.say(("%s\t%s"):format(res.outcome, res.id))
+  end
   return 0
 end
 

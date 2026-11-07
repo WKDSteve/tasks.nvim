@@ -21,6 +21,8 @@ export type TasksExport =
   | Groupings
   | Views
   | Waits
+  | Find
+  | Intent
   | DonePreview
   | Result
   | Error;
@@ -37,6 +39,14 @@ export type Hello = Head & {
    * What it can answer; show only what is listed.
    */
   capabilities: string[];
+  /**
+   * The intents tasks takes (`wkd-intent/1`, appkit/schemas/wkd-intent/1): a sender offers only these actions and modes. Additive; capability `intent`.
+   */
+  intents?: {
+    schema: "wkd-intent/1";
+    actions: string[];
+    modes: string[];
+  };
   /**
    * The marker file of the vault (schemas/tasks-vault/1). Additive; capability `vault_marker`.
    */
@@ -648,6 +658,27 @@ export type Waits = Head & {
  */
 export type WaitsKey = string;
 /**
+ * tasks.find: the tasks, open and finished, whose `refs` name one of the refs asked for (capability `find`). Open tasks first, then by id.
+ */
+export type Find = Head & {
+  kind: "tasks.find";
+  matches: FindMatch[];
+};
+/**
+ * tasks.intent: what tasks did with an intent `wkd-intent/1` (capability `intent`): `would_create` (a dry run), `created` (with `yes`), `exists` (a task holds the ref `testing-finding:<fp>` already: `matches`), `shown` or `not_found` (`tasks.show`). A refused intent is an error (`invalid_argument`, every problem in the message), nothing written.
+ */
+export type Intent = Head & {
+  kind: "tasks.intent";
+  action: "tasks.new" | "tasks.show";
+  outcome: "would_create" | "created" | "exists" | "shown" | "not_found";
+  id?: string;
+  area?: string;
+  title?: string;
+  status?: string;
+  location?: "open" | "done";
+  matches?: FindMatch[];
+};
+/**
  * tasks.donepreview: what finishing a task would do, with nothing written, and the `confirm` token that `done` needs for exactly this version of the file.
  */
 export type DonePreview = Head & {
@@ -1084,6 +1115,16 @@ export interface ViewSelect {
   tags: string[];
   plans: string[];
   query?: string;
+}
+/**
+ * A task that names a ref: the ref, the task (id, area, status) and where it is, `open` (ROADMAP) or `done` (Backlog). Never a path.
+ */
+export interface FindMatch {
+  ref: string;
+  id: string;
+  area: string;
+  status: string;
+  location: "open" | "done";
 }
 /**
  * What happened to one operation of a request, in the order they were sent. A failed operation does not stop the others.

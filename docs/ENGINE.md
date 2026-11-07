@@ -247,6 +247,36 @@ does not change -- and ``(wartet auf `mac`)`` in the summary cell of `ROADMAP/TA
 `waits_for` is byte for byte what it was** (no new column, nothing reordered): introducing the field makes no index
 stale. The template (`tasks template`) and the `:Tasks new` form do not carry the key.
 
+### Taking an intent (`wkd-intent/1`)
+
+An intent is what another app (testing.nvim, the hub) hands to tasks: "make a task of this finding", "show this task"
+(`appkit/schemas/wkd-intent/1`: document, schema, one golden per action; `TESTS/intent/` holds copies). tasks takes two
+actions, `tasks.new` and `tasks.show`, in mode `form`, and says so in the handshake (`hello.intents`); a sender offers only
+that. The engine never writes by itself: the headless answer is what it WOULD do, `--yes` does it.
+
+`tasks intent <file|-> [--yes] [--lang=de|en]` (and the API method `intent` with `{ intent, yes? }`):
+
+- the intent is **untrusted input**, checked on tasks' side whatever way it came (`tasks_nvim.intent.check`, a port of
+  `tools/check-wkd-intent.py`): at most 64 KiB measured before parsing, one JSON object of the schema, an offered action and
+  mode, `class` `public` or `internal`, no absolute path or way out of the repository in `where.file`, `repro` and `target.id`
+  (also not behind a quote or `=`), the lengths (title 120, excerpt 4096, repro 1000, file and id 300, in characters), no control
+  character, a run url on `https://github.com/`. Every problem is named (`intent refused: a; b`), nothing is written.
+- `tasks.new`: the finding's `area` has to be an area of the vault. The key is the ref `testing-finding:<fp>`: a task (open or
+  finished) that holds it makes the answer `exists` (with `matches`), never a second task. Else `would_create`, or with `yes`
+  `created`: a `bug` task tagged `testing`, refs `testing-finding:<fp>`, `<file>:<line>` and `<repo>@<sha>`, the excerpt, the
+  repro command and the run url in the body, the acceptance "the finding is gone".
+- `tasks.show`: `shown` (id, area, status, `open` or `done`) or `not_found`; the engine has no form to open, the editor
+  does that from the answer.
+- the CLI prints `would_create<TAB>area<TAB>title`, `created<TAB>id`, `exists|shown<TAB>id<TAB>status<TAB>location`.
+
+**Refs of registered namespaces** (`rules-target:<folder>`, `testing-finding:<fp>`) may be written through the `ops` door
+(`ops.REF_NAMESPACES`); any other `<ns>:` stays refused as a colon that is no line suffix. `find { refs }` (document
+`tasks.find`) asks the other way: which tasks, open and finished, name these refs (id, area, status, location, never a path;
+at most 50 refs).
+
+Not built: the editor form filled in from an intent (`:Tasks new`), the other modes (`ai-draft`, `agent`), the other actions
+(rules, ai), `rules_import.existing` through `find` (it matches rule ids, not refs).
+
 ### Claims
 
 A claim reserves an open task for the time somebody works on it, so two agents (two Claude chats, an agent and the editor)

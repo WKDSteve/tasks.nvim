@@ -47,6 +47,16 @@ G.cases = {
   { name = "next", method = "next", request = '{"params":{"n":3}}' },
   { name = "areas", method = "areas" },
   { name = "waits", method = "waits" },
+  {
+    name = "find",
+    method = "find",
+    request = '{"params":{"refs":["docs/shared.md","lib.nvim@abc1234","testing-finding:0123456789abcdef"]}}',
+  },
+  {
+    name = "intent-would-create",
+    method = "intent",
+    request = '{"params":{"intent":{"schema":"wkd-intent/1","action":"tasks.new","mode":"form","source":{"app":"testing","finding":"0123456789abcdef"},"finding":{"schema":"testing-finding/1","fp":"0123456789abcdef","class":"public","area":"lib.nvim","title":"parse_spec: an empty line ends the list","excerpt":"expected 2 items, got 1","repro":"scripts/test.sh --file parse_spec","where":{"file":"TESTS/parse_spec.lua","line":12}},"target":null}}}',
+  },
   { name = "list-waits-for", method = "list", request = '{"params":{"waits_for":["mac"]}}' },
   { name = "links", method = "links" },
   { name = "finished", method = "finished", request = '{"params":{"limit":3}}' },

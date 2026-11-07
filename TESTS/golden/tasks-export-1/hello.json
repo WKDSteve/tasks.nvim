@@ -12,10 +12,12 @@
     "eff_prio",
     "estimate",
     "etag",
+    "find",
     "finished",
     "groupings",
     "hello",
     "if_match",
+    "intent",
     "links",
     "list",
     "lists",
@@ -351,6 +353,16 @@
     ]
   },
   "generated_at": "2026-01-01T00:00:00Z",
+  "intents": {
+    "actions": [
+      "tasks.new",
+      "tasks.show"
+    ],
+    "modes": [
+      "form"
+    ],
+    "schema": "wkd-intent/1"
+  },
   "kind": "tasks.hello",
   "limits": {
     "batch_ops": 100,

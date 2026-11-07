@@ -1,0 +1,19 @@
+{
+  "action": "tasks.new",
+  "area": "lib.nvim",
+  "digest": "sha256:d1d03b96fc9ed5cb",
+  "engine": {
+    "git": "0000000",
+    "nvim": "0.0.0",
+    "version": "0.1.0-test"
+  },
+  "generated_at": "2026-01-01T00:00:00Z",
+  "kind": "tasks.intent",
+  "outcome": "would_create",
+  "plugin": "tasks.nvim",
+  "schema": 1,
+  "title": "parse_spec: an empty line ends the list",
+  "vault": {
+    "id": "vault"
+  }
+}
