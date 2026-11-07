@@ -92,7 +92,7 @@ commands:
                                           belongs to is finished after it when nothing else holds it open
   project-close <area>/<slug>             finish a project by hand (refused while an own task or an open plan that is
                                           not parked is left)
-  plan [<area>] [--for=<id>|--plan=<id>] [filters as for list] [--ready] [--with-steps] [--format=md|tsv|ids]
+  plan [<area>] [--for=<id>|--plan=<id>] [--project=<id>] [filters as for list] [--ready] [--with-steps] [--format=md|tsv|ids]
        [--write=<file> [--scope=<name>] [--check] ]   replace only the generated block of a document
                                           stages, ready tasks, decisions by leverage, critical path
                                           (--for: the task and everything that has to be finished before it)
@@ -102,7 +102,10 @@ commands:
                                           on stdout, a tasks.error on failure (exit 1, 2 for a bad request)
   --capabilities                          the handshake document (call hello)
   show <area>/<slug> [--format=text|json]   one task: fields, readiness, body
-  plans [<area>]                          the plan files: id, status, location, title
+  plans [<area>] [--tree]                 the plan files: id, status, location, title (--tree: under their project,
+                                          indented, projects first with what they add up to)
+  projects [<area>]                       the project files: id, status, location, title, plans finished/all, tasks
+                                          finished/all, days still open
   estimate [<area>] [--for=<id>] [filters as for list]   sums of effort and value, what is missing, quick wins
   list|plan|estimate @<name> [more options]   run a named list (see `lists`); options you give override its own
   lists [save <name>|delete <name>|rename <old> <new>|show <name>] [filters] [--sort=] [--area=] [--desc=]
@@ -118,7 +121,7 @@ commands:
                                           is, so another session's uncommitted tasks stay out of the commit
   migrate-actor [<area>] [--write]        propose actor=me for tasks that wait for you (status decision, tag
                                           needs-user) and leave every other task EMPTY; dry run unless --write
-  new <area>[,<area>...] <title> [--kind=k] [--prio=1..3] [--effort=XS..XL|0.5d] [--value=1..5] [--actor=cdx|me|pair] [--after=id,id] [--order=2.5] [--plan=id] [--phase=word] [--tags=a,b]
+  new <area>[,<area>...] <title> [--kind=k] [--prio=1..3] [--effort=XS..XL|0.5d] [--value=1..5] [--actor=cdx|me|pair] [--after=id,id] [--order=2.5] [--plan=id|--project=id] [--phase=word] [--tags=a,b]
        [--category=c,d] [--scope=a,b] [--severity=low|medium|high|critical] [--due=YYYY-MM-DD] [--start=YYYY-MM-DD] [--repeat=8w] [--repeat-from=done|due] [--refs=path,repo@sha] [--links=https://...,...]
        [--summary=text] [--slug=slug] [--status=s] [--waits-for=key]
        [--lang=de|en] [--folder]             create a task file (--lang: body headings;
@@ -221,6 +224,7 @@ local SPECS = {
       "actor",
       "stale",
       "plan",
+      "project",
       "phase",
       "sort",
       "format",
@@ -248,6 +252,7 @@ local SPECS = {
     value = {
       "for",
       "plan",
+      "project",
       "write",
       "scope",
       "status",
@@ -270,6 +275,7 @@ local SPECS = {
     value = {
       "for",
       "plan",
+      "project",
       "status",
       "prio",
       "effort",
@@ -309,6 +315,7 @@ local SPECS = {
   quickwins = {
     value = {
       "plan",
+      "project",
       "status",
       "prio",
       "kind",
@@ -347,6 +354,7 @@ local SPECS = {
       "after",
       "order",
       "plan",
+      "project",
       "phase",
       "refs",
       "links",
@@ -498,6 +506,7 @@ local function filter_option_map(opt)
     stale = opt.stale --[[@as string|nil]],
     stale_refs = opt["stale-refs"] == true,
     plan = opt.plan --[[@as string|nil]],
+    project = opt.project --[[@as string|nil]],
     phase = opt.phase --[[@as string|nil]],
     blocked = opt.blocked == true,
     reminders = opt.reminders == true,
@@ -1444,6 +1453,7 @@ function commands.new(ctx)
     after = opt.after --[[@as string|nil]],
     order = opt.order --[[@as string|nil]],
     plan = opt.plan --[[@as string|nil]],
+    project = opt.project --[[@as string|nil]],
     phase = opt.phase --[[@as string|nil]],
     refs = opt.refs --[[@as string|nil]],
     web_links = opt.links --[[@as string|nil]],

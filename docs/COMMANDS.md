@@ -463,6 +463,8 @@ project is also finished by `done`: when the finish closes its last plan, or is 
 (a parked one does not count) is open, the project is finished too (`project-closed` line; the parked plans stay and are
 named). Closing a finished plan or project again prints `already`.
 
+**Projects, headless.** `projects [<area>]` lists the project files, one TSV line each: id, status, location, title, `plans <finished>/<all>`, `tasks <finished>/<all>` and `<n> d open` (a project is listed in an area when it lives there or one of its plans does). `plans [<area>] --tree` puts the plans under their project, indented and with `stage <phase>`, projects first, the plans of no project after them; plain `plans` is unchanged. The filter **`--project=<id>[,<id>]`** of `list`, `plan`, `estimate` and `quickwins` keeps the tasks of those projects: in one of their plans, or their own (`project:`); it narrows together with the other filters. `new --project=<id>` makes a task of the project itself (instead of `--plan=`). The editor commands and the dashboard do not take `--project` yet.
+
 ### `:Tasks next [<area>|all] [--n=3] [--actor=cdx|me|pair|none]`
 
 What to start next: the best **ready** task and why, with a small dialog (`Not now` first, `Open <id>`, `Show another`).

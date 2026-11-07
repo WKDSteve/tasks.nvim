@@ -31,6 +31,7 @@ return function(H)
     "plan-new",
     "plans",
     "project-close",
+    "projects",
     "show",
     "unclaim",
   }
@@ -57,7 +58,8 @@ return function(H)
         "unblock",
       },
     },
-    ["estimate"] = { composer = { "list", "walk" }, cli = { "stale-refs" } },
+    -- `--project` filters in the CLI first; the editor commands and the dashboard follow (task projekt-ebene-ansichten-nvim)
+    ["estimate"] = { composer = { "list", "walk" }, cli = { "project", "stale-refs" } },
     ["folderize"] = { composer = {}, cli = { "by", "force", "no-index", "note" } },
     -- `--staged` is for the shell around a commit; the editor has no staging step of its own.
     ["index"] = { composer = {}, cli = { "staged" } },
@@ -70,6 +72,7 @@ return function(H)
         "due-before",
         "limit",
         "offset",
+        "project",
         "stale-refs",
         "starts-after",
       },
@@ -118,6 +121,7 @@ return function(H)
         "phase",
         "plan",
         "prio",
+        "project",
         "refs",
         "repeat",
         "repeat-from",
@@ -135,10 +139,10 @@ return function(H)
       },
     },
     ["next"] = { composer = {}, cli = { "by", "format" } },
-    ["plan"] = { composer = { "force", "list", "to" }, cli = { "stale-refs" } },
+    ["plan"] = { composer = { "force", "list", "to" }, cli = { "project", "stale-refs" } },
     ["quickwins"] = {
       composer = { "force", "phase", "to" },
-      cli = { "max-effort", "min-value", "stale-refs" },
+      cli = { "max-effort", "min-value", "project", "stale-refs" },
     },
     -- the editor asks before it changes many tasks (`--yes` skips the question)
     ["release"] = { composer = { "yes" }, cli = { "no-index" } },

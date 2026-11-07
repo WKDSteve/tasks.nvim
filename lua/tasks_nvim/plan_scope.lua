@@ -327,6 +327,7 @@ local FILTER_KEYS = {
   "value",
   "actor",
   "stale",
+  "project",
   "phase",
 }
 local FILTER_FLAGS = { "stale_refs", "blocked", "unestimated", "quick_win" }

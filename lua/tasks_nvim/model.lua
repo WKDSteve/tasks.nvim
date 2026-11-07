@@ -1720,6 +1720,14 @@ function M.filter(tasks, f)
   local value, actor = to_set(f.value), to_set(f.actor)
   local waits_for = to_set(f.waits_for)
   local plan_set, phase_set = to_set(f.plan), to_set(f.phase)
+  local project_set = to_set(f.project)
+  local plan_projects = f.plan_projects
+  if project_set and not plan_projects then
+    -- a task is in the project of its plan: the plan files tell (read once, kept on the filter)
+    local files = require("tasks_nvim.plans").all({ root = f.ref_opts and f.ref_opts.root }) or {}
+    plan_projects = require("tasks_nvim.projects").plan_projects(files)
+    f.plan_projects = plan_projects
+  end
   local sheet_set = to_set(f.sheet)
   local effort_max = f.effort_max and M.effort_days(f.effort_max) or nil
   local today = f.today or M.today()
@@ -1789,6 +1797,12 @@ function M.filter(tasks, f)
     end
     if keep and phase_set and not (t.phase and phase_set[t.phase]) then
       keep = false
+    end
+    if keep and project_set then
+      local project = t.project or (t.plan and plan_projects[t.plan])
+      if not (project and project_set[project]) then
+        keep = false
+      end
     end
     -- the test-sheet block: its state, or `any` for a task that has one
     if keep and sheet_set and not (t.sheets and (sheet_set.any or sheet_set[t.sheets.state])) then

@@ -378,7 +378,7 @@ a stage waits until the earlier stage is finished -- `list --ready`, `next` and 
 task that names a plan nobody wrote (`plan-unknown`), another area than the plan lists, a stage the plan does not
 list.
 
-#### A project over several plans -- the files and `check` work today; the commands and views are still to come
+#### A project over several plans -- files, `check`, finishing and the command line work today; the editor views are still to come
 
 Several plans can make one undertaking: "mobile apps for the app families" is one plan per app. The levels are fixed:
 **project, plan, task** (the steps of a task are its subtasks). A project is a file `<area>/ROADMAP/projects/<slug>.md`
@@ -398,7 +398,7 @@ project order its plans and own tasks softly: what is in a later stage follows w
 `check` catches a plan or task that names a project nobody wrote (`plan-project-unknown`, `project-unknown`), a stage the
 project does not list (`plan-project-phase`, `project-phase`), a `phase:` without a project (`plan-phase-without-project`),
 a project that is finished while the plan is not (`plan-project-done`, `project-done`), a task in an area the project
-does not list (`project-area`), and a project inside a project (`project-nested`).
+does not list (`project-area`), and a project inside a project (`project-nested`). `tasks projects` shows each project with what it adds up to, `tasks plans --tree` the plans under it, and `--project=<id>` narrows `list`, `plan` and `estimate` to its tasks (`docs/COMMANDS.md`).
 
 **Finishing.** The last task of the last open plan finishes the plan and then the project, as long as no task of the
 project's own is open; a **parked** plan does not hold a project open (the message names it, and `check` then says

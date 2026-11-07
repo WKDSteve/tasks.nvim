@@ -24,6 +24,7 @@ local contract = require("tasks_nvim.contract")
 local fsio = require("tasks_nvim.fsio")
 local model = require("tasks_nvim.model")
 local plans = require("tasks_nvim.plans")
+local projects = require("tasks_nvim.projects")
 local scan = require("tasks_nvim.scan")
 local vault = require("tasks_nvim.vault")
 
@@ -260,6 +261,83 @@ local function run_show(ctx)
   return t.valid and 0 or 1
 end
 
+---The areas a command's `[<area>]` argument stands for, as a set (nil: every area).
+---@param ctx Tasks.CliCtx
+---@param area string|nil
+---@return table<string, boolean>|nil
+local function area_set_of(ctx, area)
+  if not area then
+    return nil
+  end
+  local scope = vault.area_scope(vault.root({ root = ctx.eo.root }) or "", area)
+  return scope and scope.set or { [area] = true }
+end
+
+---The TSV line of a plan or project file: id, status, location, title.
+---@param f Tasks.PlanFile
+---@return string
+local function file_line(f)
+  return table.concat({ fsio.clean(f.id), f.status or "-", f.location, fsio.clean(f.title) }, "\t")
+end
+
+---`done/total` of a rollup figure.
+---@param done integer
+---@param total integer
+---@return string
+local function ratio(done, total)
+  return ("%d/%d"):format(done, total)
+end
+
+---The TSV line of a project: the file's cells, then what it adds up to (plans finished/all, tasks finished/all, days
+---still open).
+---@param f Tasks.PlanFile
+---@param r Tasks.ProjectRollup
+---@return string
+local function project_line(f, r)
+  return table.concat({
+    file_line(f),
+    "plans " .. ratio(r.plans_done, r.plans_total),
+    "tasks " .. ratio(r.tasks_done, r.tasks_done + r.tasks_open),
+    ("%s d open"):format(require("tasks_nvim.estimate").fmt_days(r.days_open)),
+  }, "\t")
+end
+
+---Every project of the areas asked for, with its rollup: `{ file, rollup }`.
+---@param ctx Tasks.CliCtx
+---@param set table<string, boolean>|nil
+---@param plan_files Tasks.PlanFile[]
+---@return { file: Tasks.PlanFile, rollup: Tasks.ProjectRollup }[]|nil rows
+---@return string|nil err
+local function project_rows(ctx, set, plan_files)
+  local files, err = projects.all({ root = ctx.eo.root })
+  if not files then
+    return nil, err
+  end
+  local open, oerr = scan.open_tasks({ root = ctx.eo.root })
+  if not open then
+    return nil, tostring(oerr)
+  end
+  local finished
+  local rows = {}
+  for _, f in ipairs(files) do
+    local own_area = set == nil or set[f.area] == true
+    local has_plan_here = false
+    for _, p in ipairs(projects.plans_of(f.id, plan_files)) do
+      if set == nil or set[p.area] then
+        has_plan_here = true
+      end
+    end
+    if own_area or has_plan_here then
+      finished = finished or projects.finished_items({ root = ctx.eo.root })
+      rows[#rows + 1] = {
+        file = f,
+        rollup = projects.rollup(f, { plans = plan_files, open = open, finished = finished }),
+      }
+    end
+  end
+  return rows, nil
+end
+
 ---@param ctx Tasks.CliCtx
 ---@param helpers Tasks.CliContractHelpers
 ---@return integer
@@ -290,10 +368,58 @@ local function run_plans(ctx, helpers)
     ctx.warn("error: " .. tostring(err))
     return 1
   end
+  if not ctx.args.opt.tree then
+    for _, f in ipairs(files) do
+      ctx.say(file_line(f))
+    end
+    return 0
+  end
+  -- `--tree`: the plans of a project under it, indented, then the plans of no project
+  local all_plans = plans.all({ root = ctx.eo.root }) or {}
+  local rows, rerr = project_rows(ctx, area_set_of(ctx, area), all_plans)
+  if not rows then
+    ctx.warn("error: " .. tostring(rerr))
+    return 1
+  end
+  local shown = {}
   for _, f in ipairs(files) do
-    ctx.say(
-      table.concat({ fsio.clean(f.id), f.status or "-", f.location, fsio.clean(f.title) }, "\t")
-    )
+    shown[f.id] = f
+  end
+  local placed = {}
+  for _, row in ipairs(rows) do
+    ctx.say(project_line(row.file, row.rollup))
+    for _, p in ipairs(projects.plans_of(row.file.id, all_plans)) do
+      if shown[p.id] then
+        placed[p.id] = true
+        ctx.say("  " .. file_line(p) .. (p.phase and ("\tstage " .. fsio.clean(p.phase)) or ""))
+      end
+    end
+  end
+  for _, f in ipairs(files) do
+    if not placed[f.id] then
+      ctx.say(file_line(f))
+    end
+  end
+  return 0
+end
+
+---`projects [<area>]`: the project files with what each adds up to.
+---@param ctx Tasks.CliCtx
+---@param helpers Tasks.CliContractHelpers
+---@return integer
+local function run_projects(ctx, helpers)
+  local area, ok = helpers.area_arg(ctx, "projects")
+  if not ok then
+    return 2
+  end
+  local plan_files = plans.all({ root = ctx.eo.root }) or {}
+  local rows, err = project_rows(ctx, area_set_of(ctx, area), plan_files)
+  if not rows then
+    ctx.warn("error: " .. tostring(err))
+    return 1
+  end
+  for _, row in ipairs(rows) do
+    ctx.say(project_line(row.file, row.rollup))
   end
   return 0
 end
@@ -417,9 +543,13 @@ function M.register(commands, specs, helpers)
   commands.call = run_call
   specs.show = { value = { "format" }, flag = {} }
   commands.show = run_show
-  specs.plans = { value = {}, flag = {} }
+  specs.plans = { value = {}, flag = { "tree" } }
   commands.plans = function(ctx)
     return run_plans(ctx, helpers)
+  end
+  specs.projects = { value = {}, flag = {} }
+  commands.projects = function(ctx)
+    return run_projects(ctx, helpers)
   end
 end
 

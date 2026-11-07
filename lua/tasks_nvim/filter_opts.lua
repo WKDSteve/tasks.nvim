@@ -47,7 +47,7 @@ end
 ---words the same way. Unknown words are an error, never silently ignored.
 ---`stale` may be a number, a digit string or `refs` (same as `stale_refs`: a
 ---file named in `refs` changed since `updated`); `today` is passed through.
----@param opt { plan?: string, phase?: string, status?: string, prio?: string|integer, effort?: string, kind?: string, tag?: string, category?: string, severity?: string, waits_for?: string, value?: string|integer, actor?: string, stale?: string|integer, stale_refs?: boolean, blocked?: boolean, reminders?: boolean, overdue?: boolean, due_before?: string, starts_after?: string, unestimated?: boolean, quick_win?: boolean, sheet?: string, today?: string }
+---@param opt { plan?: string, project?: string, phase?: string, status?: string, prio?: string|integer, effort?: string, kind?: string, tag?: string, category?: string, severity?: string, waits_for?: string, value?: string|integer, actor?: string, stale?: string|integer, stale_refs?: boolean, blocked?: boolean, reminders?: boolean, overdue?: boolean, due_before?: string, starts_after?: string, unestimated?: boolean, quick_win?: boolean, sheet?: string, today?: string }
 ---@return Tasks.Filter|nil filter
 ---@return string|nil err
 function M.parse(opt)
@@ -236,7 +236,7 @@ function M.parse(opt)
   if opt.stale_refs then
     f.stale_refs = true
   end
-  for _, name in ipairs({ "plan", "phase" }) do
+  for _, name in ipairs({ "plan", "project", "phase" }) do
     if opt[name] ~= nil then
       local list, lerr = listed(opt[name], name)
       if not list then
