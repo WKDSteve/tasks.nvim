@@ -566,6 +566,9 @@ function M.chips(f)
   if f.plan and #f.plan > 0 then
     chips[#chips + 1] = "plan: " .. joined(f.plan)
   end
+  if f.project and #f.project > 0 then
+    chips[#chips + 1] = "project: " .. joined(f.project)
+  end
   if f.phase and #f.phase > 0 then
     chips[#chips + 1] = "phase: " .. joined(f.phase)
   end
@@ -813,6 +816,9 @@ function M.filter_to_options(f)
   if f.plan and #f.plan > 0 then
     o.plan = joined(f.plan)
   end
+  if f.project and #f.project > 0 then
+    o.project = joined(f.project)
+  end
   if f.phase and #f.phase > 0 then
     o.phase = joined(f.phase)
   end
@@ -845,6 +851,7 @@ function M.filter_from_stored(opts)
     overdue = opts.overdue == true,
     unestimated = opts.unestimated == true,
     plan = type(opts.plan) == "string" and opts.plan or nil,
+    project = type(opts.project) == "string" and opts.project or nil,
     phase = type(opts.phase) == "string" and opts.phase or nil,
   })
   if f and (opts.readiness == "ready" or opts.readiness == "waiting") then

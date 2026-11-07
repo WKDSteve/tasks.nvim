@@ -513,6 +513,11 @@ local LIST_FLAGS = {
   { name = "ready", bool = true, desc = "Only tasks that can start now (no open blocker)" },
   { name = "waiting", bool = true, desc = "Only tasks that wait on an open blocker" },
   { name = "plan", type = "TASK_PLAN", desc = "Only the tasks of this plan file (area/slug)" },
+  {
+    name = "project",
+    type = "STRING",
+    desc = "Only the tasks of this project (area/slug): in one of its plans, or its own",
+  },
   { name = "phase", type = "STRING", desc = "Only the tasks in this stage of their plan" },
   { name = "reminders", bool = true, desc = "Only tasks whose reminder (remind:) is due" },
   { name = "overdue", bool = true, desc = "Only tasks whose due date (due:) is before today" },

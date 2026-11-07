@@ -378,7 +378,7 @@ a stage waits until the earlier stage is finished -- `list --ready`, `next` and 
 task that names a plan nobody wrote (`plan-unknown`), another area than the plan lists, a stage the plan does not
 list.
 
-#### A project over several plans -- files, `check`, finishing and the command line work today; the editor views are still to come
+#### A project over several plans -- files, `check`, finishing and the command line work today; the editor takes `--project` too
 
 Several plans can make one undertaking: "mobile apps for the app families" is one plan per app. The levels are fixed:
 **project, plan, task** (the steps of a task are its subtasks). A project is a file `<area>/ROADMAP/projects/<slug>.md`

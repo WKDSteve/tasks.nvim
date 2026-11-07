@@ -322,7 +322,7 @@ local function filter_note(flags)
     end
   end
   -- plan and phase come as lists (a comma list on the line)
-  for _, name in ipairs({ "plan", "phase" }) do
+  for _, name in ipairs({ "plan", "project", "phase" }) do
     local v = flags[name]
     if v ~= nil then
       parts[#parts + 1] = ("%s=%s"):format(
@@ -373,6 +373,7 @@ local function filter_options(flags)
     unestimated = flags.unestimated,
     quick_win = flags["quick-win"],
     plan = flags.plan,
+    project = flags.project,
     phase = flags.phase,
   }
 end
@@ -401,6 +402,9 @@ local function load_scope(ctx)
     area = area,
     for_id = flags["for"],
     plan_id = flags.plan,
+    project_id = (type(flags.project) == "string" and not flags.project:find(",", 1, true))
+        and flags.project
+      or nil,
     filter = filter,
   })
   if not scope then
@@ -965,6 +969,7 @@ function M.list(ctx)
     unestimated = flags.unestimated,
     quick_win = flags["quick-win"],
     plan = flags.plan,
+    project = flags.project,
     phase = flags.phase,
     sheet = flags.sheet,
   })

@@ -755,6 +755,15 @@ local function load_scope(ctx, name)
     area = area,
     for_id = ctx.args.opt["for"] --[[@as string|nil]],
     plan_id = ctx.args.opt.plan --[[@as string|nil]],
+    -- one project: its head (goal, stages) too. Not for a block written into a document (`--write`): the marker
+    -- records the filter only, so the refresh would not build the same block with a head
+    project_id = (
+      not ctx.args.opt.write
+      and type(ctx.args.opt.project) == "string"
+      and not ctx.args.opt.project:find(",", 1, true)
+    )
+        and ctx.args.opt.project --[[@as string]]
+      or nil,
     filter = filter,
   })
   if not scope then

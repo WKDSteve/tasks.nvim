@@ -148,10 +148,30 @@ return function(H)
     { "ALL/decide", "cascade.nvim/b", "lib.nvim/a" }
   )
   has(run({ "estimate", "--project=ALL/mobile" }).out, "3 tasks")
+  -- one project as the scope of `plan`: its head and its stages
+  local head = run({ "plan", "--project=ALL/mobile" })
+  eq(head.code, 0, head.err)
+  has(head.out, "# Plan: project ALL/mobile")
+  has(head.out, "**Mobile** (doing)")
+  has(head.out, "Stages: basis > apps")
+  has(head.out, "3 tasks")
+  local ghost = run({ "plan", "--project=ALL/ghost" })
+  eq(ghost.code, 1)
+  has(ghost.err, "no such open project")
+  -- several projects are a filter only, without a head
+  lacks(run({ "plan", "--project=ALL/mobile,ALL/other" }).out, "**Mobile**")
   -- a filter built by hand reads the plan files itself
   local open = assert(scan.open_tasks({ root = root }))
   local kept = model.filter(open, { project = "ALL/mobile", ref_opts = { root = root } })
   eq(#kept, 3)
+
+  -- ── the dashboard: a chip in its header, stored and read back ──
+  local core = require("tasks_nvim.ui.dash_core")
+  local f = assert(require("tasks_nvim.filter_opts").parse({ project = "ALL/mobile" }))
+  eq(core.chips(f), { "project: ALL/mobile" })
+  eq(core.filter_to_options(f).project, "ALL/mobile")
+  eq(core.filter_from_stored(core.filter_to_options(f)).project, { "ALL/mobile" })
+  eq(core.filter_is_empty(f), false)
 
   -- ── new --project= ──
   local made = run({ "new", "ALL", "Own task", "--project=ALL/mobile", "--phase=basis" })

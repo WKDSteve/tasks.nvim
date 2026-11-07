@@ -27,6 +27,7 @@ local M = {}
 ---@field area? string
 ---@field for_id? string
 ---@field plan_id? string             # The plan file (`<area>/<slug>`): the tasks that name it with `plan:`.
+---@field project_id? string          # The project file: the tasks of its plans and its own (the project's head is the plan file of the scope).
 ---@field filter? Tasks.Filter
 
 ---@class Tasks.PlanScope
@@ -662,6 +663,15 @@ function M.load(opts, shared)
     end
     tasks = closure
     title = "for " .. opts.for_id
+  elseif opts.project_id then
+    local projects = require("tasks_nvim.projects")
+    local found, perr = projects.find(opts.project_id, { root = opts.root })
+    if not found then
+      return nil, tostring(perr)
+    end
+    plan_file = found
+    tasks = projects.filter(open, { found.id }, shared.files)
+    title = "project " .. found.id
   elseif opts.area then
     -- an area group stands for its member areas; the history figure below only fits one area
     local scope = vault.area_scope(vault.root({ root = opts.root }) or "", opts.area)
