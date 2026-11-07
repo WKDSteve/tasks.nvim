@@ -707,10 +707,35 @@ function M.plan_closed_text(id, summary)
   return text
 end
 
+---The line that says a project is done, with what it amounted to.
+---@param id string
+---@param summary? { plans?: integer, tasks?: integer, parked_left?: string[] }
+---@return string
+function M.project_closed_text(id, summary)
+  local text = "Project " .. fsio.clean(id) .. " is done"
+  if summary then
+    local facts = {}
+    if summary.plans then
+      facts[#facts + 1] = ("%d plan%s"):format(summary.plans, summary.plans == 1 and "" or "s")
+    end
+    if summary.tasks then
+      facts[#facts + 1] = ("%d task%s"):format(summary.tasks, summary.tasks == 1 and "" or "s")
+    end
+    if summary.parked_left and #summary.parked_left > 0 then
+      facts[#facts + 1] = "parked and still open: "
+        .. fsio.clean(table.concat(summary.parked_left, ", "))
+    end
+    if #facts > 0 then
+      text = text .. " (" .. table.concat(facts, ", ") .. ")"
+    end
+  end
+  return text
+end
+
 ---A short plain-language description of the next-task answer (a popup, a message).
 ---@param pick Tasks.NextPick
 ---@param done_id? string
----@param flow? { plans_closed?: string[], plan_summaries?: table<string, table> }  # What the finish did besides: plans closed.
+---@param flow? { plans_closed?: string[], plan_summaries?: table<string, table>, projects_closed?: string[], project_summaries?: table<string, table> }  # What the finish did besides: plans and projects closed.
 ---@return string[] lines
 function M.next_message(pick, done_id, flow)
   local lines = {}
@@ -724,6 +749,12 @@ function M.next_message(pick, done_id, flow)
   for _, plan_id in ipairs(flow and flow.plans_closed or {}) do
     lines[#lines + 1] =
       M.plan_closed_text(plan_id, flow and flow.plan_summaries and flow.plan_summaries[plan_id])
+  end
+  for _, project_id in ipairs(flow and flow.projects_closed or {}) do
+    lines[#lines + 1] = M.project_closed_text(
+      project_id,
+      flow and flow.project_summaries and flow.project_summaries[project_id]
+    )
   end
   local t = pick.task
   if t then

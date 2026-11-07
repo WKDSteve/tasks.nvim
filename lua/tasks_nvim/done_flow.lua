@@ -34,6 +34,7 @@ local mutate = require("tasks_nvim.mutate")
 local next_pick = require("tasks_nvim.next_pick")
 local plan_scope = require("tasks_nvim.plan_scope")
 local plans = require("tasks_nvim.plans")
+local projects = require("tasks_nvim.projects")
 local scan = require("tasks_nvim.scan")
 local vault = require("tasks_nvim.vault")
 
@@ -53,6 +54,8 @@ local M = {}
 ---@field plan_summaries table<string, Tasks.PlanSummary>  # What each closed plan amounted to.
 ---@field freed string[]             # Ids of tasks whose last open blocker this was (set with `next`).
 ---@field plans_closed string[]      # Ids of plan files closed because their last member is done.
+---@field projects_closed string[]   # Ids of project files closed because their last plan and own task is done (a parked plan does not hold a project open).
+---@field project_summaries table<string, Tasks.ProjectSummary>  # What each closed project amounted to.
 ---@field docs_refreshed string[]    # Generated plan blocks that were refreshed.
 ---@field next_round? { id: string, due: string, path: string }  # The next round of a routine that was started.
 ---@field notes string[]             # Follow-up steps that did not work; the finish itself stands.
@@ -131,6 +134,8 @@ end
 
 ---@class Tasks.ClosedPlans
 ---@field closed string[]                        # Ids of the plan files that were finished.
+---@field projects table<string, string>         # Closed plan id -> the project it belonged to (to judge the project next).
+---@field refused table<string, string[]>        # Plan id -> the open tasks that hold it open.
 ---@field summaries table<string, Tasks.PlanSummary>
 ---@field notes string[]                         # Plans that could not be closed, or whose state could not be judged.
 
@@ -144,7 +149,7 @@ end
 function M.close_plans(plan_ids, opts)
   opts = opts or {}
   ---@type Tasks.ClosedPlans
-  local out = { closed = {}, summaries = {}, notes = {} }
+  local out = { closed = {}, projects = {}, refused = {}, summaries = {}, notes = {} }
   local files, seen = {}, {}
   for _, plan_id in ipairs(plan_ids) do
     if not seen[plan_id] then
@@ -185,11 +190,16 @@ function M.close_plans(plan_ids, opts)
     end
   end
   for _, file in ipairs(files) do
-    local open = 0
+    local open, holding = 0, {}
     for _, t in ipairs(plans.members(file.id, all)) do
       if t.status ~= "done" then
         open = open + 1
+        holding[#holding + 1] = t.id
       end
+    end
+    if open > 0 then
+      table.sort(holding)
+      out.refused[file.id] = holding
     end
     if open == 0 then
       local summary = plans.summary(file, { root = opts.root, date = opts.date or opts.today })
@@ -206,8 +216,131 @@ function M.close_plans(plan_ids, opts)
         )
       else
         out.closed[#out.closed + 1] = file.id
+        out.projects[file.id] = file.project
         summary.title = file.title
         out.summaries[file.id] = summary
+      end
+    end
+  end
+  return out
+end
+
+---@class Tasks.ProjectSummary
+---@field title? string
+---@field plans integer            # Plans of the project, finished ones included.
+---@field tasks integer            # Finished tasks of the project (in its plans and its own).
+---@field parked_left string[]     # Open plans that were parked: they did not hold the project open and stay as they are.
+
+---@class Tasks.ClosedProjects
+---@field closed string[]                        # Ids of the project files that were finished.
+---@field summaries table<string, Tasks.ProjectSummary>
+---@field refused table<string, string[]>        # Project id -> the open tasks and plans that hold it open.
+---@field notes string[]                         # Projects that could not be closed, or whose state could not be judged.
+
+---The step after `close_plans`: finish every project of `project_ids` that has no open task of its own and no open plan
+---left. A parked plan does not hold a project open (it is named in the summary); a plan or task of any other status
+---does. A project that nothing finished is never asked about: an empty project does not close by itself. The scan
+---guards are those of `close_plans`: an incomplete scan closes nothing.
+---@param project_ids string[]
+---@param opts? { root?: string, date?: string, today?: string, checkpoint_dir?: string }
+---@return Tasks.ClosedProjects
+function M.close_projects(project_ids, opts)
+  opts = opts or {}
+  ---@type Tasks.ClosedProjects
+  local out = { closed = {}, summaries = {}, refused = {}, notes = {} }
+  local files, seen = {}, {}
+  for _, project_id in ipairs(project_ids) do
+    if project_id and not seen[project_id] then
+      seen[project_id] = true
+      local file = projects.find(project_id, { root = opts.root })
+      if file then
+        files[#files + 1] = file
+      end
+    end
+  end
+  if #files == 0 then
+    return out
+  end
+  local all, errors = scan.all({ root = opts.root })
+  if not all then
+    out.notes[1] = ("the projects could not be checked: %s"):format(tostring(errors))
+    return out
+  end
+  if type(errors) == "table" and #errors > 0 then
+    for _, file in ipairs(files) do
+      out.notes[#out.notes + 1] = ("the project %s was not closed: the scan was incomplete (%s)"):format(
+        file.id,
+        tostring(errors[1])
+      )
+    end
+    return out
+  end
+  for _, t in ipairs(all) do
+    if t.error_codes and vim.tbl_contains(t.error_codes, "unreadable") then
+      for _, file in ipairs(files) do
+        out.notes[#out.notes + 1] = ("the project %s was not closed: %s could not be read"):format(
+          file.id,
+          tostring(t.path)
+        )
+      end
+      return out
+    end
+  end
+  local open_plans = plans.all({ root = opts.root }) or {}
+  local open_tasks = {}
+  for _, t in ipairs(all) do
+    if model.is_open_status(t.status) then
+      open_tasks[#open_tasks + 1] = t
+    end
+  end
+  local finished
+  for _, file in ipairs(files) do
+    local holding, parked = {}, {}
+    for _, t in ipairs(projects.members(file.id, all)) do
+      if t.status ~= "done" then
+        holding[#holding + 1] = t.id
+      end
+    end
+    for _, f in ipairs(projects.plans_of(file.id, open_plans)) do
+      if f.status == "parked" then
+        parked[#parked + 1] = f.id
+      elseif f.status ~= "done" then
+        holding[#holding + 1] = f.id
+      end
+    end
+    table.sort(holding)
+    table.sort(parked)
+    if #holding > 0 then
+      out.refused[file.id] = holding
+    else
+      finished = finished or projects.finished_items({ root = opts.root })
+      local rollup =
+        projects.rollup(file, { plans = open_plans, open = open_tasks, finished = finished })
+      local closed, cerr = projects.close(file.id, {
+        root = opts.root,
+        date = opts.date,
+        today = opts.today,
+        checkpoint_dir = opts.checkpoint_dir,
+      })
+      if not closed then
+        out.notes[#out.notes + 1] = ("the project %s could not be closed: %s"):format(
+          file.id,
+          tostring(cerr)
+        )
+      else
+        out.closed[#out.closed + 1] = file.id
+        out.summaries[file.id] = {
+          title = file.title,
+          plans = rollup.plans_total,
+          tasks = rollup.tasks_done,
+          parked_left = parked,
+        }
+        if #parked > 0 then
+          out.notes[#out.notes + 1] = ("the project %s is finished; its parked plan(s) stay: %s"):format(
+            file.id,
+            table.concat(parked, ", ")
+          )
+        end
       end
     end
   end
@@ -306,6 +439,7 @@ end
 
 ---@class Tasks.DoneFlowPreview : Tasks.DonePreview
 ---@field closes_plan? string   # The plan file this finish closes: the task is its last open member.
+---@field closes_project? string # The project file this finish closes after that: no other plan (a parked one does not count) and no task of its own is open.
 ---@field freed string[]        # Open tasks that wait on nothing but this one.
 ---@field next_round? { due: string }  # The due date of the next round, when the task is a routine.
 
@@ -365,6 +499,37 @@ function M.preview(id, opts)
         end
       end
     end
+    -- the project after it: the one of the plan this finish closes, or the one the task belongs to itself
+    local project_id = pv.project_id
+    if pv.closes_plan then
+      local closing = plans.find(pv.closes_plan, { root = opts.root })
+      project_id = closing and closing.project or project_id
+    end
+    if project_id then
+      for _, project in ipairs(shared.projects) do
+        if project.id == project_id then
+          local holding = false
+          for _, t in ipairs(shared.open) do
+            if t.id ~= id and t.project == project_id then
+              holding = true
+            end
+          end
+          for _, f in ipairs(shared.files) do
+            if
+              f.project == project_id
+              and f.id ~= pv.closes_plan
+              and f.status ~= "parked"
+              and f.status ~= "done"
+            then
+              holding = true
+            end
+          end
+          if not holding then
+            pv.closes_project = project_id
+          end
+        end
+      end
+    end
   end
   return pv, nil
 end
@@ -398,6 +563,8 @@ function M.run(id, opts)
     freed = {},
     plans_closed = {},
     plan_summaries = {},
+    projects_closed = {},
+    project_summaries = {},
     docs_refreshed = {},
     notes = {},
   }
@@ -434,6 +601,7 @@ function M.run(id, opts)
   end
 
   -- b. the plan this task belonged to: finished when no member is left open
+  local project_ids = { done.project_id }
   if done.plan_id and not opts.defer_plan_close then
     step("closing the plan " .. done.plan_id, function()
       local res = M.close_plans({ done.plan_id }, opts)
@@ -441,6 +609,22 @@ function M.run(id, opts)
       vim.list_extend(flow.notes, res.notes)
       for plan_id, summary in pairs(res.summaries) do
         flow.plan_summaries[plan_id] = summary
+      end
+      for _, plan_id in ipairs(res.closed) do
+        project_ids[#project_ids + 1] = res.projects[plan_id]
+      end
+    end)
+  end
+
+  -- b2. the project: of the plan that was just finished, or the one the task belongs to itself. Finished when no
+  -- plan (other than a parked one) and no task of its own is left open. A batch does this once at its end.
+  if #project_ids > 0 and not opts.defer_plan_close then
+    step("closing the project", function()
+      local res = M.close_projects(project_ids, opts)
+      vim.list_extend(flow.projects_closed, res.closed)
+      vim.list_extend(flow.notes, res.notes)
+      for project_id, summary in pairs(res.summaries) do
+        flow.project_summaries[project_id] = summary
       end
     end)
   end

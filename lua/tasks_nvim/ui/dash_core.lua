@@ -1122,6 +1122,9 @@ function M.describe_done(res)
   for _, plan_id in ipairs(res.plans_closed or {}) do
     lines[#lines + 1] = "plan " .. plan_id .. " is finished"
   end
+  for _, project_id in ipairs(res.projects_closed or {}) do
+    lines[#lines + 1] = "project " .. project_id .. " is finished"
+  end
   for _, doc in ipairs(res.docs_refreshed or {}) do
     lines[#lines + 1] = "plan block refreshed in " .. doc
   end

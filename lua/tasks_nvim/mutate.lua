@@ -2792,6 +2792,7 @@ function M.done(id, opts)
     resumed = plan.resume,
     steps_ticked = plan.steps_ticked,
     plan_id = plan.task.plan,
+    project_id = plan.task.project,
     readme = plan.readme_state,
     index = type(res) == "table" and res or nil,
   },
@@ -2839,6 +2840,7 @@ end
 ---@field readme? string             # `missing`, `updated` or `unchanged`: what happens to the Backlog README.
 ---@field readme_row? string
 ---@field plan_id? string
+---@field project_id? string       # The project the task belongs to directly (`project:`), not through a plan.
 ---@field etag? string               # The version of the task file this preview is about.
 ---@field confirm? string            # Hand this to `done` to finish exactly that version.
 
@@ -2872,6 +2874,7 @@ function M.done_preview(id, opts)
     readme = plan.readme_state,
     readme_row = plan.readme_row,
     plan_id = plan.task.plan,
+    project_id = plan.task.project,
     etag = etag,
     confirm = M.confirm_token(id, etag),
   },

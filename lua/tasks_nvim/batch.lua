@@ -537,6 +537,8 @@ end
 ---@field steps_ticked integer           # Plan steps ticked in the finished copies.
 ---@field plans_closed string[]          # Plan files finished because their last member was among these.
 ---@field plan_summaries table<string, Tasks.PlanSummary>
+---@field projects_closed string[]       # Project files finished because their last plan or own task was among these.
+---@field project_summaries table<string, Tasks.ProjectSummary>
 ---@field docs_refreshed string[]        # Documents whose generated blocks changed.
 ---@field notes string[]                 # Follow-up steps that did not work (the finishes stand).
 
@@ -556,10 +558,12 @@ function M.done_many(ids, opts)
     steps_ticked = 0,
     plans_closed = {},
     plan_summaries = {},
+    projects_closed = {},
+    project_summaries = {},
     docs_refreshed = {},
     notes = {},
   }
-  local moved, plan_ids = {}, {}
+  local moved, plan_ids, project_ids = {}, {}, {}
   for _, id in ipairs(ids) do
     local flow, err = done_flow.run(id, {
       root = opts.root,
@@ -581,6 +585,9 @@ function M.done_many(ids, opts)
       if r.plan_id then
         plan_ids[#plan_ids + 1] = r.plan_id
       end
+      if r.project_id then
+        project_ids[#project_ids + 1] = r.project_id
+      end
       res.steps_ticked = res.steps_ticked + flow.steps_ticked
       vim.list_extend(res.plans_closed, flow.plans_closed)
       for plan_id, summary in pairs(flow.plan_summaries) do
@@ -598,8 +605,24 @@ function M.done_many(ids, opts)
       for plan_id, summary in pairs(closed.summaries) do
         res.plan_summaries[plan_id] = summary
       end
+      for _, plan_id in ipairs(closed.closed) do
+        project_ids[#project_ids + 1] = closed.projects[plan_id]
+      end
     else
       res.notes[#res.notes + 1] = "closing the plans: " .. tostring(closed)
+    end
+  end
+  if #project_ids > 0 then
+    -- After the plans: the projects of the finished tasks and of the plans that were just finished, once each.
+    local ran, closed = pcall(done_flow.close_projects, project_ids, opts)
+    if ran then
+      vim.list_extend(res.projects_closed, closed.closed)
+      vim.list_extend(res.notes, closed.notes)
+      for project_id, summary in pairs(closed.summaries) do
+        res.project_summaries[project_id] = summary
+      end
+    else
+      res.notes[#res.notes + 1] = "closing the projects: " .. tostring(closed)
     end
   end
   res.areas = areas_of(moved)

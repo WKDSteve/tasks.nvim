@@ -88,6 +88,10 @@ commands:
         green and waiting for your judgement), any: a task with the block; nothing is run)
   plan-new <area> <title> [--areas=a,b] [--target=<id>] [--phases=a,b,c] [--gate=hard] [--summary=text]
                                           create ROADMAP/plans/<slug>.md; tasks join it with plan=<id> phase=<word>
+  plan-close <area>/<slug>                finish a plan by hand (refused while a member task is open); the project it
+                                          belongs to is finished after it when nothing else holds it open
+  project-close <area>/<slug>             finish a project by hand (refused while an own task or an open plan that is
+                                          not parked is left)
   plan [<area>] [--for=<id>|--plan=<id>] [filters as for list] [--ready] [--with-steps] [--format=md|tsv|ids]
        [--write=<file> [--scope=<name>] [--check] ]   replace only the generated block of a document
                                           stages, ready tasks, decisions by leverage, critical path
@@ -326,6 +330,8 @@ local SPECS = {
     value = { "areas", "target", "phases", "gate", "status", "summary", "slug", "title" },
     flag = {},
   },
+  ["plan-close"] = { value = {}, flag = {} },
+  ["project-close"] = { value = {}, flag = {} },
   index = { value = {}, flag = { "check", "all", "staged" } },
   new = {
     value = {
@@ -1169,6 +1175,126 @@ commands["plan-new"] = function(ctx)
   return 0
 end
 
+---Say what a hand-made close did, one line each.
+---@param ctx table
+---@param plans_closed string[]
+---@param plan_summaries table<string, table>
+---@param projects Tasks.ClosedProjects
+local function say_closed(ctx, plans_closed, plan_summaries, projects)
+  for _, plan_id in ipairs(plans_closed) do
+    ctx.say(
+      ("plan-closed\t%s\t%s"):format(
+        plan_id,
+        plan_view.plan_closed_text(plan_id, plan_summaries[plan_id])
+      )
+    )
+  end
+  for _, project_id in ipairs(projects.closed) do
+    ctx.say(
+      ("project-closed\t%s\t%s"):format(
+        project_id,
+        plan_view.project_closed_text(project_id, projects.summaries[project_id])
+      )
+    )
+  end
+  for _, note in ipairs(projects.notes) do
+    ctx.warn("warn: " .. note)
+  end
+end
+
+commands["plan-close"] = function(ctx)
+  local args, eo = ctx.args, ctx.eo
+  local id = args.pos[1]
+  if not id or #args.pos > 1 then
+    ctx.warn("error: usage: plan-close <area>/<slug>")
+    return 2
+  end
+  local file, ferr = require("tasks_nvim.plans").find(id, { root = eo.root })
+  if not file then
+    -- finished already: closing again is not an error
+    local held = require("tasks_nvim.scan").find_done(id, { root = eo.root })
+    if held then
+      ctx.say(("already	%s	%s"):format(id, held.path))
+      return 0
+    end
+    ctx.warn("error: " .. tostring(ferr))
+    return 1
+  end
+  local opts = { root = eo.root, today = eo.today, date = eo.today }
+  local res = done_flow.close_plans({ id }, opts)
+  for _, note in ipairs(res.notes) do
+    ctx.warn("warn: " .. note)
+  end
+  if #res.closed == 0 then
+    local holding = res.refused[id]
+    if holding then
+      ctx.warn(
+        ("error: %s still has %d open task%s: %s"):format(
+          id,
+          #holding,
+          #holding == 1 and "" or "s",
+          table.concat(holding, ", ")
+        )
+      )
+    else
+      ctx.warn("error: " .. id .. " was not closed")
+    end
+    return 1
+  end
+  local project_ids = {}
+  for _, plan_id in ipairs(res.closed) do
+    project_ids[#project_ids + 1] = res.projects[plan_id]
+  end
+  say_closed(ctx, res.closed, res.summaries, done_flow.close_projects(project_ids, opts))
+  done_flow.refresh_marker_docs({ root = eo.root, closed = res.summaries })
+  return 0
+end
+
+commands["project-close"] = function(ctx)
+  local args, eo = ctx.args, ctx.eo
+  local id = args.pos[1]
+  if not id or #args.pos > 1 then
+    ctx.warn("error: usage: project-close <area>/<slug>")
+    return 2
+  end
+  local file, ferr = require("tasks_nvim.projects").find(id, { root = eo.root })
+  if not file then
+    local held = require("tasks_nvim.scan").find_done(id, { root = eo.root })
+    if held then
+      ctx.say(("already	%s	%s"):format(id, held.path))
+      return 0
+    end
+    ctx.warn("error: " .. tostring(ferr))
+    return 1
+  end
+  local res = done_flow.close_projects(
+    { id },
+    { root = eo.root, today = eo.today, date = eo.today }
+  )
+  if #res.closed == 0 then
+    for _, note in ipairs(res.notes) do
+      ctx.warn("warn: " .. note)
+    end
+    local holding = res.refused[id]
+    if holding then
+      ctx.warn(
+        ("error: %s still has %d open task%s or plan%s: %s"):format(
+          id,
+          #holding,
+          #holding == 1 and "" or "s",
+          #holding == 1 and "" or "s",
+          table.concat(holding, ", ")
+        )
+      )
+    else
+      ctx.warn("error: " .. id .. " was not closed")
+    end
+    return 1
+  end
+  say_closed(ctx, {}, {}, res)
+  return 0
+end
+
 commands["next"] = function(ctx)
   local area, ok = area_arg(ctx, "next")
   if not ok then
@@ -1620,6 +1746,14 @@ function commands.done(ctx)
       ("plan-closed\t%s\t%s"):format(
         plan_id,
         plan_view.plan_closed_text(plan_id, flow.plan_summaries[plan_id])
+      )
+    )
+  end
+  for _, project_id in ipairs(flow.projects_closed) do
+    ctx.say(
+      ("project-closed\t%s\t%s"):format(
+        project_id,
+        plan_view.project_closed_text(project_id, flow.project_summaries[project_id])
       )
     )
   end

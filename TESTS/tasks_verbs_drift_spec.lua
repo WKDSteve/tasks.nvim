@@ -27,8 +27,10 @@ return function(H)
     -- `intent` takes a document of another app; the editor fills `:Tasks new` from it later
     "intent",
     "migrate-actor",
+    "plan-close",
     "plan-new",
     "plans",
+    "project-close",
     "show",
     "unclaim",
   }

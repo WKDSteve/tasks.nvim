@@ -457,6 +457,12 @@ that a real rule (a task of a stage waits until the earlier stage is finished, a
 all see it), `--target` the task that means "done". When the last member task is finished the plan is finished too (see
 `:Tasks done`). Headless: `plan-new`.
 
+Headless `plan-close <area>/<slug>` finishes a plan by hand (refused while a member task is open: the message names them)
+and `project-close <area>/<slug>` a project (refused while a task of its own or a plan that is not parked is open). A
+project is also finished by `done`: when the finish closes its last plan, or is its last own task, and no other plan
+(a parked one does not count) is open, the project is finished too (`project-closed` line; the parked plans stay and are
+named). Closing a finished plan or project again prints `already`.
+
 ### `:Tasks next [<area>|all] [--n=3] [--actor=cdx|me|pair|none]`
 
 What to start next: the best **ready** task and why, with a small dialog (`Not now` first, `Open <id>`, `Show another`).

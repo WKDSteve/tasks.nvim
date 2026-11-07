@@ -1087,6 +1087,9 @@ local function do_done(op, ctx)
   for _, plan_id in ipairs(flow.plans_closed) do
     changed[#changed + 1] = plan_id
   end
+  for _, project_id in ipairs(flow.projects_closed) do
+    changed[#changed + 1] = project_id
+  end
   local notes = {}
   for _, note in ipairs(flow.notes) do
     notes[#notes + 1] = contract.redact(ctx.root, note)

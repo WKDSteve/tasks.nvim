@@ -602,7 +602,8 @@ end
 ---one must not delete the earlier one's result). A finished copy a killed run left behind (same text) is resumed.
 ---A plan whose id is already held by an open task or a finished item is refused (one id namespace).
 ---@param id string
----@param opts? { root?: string, date?: string, today?: string, checkpoint_dir?: string }
+---`opts.kind = "project"` finishes a project file (`ROADMAP/projects/`) the same way.
+---@param opts? { root?: string, date?: string, today?: string, checkpoint_dir?: string, kind?: "plan"|"project" }
 ---@return { id: string, from: string, to: string, readme: string }|nil result
 ---@return string|nil err
 function M.close(id, opts)
@@ -611,7 +612,9 @@ function M.close(id, opts)
   if not root then
     return nil, rerr
   end
-  local plan, ferr = M.find(id, { root = root })
+  -- a project file is finished the same way (`opts.kind = "project"`, see `tasks_nvim.projects.close`)
+  local finder = opts.kind == "project" and require("tasks_nvim.projects").find or M.find
+  local plan, ferr = finder(id, { root = root })
   if not plan then
     local finished = scan.find_done(id, { root = root })
     if finished then
@@ -628,7 +631,12 @@ function M.close(id, opts)
   if not old_text then
     return nil, "cannot read " .. plan.path .. ": " .. tostring(rd_err)
   end
-  local new_text, uerr = fm.update_text(old_text, { { "status", "done" }, { "updated", today } })
+  -- `closed_kind` says what the finished file is: in the Backlog a plan or a project reads like a task otherwise
+  local new_text, uerr = fm.update_text(old_text, {
+    { "status", "done" },
+    { "updated", today },
+    { "closed_kind", opts.kind == "project" and "project" or "plan" },
+  })
   if not new_text then
     return nil, "cannot update " .. plan.path .. ": " .. tostring(uerr)
   end

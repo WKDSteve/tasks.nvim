@@ -146,12 +146,16 @@ function M.members(project_id, tasks)
   return out
 end
 
----A finished item of a Backlog is a plan file (a closed plan lands in `Backlog/FEATURES/` as it is) when it carries
----one of the keys only a plan file has; a finished task never does.
+---A finished item of a Backlog is a plan file (a closed plan lands in `Backlog/FEATURES/`) when `plans.close` marked it
+---(`closed_kind: plan`). A plan closed before the mark existed is told by the keys only a plan file has (`areas`,
+---`phase_order`, `gate`, `target`); a finished task never has them.
 ---@param item Tasks.Task
 ---@return boolean
 function M.is_finished_plan(item)
   local meta = item.meta or {}
+  if meta.closed_kind ~= nil then
+    return meta.closed_kind == "plan"
+  end
   return meta.areas ~= nil or meta.phase_order ~= nil or meta.gate ~= nil or meta.target ~= nil
 end
 
@@ -237,6 +241,16 @@ function M.rollup(project, ctx)
   out.days_open = days
   out.plan_ids = plan_ids
   return out
+end
+
+---Finish a project: `status: done`, moved to `Backlog/FEATURES/YYYY-MM-DD_<slug>.md` with a row in the Backlog README, as
+---a plan is (`plans.close`). Whether the project may be finished is the caller's judgement (`done_flow.close_projects`).
+---@param id string
+---@param opts? { root?: string, date?: string, today?: string, checkpoint_dir?: string }
+---@return { id: string, from: string, to: string, readme: string }|nil result
+---@return string|nil err
+function M.close(id, opts)
+  return plans.close(id, vim.tbl_extend("force", opts or {}, { kind = "project" }))
 end
 
 return M

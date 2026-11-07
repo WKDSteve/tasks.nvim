@@ -398,7 +398,13 @@ project order its plans and own tasks softly: what is in a later stage follows w
 `check` catches a plan or task that names a project nobody wrote (`plan-project-unknown`, `project-unknown`), a stage the
 project does not list (`plan-project-phase`, `project-phase`), a `phase:` without a project (`plan-phase-without-project`),
 a project that is finished while the plan is not (`plan-project-done`, `project-done`), a task in an area the project
-does not list (`project-area`), and a project inside a project (`project-nested`). `tasks_nvim.projects.rollup` adds a
+does not list (`project-area`), and a project inside a project (`project-nested`).
+
+**Finishing.** The last task of the last open plan finishes the plan and then the project, as long as no task of the
+project's own is open; a **parked** plan does not hold a project open (the message names it, and `check` then says
+`plan-project-done` for it). A task of the project itself that is the last holder finishes the project, too. `done`
+shows it in its preview (`closes_project`); by hand there is `plan-close` and `project-close`. A project nothing
+finished is never closed by itself: an empty project stays until you close it. `tasks_nvim.projects.rollup` adds a
 project up: plans (open, finished, parked), tasks (open, finished, its own) and the days still open.
 
 ### 17. "This one should come after that one" -- works today
