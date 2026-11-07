@@ -63,6 +63,7 @@ M.CAPABILITIES = {
   "attach",
   "bodies",
   "check",
+  "claims",
   "done_preview",
   "eff_prio",
   "estimate",
@@ -108,6 +109,9 @@ M.ERROR_PATTERNS = {
   -- vocabulary of `lib.nvim.contract.errors` has no word of its own for it, so it is `invalid_argument`; a reader that
   -- wants the cause shows the message (it names the key or the version).
   { code = "invalid_argument", find = { "tasks-vault.json:" } },
+  -- a task somebody else has claimed (`tasks_nvim.claims`): the message names the owner and the time; the shared
+  -- vocabulary has no word of its own for it
+  { code = "conflict", find = { " is claimed by " } },
   { code = "not_found", find = { "vault not found", "unknown area" } },
   {
     code = "invalid_argument",
@@ -233,6 +237,28 @@ end
 ---@param node? Tasks.PlanNode
 ---@param rank? integer
 ---@return table
+---The claim of a task as the entry carries it, `nil` when there is none. `expired` is the engine's judgement at the time
+---of the document: a reader that keeps the document longer compares `until` with its own clock.
+---@param root string
+---@param id string
+---@return table|nil
+function M.claim_entry(root, id)
+  local claims = require("tasks_nvim.claims")
+  local all = fsio.scope_memo("claims:" .. root, function()
+    return claims.list(root)
+  end)
+  local claim = all[id]
+  if not claim then
+    return nil
+  end
+  return json.object({
+    by = claim.by,
+    since = claim.since,
+    ["until"] = claim.until_,
+    expired = claim.until_ <= claims.now(),
+  })
+end
+
 local function task_entry(root, task, node, rank)
   local days = model.effort_days(task.effort)
   local roi = model.roi(task)
@@ -261,6 +287,7 @@ local function task_entry(root, task, node, rank)
     remind = model.is_date(task.remind) and task.remind or nil,
     due = model.is_date(task.due) and task.due or nil,
     start = model.is_date(task.start) and task.start or nil,
+    claim = M.claim_entry(root, task.id),
     -- a routine: the interval and where the next round counts from (only well-formed values)
     ["repeat"] = model.is_repeat(task.repeat_every) and task.repeat_every or nil,
     repeat_from = model.is_repeat_from(task.repeat_from) and task.repeat_from or nil,
@@ -556,6 +583,14 @@ local function rev_of(view, entries)
   end
   for _, u in ipairs(view.unlisted) do
     lines[#lines + 1] = "unlisted:" .. u.id .. "\t" .. u.status
+  end
+  -- a claim changes what a reader may do: a held document must see a new one as a new revision (not the clock: `expired`)
+  local claim_map = require("tasks_nvim.claims").list(view.root)
+  local claim_ids = vim.tbl_keys(claim_map)
+  table.sort(claim_ids)
+  for _, id in ipairs(claim_ids) do
+    local c = claim_map[id]
+    lines[#lines + 1] = ("claim:%s\t%s|%s|%s"):format(id, c.by, c.since, c.until_)
   end
   return builder.rev_of(lines)
 end
@@ -1594,6 +1629,8 @@ function M.next(params, opts)
   doc.freed = vim.list_slice(pick.freed, 1)
   doc.ready = json.object({ area = pick.ready.area, vault = pick.ready.vault })
   doc.open = json.object({ area = pick.open.area, vault = pick.open.vault })
+  -- ready tasks left out because somebody else works on them (capability `claims`)
+  doc.claimed = (pick.claimed or 0) > 0 and pick.claimed or nil
   if pick.empty then
     doc.empty = json.object({
       kind = pick.empty.kind,

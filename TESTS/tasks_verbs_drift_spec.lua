@@ -19,6 +19,8 @@ return function(H)
     "call",
     "check",
     "ci",
+    -- the editor has no `:Tasks claim` yet (a claim is made by an agent or a script; `by` of the editor is user@host)
+    "claim",
     "export",
     "import",
     "init-vault",
@@ -26,17 +28,33 @@ return function(H)
     "plan-new",
     "plans",
     "show",
+    "unclaim",
   }
   local ONLY_COMPOSER = { "folder", "open", "planfile", "preview" }
   local OPTIONS = {
     ["answer"] = { composer = {}, cli = { "no-index" } },
-    ["attach"] = { composer = {}, cli = { "clipboard", "latest", "name", "no-index" } },
+    ["attach"] = {
+      composer = {},
+      cli = { "by", "clipboard", "force", "latest", "name", "no-index", "note" },
+    },
     ["done"] = {
       composer = { "yes" },
-      cli = { "commits", "date", "done-in", "last", "no-index", "no-next", "remind", "unblock" },
+      cli = {
+        "by",
+        "commits",
+        "date",
+        "done-in",
+        "force",
+        "last",
+        "no-index",
+        "no-next",
+        "note",
+        "remind",
+        "unblock",
+      },
     },
     ["estimate"] = { composer = { "list", "walk" }, cli = { "stale-refs" } },
-    ["folderize"] = { composer = {}, cli = { "no-index" } },
+    ["folderize"] = { composer = {}, cli = { "by", "force", "no-index", "note" } },
     -- `--staged` is for the shell around a commit; the editor has no staging step of its own.
     ["index"] = { composer = {}, cli = { "staged" } },
     ["list"] = {
@@ -111,7 +129,7 @@ return function(H)
         "waits-for",
       },
     },
-    ["next"] = { composer = {}, cli = { "format" } },
+    ["next"] = { composer = {}, cli = { "by", "format" } },
     ["plan"] = { composer = { "force", "list", "to" }, cli = { "stale-refs" } },
     ["quickwins"] = {
       composer = { "force", "phase", "to" },
@@ -119,7 +137,7 @@ return function(H)
     },
     -- the editor asks before it changes many tasks (`--yes` skips the question)
     ["release"] = { composer = { "yes" }, cli = { "no-index" } },
-    ["set"] = { composer = {}, cli = { "no-index" } },
+    ["set"] = { composer = {}, cli = { "by", "force", "no-index", "note" } },
     -- the editor takes testing.nvim's path from setup({ sheet_run = { testing_cli } })
     ["sheet-run"] = { composer = {}, cli = { "testing-cli" } },
     -- the editor asks in a dialog and reads the answer from the buffer

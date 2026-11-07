@@ -69,6 +69,7 @@ return function(H)
     "answer",
     "append_note",
     "attach",
+    "claims",
     "eff_prio",
     "etag",
     "if_match",

@@ -34,6 +34,7 @@ local mutate = require("tasks_nvim.mutate")
 local questions = require("tasks_nvim.questions")
 local next_pick = require("tasks_nvim.next_pick")
 local plan_scope = require("tasks_nvim.plan_scope")
+local claims = require("tasks_nvim.claims")
 local plan_view = require("tasks_nvim.plan_view")
 local scan = require("tasks_nvim.scan")
 local staleness = require("tasks_nvim.staleness")
@@ -134,6 +135,11 @@ commands:
                                           finish: move to Backlog/; prints the tasks it freed and what to start
                                           next; --unblock sets the freed tasks that still say blocked to open;
                                           a routine (`repeat: 8w`) starts its next round (--last: it ends for good)
+  claim <area>/<slug> [--by=<name>] [--for=4h] [--renew] [--force --note=<why>]
+                                          reserve a task while you work on it (status doing); the same name renews,
+                                          an expired claim is taken over, one of somebody else is refused
+  unclaim <area>/<slug> [--by=<name>] [--status=open|parked|decision] [--force --note=<why>]
+                                          give it back (a doing task goes to open); `done` releases by itself
   attach <area>/<slug> <file> [--name=n]  copy a file to <slug>/assets/ (a plain task becomes a
                                           folder task) and print the Markdown link
   attach <area>/<slug> --clipboard [--name=n]
@@ -312,7 +318,7 @@ local SPECS = {
     },
     flag = { "blocked", "stale-refs", "unestimated", "by-actor", "paths" },
   },
-  next = { value = { "n", "actor", "format" }, flag = {} },
+  next = { value = { "n", "actor", "format", "by" }, flag = {} },
   ["plan-new"] = {
     value = { "areas", "target", "phases", "gate", "status", "summary", "slug", "title" },
     flag = {},
@@ -348,18 +354,23 @@ local SPECS = {
     },
     flag = { "no-index", "folder" },
   },
-  set = { value = {}, flag = { "no-index" } },
+  set = { value = { "by", "note" }, flag = { "no-index", "force" } },
+  claim = { value = { "by", "for", "note" }, flag = { "renew", "force" } },
+  unclaim = { value = { "by", "note", "status" }, flag = { "force" } },
   waits = { value = { "format" }, flag = {} },
   release = { value = {}, flag = { "dry-run", "no-index" } },
   answer = { value = {}, flag = { "no-index" } },
   ["migrate-actor"] = { value = {}, flag = { "write", "no-index" } },
   done = {
-    value = { "done-in", "commits", "date", "remind" },
-    flag = { "no-index", "no-next", "unblock", "last" },
+    value = { "done-in", "commits", "date", "remind", "by", "note" },
+    flag = { "no-index", "no-next", "unblock", "last", "force" },
   },
   -- `latest` is both: `--latest` (the configured screenshot folders) and `--latest=<folder>`.
-  attach = { value = { "name", "latest" }, flag = { "no-index", "clipboard", "latest" } },
-  folderize = { value = {}, flag = { "no-index" } },
+  attach = {
+    value = { "name", "latest", "by", "note" },
+    flag = { "no-index", "clipboard", "latest", "force" },
+  },
+  folderize = { value = { "by", "note" }, flag = { "no-index", "force" } },
   ["sheet-run"] = { value = { "testing-cli" }, flag = { "dry-run" } },
   ["sheet-ai"] = { value = { "testing-cli", "from" }, flag = { "yes" } },
   check = { value = {}, flag = { "all" } },
@@ -505,6 +516,17 @@ local function engine_opts(opt)
   return {
     root = opt.vault --[[@as string|nil]],
     today = opt.today --[[@as string|nil]],
+  }
+end
+
+---`--by`, `--force`, `--note` of a write: who changes the task, and whether a claim of somebody else may be passed.
+---@param opt table<string, string|boolean>
+---@return { by?: string, force: boolean, note?: string }
+local function claim_opts(opt)
+  return {
+    by = opt.by --[[@as string|nil]],
+    force = opt.force == true,
+    note = opt.note --[[@as string|nil]],
   }
 end
 
@@ -1175,6 +1197,7 @@ commands["next"] = function(ctx)
     area = area,
     actor = actor,
     n = count - 1,
+    by = ctx.args.opt.by --[[@as string|nil]],
   })
   if not pick then
     ctx.warn("error: " .. tostring(err))
@@ -1343,15 +1366,26 @@ function commands.set(ctx)
       )
     end
   end
-  local res, err = mutate.set(id, patch, {
-    root = eo.root,
-    today = eo.today,
-    index = not args.opt["no-index"],
-  })
+  local co = claim_opts(args.opt)
+  local before = co.force and claims.read(vault.root(eo) or "", id) or nil
+  local res, err = mutate.set(
+    id,
+    patch,
+    vim.tbl_extend(
+      "force",
+      { root = eo.root, today = eo.today, index = not args.opt["no-index"] },
+      co
+    )
+  )
   if not res then
     ctx.warn("error: " .. tostring(err))
     return 1
   end
+  claims.record_override(
+    id,
+    before,
+    vim.tbl_extend("force", { root = eo.root, today = eo.today }, co)
+  )
   ctx.say(("set\t%s\t%s\t%s"):format(res.id, res.changed and "changed" or "unchanged", res.path))
   report_index(ctx, res)
   return 0
@@ -1548,6 +1582,9 @@ function commands.done(ctx)
     date = args.opt.date --[[@as string|nil]],
     index = not args.opt["no-index"],
     last = args.opt.last == true,
+    by = args.opt.by --[[@as string|nil]],
+    force = args.opt.force == true,
+    note = args.opt.note --[[@as string|nil]],
   })
   if not flow then
     ctx.warn("error: " .. tostring(err))
@@ -1645,17 +1682,24 @@ function commands.attach(ctx)
         name = args.opt.name --[[@as string|nil]],
         dir = type(from_latest) == "string" and from_latest or nil,
         index = not args.opt["no-index"],
+        by = args.opt.by --[[@as string|nil]],
+        force = args.opt.force == true,
+        note = args.opt.note --[[@as string|nil]],
       })
     if not res and too_old then
       err = tostring(err) .. " (pass the file, or raise attach.max_age_s)"
     end
   else
-    res, err = mutate.attach(id, file, {
-      root = eo.root,
-      today = eo.today,
-      name = args.opt.name --[[@as string|nil]],
-      index = not args.opt["no-index"],
-    })
+    res, err = mutate.attach(
+      id,
+      file,
+      vim.tbl_extend("force", {
+        root = eo.root,
+        today = eo.today,
+        name = args.opt.name --[[@as string|nil]],
+        index = not args.opt["no-index"],
+      }, claim_opts(args.opt))
+    )
   end
   if not res then
     ctx.warn("error: " .. tostring(err))
@@ -1672,6 +1716,75 @@ function commands.attach(ctx)
   return 0
 end
 
+---`claim <id> [--by=] [--for=] [--renew] [--force --note=]`: reserve a task while somebody works on it.
+function commands.claim(ctx)
+  local args, eo = ctx.args, ctx.eo
+  local id = args.pos[1]
+  if not id or #args.pos > 1 then
+    ctx.warn(
+      "error: usage: claim <area>/<slug> [--by=<name>] [--for=4h] [--renew] [--force --note=<why>]"
+    )
+    return 2
+  end
+  local res, err = claims.acquire(id, {
+    root = eo.root,
+    today = eo.today,
+    by = args.opt.by --[[@as string|nil]],
+    for_ = args.opt["for"] --[[@as string|nil]],
+    renew = args.opt.renew == true,
+    force = args.opt.force == true,
+    note = args.opt.note --[[@as string|nil]],
+  })
+  if not res then
+    ctx.warn("error: " .. tostring(err))
+    return 1
+  end
+  if res.taken_over then
+    ctx.warn(
+      ("warn: took over the claim of %s (%s)"):format(
+        res.taken_over.by,
+        claims.describe(res.taken_over)
+      )
+    )
+  end
+  ctx.say(
+    ("%s\t%s\t%s\t%s"):format(
+      res.renewed and "renewed" or "claimed",
+      id,
+      res.claim.by,
+      res.claim.until_
+    )
+  )
+  return 0
+end
+
+---`unclaim <id> [--by=] [--status=] [--force --note=]`: give a task back (the name of the verb: `release` is taken by
+---the parked tasks of `waits_for`).
+function commands.unclaim(ctx)
+  local args, eo = ctx.args, ctx.eo
+  local id = args.pos[1]
+  if not id or #args.pos > 1 then
+    ctx.warn(
+      "error: usage: unclaim <area>/<slug> [--by=<name>] [--status=open|parked|decision] [--force --note=<why>]"
+    )
+    return 2
+  end
+  local res, err = claims.release(id, {
+    root = eo.root,
+    today = eo.today,
+    by = args.opt.by --[[@as string|nil]],
+    force = args.opt.force == true,
+    note = args.opt.note --[[@as string|nil]],
+    status = args.opt.status --[[@as string|nil]],
+  })
+  if not res then
+    ctx.warn("error: " .. tostring(err))
+    return 1
+  end
+  ctx.say(("unclaimed\t%s\t%s"):format(id, res.status or "-"))
+  return 0
+end
+
 function commands.folderize(ctx)
   local args, eo = ctx.args, ctx.eo
   local id = args.pos[1]
@@ -1679,7 +1792,14 @@ function commands.folderize(ctx)
     ctx.warn("error: usage: folderize <area>/<slug>")
     return 2
   end
-  local res, err = mutate.folderize(id, { root = eo.root, index = not args.opt["no-index"] })
+  local res, err = mutate.folderize(
+    id,
+    vim.tbl_extend(
+      "force",
+      { root = eo.root, index = not args.opt["no-index"] },
+      claim_opts(args.opt)
+    )
+  )
   if not res then
     ctx.warn("error: " .. tostring(err))
     return 1
@@ -1815,7 +1935,7 @@ function commands.check(ctx)
     return 2
   end
   local area = (not args.opt.all) and args.pos[1] or nil
-  local res, err = check.run({ root = eo.root, area = area })
+  local res, err = check.run({ root = eo.root, area = area, today = eo.today })
   if not res then
     ctx.warn("error: " .. tostring(err))
     return 1

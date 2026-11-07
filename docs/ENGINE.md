@@ -247,6 +247,39 @@ does not change -- and ``(wartet auf `mac`)`` in the summary cell of `ROADMAP/TA
 `waits_for` is byte for byte what it was** (no new column, nothing reordered): introducing the field makes no index
 stale. The template (`tasks template`) and the `:Tasks new` form do not carry the key.
 
+### Claims
+
+A claim reserves an open task for the time somebody works on it, so two agents (two Claude chats, an agent and the editor)
+do not take the same task. `claim <id> --by=<name> [--for=4h]` writes who, since when and until when into
+`<vault>/.claims/<area>/<slug>.json` (UTC, seconds; a `.gitignore` of `*` is made beside it, so a claim lives on this machine,
+makes no commit noise and is no data of the vault) and sets the task to `doing`, the visible sign. The default is 4 hours, the
+longest 24; `--for=90m|2h|1d`. `unclaim <id>` gives it back (a `doing` task goes to `open`, `--status=parked|decision` for
+the other cases; the CLI verb is `unclaim` because `release <key>` is the verb of the parked tasks, the ops door calls it
+`release`); `done` releases by itself and a task in `Backlog/` has no claim.
+
+- **Names.** `--by` is free text (1 to 64 of letters, digits and `. _ : - @`). Without it the engine takes
+  `cdx:<8 characters of $CLAUDE_CODE_SESSION_ID>` inside a Claude Code session, else `<user>@<host>`; an agent should name
+  itself. The same name claiming again renews (the start stays); `--renew` insists on that and refuses a name that holds no
+  claim.
+- **Expiry.** A claim whose `until` has passed counts as free: `claim` takes it over (and says whose it was), every write
+  is allowed, `check` warns `claim-expired`. A chat that died blocks nothing for longer than its duration. Time is UTC
+  and always passed in (`opts.now`), so the specs need no waiting.
+- **The guard.** A valid claim of **another** name refuses `set`, the text edits (`tick_step`, `add_steps`, `answer`,
+  `append_note`, `set_body`), `done` and its preview, `attach`, `folderize` and `move_area` (reordering and the
+  reference rewrites of a move do not ask). The answer is `conflict` and the message names the owner and the time
+  (`... is claimed by chat-1 since ... until ...`). `--force --note=<why>` passes it (without a note it is refused) and, on `set`,
+  `attach` and `folderize`, writes `claim of X overridden by Y: <why>` into the notes. Reading (`show`, `list`, the documents) is free.
+  The guard runs under the task file's lock, the one `set` and `done` hold, so reserving and changing never interleave;
+  two processes that claim at once have exactly one winner.
+- **`next`** leaves out the ready tasks of other names and says how many (`claimed: 2 task(s) left out ...`); the owner
+  sees his own (`--by`), and `doing` of an unclaimed task ranks as before.
+- **`check`**: `claim-expired`, `claim-orphan` (a claim file of a task that is not open: delete it) and `doing-unclaimed`
+  (`doing` for two days or more since `updated`, nobody claimed it), all warnings.
+- **Not built / limits.** The store is a file per claim on one machine: a vault synced by something that is no git
+  (OneDrive, Obsidian Sync) does not carry `.claims/` between machines on purpose. Not claimed: plans, areas, reorder.
+  The editor has no `:Tasks claim` yet (the CLI and the ops door have). The module is `tasks_nvim.claims`; its store
+  functions (`read`, `list`, `write`, `remove`) are the one place to replace for another backend (a frontmatter field).
+
 ### Routines (`repeat`)
 
 `repeat: 8w` on a task makes it a routine: a whole number of 1 to 999 and `d` (days), `w` (weeks), `m` (months) or `y`
@@ -386,6 +419,7 @@ file that is there (also not a refused one). Nobody else writes it: a person edi
 | `duplicate-id` | an open and a finished task share an id |
 | `frontmatter-warning` (warning) | a frontmatter line was kept but not understood |
 | `area-groups-invalid` (error) | `<vault>/area-groups.json` cannot be read or parsed, or one of its groups (or one of `setup({ area_groups })`) is malformed; whole-vault runs only, area `""` |
+| `claim-expired`, `claim-orphan`, `doing-unclaimed` (warnings) | a claim that ran out, a claim file of a task that is not open, a `doing` task nobody claimed for two days. See [Claims](#claims) |
 | `bad-repeat` (error), `repeat-without-due`, `repeat-from-without-repeat` (warnings) | `repeat` is no interval (or `repeat_from` is neither `done` nor `due`); a routine with no `due` date; `repeat_from` on a task that is no routine. See [Routines](#routines-repeat) |
 | `vault-marker-missing`, `vault-marker-outdated` (warnings) | the vault has no `tasks-vault.json`, or it names an older layout version than this engine writes; vault-wide, so the finding has `area: ""` and `file: tasks-vault.json` and a check of one area leaves it out |
 | `area-groups-config` (warning) | a group of `setup({ area_groups })` is malformed (the file is fine; a `setup()` group that replaces one of the file by name is no finding) |

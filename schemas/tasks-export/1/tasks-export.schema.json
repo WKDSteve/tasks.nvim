@@ -431,6 +431,18 @@
           "$ref": "#/$defs/Date",
           "description": "The earliest day to begin (optional). Never after `due`."
         },
+        "claim": {
+          "type": "object",
+          "required": ["by", "since", "until", "expired"],
+          "properties": {
+            "by": { "type": "string" },
+            "since": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$" },
+            "until": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$" },
+            "expired": { "type": "boolean" }
+          },
+          "additionalProperties": false,
+          "description": "Somebody works on the task (optional; capability `claims`): who, since when, until when (UTC). `expired` is the engine's judgement when the document was made; a reader that keeps it compares `until` with its own clock. An expired claim counts as free."
+        },
         "repeat": {
           "type": "string",
           "pattern": "^[1-9][0-9]{0,2}[dwmy]$",
@@ -1966,6 +1978,11 @@
           },
           "additionalProperties": false
         },
+        "claimed": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Ready tasks left out because somebody else has claimed them (capability `claims`); absent when none."
+        },
         "empty": {
           "description": "Present when there is no task to start: which kind of nothing it is. `all_done` is only said when nothing is open at all.",
           "type": "object",
@@ -2802,7 +2819,7 @@
           "minimum": 1
         },
         "op": {
-          "enum": ["set", "new", "reorder", "done", "move_area", "plan_new", "tick_step", "add_steps", "answer", "append_note", "reopen", "set_body", "view_save", "view_delete", "attach"]
+          "enum": ["set", "new", "reorder", "done", "move_area", "plan_new", "tick_step", "add_steps", "answer", "append_note", "reopen", "set_body", "view_save", "view_delete", "attach", "claim", "release"]
         },
         "id": {
           "type": "string"

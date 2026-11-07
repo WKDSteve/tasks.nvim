@@ -66,6 +66,7 @@
 --- Not its job: parsing the request line (`api`), the documents of the read side (`contract`).
 
 local batch = require("tasks_nvim.batch")
+local claims = require("tasks_nvim.claims")
 local contract = require("tasks_nvim.contract")
 local done_flow = require("tasks_nvim.done_flow")
 local edges = require("tasks_nvim.edges")
@@ -126,6 +127,8 @@ M.OPS = {
   "view_save",
   "view_delete",
   "attach",
+  "claim",
+  "release",
 }
 
 ---Longest `client_op_id`.
@@ -139,6 +142,10 @@ M.MAX_SET_BODY = 100000
 
 ---Longest entry of a list value (a tag, a ref, an id).
 M.MAX_ENTRY = 300
+
+---Who acts and whether a claim of somebody else may be passed: carried by every operation that changes an open task
+---(`tasks_nvim.claims`; the answer to a claimed task is `conflict` with the owner's name in the message).
+local CLAIM_FIELDS = { by = "string", force = "boolean", note = "string" }
 
 ---What each operation may carry, and of what type. A field that is not listed is refused.
 ---@type table<string, table<string, string>>
@@ -181,6 +188,15 @@ local FIELDS = {
   },
   view_delete = { id = "string", if_match = "string" },
   attach = { id = "string", from = "string", name = "string", upload = "string" },
+  claim = {
+    id = "string",
+    by = "string",
+    ["for"] = "string",
+    renew = "boolean",
+    force = "boolean",
+    note = "string",
+  },
+  release = { id = "string", by = "string", force = "boolean", note = "string", status = "string" },
   plan_new = {
     area = "string",
     title = "string",
@@ -193,6 +209,22 @@ local FIELDS = {
     slug = "string",
   },
 }
+
+for _, name in ipairs({
+  "set",
+  "reorder",
+  "done",
+  "move_area",
+  "tick_step",
+  "add_steps",
+  "answer",
+  "append_note",
+  "reopen",
+  "set_body",
+  "attach",
+}) do
+  FIELDS[name] = vim.tbl_extend("error", FIELDS[name], CLAIM_FIELDS)
+end
 
 ---@param names table<string, any>
 ---@return string
@@ -1314,6 +1346,105 @@ end
 ---The folders are those the caller named with `attach_dirs` (the hub, from its settings), else those of the
 ---configuration (`attach.screenshot_dirs`); an operation names no path of this machine.
 ---A dry run checks the request and the task and reads neither the clipboard nor a folder.
+---The entry of `claim` and `release`: the task file changes (`doing` and back) and its version tag with it.
+---@param ctx Tasks.OpsCtx
+---@param id string
+---@param before string|nil  # version tag before
+---@param changed boolean
+---@return table entry
+local function claim_entry(ctx, id, before, changed)
+  local task = scan.find(id, { root = ctx.root })
+  local entry = {
+    ok = true,
+    id = id,
+    outcome = changed and "changed" or "unchanged",
+    etag_before = before,
+    etag_after = task and task.etag or before,
+    changed_ids = changed and { id } or {},
+  }
+  local area = vault.parse_id(id)
+  if area then
+    ctx.touched[area] = true
+  end
+  return entry
+end
+
+---@param op table
+---@param ctx Tasks.OpsCtx
+---@return table entry
+local function do_claim(op, ctx)
+  if op.id == nil then
+    return refuse("invalid_argument", "claim needs id")
+  end
+  local task = scan.find(op.id, { root = ctx.root })
+  if not task then
+    return refuse("not_found", "no such open task: " .. tostring(op.id))
+  end
+  local opts = {
+    root = ctx.root,
+    today = ctx.today,
+    by = op.by,
+    for_ = op["for"],
+    renew = op.renew,
+    force = op.force,
+    note = op.note,
+  }
+  if ctx.dry then
+    local ok, gerr, ginfo = claims.guard(ctx.root, op.id, opts)
+    if not ok then
+      return mutate_failure(ctx, gerr, ginfo)
+    end
+    return {
+      ok = true,
+      id = op.id,
+      outcome = "would_change",
+      etag_before = task.etag,
+      changed_ids = {},
+    }
+  end
+  local r, err, info = claims.acquire(op.id, opts)
+  if not r then
+    return mutate_failure(ctx, err, info)
+  end
+  return claim_entry(ctx, op.id, task.etag, true)
+end
+
+---@param op table
+---@param ctx Tasks.OpsCtx
+---@return table entry
+local function do_release(op, ctx)
+  if op.id == nil then
+    return refuse("invalid_argument", "release needs id")
+  end
+  local task = scan.find(op.id, { root = ctx.root })
+  local opts = {
+    root = ctx.root,
+    today = ctx.today,
+    by = op.by,
+    force = op.force,
+    note = op.note,
+    status = op.status,
+  }
+  if ctx.dry then
+    local ok, gerr, ginfo = claims.guard(ctx.root, op.id, opts)
+    if not ok then
+      return mutate_failure(ctx, gerr, ginfo)
+    end
+    return {
+      ok = true,
+      id = op.id,
+      outcome = "would_change",
+      etag_before = task and task.etag,
+      changed_ids = {},
+    }
+  end
+  local r, err, info = claims.release(op.id, opts)
+  if not r then
+    return mutate_failure(ctx, err, info)
+  end
+  return claim_entry(ctx, op.id, task and task.etag, r.released or r.status ~= nil)
+end
+
 ---@param op table
 ---@param ctx Tasks.OpsCtx
 ---@return table entry
@@ -1419,6 +1550,8 @@ local HANDLERS = {
   view_save = do_view_save,
   view_delete = do_view_delete,
   attach = do_attach,
+  claim = do_claim,
+  release = do_release,
 }
 
 -- ── the request ──────────────────────────────────────────────────────────────
@@ -1427,7 +1560,19 @@ local HANDLERS = {
 ---cannot hold are `lib.nvim.contract.ops`'s; what an operation DOES is a handler above.
 local ops = {}
 for _, name in ipairs(M.OPS) do
-  ops[name] = { fields = FIELDS[name], run = HANDLERS[name] }
+  local handler = HANDLERS[name]
+  -- the acting name of the operation is what `claims.guard` judges the write by
+  ops[name] = {
+    fields = FIELDS[name],
+    run = function(op, ctx)
+      return claims.with_identity(
+        { by = op.by, force = op.force, note = op.note },
+        handler,
+        op,
+        ctx
+      )
+    end,
+  }
 end
 
 door = contract_ops.make({

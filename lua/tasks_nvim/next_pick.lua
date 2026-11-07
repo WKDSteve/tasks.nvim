@@ -32,6 +32,7 @@ local vault = require("tasks_nvim.vault")
 local M = {}
 
 ---@class Tasks.NextOpts
+---@field foreign? table<string, boolean>     # Ids somebody else has claimed: not offered, counted in `claimed`.
 ---@field tasks Tasks.Task[]                    # Every open task of the vault.
 ---@field plans? Tasks.PlanFile[]               # The open plan files (their stage order and gates count).
 ---@field is_done? (fun(id: string): boolean)|table<string, boolean>  # Finished ids (default: none known).
@@ -55,6 +56,7 @@ local M = {}
 ---@field open { area: integer, vault: integer }
 ---@field empty? Tasks.NextEmpty
 ---@field incomplete? string[]                  # Folders that could not be read: the answer may be incomplete.
+---@field claimed? integer                    # Ready tasks left out because somebody else has claimed them (`foreign` of the options).
 ---@field reminders? { open: Tasks.Task[], done: integer }  # Reminders that are due: the open tasks (oldest date first) and how many finished tasks carry one (`pick_from_vault` with `reminders = true` only).
 
 ---@class Tasks.NextEmpty
@@ -148,7 +150,10 @@ function M.pick(opts)
   local candidates = {}
   for _, id in ipairs(built.ready) do
     local node = built.nodes[id]
-    if wanted(node.task, opts.actor) then
+    if opts.foreign and opts.foreign[id] then
+      -- somebody is working on it: it stays a blocker for others, it is no candidate for this caller
+      result.claimed = (result.claimed or 0) + 1
+    elseif wanted(node.task, opts.actor) then
       candidates[#candidates + 1] = node.task
       result.ready.vault = result.ready.vault + 1
       if home_set and home_set[node.task.area] then
@@ -286,7 +291,7 @@ function M.due_reminders(open, finished, today)
 end
 
 ---The same over the vault on disk: every open task, the finished ids looked up in the Backlogs when needed.
----@param opts { root?: string, done?: { id: string, area: string }, area?: string, actor?: string, n?: integer, cdx?: integer, today?: string, reminders?: boolean }
+---@param opts { root?: string, by?: string, done?: { id: string, area: string }, area?: string, actor?: string, n?: integer, cdx?: integer, today?: string, reminders?: boolean }
 ---@return Tasks.NextPick|nil result
 ---@return string|nil err
 function M.pick_from_vault(opts)
@@ -305,7 +310,21 @@ function M.pick_from_vault(opts)
       unlisted = unlisted + 1
     end
   end
+  -- the tasks somebody else has claimed (a valid claim of another name) are not offered
+  local foreign
+  local root = vault.root(opts)
+  if root then
+    local claims = require("tasks_nvim.claims")
+    local by, now = opts.by or claims.default_name(), claims.now()
+    for id, claim in pairs(claims.list(root)) do
+      if claims.state(claim, by, now) == "foreign" then
+        foreign = foreign or {}
+        foreign[id] = true
+      end
+    end
+  end
   local result = M.pick({
+    foreign = foreign,
     tasks = open,
     is_done = scan.finished_lookup({ root = opts.root }),
     plans = require("tasks_nvim.plans").all({ root = opts.root }) or {},

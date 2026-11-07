@@ -582,6 +582,19 @@ nvim --headless -u NONE -l scripts/tasks.lua quickwins --min-value=3 --max-effor
 `setup({ quick_wins = { min_value = 3, max_effort = "M" } })`: every place that names quick wins (`:Tasks estimate`, the
 plan header, `--quick-win`, this report) follows it.
 
+### Headless: `claim` and `unclaim` (reserve a task while you work on it)
+
+```
+nvim --headless -u NONE -l scripts/tasks.lua claim lib.nvim/the-task --by=cdx-chat-3 --for=2h
+nvim --headless -u NONE -l scripts/tasks.lua unclaim lib.nvim/the-task --by=cdx-chat-3
+nvim --headless -u NONE -l scripts/tasks.lua next --by=cdx-chat-3
+```
+
+`claim` reserves the task (and sets it `doing`); another name is refused with the owner's name, the same name renews, an expired
+claim is taken over. `--force --note=<why>` passes a claim of somebody else. `set`, `done`, `attach` and `folderize` take
+`--by`, `--force` and `--note`; `next` takes `--by` and leaves out what others work on. `show` prints `claim: <by> since ... until ...`.
+`unclaim` is the verb for giving back (`release <key>` belongs to the parked tasks). Details: [ENGINE.md](ENGINE.md#claims).
+
 ### `:Tasks done <id> [done_in=...] [commits=repo@sha,...] [date=YYYY-MM-DD] [--yes]`
 
 `commits` is the list of every commit made for the task, `repo@sha` each (7-40 hex digits),

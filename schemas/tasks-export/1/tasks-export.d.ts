@@ -495,6 +495,10 @@ export type Next = Head & {
     vault: number;
   };
   /**
+   * Ready tasks left out because somebody else has claimed them (capability `claims`); absent when none.
+   */
+  claimed?: number;
+  /**
    * Present when there is no task to start: which kind of nothing it is. `all_done` is only said when nothing is open at all.
    */
   empty?: {
@@ -817,6 +821,15 @@ export interface TaskEntry {
    */
   start?: string;
   /**
+   * Somebody works on the task (optional; capability `claims`): who, since when, until when (UTC). `expired` is the engine's judgement when the document was made; a reader that keeps it compares `until` with its own clock. An expired claim counts as free.
+   */
+  claim?: {
+    by: string;
+    since: string;
+    until: string;
+    expired: boolean;
+  };
+  /**
    * A routine (optional): every N days, weeks, months or years (`8w`). Finishing the task starts the next round. Capability `repeat`.
    */
   repeat?: string;
@@ -1092,7 +1105,9 @@ export interface ResultEntry {
     | "set_body"
     | "view_save"
     | "view_delete"
-    | "attach";
+    | "attach"
+    | "claim"
+    | "release";
   id?: string;
   ok: boolean;
   /**

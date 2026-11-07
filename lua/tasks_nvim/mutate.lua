@@ -25,6 +25,7 @@
 local checkpoint = require("lib.nvim.checkpoint")
 local fm = require("lib.nvim.markdown.frontmatter")
 
+local claims = require("tasks_nvim.claims")
 local fsio = require("tasks_nvim.fsio")
 local index = require("tasks_nvim.index")
 local model = require("tasks_nvim.model")
@@ -1449,6 +1450,14 @@ end
 ---@return string|nil err
 ---@return table|nil info  # `{ code = "conflict", id, key?, expected, actual }`
 local function precondition(task, text, opts)
+  -- a task somebody else has claimed is not changed (`claims.guard`; the override says why in the notes below)
+  local root = vault.root(opts)
+  if root then
+    local free, gerr, ginfo = claims.guard(root, task.id, opts)
+    if not free then
+      return gerr, ginfo
+    end
+  end
   if opts.if_match ~= nil then
     local etag = fsio.etag(text)
     if etag ~= opts.if_match then
@@ -2323,6 +2332,11 @@ local function plan_done(id, opts)
     return nil, find_err or ("no such open task: " .. id)
   end
 
+  local free, gerr, ginfo = claims.guard(root, id, opts)
+  if not free then
+    return nil, gerr, ginfo
+  end
+
   local kind = task.kind or "task"
   local bucket = vault.BUCKET_OF_KIND[kind]
   if not bucket then
@@ -2709,6 +2723,8 @@ function M.done(id, opts)
     return rollback_done(plan, cp, progress, err)
   end
   checkpoint.discard(cp)
+  -- a finished task has no claim (the file is in the Backlog now)
+  claims.remove(plan.root, id)
 
   return {
     id = id,
@@ -2882,6 +2898,10 @@ function M.folderize(id, opts)
   if task.folder then
     return { id = task.id, path = task.path, changed = false }, nil
   end
+  local free, gerr, ginfo = claims.guard(root, task.id, opts)
+  if not free then
+    return nil, gerr, ginfo
+  end
   local dest, err = to_folder(root, task)
   if not dest then
     return nil, err
@@ -2958,6 +2978,10 @@ function M.attach(id, src, opts)
   local task, ferr = scan.find(id, { root = root })
   if not task then
     return nil, ferr
+  end
+  local free, gerr, ginfo = claims.guard(root, task.id, opts)
+  if not free then
+    return nil, gerr, ginfo
   end
 
   local path, folderized = task.path, false

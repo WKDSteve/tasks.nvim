@@ -210,6 +210,17 @@ local function run_show(ctx)
   field("title", t.title)
   field("status", t.status)
   field("waits_for", t.waits_for)
+  if t.claim then
+    field(
+      "claim",
+      ("%s since %s until %s%s"):format(
+        t.claim.by,
+        t.claim.since,
+        t.claim["until"],
+        t.claim.expired and " (expired)" or ""
+      )
+    )
+  end
   field("kind", t.kind)
   field("prio", t.prio)
   field("effort", t.effort)

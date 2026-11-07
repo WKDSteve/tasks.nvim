@@ -505,6 +505,83 @@ local function marker_findings(findings, root)
   end
 end
 
+---A `doing` task nobody has claimed for this long (days since `updated`) is told: a forgotten `doing` looks like work
+---of a moment ago.
+M.DOING_UNCLAIMED_DAYS = 2
+
+---The claims (`tasks_nvim.claims`): one that ran out (`claim-expired`), one for a task that is not open any more
+---(`claim-orphan`: the file lives outside the vault's data, so nothing else would notice) and a `doing` task that
+---nobody claimed for days (`doing-unclaimed`). All warnings.
+---@param findings Tasks.Finding[]
+---@param root string
+---@param open_ids table<string, Tasks.Task>
+---@param names string[]  # the areas checked
+---@param today string
+local function claim_findings(findings, root, open_ids, names, today)
+  local claims = require("tasks_nvim.claims")
+  local checked = {}
+  for _, n in ipairs(names) do
+    checked[n] = true
+  end
+  local now = claims.now()
+  local all = claims.list(root)
+  for id, claim in pairs(all) do
+    local area = vault.parse_id(id)
+    if area and checked[area] then
+      local path = ("%s/%s/%s.json"):format(root .. "/" .. claims.DIR, area, id:match("/(.+)$"))
+      if not open_ids[id] then
+        add(
+          findings,
+          "warn",
+          "claim-orphan",
+          { area = area, path = path, id = id },
+          ("claim of %s for a task that is not open (a finished or moved task keeps no claim): delete %s"):format(
+            claim.by,
+            claims.DIR .. "/" .. area
+          )
+        )
+      elseif claim.until_ <= now then
+        add(
+          findings,
+          "warn",
+          "claim-expired",
+          open_ids[id],
+          ("the claim of %s ran out at %s: it counts as free, `claim` takes it over, `release` clears it"):format(
+            claim.by,
+            claim.until_
+          )
+        )
+      end
+    end
+  end
+  local function days_between(from, to)
+    local function at(d)
+      local y, m, dd = d:match("^(%d%d%d%d)-(%d%d)-(%d%d)$")
+      return os.time({ year = tonumber(y), month = tonumber(m), day = tonumber(dd), hour = 12 })
+    end
+    return math.floor((at(to) - at(from)) / 86400 + 0.5)
+  end
+  for id, t in pairs(open_ids) do
+    if
+      checked[t.area]
+      and t.status == "doing"
+      and not all[id]
+      and model.is_date(t.updated)
+      and days_between(t.updated, today) >= M.DOING_UNCLAIMED_DAYS
+    then
+      add(
+        findings,
+        "warn",
+        "doing-unclaimed",
+        t,
+        ("status is doing since %s and nobody claimed it: `claim` it, or set the status back"):format(
+          t.updated
+        )
+      )
+    end
+  end
+end
+
 ---Run the checks.
 ---@param opts? Tasks.CheckOpts
 ---@return Tasks.CheckResult|nil result
@@ -744,6 +821,7 @@ function M.run(opts)
     area_group_findings(findings, root)
     marker_findings(findings, root)
   end
+  claim_findings(findings, root, open_ids, names, opts.today or model.today())
 
   table.sort(findings, finding_less)
   local errors, warnings = 0, 0

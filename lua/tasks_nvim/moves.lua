@@ -235,6 +235,10 @@ function M.move(id, to_area, opts)
   if fsio.is_link(task.path) then
     return nil, id .. " is a symbolic link: it is not moved", { code = "forbidden" }
   end
+  local free, gerr, ginfo = require("tasks_nvim.claims").guard(root, id, opts)
+  if not free then
+    return nil, gerr, ginfo
+  end
   local old_text, rerr = fsio.read(task.path)
   if not old_text then
     return nil, "cannot read " .. task.path .. ": " .. tostring(rerr), { code = "io" }
@@ -345,8 +349,11 @@ function M.move(id, to_area, opts)
     for _, other_id in ipairs(order) do
       local entry = patches[other_id]
       if next(entry.patch) ~= nil then
-        local r, serr, sinfo =
-          mutate.set(other_id, entry.patch, { root = root, today = today, index = false })
+        local r, serr, sinfo = mutate.set(
+          other_id,
+          entry.patch,
+          { root = root, today = today, index = false, claims_guard = false }
+        )
         if not r then
           return nil, "cannot rewrite " .. other_id .. ": " .. tostring(serr), sinfo
         end
