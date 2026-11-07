@@ -268,6 +268,8 @@ that were missed). `new --repeat=8w [--repeat-from=due]`, `set <id> repeat=2w` (
 - `--last` (`done_flow` option `last`) ends a routine: no next round. A failure to write the next round never undoes the
   finish: a note says so (`the next round of ... was not started`), and the routine continues with `new`.
 
+The next round of a folder task is a plain task file: its assets stay with the finished round.
+
 `check`: `bad-repeat` (error, also a `repeat_from` that is neither word), `repeat-without-due` (warning: the first round has
 no deadline) and `repeat-from-without-repeat` (warning). Not built: a round that is not "ready" before its due day (the
 reminder is what brings it back), deleting with a warning, a history of the rounds beyond the Backlog files.
