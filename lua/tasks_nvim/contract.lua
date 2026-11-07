@@ -115,7 +115,7 @@ M.ERROR_PATTERNS = {
   -- vocabulary has no word of its own for it
   { code = "conflict", find = { " is claimed by " } },
   -- an intent `wkd-intent/1` the engine refused (`tasks_nvim.intent`): nothing was written, the message names every problem
-  { code = "invalid_argument", find = { "intent refused: ", "find: " } },
+  { code = "invalid_argument", find = { "intent refused: " } },
   { code = "not_found", find = { "vault not found", "unknown area" } },
   {
     code = "invalid_argument",
