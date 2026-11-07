@@ -10,6 +10,13 @@
 ---     marker_docs = {...} } })` are refreshed -- only those files, nothing is scanned;
 ---  d. the tasks the finish freed, and e. the next task to start (`next_pick`).
 ---
+--- Before the chain, a routine (`repeat: 8w`) starts its next round: a new open task, the same fields and body (steps
+--- and acceptance boxes ticked off again), `due` and `remind` set to the next date, and the slug `<base>-<due>`
+--- (`sweep` becomes `sweep-2027-01-05`: an open task and a finished one may not share an id, `check` says
+--- `duplicate-id`, so each round has an id of its own)
+--- (`model.next_round_due`); `opts.last` finishes a routine without one. It is written after the finish and reported in
+--- `next_round`; if it cannot be written the finish stands and a note says so (a routine must not be lost silently).
+---
 --- Rules the chain keeps (so they can be relied on now):
 ---  - the truth changes first: `mutate.done` runs, and only a successful, non-`already` finish starts the chain;
 ---  - a failure AFTER the finish never undoes it: it goes to `notes` (the task is done, one follow-up step did not
@@ -18,7 +25,11 @@
 ---
 --- Not its job: the finish itself (`mutate.done`), batches (`batch.done_many` calls `run` per task), messages.
 
+local fm = require("lib.nvim.markdown.frontmatter")
+
 local fsio = require("tasks_nvim.fsio")
+local index = require("tasks_nvim.index")
+local model = require("tasks_nvim.model")
 local mutate = require("tasks_nvim.mutate")
 local next_pick = require("tasks_nvim.next_pick")
 local plan_scope = require("tasks_nvim.plan_scope")
@@ -32,6 +43,7 @@ local M = {}
 ---@field chain? boolean       # Run the follow-up steps (default true).
 ---@field pick_next? boolean   # Name the freed tasks and pick the next one (default true; a batch picks once at its end).
 ---@field refresh_docs? boolean  # Refresh the generated blocks of the configured documents (default true; a batch does it once).
+---@field last? boolean        # Finish a routine (`repeat`) for good: no next round.
 ---@field defer_plan_close? boolean  # Leave step b to the caller (`close_plans`): a batch checks each plan once, not per task.
 
 ---What a finish did. `done` is what `mutate.done` returned (`done.already` for a task that was finished before).
@@ -42,6 +54,7 @@ local M = {}
 ---@field freed string[]             # Ids of tasks whose last open blocker this was (set with `next`).
 ---@field plans_closed string[]      # Ids of plan files closed because their last member is done.
 ---@field docs_refreshed string[]    # Generated plan blocks that were refreshed.
+---@field next_round? { id: string, due: string, path: string }  # The next round of a routine that was started.
 ---@field notes string[]             # Follow-up steps that did not work; the finish itself stands.
 ---@field next? Tasks.NextPick       # What to start next (`next_pick`); absent when not asked for or not computable.
 
@@ -201,9 +214,99 @@ function M.close_plans(plan_ids, opts)
   return out
 end
 
+---Reset the ticked boxes (`- [x]`) of a task text to open ones, in the body only (below the frontmatter).
+---@param text string
+---@return string
+local function reopen_boxes(text)
+  local lines = vim.split(text, "\n", { plain = true })
+  local fences = 0
+  for i, line in ipairs(lines) do
+    if fences >= 2 then
+      lines[i] = line:gsub("^(%s*[-*+]%s+)%[[xX]%]", "%1[ ]")
+    elseif line:match("^%-%-%-%s*$") then
+      fences = fences + 1
+    end
+  end
+  return table.concat(lines, "\n")
+end
+
+---The routine a task is, read before it is finished: the open task and the text of its file. `nil` when it is none.
+---@param id string
+---@param opts table
+---@return { task: Tasks.Task, text: string }|nil
+local function read_routine(id, opts)
+  local root = vault.root(opts)
+  if not root then
+    return nil
+  end
+  local task = mutate.find_open(id, root)
+  if not task or not model.is_repeat(task.repeat_every) then
+    return nil
+  end
+  local text = fsio.read(task.path)
+  if not text then
+    return nil
+  end
+  return { task = task, text = text }
+end
+
+---Start the next round of a routine whose finish just succeeded.
+---@param routine { task: Tasks.Task, text: string }
+---@param opts table
+---@return { id: string, due: string, path: string }|nil round
+---@return string|nil err
+local function start_next_round(routine, opts)
+  local task = routine.task
+  local root, rerr = vault.root(opts)
+  if not root then
+    return nil, rerr
+  end
+  local today = opts.today or model.today()
+  local done_date = opts.date or today
+  local due = model.next_round_due(task, done_date, today)
+  if not due then
+    return nil, "the next due date cannot be worked out from repeat " .. tostring(task.repeat_every)
+  end
+  -- what belongs to the finished round goes; what describes the routine stays (title, tags, fields, body)
+  local text, uerr = fm.update_text(routine.text, {
+    { "status", "open" },
+    { "waits_for", mutate.REMOVE },
+    { "commits", mutate.REMOVE },
+    { "done_in", mutate.REMOVE },
+    { "blocked_by", mutate.REMOVE },
+    { "start", mutate.REMOVE },
+    { "remind", due },
+    { "due", due },
+    { "created", today },
+    { "updated", today },
+  })
+  if not text then
+    return nil, tostring(uerr)
+  end
+  text = reopen_boxes(text)
+  -- the base of the slug: without the date a round before this one carries; room is left for the date
+  local base = task.slug:gsub("%-%d%d%d%d%-%d%d%-%d%d$", "")
+  base = base:sub(1, mutate.MAX_SLUG - #due - 1):gsub("%-+$", "")
+  local slug = base .. "-" .. due
+  local path = vault.tasks_dir(root, task.area) .. "/" .. slug .. ".md"
+  local ok, werr = fsio.create_exclusive(path, text)
+  if not ok then
+    return nil, ("cannot write %s: %s"):format(path, tostring(werr))
+  end
+  if opts.index ~= false then
+    local res, ierr = index.write_area(task.area, { root = root })
+    if not res then
+      return nil,
+        "the next round is written, the index could not be regenerated: " .. tostring(ierr)
+    end
+  end
+  return { id = task.area .. "/" .. slug, due = due, path = path }, nil
+end
+
 ---@class Tasks.DoneFlowPreview : Tasks.DonePreview
 ---@field closes_plan? string   # The plan file this finish closes: the task is its last open member.
 ---@field freed string[]        # Open tasks that wait on nothing but this one.
+---@field next_round? { due: string }  # The due date of the next round, when the task is a routine.
 
 ---What finishing `id` would do, chain included, with nothing written: `mutate.done_preview` plus the plan it would
 ---close and the tasks it would free. The `confirm` token in the answer is what `run` is confirmed with.
@@ -222,6 +325,14 @@ function M.preview(id, opts)
   pv.freed = {}
   if pv.already then
     return pv, nil
+  end
+  if not opts.last then
+    local routine = read_routine(id, opts)
+    if routine then
+      local today = opts.today or model.today()
+      local due = model.next_round_due(routine.task, opts.date or today, today)
+      pv.next_round = due and { due = due } or nil
+    end
   end
   -- the chain: judged on one pass over the vault, as `plan` and `next` judge it
   local all, scan_errors = scan.all({ root = opts.root })
@@ -265,6 +376,7 @@ end
 ---@return table|nil info   # `{ code = "conflict", ... }` when `opts.if_match` is not the version of the file.
 function M.run(id, opts)
   opts = opts or {}
+  local routine = not opts.last and not opts.drafts and read_routine(id, opts) or nil
   -- Step a is part of the finish itself: the ticked text is what `mutate.done` writes as the finished copy.
   local done, err, info =
     mutate.done(id, vim.tbl_extend("force", opts, { tick_steps = opts.chain ~= false }))
@@ -282,7 +394,22 @@ function M.run(id, opts)
     notes = {},
   }
   flow.steps_ticked = done.steps_ticked or 0
-  if done.already or opts.chain == false then
+  if done.already then
+    return flow, nil
+  end
+  -- the routine first: the plan below must see the open next round, or it would close a plan that goes on
+  if routine then
+    local ran, round, rerr = pcall(start_next_round, routine, opts)
+    if ran and round then
+      flow.next_round = round
+    else
+      flow.notes[#flow.notes + 1] = ("the next round of %s was not started: %s"):format(
+        id,
+        tostring(ran and rerr or round)
+      )
+    end
+  end
+  if opts.chain == false then
     return flow, nil
   end
   -- Each follow-up step runs in its own pcall so that one cannot cost the others; a failure is a note.

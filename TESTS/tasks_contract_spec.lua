@@ -78,6 +78,7 @@ return function(H)
     "reminders",
     "reopen",
     "reorder",
+    "repeat",
     "set_body",
     "tick_step",
     "vault_marker",

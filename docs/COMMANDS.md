@@ -290,7 +290,7 @@ opens with the same title and ref filled in.
 
 Changes frontmatter of an *open* task and sets `updated` -- but only when something really
 changed (an identical value rewrites nothing). Settable: `title status waits_for kind prio effort tags
-category scope severity value actor summary blocked_by after order plan phase refs rules done_in commits created remind due start`. A value may contain spaces
+category scope severity value actor summary blocked_by after order plan phase refs rules done_in commits created remind due start repeat repeat_from`. A value may contain spaces
 (`title=Fix the thing status=doing`: a word that does not start with a known `key=`
 continues the value before it); an empty value removes the key (`kind=`). `status=done` is
 refused: finishing moves the file, see `task done`. A *finished* task takes `remind=` only (a date, or `+7d` / `+2w` from today;
@@ -589,6 +589,11 @@ so a finished task can be traced back to its code afterwards. `commits=` adds to
 `commits` (a commit named twice is listed once); `:Tasks set <id> commits=[...]` replaces the
 list at any time, and `tasks check` reports a malformed entry (`bad-commit`). `done_in` stays
 free text.
+
+**A routine** (`repeat: 8w`, see [ENGINE.md](ENGINE.md#routines-repeat)) starts its next round when it is finished: the
+finished round goes to `Backlog/` as always, and a new open task with the slug `<base>-<due>` takes its place. The CLI
+prints `next-round<TAB><id><TAB><due>`, the editor says "next round of ...". `tasks done <id> --last` (headless) finishes a
+routine for good: no next round (or take `repeat` away with `set <id> repeat=` first).
 
 Rule R6, after a confirmation (`--yes` skips it): `status: done`, `done_in`, `commits`; the file moves
 to `Backlog/FEATURES/` (`feature`, `idea`, `research`) or `Backlog/TASKS/` (`task`, `bug`, no

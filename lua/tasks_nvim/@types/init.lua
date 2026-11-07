@@ -33,6 +33,8 @@
 ---@field created? string             # `YYYY-MM-DD`
 ---@field updated? string             # `YYYY-MM-DD`
 ---@field due? string                 # `YYYY-MM-DD`, optional: when the task is due (not the reminder, see `remind`).
+---@field repeat_every? string         # `<n>d|w|m|y`, optional (frontmatter key `repeat`): a routine, `done` starts the next round.
+---@field repeat_from? string          # `done` (default) or `due`: where the next round counts from.
 ---@field start? string               # `YYYY-MM-DD`, optional: the earliest day to begin; `check` refuses a start after the due date.
 ---@field blocked_by string[]         # Task ids (hard edges: the task cannot begin before they are finished). A wikilink is its id; a bare `[[slug]]` that names no single id stays as written (see `link_problems`).
 ---@field after string[]              # Task ids (soft edges: "should come after", never an error), read like `blocked_by`.

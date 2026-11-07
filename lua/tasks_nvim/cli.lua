@@ -114,7 +114,7 @@ commands:
   migrate-actor [<area>] [--write]        propose actor=me for tasks that wait for you (status decision, tag
                                           needs-user) and leave every other task EMPTY; dry run unless --write
   new <area>[,<area>...] <title> [--kind=k] [--prio=1..3] [--effort=XS..XL|0.5d] [--value=1..5] [--actor=cdx|me|pair] [--after=id,id] [--order=2.5] [--plan=id] [--phase=word] [--tags=a,b]
-       [--category=c,d] [--scope=a,b] [--severity=low|medium|high|critical] [--due=YYYY-MM-DD] [--start=YYYY-MM-DD] [--refs=path,repo@sha] [--links=https://...,...]
+       [--category=c,d] [--scope=a,b] [--severity=low|medium|high|critical] [--due=YYYY-MM-DD] [--start=YYYY-MM-DD] [--repeat=8w] [--repeat-from=done|due] [--refs=path,repo@sha] [--links=https://...,...]
        [--summary=text] [--slug=slug] [--status=s] [--waits-for=key]
        [--lang=de|en] [--folder]             create a task file (--lang: body headings;
                                                --folder: a folder task that can hold assets;
@@ -130,9 +130,10 @@ commands:
   answer <area>/<slug> <q1|#n> <n|clear>  answer a question of the `## Offene Fragen` section: tick option n (1-based),
                                           or take the answer back (clear)
   done <area>/<slug> [--commits=repo@sha,repo@sha] [--done-in=text] [--date=YYYY-MM-DD] [--remind=7d|YYYY-MM-DD]
-                                          [--no-next] [--unblock]  (--commits adds to the task's own `commits`)
+                                          [--no-next] [--unblock] [--last]  (--commits adds to the task's own `commits`)
                                           finish: move to Backlog/; prints the tasks it freed and what to start
-                                          next; --unblock sets the freed tasks that still say blocked to open
+                                          next; --unblock sets the freed tasks that still say blocked to open;
+                                          a routine (`repeat: 8w`) starts its next round (--last: it ends for good)
   attach <area>/<slug> <file> [--name=n]  copy a file to <slug>/assets/ (a plain task becomes a
                                           folder task) and print the Markdown link
   attach <area>/<slug> --clipboard [--name=n]
@@ -336,6 +337,8 @@ local SPECS = {
       "links",
       "due",
       "start",
+      "repeat",
+      "repeat-from",
       "lang",
       "summary",
       "slug",
@@ -352,7 +355,7 @@ local SPECS = {
   ["migrate-actor"] = { value = {}, flag = { "write", "no-index" } },
   done = {
     value = { "done-in", "commits", "date", "remind" },
-    flag = { "no-index", "no-next", "unblock" },
+    flag = { "no-index", "no-next", "unblock", "last" },
   },
   -- `latest` is both: `--latest` (the configured screenshot folders) and `--latest=<folder>`.
   attach = { value = { "name", "latest" }, flag = { "no-index", "clipboard", "latest" } },
@@ -1287,6 +1290,8 @@ function commands.new(ctx)
     web_links = opt.links --[[@as string|nil]],
     due = opt.due --[[@as string|nil]],
     start = opt.start --[[@as string|nil]],
+    repeat_every = opt["repeat"] --[[@as string|nil]],
+    repeat_from = opt["repeat-from"] --[[@as string|nil]],
     lang = opt.lang --[[@as "de"|"en"|nil]],
     summary = opt.summary --[[@as string|nil]],
     slug = opt.slug --[[@as string|nil]],
@@ -1542,6 +1547,7 @@ function commands.done(ctx)
       or nil,
     date = args.opt.date --[[@as string|nil]],
     index = not args.opt["no-index"],
+    last = args.opt.last == true,
   })
   if not flow then
     ctx.warn("error: " .. tostring(err))
@@ -1558,6 +1564,9 @@ function commands.done(ctx)
   end
   if flow.steps_ticked > 0 then
     ctx.say(("steps\t%s\t%d"):format(res.id, flow.steps_ticked))
+  end
+  if flow.next_round then
+    ctx.say(("next-round\t%s\t%s"):format(flow.next_round.id, flow.next_round.due))
   end
   for _, plan_id in ipairs(flow.plans_closed) do
     ctx.say(

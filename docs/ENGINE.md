@@ -247,6 +247,31 @@ does not change -- and ``(wartet auf `mac`)`` in the summary cell of `ROADMAP/TA
 `waits_for` is byte for byte what it was** (no new column, nothing reordered): introducing the field makes no index
 stale. The template (`tasks template`) and the `:Tasks new` form do not carry the key.
 
+### Routines (`repeat`)
+
+`repeat: 8w` on a task makes it a routine: a whole number of 1 to 999 and `d` (days), `w` (weeks), `m` (months) or `y`
+(years). `repeat_from: done|due` says where the next round counts from (`done`, the default: the day the round was
+finished, so a late round does not pile up; `due`: the due date of the finished round, a fixed rhythm that skips rounds
+that were missed). `new --repeat=8w [--repeat-from=due]`, `set <id> repeat=2w` (empty removes it and ends the routine).
+
+`done` (the `done_flow`, so the editor, the dashboard's `D`, a batch and the CLI alike) writes the finished round to
+`Backlog/` as always and then starts the next one:
+
+- a new open task with the same title, fields and body; `status` is `open`, `created` and `updated` are today, `due` and
+  `remind` are the next date (the reminder machinery shows it on its day: the start line and `next`), and `commits`,
+  `done_in`, `waits_for`, `blocked_by` and `start` are gone (they belong to the finished round);
+- every ticked box in the body (`- [x]`, also the steps of `## Plan`) is open again; the finished round keeps its ticks;
+- the slug is `<base>-<due>` (`sweep` becomes `sweep-2027-01-05`, the round after it `sweep-2027-03-02`): an open task and
+  a finished one may not share an id (`duplicate-id`), so every round has its own. Anything that names the routine by id
+  (`blocked_by`, a typed id) names a finished round afterwards; `plan:` is carried over, so the plan stays open;
+- `done_preview` names it (`next_round.due`), `done` reports it (`next_round`), the CLI prints `next-round`;
+- `--last` (`done_flow` option `last`) ends a routine: no next round. A failure to write the next round never undoes the
+  finish: a note says so (`the next round of ... was not started`), and the routine continues with `new`.
+
+`check`: `bad-repeat` (error, also a `repeat_from` that is neither word), `repeat-without-due` (warning: the first round has
+no deadline) and `repeat-from-without-repeat` (warning). Not built: a round that is not "ready" before its due day (the
+reminder is what brings it back), deleting with a warning, a history of the rounds beyond the Backlog files.
+
 ### Folder tasks
 
 A task is a file `tasks/<slug>.md` **or** a folder `tasks/<slug>/<slug>.md` (same name) that
@@ -359,6 +384,7 @@ file that is there (also not a refused one). Nobody else writes it: a person edi
 | `duplicate-id` | an open and a finished task share an id |
 | `frontmatter-warning` (warning) | a frontmatter line was kept but not understood |
 | `area-groups-invalid` (error) | `<vault>/area-groups.json` cannot be read or parsed, or one of its groups (or one of `setup({ area_groups })`) is malformed; whole-vault runs only, area `""` |
+| `bad-repeat` (error), `repeat-without-due`, `repeat-from-without-repeat` (warnings) | `repeat` is no interval (or `repeat_from` is neither `done` nor `due`); a routine with no `due` date; `repeat_from` on a task that is no routine. See [Routines](#routines-repeat) |
 | `vault-marker-missing`, `vault-marker-outdated` (warnings) | the vault has no `tasks-vault.json`, or it names an older layout version than this engine writes; vault-wide, so the finding has `area: ""` and `file: tasks-vault.json` and a check of one area leaves it out |
 | `area-groups-config` (warning) | a group of `setup({ area_groups })` is malformed (the file is fine; a `setup()` group that replaces one of the file by name is no finding) |
 | `area-group-shadowed`, `area-group-empty`, `area-group-unknown-member`, `area-group-nested` (warnings) | an area group has the name of an area (the area wins), matches no area, names an exact area that does not exist, or names another group (groups do not nest); whole-vault runs only |

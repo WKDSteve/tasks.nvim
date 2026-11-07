@@ -1596,6 +1596,8 @@ function M.task_new(ctx)
       phase = values.phase,
       due = ctx.kv.due,
       start = ctx.kv.start,
+      repeat_every = ctx.kv["repeat"],
+      repeat_from = ctx.kv.repeat_from,
       status = values.status,
       waits_for = values.waits_for,
       web_links = values.links,
@@ -2146,6 +2148,9 @@ local function finish_task(id, opts)
     return
   end
   M.retarget_buffers(res.from, res.to)
+  if flow.next_round then
+    notify.info(("next round of %s: due %s"):format(flow.next_round.id, flow.next_round.due))
+  end
   if res.index_err then
     notify.warn("task finished, but the index was not updated: " .. res.index_err)
   end

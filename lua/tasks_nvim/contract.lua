@@ -84,6 +84,7 @@ M.CAPABILITIES = {
   "reminders",
   "reopen",
   "reorder",
+  "repeat",
   "set_body",
   "snapshot",
   "task",
@@ -260,6 +261,9 @@ local function task_entry(root, task, node, rank)
     remind = model.is_date(task.remind) and task.remind or nil,
     due = model.is_date(task.due) and task.due or nil,
     start = model.is_date(task.start) and task.start or nil,
+    -- a routine: the interval and where the next round counts from (only well-formed values)
+    ["repeat"] = model.is_repeat(task.repeat_every) and task.repeat_every or nil,
+    repeat_from = model.is_repeat_from(task.repeat_from) and task.repeat_from or nil,
     plan = task.plan,
     phase = task.phase,
     done_in = task.done_in,
@@ -2149,6 +2153,7 @@ function M.done_preview(id, opts)
   doc.readme = json.object({ state = pv.readme, row = pv.readme_row })
   doc.plan = pv.plan_id
   doc.closes_plan = pv.closes_plan
+  doc.next_round = pv.next_round and json.object({ due = pv.next_round.due }) or nil
   doc.freed = vim.list_slice(pv.freed, 1)
   doc.etag = pv.etag
   doc.confirm = pv.confirm

@@ -463,6 +463,105 @@ function M.waits_for_error(value)
   )
 end
 
+---The units of a `repeat` interval: days, weeks, months, years.
+M.REPEAT_UNITS = { d = "day", w = "week", m = "month", y = "year" }
+
+---The largest number of an interval (`999d`, `120m`).
+M.REPEAT_MAX = 999
+
+---The words of `repeat_from`: where the next round counts from.
+---`done` = the day the round was finished (robust when late), `due` = the due date of the finished round (a fixed rhythm).
+---@type string[]
+M.REPEAT_FROMS = { "done", "due" }
+
+---Split a `repeat` value (`8w`) into its number and unit.
+---@param s any
+---@return integer|nil n
+---@return string|nil unit  one of `d w m y`
+function M.parse_repeat(s)
+  if type(s) ~= "string" then
+    return nil, nil
+  end
+  local digits, unit = s:match("^(%d+)([dwmy])$")
+  local n = digits and tonumber(digits)
+  if not n or n < 1 or n > M.REPEAT_MAX or digits:sub(1, 1) == "0" then
+    return nil, nil
+  end
+  return n, unit
+end
+
+---@param s any
+---@return boolean
+function M.is_repeat(s)
+  return M.parse_repeat(s) ~= nil
+end
+
+---The message for a `repeat` value that is no interval.
+---@param value any
+---@return string
+function M.repeat_error(value)
+  return ("repeat '%s' is no interval (a whole number of 1 to %d and d, w, m or y: 8w = every eight weeks)"):format(
+    tostring(value),
+    M.REPEAT_MAX
+  )
+end
+
+---@param value any
+---@return boolean
+function M.is_repeat_from(value)
+  return value == "done" or value == "due"
+end
+
+---`date` plus an interval. Days and weeks are calendar days; months and years keep the day of the month and stop
+---at the end of a shorter month (31 January + 1m is 28 or 29 February).
+---@param date string  YYYY-MM-DD
+---@param n integer
+---@param unit string  `d w m y`
+---@return string|nil next
+function M.add_interval(date, n, unit)
+  local ys, ms, ds = tostring(date):match("^(%d%d%d%d)-(%d%d)-(%d%d)$")
+  if not ys or not M.is_date(date) or not M.REPEAT_UNITS[unit] then
+    return nil
+  end
+  local y, m, d = tonumber(ys), tonumber(ms), tonumber(ds)
+  if unit == "d" or unit == "w" then
+    -- noon: a change of the clock never moves the day
+    local t = os.time({ year = y, month = m, day = d + n * (unit == "w" and 7 or 1), hour = 12 })
+    return os.date("%Y-%m-%d", t) --[[@as string]]
+  end
+  local months = (y * 12 + (m - 1)) + n * (unit == "y" and 12 or 1)
+  local ny, nm = math.floor(months / 12), months % 12 + 1
+  -- the day after the last of the month, minus one: the length of month `nm`
+  local last = tonumber(os.date("%d", os.time({ year = ny, month = nm + 1, day = 0, hour = 12 })))
+  return ("%04d-%02d-%02d"):format(ny, nm, math.min(d, last))
+end
+
+---The due date of the round after a finished one.
+---With `repeat_from` `done` (the default) it counts from `done_date`; with `due` from the finished round's due date and
+---goes on by whole intervals until the date is after `today` (a rhythm that fell behind skips the missed rounds). A
+---round with no due date counts from `done_date` either way.
+---@param task { due?: string, repeat_every?: string, repeat_from?: string }
+---@param done_date string
+---@param today string
+---@return string|nil due
+function M.next_round_due(task, done_date, today)
+  local n, unit = M.parse_repeat(task.repeat_every)
+  if not n then
+    return nil
+  end
+  if task.repeat_from == "due" and M.is_date(task.due) then
+    local due = task.due
+    for _ = 1, 100000 do
+      due = M.add_interval(due, n, unit)
+      if not due or due > today then
+        return due
+      end
+    end
+    return nil
+  end
+  return M.add_interval(done_date, n, unit)
+end
+
 ---The most days an effort may name (ten years). A larger number is no effort: a sum of such numbers could not be
 ---written down (2^53 and more, or beyond a double), and one task file would take every document of the vault with it.
 M.MAX_EFFORT_DAYS = 3650
@@ -1047,6 +1146,34 @@ function M.parse_text(text, ctx)
     end
     if M.is_date(task.start) and M.is_date(task.due) and task.start > task.due then
       bad("start-after-due", ("start %s is after due %s"):format(task.start, task.due))
+    end
+
+    -- a routine: `repeat: 8w` makes `done` start the next round; `repeat_from` says where it counts from
+    local every = as_text(meta["repeat"], "repeat", bad)
+    if every then
+      task.repeat_every = every
+      if not M.is_repeat(every) then
+        bad("bad-repeat", M.repeat_error(every))
+      elseif not M.is_date(task.due) then
+        hints[#hints + 1] = {
+          code = "repeat-without-due",
+          msg = ("repeat '%s' on a task with no due date: the first round has no deadline (set due=YYYY-MM-DD)"):format(
+            every
+          ),
+        }
+      end
+    end
+    local from = as_text(meta.repeat_from, "repeat_from", bad)
+    if from then
+      task.repeat_from = from
+      if not M.is_repeat_from(from) then
+        bad("bad-repeat", ("repeat_from '%s' is neither done nor due"):format(from))
+      elseif not every then
+        hints[#hints + 1] = {
+          code = "repeat-from-without-repeat",
+          msg = "repeat_from without repeat does nothing",
+        }
+      end
     end
 
     -- A reference is an id or an Obsidian wikilink (`tasks_nvim.wikilinks`): `[[<area>/<slug>]]` is the id here, a

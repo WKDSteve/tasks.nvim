@@ -28,6 +28,7 @@
     "reminders",
     "reopen",
     "reorder",
+    "repeat",
     "set_body",
     "snapshot",
     "task",

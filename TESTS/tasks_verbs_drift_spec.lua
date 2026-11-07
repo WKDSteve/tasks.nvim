@@ -33,7 +33,7 @@ return function(H)
     ["attach"] = { composer = {}, cli = { "clipboard", "latest", "name", "no-index" } },
     ["done"] = {
       composer = { "yes" },
-      cli = { "commits", "date", "done-in", "no-index", "no-next", "remind", "unblock" },
+      cli = { "commits", "date", "done-in", "last", "no-index", "no-next", "remind", "unblock" },
     },
     ["estimate"] = { composer = { "list", "walk" }, cli = { "stale-refs" } },
     ["folderize"] = { composer = {}, cli = { "no-index" } },
@@ -96,6 +96,8 @@ return function(H)
         "plan",
         "prio",
         "refs",
+        "repeat",
+        "repeat-from",
         "scope",
         "severity",
         "slug",

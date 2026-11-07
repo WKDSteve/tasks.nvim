@@ -670,6 +670,12 @@ export type DonePreview = Head & {
    */
   closes_plan?: string;
   /**
+   * Present when the task is a routine (`repeat`): the due date of the round the finish starts.
+   */
+  next_round?: {
+    due: Date;
+  };
+  /**
    * Open tasks that wait on nothing but this one.
    */
   freed?: string[];
@@ -810,6 +816,14 @@ export interface TaskEntry {
    * A calendar day, YYYY-MM-DD.
    */
   start?: string;
+  /**
+   * A routine (optional): every N days, weeks, months or years (`8w`). Finishing the task starts the next round. Capability `repeat`.
+   */
+  repeat?: string;
+  /**
+   * Where the next round counts from: the day the round was finished (`done`, the default) or the due date of the finished round (`due`, a fixed rhythm).
+   */
+  repeat_from?: "done" | "due";
   plan?: string;
   phase?: string;
   done_in?: string;

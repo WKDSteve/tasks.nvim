@@ -431,6 +431,15 @@
           "$ref": "#/$defs/Date",
           "description": "The earliest day to begin (optional). Never after `due`."
         },
+        "repeat": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]{0,2}[dwmy]$",
+          "description": "A routine (optional): every N days, weeks, months or years (`8w`). Finishing the task starts the next round. Capability `repeat`."
+        },
+        "repeat_from": {
+          "enum": ["done", "due"],
+          "description": "Where the next round counts from: the day the round was finished (`done`, the default) or the due date of the finished round (`due`, a fixed rhythm)."
+        },
         "plan": {
           "type": "string"
         },
@@ -3029,6 +3038,15 @@
         "closes_plan": {
           "description": "The plan this finish closes: the task is its last open member.",
           "type": "string"
+        },
+        "next_round": {
+          "description": "Present when the task is a routine (`repeat`): the due date of the round the finish starts.",
+          "type": "object",
+          "required": ["due"],
+          "properties": {
+            "due": { "$ref": "#/$defs/Date" }
+          },
+          "additionalProperties": false
         },
         "freed": {
           "description": "Open tasks that wait on nothing but this one.",

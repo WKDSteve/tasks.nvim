@@ -14,7 +14,7 @@
 ---    cannot both win; a change of the relations (`blocked_by`, `after`, `plan`, `phase`) is judged first
 ---    (`tasks_nvim.edges`)
 ---  - `new` { area, title, fields?, body? }: create a task; `body` (text, at most 20000 characters) replaces the template
----    sections of the file; `fields` are the keys (kind, prio, effort, tags, category, severity, value, actor, due, start, summary,
+---    sections of the file; `fields` are the keys (kind, prio, effort, tags, category, severity, value, actor, due, start, repeat, repeat_from, summary,
 ---    refs, links, status, slug, after, plan, phase); `after`, `plan` and `phase` are judged as `set` judges them
 ---    (`tasks_nvim.edges`: a target that exists nowhere, a plan that is no plan file, a phase not in its `phase_order`)
 ---  - `reorder` { id, after?, before?, group?, if_match? }: move a task inside its group (`batch.reorder`)
@@ -225,6 +225,8 @@ local NEW_FIELDS = {
   phase = true,
   due = true,
   start = true,
+  ["repeat"] = true,
+  repeat_from = true,
 }
 M.NEW_FIELDS = NEW_FIELDS
 
@@ -837,6 +839,8 @@ local function do_new(op, ctx)
     link_resolver = link_resolver(ctx),
   })
   new_opts.web_links, new_opts.links = fields.links, nil
+  -- `repeat` is a word of Lua: `mutate.new` calls the field `repeat_every`
+  new_opts.repeat_every, new_opts["repeat"] = fields["repeat"], nil
   -- the relations, as `set` judges them: on the ids the values name (wikilinks resolved), before anything is written
   local relation = {}
   for _, key in ipairs(NEW_RELATIONS) do

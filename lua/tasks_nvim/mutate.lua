@@ -390,6 +390,12 @@ local function meta_pairs(meta)
   if meta.start then
     pairs_[#pairs_ + 1] = { "start", meta.start }
   end
+  if meta.repeat_every then
+    pairs_[#pairs_ + 1] = { "repeat", meta.repeat_every }
+  end
+  if meta.repeat_from then
+    pairs_[#pairs_ + 1] = { "repeat_from", meta.repeat_from }
+  end
   pairs_[#pairs_ + 1] = { "created", meta.created }
   pairs_[#pairs_ + 1] = { "updated", meta.updated }
   if meta.refs then
@@ -651,6 +657,8 @@ local SETTABLE = {
   "remind",
   "due",
   "start",
+  "repeat",
+  "repeat_from",
 }
 
 ---@type string[]
@@ -787,6 +795,13 @@ local FIELD_NORMALIZERS = {
   created = date_field,
   due = date_field,
   start = date_field,
+  ["repeat"] = function(value)
+    if not model.is_repeat(value) then
+      return nil, model.repeat_error(value)
+    end
+    return value
+  end,
+  repeat_from = one_of("repeat_from", model.is_repeat_from, model.REPEAT_FROMS),
   remind = function(value, _, ctx)
     -- a date, or days / weeks from today: the file always holds the date
     return model.resolve_remind(value, (ctx.opts and ctx.opts.today) or model.today())
@@ -1228,6 +1243,17 @@ function M.new(area, opts)
   if opts.due ~= nil and opts.start ~= nil and opts.start > opts.due then
     return nil, ("start %s is after due %s"):format(opts.start, opts.due)
   end
+  if opts.repeat_every ~= nil and not model.is_repeat(opts.repeat_every) then
+    return nil, model.repeat_error(opts.repeat_every)
+  end
+  if opts.repeat_from ~= nil then
+    if not model.is_repeat_from(opts.repeat_from) then
+      return nil, ("repeat_from '%s' is neither done nor due"):format(tostring(opts.repeat_from))
+    end
+    if opts.repeat_every == nil then
+      return nil, "repeat_from needs repeat"
+    end
+  end
   local summary
   if opts.summary ~= nil then
     local s, serr = one_line(opts.summary, "summary")
@@ -1281,6 +1307,8 @@ function M.new(area, opts)
       severity = opts.severity,
       due = opts.due,
       start = opts.start,
+      repeat_every = opts.repeat_every,
+      repeat_from = opts.repeat_from,
       refs = refs,
       links = links,
       rules = rules,

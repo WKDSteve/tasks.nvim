@@ -118,6 +118,8 @@ register your own verb from `tasks_nvim.ui.routes` instead. There is no built-in
 :Tasks done my-area/fix-the-thing done_in=my-repo@abc1234
 ```
 
+A routine, say every eight weeks, is a task with an interval: `:Tasks new my-area "Compare open cases" due=2026-12-01 repeat=8w`. Finishing a round starts the next one (`compare-open-cases-2027-01-05`, boxes open again, `due` and `remind` moved on); `tasks done <id> --last` ends it ([docs/ENGINE.md](docs/ENGINE.md#routines-repeat)).
+
 No vault yet? `nvim --headless -u NONE -l scripts/tasks.lua init-vault <dir> --apply` makes one with a first area and
 an example task; `examples/vault` is a small finished vault to try every verb on (`--vault=examples/vault`).
 

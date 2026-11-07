@@ -608,6 +608,8 @@ local FIELD_DESC = {
   links = "Web addresses (http or https), comma-separated; paths go in refs",
   due = "Deadline as YYYY-MM-DD (optional); the reminder is remind",
   start = "Earliest day to begin as YYYY-MM-DD (optional); never after due",
+  ["repeat"] = "A routine: every N d, w, m or y (8w); finishing it starts the next round",
+  repeat_from = "Where the next round counts from: done (default) or due",
   category = "Concerns the task serves; several allowed, comma list",
   scope = "What the task touches (usercmd, keymap, ui, ...); several allowed, comma list",
   severity = "How serious a bug or security task is",
@@ -651,6 +653,8 @@ local function set_kv()
     remind = "Look at the task again on this date (YYYY-MM-DD, or +7d / +2w from today)",
     due = FIELD_DESC.due,
     start = FIELD_DESC.start,
+    ["repeat"] = FIELD_DESC["repeat"],
+    repeat_from = FIELD_DESC.repeat_from,
   })
   local out = {}
   for _, key in ipairs(mutate.SETTABLE) do
@@ -772,6 +776,8 @@ local function nested_routes()
         { key = "phase", type = "STRING", desc = FIELD_DESC.phase },
         { key = "due", type = "STRING", desc = FIELD_DESC.due },
         { key = "start", type = "STRING", desc = FIELD_DESC.start },
+        { key = "repeat", type = "STRING", desc = FIELD_DESC["repeat"] },
+        { key = "repeat_from", type = "STRING", desc = FIELD_DESC.repeat_from },
         {
           key = "status",
           type = "STRING",
