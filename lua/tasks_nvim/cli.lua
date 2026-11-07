@@ -2211,6 +2211,9 @@ commands["init-vault"] = function(ctx)
     if not fsio.is_file(root .. "/README.md") then
       ctx.say("would-make\tREADME.md")
     end
+    if not fsio.lstat(root .. "/tasks-vault.json") then
+      ctx.say("would-make\ttasks-vault.json")
+    end
     local missing, berr = rules_import.bootstrap_plan(root, area)
     if not missing then
       ctx.warn("error: " .. tostring(berr))
@@ -2226,7 +2229,7 @@ commands["init-vault"] = function(ctx)
     return 0
   end
 
-  local res, cerr = vault_ops.create_vault(root, { area })
+  local res, cerr = vault_ops.create_vault(root, { area }, { lang = lang })
   if not res then
     ctx.warn("error: " .. tostring(cerr))
     return 1

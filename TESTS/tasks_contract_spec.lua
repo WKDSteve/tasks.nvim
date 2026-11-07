@@ -80,6 +80,7 @@ return function(H)
     "reorder",
     "set_body",
     "tick_step",
+    "vault_marker",
     "view_delete",
     "view_save",
     "waits_for",
@@ -100,6 +101,34 @@ return function(H)
     "a document that reads no task has no rev and no digest"
   )
   golden("hello")
+  eq(
+    hello.marker,
+    { present = true, layout_version = 1 },
+    "the fixture vault carries its marker file"
+  )
+
+  -- a refused marker file: `hello` still answers and names the problem, every other call fails with its message
+  local marker = require("tasks_nvim.vault_marker")
+  local marker_text = H.read(marker.path(root))
+  H.write(
+    marker.path(root),
+    '{"schema":1,"plugin":"tasks.nvim","kind":"tasks.vault","layout_version":2}'
+  )
+  local refused_hello = call("hello")
+  eq(refused_hello.kind, "tasks.hello", "hello answers for a vault whose marker file is refused")
+  eq(refused_hello.marker.present, true)
+  eq(refused_hello.marker.layout_version, nil)
+  ok(
+    refused_hello.marker.problem:find("layout_version 2 is newer", 1, true),
+    refused_hello.marker.problem
+  )
+  ok(not refused_hello.marker.problem:find(root, 1, true), "the problem names no path")
+  local refused_doc, _, refused_code = call("snapshot")
+  eq(refused_doc.kind, "tasks.error")
+  eq(refused_code, "invalid_argument", "the shared vocabulary has no word of its own for it")
+  ok(refused_doc.message:find("tasks-vault.json: layout_version 2", 1, true), refused_doc.message)
+  H.write(marker.path(root), marker_text)
+  eq(call("hello").marker.problem, nil, "the file is valid again")
 
   -- ── snapshot ──
   local snap, snap_text = call("snapshot")

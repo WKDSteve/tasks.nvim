@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/WKDSteve/tasks.nvim/schemas/tasks-vault/1/tasks-vault.schema.json",
+  "title": "tasks-vault/1",
+  "description": "The optional marker file `tasks-vault.json` in the root of a tasks vault: layout version, extra areas and defaults. Read by the engine; written once by `:TasksVault create`. No data classes, no paths, no code: the vault is synced. An unknown key or a newer version is refused (fail closed).",
+  "type": "object",
+  "required": ["schema", "plugin", "kind", "layout_version"],
+  "properties": {
+    "schema": { "const": 1, "description": "Version of this file format." },
+    "plugin": { "const": "tasks.nvim" },
+    "kind": { "const": "tasks.vault" },
+    "layout_version": {
+      "const": 1,
+      "description": "Version of the folder layout (migrations hang on it)."
+    },
+    "extra_areas": {
+      "type": "array",
+      "maxItems": 100,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "maxLength": 100,
+        "pattern": "^[A-Za-z0-9_][A-Za-z0-9_.-]*$"
+      },
+      "description": "Folders of the vault that are areas although they hold neither ROADMAP/ nor Backlog/."
+    },
+    "lang": {
+      "enum": ["de", "en"],
+      "description": "Language of the body of a new task when the caller names none."
+    },
+    "ci": {
+      "type": "object",
+      "properties": {
+        "strict": {
+          "type": "boolean",
+          "description": "Warnings fail the CI gate too. `trust_vault_lint` is never read from the file."
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

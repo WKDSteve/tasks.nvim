@@ -294,6 +294,52 @@ function readSnapshot(doc) {
   );
 }
 
+// ---- 5. the marker file tasks-vault.json (schemas/tasks-vault/1)
+{
+  const vaultDir = path.join(repo, "schemas/tasks-vault/1");
+  const vaultSchema = JSON.parse(
+    fs.readFileSync(path.join(vaultDir, "tasks-vault.schema.json"), "utf8"),
+  );
+  const vajv = new Ajv2020({ strict: true, allErrors: true });
+  let vvalidate;
+  try {
+    vvalidate = vajv.compile(vaultSchema);
+    report(true, "marker schema compiles in strict mode");
+  } catch (e) {
+    report(false, "marker schema compiles in strict mode", e.message);
+    process.exit(1);
+  }
+  const example = JSON.parse(
+    fs.readFileSync(path.join(vaultDir, "example.json"), "utf8"),
+  );
+  report(vvalidate(example), "marker example.json is valid");
+  const minimal = {
+    schema: 1,
+    plugin: "tasks.nvim",
+    kind: "tasks.vault",
+    layout_version: 1,
+  };
+  report(vvalidate(minimal), "the four required keys alone are valid");
+  const bad = {
+    "an unknown key": { ...minimal, colour: "red" },
+    "trust_vault_lint in the file": { ...minimal, ci: { trust_vault_lint: true } },
+    "an unknown key in ci": { ...minimal, ci: { strict: true, x: 1 } },
+    "a path as an area": { ...minimal, extra_areas: ["../x"] },
+    "an absolute path as an area": { ...minimal, extra_areas: ["/etc"] },
+    "a duplicate area": { ...minimal, extra_areas: ["ALL", "ALL"] },
+    "a newer layout_version": { ...minimal, layout_version: 2 },
+    "a newer schema": { ...minimal, schema: 2 },
+    "a foreign plugin": { ...minimal, plugin: "obsidian-git" },
+    "a foreign kind": { ...minimal, kind: "other" },
+    "an unknown lang": { ...minimal, lang: "fr" },
+    "a string for strict": { ...minimal, ci: { strict: "yes" } },
+    "no layout_version": { schema: 1, plugin: "tasks.nvim", kind: "tasks.vault" },
+  };
+  for (const [name, doc] of Object.entries(bad)) {
+    report(!vvalidate(doc), `marker schema refuses ${name}`);
+  }
+}
+
 // ---- 4. the generated TypeScript
 const types = await compile(schema, "TasksExport", {
   additionalProperties: false,

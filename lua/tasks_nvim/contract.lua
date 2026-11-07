@@ -88,6 +88,7 @@ M.CAPABILITIES = {
   "snapshot",
   "task",
   "tick_step",
+  "vault_marker",
   "view_delete",
   "view_save",
   "views",
@@ -102,6 +103,10 @@ M.LIMITS = { title = 300, summary = 1000, body_bytes = 262144, list_items = 100,
 ---`lib.nvim.contract.errors` (`{ code, find, retryable? }`). The one fragile spot, until every source gives its code.
 ---@type Lib.Contract.ErrorPattern[]
 M.ERROR_PATTERNS = {
+  -- a refused marker file (`vault_marker`): the message always starts with the file name and holds no path. The shared
+  -- vocabulary of `lib.nvim.contract.errors` has no word of its own for it, so it is `invalid_argument`; a reader that
+  -- wants the cause shows the message (it names the key or the version).
+  { code = "invalid_argument", find = { "tasks-vault.json:" } },
   { code = "not_found", find = { "vault not found", "unknown area" } },
   {
     code = "invalid_argument",
@@ -574,8 +579,18 @@ M.relative = relative
 ---@param opts? { root?: string }
 ---@return table doc
 function M.hello(opts)
-  local root = vault.root(opts)
+  -- `hello` answers for a vault whose marker file is refused too: it names the problem (`marker.problem`) instead of
+  -- leaving the reader with "no engine"
+  local root = vault.root(vim.tbl_extend("force", opts or {}, { unchecked = true }))
   local doc = M.head("tasks.hello", root)
+  if root then
+    local status = require("tasks_nvim.vault_marker").status(root)
+    doc.marker = json.object({
+      present = status.present,
+      layout_version = status.layout_version,
+      problem = status.problem and clip(redact(root, status.problem), 300) or nil,
+    })
+  end
   doc.schemas = { M.SCHEMA }
   doc.capabilities = vim.list_slice(M.CAPABILITIES, 1)
   doc.limits = json.object(vim.deepcopy(M.LIMITS))

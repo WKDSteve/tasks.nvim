@@ -72,7 +72,15 @@ function M.check()
     if #names > 1 then
       info("named vaults: " .. table.concat(names, ", ") .. " (:TasksVault switch <name>)")
     end
-    local extras = vault.extra_areas()
+    local marker = require("tasks_nvim.vault_marker").status(root)
+    if marker.layout_version then
+      ok(("marker file tasks-vault.json: layout version %d"):format(marker.layout_version))
+    else
+      info(
+        "no tasks-vault.json (optional: the layout version, extra areas and defaults of the vault)"
+      )
+    end
+    local extras = vault.extra_areas(root)
     if #extras > 0 then
       info("extra areas: " .. table.concat(extras, ", "))
     end

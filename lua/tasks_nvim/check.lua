@@ -475,6 +475,36 @@ local function plan_file_findings(findings, open_ids, names, scan_opts, is_finis
   end
 end
 
+---The marker file `tasks-vault.json`: a vault without one is told once (a warning, the vault works), one with an older
+---layout version too. A refused file never gets here: `vault.root()` refuses the vault first.
+---@param findings Tasks.Finding[]
+---@param root string
+local function marker_findings(findings, root)
+  local vault_marker = require("tasks_nvim.vault_marker")
+  local at = { area = "", path = vault_marker.path(root) }
+  local marker = vault_marker.read(root)
+  if not marker then
+    add(
+      findings,
+      "warn",
+      "vault-marker-missing",
+      at,
+      "the vault has no tasks-vault.json (layout version, extra areas, defaults); it works without, `:TasksVault create` writes one for a new vault"
+    )
+  elseif marker.layout_version < vault_marker.LAYOUT_VERSION then
+    add(
+      findings,
+      "warn",
+      "vault-marker-outdated",
+      at,
+      ("tasks-vault.json names layout version %d, this engine writes %d"):format(
+        marker.layout_version,
+        vault_marker.LAYOUT_VERSION
+      )
+    )
+  end
+end
+
 ---Run the checks.
 ---@param opts? Tasks.CheckOpts
 ---@return Tasks.CheckResult|nil result
@@ -712,6 +742,7 @@ function M.run(opts)
   view_findings(findings, root, names)
   if not opts.area then
     area_group_findings(findings, root)
+    marker_findings(findings, root)
   end
 
   table.sort(findings, finding_less)

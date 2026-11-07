@@ -53,6 +53,8 @@ function F.vault(H)
   mkdir(root .. "/_Telemetry/ROADMAP")
   mkdir(root .. "/TEMPLATES/ROADMAP")
   mkdir(root .. "/TOOLS/Backlog")
+  -- the marker file (without it `check` warns `vault-marker-missing`); a spec about the missing file removes it
+  H.write(root .. "/tasks-vault.json", require("tasks_nvim.vault_marker").render({}))
   -- No built-in extras any more: the fixture names the three it relies on.
   require("tasks_nvim.vault").configure({
     extra_areas = { "ALL", "nvim-config", "docmap-desktop", "migrate.nvim" },

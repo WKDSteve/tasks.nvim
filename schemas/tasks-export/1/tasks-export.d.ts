@@ -37,6 +37,23 @@ export type Hello = Head & {
    * What it can answer; show only what is listed.
    */
   capabilities: string[];
+  /**
+   * The marker file of the vault (schemas/tasks-vault/1). Additive; capability `vault_marker`.
+   */
+  marker?: {
+    /**
+     * The vault has a marker file `tasks-vault.json` (valid or refused).
+     */
+    present: boolean;
+    /**
+     * Version of the folder layout the file names; absent when there is no valid file.
+     */
+    layout_version?: number;
+    /**
+     * Why the file is refused (every other call then fails with `invalid_argument` and this message); no path.
+     */
+    problem?: string;
+  };
   limits: {
     title: number;
     summary: number;

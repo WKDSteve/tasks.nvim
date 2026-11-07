@@ -1,0 +1,13 @@
+{
+  "ci": {
+    "strict": false
+  },
+  "extra_areas": [
+    "ALL"
+  ],
+  "kind": "tasks.vault",
+  "lang": "de",
+  "layout_version": 1,
+  "plugin": "tasks.nvim",
+  "schema": 1
+}

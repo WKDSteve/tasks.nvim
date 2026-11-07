@@ -476,7 +476,7 @@ function M.create_plan(root, areas)
     "",
     "  1. Folder (name and location):",
     "       " .. root,
-    "       (a README.md is added when there is none)",
+    "       (a README.md and a tasks-vault.json are added when there are none)",
     "  2. Areas to make:  "
       .. (
         #areas > 0 and table.concat(areas, ", ")

@@ -1,0 +1,7 @@
+{
+  "kind": "tasks.vault",
+  "lang": "en",
+  "layout_version": 1,
+  "plugin": "tasks.nvim",
+  "schema": 1
+}

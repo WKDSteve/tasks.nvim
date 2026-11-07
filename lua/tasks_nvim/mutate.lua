@@ -1209,7 +1209,13 @@ function M.new(area, opts)
     end
     rules = #list > 0 and list or nil
   end
-  local lang, langerr = check_lang(opts.lang)
+  -- the language of the body: the caller's, else the one the vault's marker file names, else German
+  local want_lang = opts.lang
+  if want_lang == nil then
+    local file = require("tasks_nvim.vault_marker").read(root)
+    want_lang = file and file.lang or nil
+  end
+  local lang, langerr = check_lang(want_lang)
   if not lang then
     return nil, langerr
   end

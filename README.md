@@ -122,7 +122,7 @@ No vault yet? `nvim --headless -u NONE -l scripts/tasks.lua init-vault <dir> --a
 an example task; `examples/vault` is a small finished vault to try every verb on (`--vault=examples/vault`).
 
 An area is any folder in the vault that holds `ROADMAP/` or `Backlog/`; create the folders once (or name the area
-in `extra_areas`). Every verb, flag and filter: [docs/COMMANDS.md](docs/COMMANDS.md).
+in `extra_areas`, or in the optional marker file `tasks-vault.json` of the vault root: [docs/ENGINE.md](docs/ENGINE.md#the-marker-file-tasks-vaultjson)). Every verb, flag and filter: [docs/COMMANDS.md](docs/COMMANDS.md).
 
 ## Configuration
 

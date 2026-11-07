@@ -189,17 +189,27 @@ function M.switch(name)
   return root, nil
 end
 
----The named extras: `configure({ extra_areas })` plus `$TASKS_EXTRA_AREAS` (comma separated; the
----headless CLI has no `setup`, so this is how it learns them).
+---The named extras: `configure({ extra_areas })`, `$TASKS_EXTRA_AREAS` (comma separated; the headless CLI has
+---no `setup`, so this is how it learns them) and, with a `root`, the `extra_areas` of the vault's marker file
+---`tasks-vault.json`. The union, a name once.
+---@param root? string
 ---@return string[]
-function M.extra_areas()
-  local env = vim.env.TASKS_EXTRA_AREAS
-  if not env or env == "" then
-    return vim.list_extend({}, M.EXTRA_AREAS)
-  end
+function M.extra_areas(root)
   local out = vim.list_extend({}, M.EXTRA_AREAS)
-  for name in env:gmatch("[^,]+") do
-    out[#out + 1] = vim.trim(name)
+  local env = vim.env.TASKS_EXTRA_AREAS
+  if env and env ~= "" then
+    for name in env:gmatch("[^,]+") do
+      out[#out + 1] = vim.trim(name)
+    end
+  end
+  if root then
+    -- an invalid marker never gets this far: `root()` refuses the vault first
+    local marker = require("tasks_nvim.vault_marker").read(root)
+    for _, name in ipairs(marker and marker.extra_areas or {}) do
+      if not vim.tbl_contains(out, name) then
+        out[#out + 1] = name
+      end
+    end
   end
   return out
 end
@@ -212,7 +222,11 @@ function M.set_root(path)
 end
 
 ---Resolve the vault root. Order: `opts.root`, `set_root`, `configure`, `$TASKS_VAULT`.
----@param opts? { root?: string }
+---
+---A vault with a marker file `tasks-vault.json` that is refused (unknown key, newer version, not JSON) is no vault:
+---the answer is `nil, "tasks-vault.json: <reason>"` (fail closed). `opts.unchecked` skips that, for the one caller
+---that has to report the problem (`contract.hello`).
+---@param opts? { root?: string, unchecked?: boolean }
 ---@return string|nil root  forward slashes, no trailing slash
 ---@return string|nil err
 function M.root(opts)
@@ -240,6 +254,12 @@ function M.root(opts)
   candidate = fsio.norm(candidate)
   if not fsio.is_dir(candidate) then
     return nil, "vault is not a directory: " .. candidate
+  end
+  if not (opts and opts.unchecked) then
+    local _, merr = require("tasks_nvim.vault_marker").read(candidate)
+    if merr then
+      return nil, merr
+    end
   end
   return candidate, nil
 end
@@ -446,7 +466,7 @@ local function is_area_dir(root, name)
   if not fsio.is_dir(dir) or fsio.is_link(dir) then
     return false
   end
-  for _, extra in ipairs(M.extra_areas()) do
+  for _, extra in ipairs(M.extra_areas(root)) do
     if extra == name then
       return true
     end

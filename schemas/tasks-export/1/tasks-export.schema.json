@@ -647,6 +647,27 @@
           },
           "description": "What it can answer; show only what is listed."
         },
+        "marker": {
+          "type": "object",
+          "required": ["present"],
+          "properties": {
+            "present": {
+              "type": "boolean",
+              "description": "The vault has a marker file `tasks-vault.json` (valid or refused)."
+            },
+            "layout_version": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Version of the folder layout the file names; absent when there is no valid file."
+            },
+            "problem": {
+              "type": "string",
+              "description": "Why the file is refused (every other call then fails with `invalid_argument` and this message); no path."
+            }
+          },
+          "additionalProperties": false,
+          "description": "The marker file of the vault (schemas/tasks-vault/1). Additive; capability `vault_marker`."
+        },
         "limits": {
           "type": "object",
           "required": [

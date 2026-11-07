@@ -766,7 +766,7 @@ second word (`:TasksVault clipboard ALL all`). Part words are never completed to
 | `tree` | the folder in the file explorer (filetree.nvim when it is there) |
 | `cdx` | a ready prompt for Claude Code that names the folder, into the `+` register (`--rel`, `--file` as above) |
 | `new feature\|task <title...> [--area=]` | a dated note `Backlog/FEATURES\|TASKS/<date>_<slug>.md`, its README row, opened |
-| `create [<dir>] [<area>...] [--force] [--yes]` | a vault folder with the named areas; lists what happens first (see below) |
+| `create [<dir>] [<area>...] [--force] [--yes]` | a vault folder with the named areas and a marker file `tasks-vault.json`; lists what happens first (see below) |
 | `switch <name>` | work on another named vault in this session (see below) |
 | `status` (and the bare `:TasksVault`) | the vault in use (with its name), its areas and the area of this buffer |
 

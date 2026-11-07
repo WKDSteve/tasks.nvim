@@ -370,11 +370,14 @@ end
 
 ---Create a vault folder (and its parents) with the given areas. An existing folder is fine, an existing area
 ---too; nothing is overwritten. The folder may become a repository later, that is the user's decision.
+---A vault without one gets the marker file `tasks-vault.json` (`opts.lang` is its default body language); an existing
+---file stays as it is, byte for byte, valid or not.
 ---@param dir string  the vault folder
 ---@param areas? string[]
+---@param opts? { lang?: "de"|"en" }
 ---@return { root: string, existed: boolean, created: string[] }|nil result
 ---@return string|nil err
-function M.create_vault(dir, areas)
+function M.create_vault(dir, areas, opts)
   local root, check_err = M.check_vault_target(dir, areas)
   if not root then
     return nil, check_err
@@ -394,6 +397,14 @@ function M.create_vault(dir, areas)
       return nil, ("cannot write %s: %s"):format(readme, tostring(err))
     end
     created[#created + 1] = "README.md"
+  end
+  local vault_marker = require("tasks_nvim.vault_marker")
+  if not fsio.lstat(vault_marker.path(root)) then
+    local ok, err = vault_marker.write(root, { lang = opts and opts.lang or nil })
+    if not ok then
+      return nil, tostring(err)
+    end
+    created[#created + 1] = vault_marker.FILE
   end
   for _, area in ipairs(areas or {}) do
     -- scaffold_area hands back the folders made so far together with the error, so the error is what counts

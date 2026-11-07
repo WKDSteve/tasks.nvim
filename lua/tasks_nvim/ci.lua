@@ -157,6 +157,14 @@ function M.run(opts, say)
     return result
   end
 
+  -- warnings fail the run when the flag says so or the vault's marker file does (`ci.strict`); `trust_vault_lint` is
+  -- never read from the file: code from a synced vault runs only with an explicit trust
+  local strict = opts.strict
+  if not strict then
+    local file = require("tasks_nvim.vault_marker").read(root)
+    strict = file ~= nil and file.ci_strict == true
+  end
+
   local done_in_roadmap, stale_areas = {}, {}
 
   -- 1. rule check
@@ -170,7 +178,7 @@ function M.run(opts, say)
         done_in_roadmap[#done_in_roadmap + 1] = fsio.clean(f.id)
       end
     end
-    local bad = res.errors + (opts.strict and res.warnings or 0)
+    local bad = res.errors + (strict and res.warnings or 0)
     local line = ("check: %d error(s), %d warning(s) in %d area(s), %d task file(s) read"):format(
       res.errors,
       res.warnings,
@@ -178,7 +186,7 @@ function M.run(opts, say)
       res.tasks
     )
     if bad > 0 then
-      fail("check", line .. (opts.strict and " (strict: warnings count)" or ""))
+      fail("check", line .. (strict and " (strict: warnings count)" or ""))
     else
       out("tasks-ci: " .. line .. " -- ok")
     end

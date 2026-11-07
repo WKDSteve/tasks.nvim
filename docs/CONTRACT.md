@@ -83,7 +83,7 @@ Every document starts with the same head:
 
 **`tasks.hello`** -- `schemas` (the versions this engine speaks), `capabilities` (what it can answer, sorted: an app shows
 only what is listed), `limits` (`title`, `summary`, `body_bytes`, `list_items`, `batch_ops`) and `enums` (the words of
-`status`, `kind`, `prio`, `value`, `effort`, `actor`, `category`, `scope`, `severity`, so a client needs no copy of them), plus `enums.scaffold`: the fixed acceptance lines by kind, category and scope (`kind`, `category`, `scope`: word to rows `{ id, de, en }`; `implied`: scopes whose rows a kind and category also get). A client joins the rows of what applies, each `id` once, in the order kind, category, scope (the order of the lists).
+`status`, `kind`, `prio`, `value`, `effort`, `actor`, `category`, `scope`, `severity`, so a client needs no copy of them), plus `marker` (optional, additive; capability `vault_marker`): `present` (the vault has a `tasks-vault.json`), `layout_version` (of a valid file) and `problem` (why a file is refused; no path). A refused file fails every other call with `invalid_argument` and the message `tasks-vault.json: <reason>`; `hello` is the one that still answers. See [ENGINE.md](ENGINE.md#the-marker-file-tasks-vaultjson). Plus `enums.scaffold`: the fixed acceptance lines by kind, category and scope (`kind`, `category`, `scope`: word to rows `{ id, de, en }`; `implied`: scopes whose rows a kind and category also get). A client joins the rows of what applies, each `id` once, in the order kind, category, scope (the order of the lists).
 
 **`tasks.snapshot`** -- the primary document.
 

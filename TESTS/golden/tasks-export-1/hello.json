@@ -32,6 +32,7 @@
     "snapshot",
     "task",
     "tick_step",
+    "vault_marker",
     "view_delete",
     "view_save",
     "views",
@@ -355,6 +356,10 @@
     "list_items": 100,
     "summary": 1000,
     "title": 300
+  },
+  "marker": {
+    "layout_version": 1,
+    "present": true
   },
   "plugin": "tasks.nvim",
   "schema": 1,

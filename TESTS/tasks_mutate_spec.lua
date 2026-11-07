@@ -203,6 +203,16 @@ return function(H)
   local bad_lang =
     select(2, mutate.new("cascade.nvim", with(o, { title = "Bad lang", lang = "fr" })))
   has(bad_lang, "unknown lang", "an unknown lang is refused")
+  -- the marker file names the default language; --lang still wins
+  local marker = require("tasks_nvim.vault_marker")
+  H.write(marker.path(root), marker.render({ lang = "en" }))
+  local from_file =
+    assert(mutate.new("cascade.nvim", with(o, { title = "Language from the file" })))
+  has(H.read(from_file.path), "## Acceptance", "lang of the marker file is the default")
+  local over =
+    assert(mutate.new("cascade.nvim", with(o, { title = "Language by hand", lang = "de" })))
+  has(H.read(over.path), "## Kontext", "the caller's lang wins over the file")
+  H.write(marker.path(root), marker.render({}))
   has(mutate.template({ today = TODAY, lang = "en" }), "## Acceptance", "template in English")
   has(mutate.template({ today = TODAY }), "## Akzeptanz", "template in German by default")
 
