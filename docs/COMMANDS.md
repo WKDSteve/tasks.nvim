@@ -286,7 +286,7 @@ opens with the same title and ref filled in.
 :'<,'>Tasks new lib.nvim                    " title = first selected line, refs = this file:line
 ```
 
-On the command line `tasks new <area> <title> --created=YYYY-MM-DD` puts a task on the record on an earlier day (history written
+On the command line `tasks new <area> <title> --created=YYYY-MM-DD` puts a task on the record on an earlier day, never a later one (history written
 down later; `updated` stays today). A title that starts with `--` goes in as `--title=--diagnose ...` (or after a `--`
 that ends the options).
 

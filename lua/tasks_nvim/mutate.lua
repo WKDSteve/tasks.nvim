@@ -1336,6 +1336,9 @@ function M.new(area, opts)
     if not model.is_date(opts.created) then
       return nil, "created is not a date (YYYY-MM-DD): " .. tostring(opts.created)
     end
+    if opts.created > today then
+      return nil, "created is after today (" .. today .. "): " .. opts.created
+    end
     created = opts.created
   end
   if opts.slug ~= nil and not vault.valid_slug(opts.slug) then
