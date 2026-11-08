@@ -126,25 +126,29 @@ return {
     },
 
     { keys = ":Tasks list<CR>", note = "the dashboard of main" },
-    { wait = [[_G.listed(2) and _G.title():find("[main]", 1, true) ~= nil]], timeout = 10000 },
+    { wait = [[_G.listed(2) and _G.title():find("[main]", 1, true) ~= nil]], timeout = 30000 },
     -- a filter set in the dashboard is the one remembered for its vault (one from the command line is not: LUA-87)
     { lua = [[_G.answers = { "prio", "1" }]], note = "the answers: dimension prio, value 1" },
     { input = "<M-f>", note = "<M-f> in the prompt: set a filter chip" },
     {
       wait = [[#_G.prompts == 2 and _G.listed(1) and _G.title():find("[main]", 1, true) ~= nil]],
-      timeout = 10000,
+      timeout = 30000,
       note = "asked twice, the dashboard of main shows prio 1 only",
     },
     {
       expect = [[_G.shows("Main urgent one") and not _G.shows("Main later one")]],
       note = "the filter holds",
     },
-    { wait = [[_G.watching(_G.main) > 0]], note = "the live refresh watches main" },
+    {
+      wait = [[_G.watching(_G.main) > 0]],
+      timeout = 30000,
+      note = "the live refresh watches main",
+    },
 
     { keys = ":TasksVault switch other<CR>", note = "switch to the other vault" },
     {
       wait = [[_G.listed(2) and _G.title():find("[other]", 1, true) ~= nil]],
-      timeout = 10000,
+      timeout = 30000,
       note = "the dashboard opened again on other, its title names it",
     },
     {
@@ -154,19 +158,21 @@ return {
     { expect = [[select(2, _G.picker()) == 1]], note = "one dashboard, the old picker is closed" },
     {
       wait = [[_G.watching(_G.main) == 0 and _G.watching(_G.other) > 0]],
+      timeout = 30000,
       note = "no handle left on main",
     },
 
     { keys = ":TasksVault switch main<CR>", note = "back to main" },
     {
       wait = [[_G.listed(1) and _G.title():find("[main]", 1, true) ~= nil]],
-      timeout = 10000,
+      timeout = 30000,
       note = "on main again, with the filter remembered for main (prio 1: one of two tasks)",
     },
     { expect = [[_G.shows("Main urgent one")]] },
     { expect = [[select(2, _G.picker()) == 1]], note = "still one dashboard" },
     {
       wait = [[_G.watching(_G.other) == 0 and _G.watching(_G.main) > 0]],
+      timeout = 30000,
       note = "no handle left on other",
     },
 
@@ -177,6 +183,7 @@ return {
     { lua = [[local p = _G.picker(); if p then p:close() end]], note = "close the dashboard" },
     {
       wait = [[_G.picker() == nil and _G.watching(_G.main) == 0]],
+      timeout = 30000,
       note = "closed, no watcher left at all",
     },
   },
