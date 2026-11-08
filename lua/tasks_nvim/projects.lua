@@ -354,7 +354,16 @@ function M.overview(project, ctx)
     end
     return a.id < b.id
   end)
-  local lines = { "| Stage | Plan | Status | Open | Days |", "|---|---|---|---|---|" }
+  local lines = { ("**%s** (%s)"):format(cell(project.title), project.status or "?") }
+  if #(project.phase_order or {}) > 0 then
+    lines[#lines + 1] = ""
+    lines[#lines + 1] = "Stages: " .. table.concat(project.phase_order, " > ")
+  end
+  if project.target then
+    lines[#lines + 1] = ""
+    lines[#lines + 1] = "Done when: " .. cell(project.target)
+  end
+  vim.list_extend(lines, { "", "| Stage | Plan | Status | Open | Days |", "|---|---|---|---|---|" })
   for _, r in ipairs(rows) do
     lines[#lines + 1] = ("| %s | `%s` %s | %s | %d | %s |"):format(
       cell(r.phase or "-"),
