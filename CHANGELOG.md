@@ -9,6 +9,7 @@ the version is not tagged yet (the repository is not published).
 
 - The short command `tasks` (`bin/tasks` for POSIX shells, `bin/tasks.cmd` for Windows): runs `scripts/tasks.lua`, hands the exit code through, and says so when `nvim` is missing or the launcher is away from its checkout.
 - `tasks new --created=YYYY-MM-DD` for a task written down later, not after today (the title may start with `--`: `--title=...` or after a `--`).
+- `tasks new` warns on stderr when its `--plan`, `--project` or `--phase` names nothing (the task is still made; `check` reports it later).
 - `tasks-export/1` (additive): `tasks.groupings` has a read-only field `project` (after `phase`: a task stands in the project of its plan, or in its own), `GroupField` knows it, and a saved view may group by it and select `select.projects` (`sel_projects` in its file). `plan --project=` draws a `Plan` column in the stage tables, and the overview block of a project has a head (title, status, stages, goal).
 - `:Tasks new` form: a `Project:` line (and `project=` pre-fill) for a task that belongs to a project itself.
 

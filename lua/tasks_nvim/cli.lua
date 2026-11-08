@@ -1492,6 +1492,17 @@ function commands.new(ctx)
     if res.ambiguous then
       ctx.warn("warn: " .. require("tasks_nvim.wikilinks").ambiguity_message(res.ambiguous))
     end
+    -- the file is written as asked (a plan may follow); a relation that names nothing is a word, as `check` would say
+    if new_opts.plan or new_opts.project or new_opts.phase then
+      local problems = require("tasks_nvim.edges").validate(res.id, {
+        plan = new_opts.plan,
+        project = new_opts.project,
+        phase = new_opts.phase,
+      }, { root = eo.root })
+      for _, problem in ipairs(problems or {}) do
+        ctx.warn("warn: " .. res.id .. ": " .. problem.message)
+      end
+    end
     report_index(ctx, res)
   end
   return 0

@@ -290,6 +290,9 @@ On the command line `tasks new <area> <title> --created=YYYY-MM-DD` puts a task 
 down later; `updated` stays today). A title that starts with `--` goes in as `--title=--diagnose ...` (or after a `--`
 that ends the options).
 
+`tasks new` writes the file as asked even when the `plan`, `project` or `phase` it names exists nowhere yet (a plan may follow), and says
+so on stderr as `warn: <id>: plan X is no plan file ...`; `tasks check` reports it later as `plan-unknown` and the like.
+
 ### `:Tasks set <id> key=value ...`
 
 Changes frontmatter of an *open* task and sets `updated` -- but only when something really

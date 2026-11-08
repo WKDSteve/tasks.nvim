@@ -114,6 +114,19 @@ return function(H)
   r = run({ "new", "ALL", "Bad day", "--created=yesterday", "--no-index" })
   eq(r.code, 1)
   has(r.err, "created is not a date")
+  -- a plan, project or phase that exists nowhere: the task is made, the output says so
+  r = run({ "new", "ALL", "Odd plan", "--plan=ALL/ghost-plan", "--no-index" })
+  eq(r.code, 0, r.err)
+  has(r.err, "ALL/odd-plan")
+  has(r.err, "plan ALL/ghost-plan is no plan file")
+  r = run({ "new", "ALL", "Odd project", "--project=ALL/ghost-project", "--no-index" })
+  eq(r.code, 0, r.err)
+  has(r.err, "project ALL/ghost-project is no project file")
+  r = run({ "new", "ALL", "Plain one", "--no-index" })
+  eq(r.err, "", "no relation, no word")
+  for _, slug in ipairs({ "odd-plan", "odd-project", "plain-one" }) do
+    vim.fn.delete(root .. "/ALL/ROADMAP/tasks/" .. slug .. ".md") -- later lists expect the fixture as it was
+  end
   r = run({ "new", "ALL", "Tomorrow", "--created=2099-01-01", "--no-index" })
   eq(r.code, 1)
   has(r.err, "created is after today")
