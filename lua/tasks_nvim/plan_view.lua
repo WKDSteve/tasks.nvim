@@ -223,7 +223,8 @@ function M.markdown(plan, opts)
     lines[#lines + 1] = ""
   end
 
-  -- Stages
+  -- Stages (a project: the plan each task belongs to is a column, its own tasks show `-`)
+  local by_plan = file ~= nil and file.kind == "project"
   for i, stage in ipairs(plan.stages) do
     lines[#lines + 1] = ("## Stage %d"):format(i - 1)
     lines[#lines + 1] = ""
@@ -236,11 +237,13 @@ function M.markdown(plan, opts)
         lines[#lines + 1] = ""
       end
     end
-    lines[#lines + 1] = "| Task | Status | Effort | Waits on | Note |"
-    lines[#lines + 1] = "| --- | --- | --- | --- | --- |"
+    lines[#lines + 1] = by_plan and "| Plan | Task | Status | Effort | Waits on | Note |"
+      or "| Task | Status | Effort | Waits on | Note |"
+    lines[#lines + 1] = by_plan and "| --- | --- | --- | --- | --- | --- |"
+      or "| --- | --- | --- | --- | --- |"
     for _, id in ipairs(stage) do
       local node = plan.nodes[id]
-      lines[#lines + 1] = row({
+      local cells = {
         id
           .. " -- "
           .. fsio.clean(node.task.title)
@@ -254,7 +257,11 @@ function M.markdown(plan, opts)
         node.task.effort or "-",
         waits_text(node),
         hint(node),
-      })
+      }
+      if by_plan then
+        table.insert(cells, 1, fsio.clean(node.task.plan or "-"))
+      end
+      lines[#lines + 1] = row(cells)
     end
     lines[#lines + 1] = ""
     if opts.with_steps then
