@@ -114,6 +114,7 @@ return function(H)
     kinds = {},
     tags = { "golden" },
     plans = {},
+    projects = {},
     query = "build",
   }, "every list of the selection is there, the empty ones too")
   eq({ matrix.created, matrix.updated }, { F.TODAY, F.TODAY })
@@ -273,6 +274,21 @@ return function(H)
   })
   eq({ by_cross.ok, by_cross.outcome }, { true, "created" }, vim.inspect(by_cross))
   has(H.read(path_of(by_cross.id)), "group_by: cross")
+
+  -- by project: grouped by the derived field, narrowed to a project
+  local by_project = one({
+    op = "view_save",
+    area = "lib.nvim",
+    view = {
+      title = "By project",
+      display = "list",
+      group_by = "project",
+      select = { projects = { "ALL/mobile" } },
+    },
+  })
+  eq({ by_project.ok, by_project.outcome }, { true, "created" }, vim.inspect(by_project))
+  has(H.read(path_of(by_project.id)), "group_by: project")
+  has(H.read(path_of(by_project.id)), "ALL/mobile")
 
   -- a view changed outside (a pull) is a new `views_rev` of the snapshot - the one `tasks.views` names - and changes its
   -- digest, so that a reader that shows the views learns of it; the `rev` of the tasks stays, and no other document

@@ -5,7 +5,7 @@
 ---version tag (`if_match`) like every other file it writes.
 ---
 ---Frontmatter: `title`, `group_by`, `group_by2`, `display`, `collapsed` (the groups that are folded), `sel_areas`,
----`sel_statuses`, `sel_actors`, `sel_kinds`, `sel_tags`, `sel_plans`, `sel_query`, `created`, `updated`.
+---`sel_statuses`, `sel_actors`, `sel_kinds`, `sel_tags`, `sel_plans`, `sel_projects`, `sel_query`, `created`, `updated`.
 local fm = require("lib.nvim.markdown.frontmatter")
 local fsio = require("tasks_nvim.fsio")
 local model = require("tasks_nvim.model")
@@ -27,6 +27,7 @@ M.GROUP_FIELDS = {
   "tags",
   "plan",
   "phase",
+  "project",
   "area",
   "state",
   "cross",
@@ -41,6 +42,7 @@ M.SELECT = {
   { name = "kinds", key = "sel_kinds" },
   { name = "tags", key = "sel_tags" },
   { name = "plans", key = "sel_plans" },
+  { name = "projects", key = "sel_projects" },
 }
 
 ---Most entries of a list of the selection, and of the folded groups; longest entry or query, in characters.

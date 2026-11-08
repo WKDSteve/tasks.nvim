@@ -635,7 +635,7 @@ export type Links = Head & {
   incomplete: string[];
 };
 /**
- * tasks.groupings: the fields the open tasks can be grouped by, with the values each can have and how a reader writes it. `status`, `prio`, `actor`, `kind`, `effort` and `value` are the model's; `tags`, `plan` and `phase` are the ones the open tasks name (at most 200, `truncated` says the rest); `area` is the areas of the vault; `state` and `cross` are derived (`cross`: `several` for a task `tasks.links` names among the tasks that touch two or more areas, else `one`). `mode` says which operation writes the field: `set` (a field of the file), `tags` (the list of tags: leaving one and taking another is one `set` of the whole list) or `move_area`; a field without `mode` is read only. The same `rev` as the snapshot of the same vault.
+ * tasks.groupings: the fields the open tasks can be grouped by, with the values each can have and how a reader writes it. `status`, `prio`, `actor`, `kind`, `effort` and `value` are the model's; `tags`, `plan`, `phase` and `project` (derived: the project of the task's plan, or its own) are the ones the open tasks name (at most 200, `truncated` says the rest); `area` is the areas of the vault; `state` and `cross` are derived (`cross`: `several` for a task `tasks.links` names among the tasks that touch two or more areas, else `one`). `mode` says which operation writes the field: `set` (a field of the file), `tags` (the list of tags: leaving one and taking another is one `set` of the whole list) or `move_area`; a field without `mode` is read only. The same `rev` as the snapshot of the same vault.
  */
 export type Groupings = Head & {
   kind: "tasks.groupings";
@@ -652,6 +652,7 @@ export type Groupings = Head & {
       | "tags"
       | "plan"
       | "phase"
+      | "project"
       | "area"
       | "state"
       | "cross";
@@ -678,7 +679,19 @@ export type Views = Head & {
   }[];
 };
 export type GroupField =
-  "status" | "prio" | "actor" | "kind" | "effort" | "value" | "tags" | "plan" | "phase" | "area" | "state" | "cross";
+  | "status"
+  | "prio"
+  | "actor"
+  | "kind"
+  | "effort"
+  | "value"
+  | "tags"
+  | "plan"
+  | "phase"
+  | "project"
+  | "area"
+  | "state"
+  | "cross";
 /**
  * tasks.waits: what the parked tasks wait for, of the vault or of one area (or area group). `keys` are the `waits_for` keys in use, the one with the most tasks first (then by name), each with its number of parked tasks and their areas. `parked` counts every parked task: the ones of `keys`, `without_reason` (parked by choice, no `waits_for`) and `invalid` (a `waits_for` that is no key, the `invalid-waits-for` finding). Same `rev` as the snapshot of the same state.
  */
@@ -1148,7 +1161,19 @@ export interface View {
    * The field of the rows of a matrix (never the field of the columns).
    */
   group_by2?:
-    "status" | "prio" | "actor" | "kind" | "effort" | "value" | "tags" | "plan" | "phase" | "area" | "state" | "cross";
+    | "status"
+    | "prio"
+    | "actor"
+    | "kind"
+    | "effort"
+    | "value"
+    | "tags"
+    | "plan"
+    | "phase"
+    | "project"
+    | "area"
+    | "state"
+    | "cross";
   /**
    * The groups that are folded (the values as `tasks.groupings` names them).
    */
@@ -1168,6 +1193,7 @@ export interface ViewSelect {
   kinds: string[];
   tags: string[];
   plans: string[];
+  projects?: string[];
   query?: string;
 }
 /**

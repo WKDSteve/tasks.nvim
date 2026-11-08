@@ -2285,6 +2285,12 @@ function M.groupings(opts)
     return t.phase
   end)
   add("phase", phases, "set", { truncated = phases_cut })
+  -- derived: a task stands in the project of its plan, or in its own (`projects.project_of`); read only
+  local plan_projects = require("tasks_nvim.projects").plan_projects(view.files)
+  local project_ids, projects_cut = grouping_values(view.open, function(t)
+    return require("tasks_nvim.projects").project_of(t, plan_projects)
+  end)
+  add("project", project_ids, nil, { truncated = projects_cut })
   local areas = vim.tbl_map(function(a)
     return a.name
   end, vault.areas(view.root))

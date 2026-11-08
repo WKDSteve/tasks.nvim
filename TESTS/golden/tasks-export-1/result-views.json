@@ -1,6 +1,6 @@
 {
   "client_op_id": "golden-views",
-  "digest": "sha256:1df2696057a8c513",
+  "digest": "sha256:d6fd46431584834a",
   "dry_run": false,
   "engine": {
     "git": "0000000",
@@ -46,6 +46,7 @@
             "areas": [],
             "kinds": [],
             "plans": [],
+            "projects": [],
             "statuses": [
               "open",
               "doing",
@@ -101,6 +102,7 @@
             ],
             "kinds": [],
             "plans": [],
+            "projects": [],
             "query": "build",
             "statuses": [],
             "tags": [

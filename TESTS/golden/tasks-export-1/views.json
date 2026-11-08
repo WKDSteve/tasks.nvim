@@ -1,5 +1,5 @@
 {
-  "digest": "sha256:b8cc9e6f2405106b",
+  "digest": "sha256:a3464ed7be25d3d4",
   "engine": {
     "git": "0000000",
     "nvim": "0.0.0",
@@ -34,6 +34,7 @@
         "areas": [],
         "kinds": [],
         "plans": [],
+        "projects": [],
         "statuses": [
           "open",
           "doing",
@@ -63,6 +64,7 @@
         ],
         "kinds": [],
         "plans": [],
+        "projects": [],
         "query": "build",
         "statuses": [],
         "tags": [

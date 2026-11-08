@@ -424,6 +424,7 @@ return function(H)
       "tags",
       "plan",
       "phase",
+      "project",
       "area",
       "state",
       "cross",
@@ -435,6 +436,8 @@ return function(H)
       "an open task is never grouped as done"
     )
     eq({ by.status.mode, by.status.writable, by.status.value_type }, { "set", true, "string" })
+    -- derived: a task stands in the project of its plan or its own; a reader cannot write it
+    eq({ by.project.writable, by.project.mode, by.project.value_type }, { false, nil, "string" })
     eq({ by.prio.values, by.prio.value_type }, { { "1", "2", "3" }, "number" })
     eq({ by.value.values, by.value.value_type }, { { "1", "2", "3", "4", "5" }, "number" })
     eq(by.effort.values, { "XS", "S", "M", "L", "XL" })

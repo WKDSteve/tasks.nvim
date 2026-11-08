@@ -1,5 +1,5 @@
 {
-  "digest": "sha256:1b6b331bea34a3a8",
+  "digest": "sha256:4fe330661cf7898c",
   "engine": {
     "git": "0000000",
     "nvim": "0.0.0",
@@ -118,6 +118,15 @@
         "test"
       ],
       "writable": true
+    },
+    {
+      "field": "project",
+      "truncated": false,
+      "value_type": "string",
+      "values": [
+        "lib.nvim/the-project"
+      ],
+      "writable": false
     },
     {
       "field": "area",

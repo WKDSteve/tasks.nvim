@@ -7,6 +7,7 @@ the version is not tagged yet (the repository is not published).
 
 ### Added
 
+- `tasks-export/1` (additive): `tasks.groupings` has a read-only field `project` (after `phase`: a task stands in the project of its plan, or in its own), `GroupField` knows it, and a saved view may group by it and select `select.projects` (`sel_projects` in its file). `plan --project=` draws a `Plan` column in the stage tables, and the overview block of a project has a head (title, status, stages, goal).
 - `:Tasks new` form: a `Project:` line (and `project=` pre-fill) for a task that belongs to a project itself.
 
 - The steps of a task (`## Plan`) show as `3/5` on the dashboard line and behind the title in the stage tables of `plan`.
