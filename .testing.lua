@@ -61,8 +61,25 @@ return {
   ci = {
     default = "full",
     profiles = {
-      fast = { "stylua", "luacheck" },
+      -- workflow-in-sync: .github/workflows/ci.yml is the one `workflow` below gives (testing init --workflow=public)
+      fast = { "stylua", "luacheck", "workflow-in-sync" },
       full = { "fast", "suite", "conformance", "contract" },
+    },
+    -- The GitHub workflow, generated: `testing init --workflow=public --force` writes it (testing.nvim
+    -- docs/WORKFLOW-CI.md). Only what differs from the other public repositories is written here.
+    workflow = {
+      name = "tasks.nvim",
+      -- the steps that depend on the platform: the hosted windows and macOS legs run only these
+      platform = { "suite", "conformance" },
+      node = { version = "22", used_by = "the Node contract check" },
+      checkouts = {
+        {
+          repo = "folke/snacks.nvim",
+          ref = "882c996cf28183f4d63640de0b4c02ec886d01f2",
+          why = "The dashboard specs drive the real Snacks picker; without it they would pass with no assertion.",
+        },
+      },
+      env = { TASKS_REQUIRE_SNACKS = "1" },
     },
     steps = {
       luacheck = { preset = "luacheck", args = { "lua", "TESTS", "scripts" } },
