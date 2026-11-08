@@ -145,6 +145,7 @@
 ---@field summary? string
 ---@field slug? string
 ---@field today? string
+---@field created? string              # `YYYY-MM-DD`: put the task on the record on that day (default: today); `updated` stays today.
 ---@field index? boolean              # Regenerate the area index afterwards (default true).
 
 return {}

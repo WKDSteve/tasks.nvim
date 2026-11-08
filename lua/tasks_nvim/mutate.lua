@@ -1330,6 +1330,14 @@ function M.new(area, opts)
   if not model.is_date(today) then
     return nil, "today is not a date (YYYY-MM-DD): " .. tostring(today)
   end
+  -- `created` is today unless the caller puts a task on the record later (history written down afterwards)
+  local created = today
+  if opts.created ~= nil then
+    if not model.is_date(opts.created) then
+      return nil, "created is not a date (YYYY-MM-DD): " .. tostring(opts.created)
+    end
+    created = opts.created
+  end
   if opts.slug ~= nil and not vault.valid_slug(opts.slug) then
     return nil, "invalid slug: " .. tostring(opts.slug)
   end
@@ -1384,7 +1392,7 @@ function M.new(area, opts)
       refs = refs,
       links = links,
       rules = rules,
-      created = today,
+      created = created,
       updated = today,
     }),
     { create = true }
@@ -1970,6 +1978,34 @@ function M.readme_update(path, bucket, rel, row)
   return res, err
 end
 
+---The first row into a Backlog index that does not exist yet (a new area): the file is made with a title, then the row is
+---added as `readme_add_row` does. Another run that made it first is not overwritten: the row goes into theirs.
+---@param path string
+---@param area string
+---@param bucket Tasks.Bucket
+---@param rel string
+---@param row string
+---@return { state: "updated"|"unchanged", text: string, created: boolean }|nil result
+---@return string|nil err
+function M.readme_create(path, area, bucket, rel, row)
+  local nl = string.char(10)
+  local head = ("# %s -- Backlog"):format(area) .. nl .. nl .. "Finished work of this area." .. nl
+  local text = M.readme_add_row(head, bucket, rel, row)
+  local made = fsio.mkdirp(fsio.dirname(path))
+  if not made then
+    return nil, "cannot create " .. fsio.dirname(path)
+  end
+  local ok = fsio.create_exclusive(path, text)
+  if ok then
+    return { state = "updated", text = text, created = true }, nil
+  end
+  local res, err = M.readme_update(path, bucket, rel, row)
+  if res then
+    res.created = false
+  end
+  return res, err
+end
+
 ---Add `row` to the `## <bucket> (N)` section of a `Backlog/README.md` text.
 ---
 ---A section holding the `_noch leer_` placeholder gets a table instead; a
@@ -2377,6 +2413,7 @@ end
 ---@field removed_original boolean   # The plain task file was removed.
 ---@field created_target boolean     # This run created `target` (as opposed to finding another process's).
 ---@field readme_written? string     # The README text this run wrote (nil: it did not write the README).
+---@field readme_created? boolean    # This run made the README (a new area had none): a rollback removes it again.
 
 ---Validate and compute: no file is written. `nil, err` when the task cannot be finished;
 ---`{ already = true }` (a finished task) as the first result when there is nothing to do.
@@ -2641,6 +2678,17 @@ local function execute_done(plan, progress)
     end
     progress.readme_written = res.state == "updated" and res.text or nil
   end
+  if not plan.readme_old then
+    -- a new area has no Backlog index yet: this finish makes it, with the row
+    local res, err =
+      M.readme_create(plan.readme_path, plan.area, plan.bucket, plan.rel, plan.readme_row)
+    if not res then
+      return nil, tostring(err)
+    end
+    progress.readme_written = res.state == "updated" and res.text or nil
+    progress.readme_created = res.created
+    plan.readme_state = "updated"
+  end
   if plan.index then
     local res, ierr = index.write_area(plan.area, { root = plan.root })
     if not res then
@@ -2685,6 +2733,13 @@ local function rollback_done(plan, cp, progress, err)
     forget(plan.readme_path)
   end
   local stuck = {}
+  -- a README this run made goes again, unless someone wrote into it since
+  if progress.readme_created and fsio.read(plan.readme_path) == progress.readme_written then
+    local gone, g_err = attempt(fsio.remove, plan.readme_path)
+    if not gone and fsio.is_file(plan.readme_path) then
+      stuck[#stuck + 1] = ("%s (cannot remove it: %s)"):format(plan.readme_path, tostring(g_err))
+    end
+  end
   if progress.moved then
     local src_dir, target_dir = plan.src_dir, plan.target_dir
     ---@cast src_dir string

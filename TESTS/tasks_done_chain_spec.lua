@@ -92,6 +92,15 @@ return function(H)
   ok(not H.exists(file.path), "the plan file left ROADMAP/plans")
   ok(H.exists(root .. "/lib.nvim/Backlog/FEATURES/2026-10-03_chain-plan.md"))
   has(H.read(root .. "/lib.nvim/Backlog/README.md"), "chain-plan")
+  -- a new area has no Backlog index yet: closing a plan makes it, with the row
+  local bare = assert(
+    plans.new("lib.nvim", { root = root, today = F.TODAY, title = "Bare plan", phases = "a" })
+  )
+  vim.fn.delete(root .. "/lib.nvim/Backlog/README.md")
+  local bare_res =
+    assert(plans.close(bare.id, { root = root, date = "2026-10-04", today = F.TODAY }))
+  eq(bare_res.readme, "updated")
+  has(H.read(root .. "/lib.nvim/Backlog/README.md"), "bare-plan")
   local summary = last.plan_summaries[file.id]
   eq(summary.title, "Chain plan")
   eq(summary.tasks, 2)

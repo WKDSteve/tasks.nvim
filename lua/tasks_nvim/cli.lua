@@ -121,7 +121,7 @@ commands:
                                           is, so another session's uncommitted tasks stay out of the commit
   migrate-actor [<area>] [--write]        propose actor=me for tasks that wait for you (status decision, tag
                                           needs-user) and leave every other task EMPTY; dry run unless --write
-  new <area>[,<area>...] <title> [--kind=k] [--prio=1..3] [--effort=XS..XL|0.5d] [--value=1..5] [--actor=cdx|me|pair] [--after=id,id] [--order=2.5] [--plan=id|--project=id] [--phase=word] [--tags=a,b]
+  new <area>[,<area>...] <title> [--kind=k] [--prio=1..3] [--effort=XS..XL|0.5d] [--value=1..5] [--actor=cdx|me|pair] [--after=id,id] [--order=2.5] [--plan=id|--project=id] [--phase=word] [--created=YYYY-MM-DD] [--tags=a,b]
        [--category=c,d] [--scope=a,b] [--severity=low|medium|high|critical] [--due=YYYY-MM-DD] [--start=YYYY-MM-DD] [--repeat=8w] [--repeat-from=done|due] [--refs=path,repo@sha] [--links=https://...,...]
        [--summary=text] [--slug=slug] [--status=s] [--waits-for=key]
        [--lang=de|en] [--folder]             create a task file (--lang: body headings;
@@ -342,6 +342,7 @@ local SPECS = {
   index = { value = {}, flag = { "check", "all", "staged" } },
   new = {
     value = {
+      "created",
       "kind",
       "prio",
       "effort",
@@ -1468,6 +1469,7 @@ function commands.new(ctx)
     web_links = opt.links --[[@as string|nil]],
     due = opt.due --[[@as string|nil]],
     start = opt.start --[[@as string|nil]],
+    created = opt.created --[[@as string|nil]],
     repeat_every = opt["repeat"] --[[@as string|nil]],
     repeat_from = opt["repeat-from"] --[[@as string|nil]],
     lang = opt.lang --[[@as "de"|"en"|nil]],

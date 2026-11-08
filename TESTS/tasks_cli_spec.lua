@@ -104,6 +104,17 @@ return function(H)
   )
   ok(not H.exists(root .. "/ALL/ROADMAP/TASKS.md"))
 
+  -- a title that starts with `--` (as `--title=`), written down later with its own day
+  r = run({ "new", "ALL", "--created=2026-01-05", "--no-index", "--title=--diagnose the stall" })
+  eq(r.code, 0, r.err)
+  local back = H.read(root .. "/ALL/ROADMAP/tasks/diagnose-the-stall.md")
+  has(back, "title: --diagnose the stall")
+  has(back, "created: 2026-01-05")
+  vim.fn.delete(root .. "/ALL/ROADMAP/tasks/diagnose-the-stall.md") -- later lists expect the fixture as it was
+  r = run({ "new", "ALL", "Bad day", "--created=yesterday", "--no-index" })
+  eq(r.code, 1)
+  has(r.err, "created is not a date")
+
   r = run({ "new", "lib.nvim" })
   eq(r.code, 2, "title missing")
   r = run({ "new", "nope.nvim", "T" })
@@ -270,7 +281,8 @@ return function(H)
   vim.fn.delete(root .. "/ALL/Backlog/README.md")
   r = run({ "done", "ALL/via-option" })
   eq(r.code, 0)
-  has(r.err, "Backlog/README.md does not exist")
+  eq(r.err, "", "no warning: the finish makes the index of a new area")
+  has(H.read(root .. "/ALL/Backlog/README.md"), "via-option")
 
   -- ── template / areas / export ───────────────────────────────────────────
   r = run({ "template", "--title=Hello", "--kind=bug", "--prio=1", "--tags=a,b" })

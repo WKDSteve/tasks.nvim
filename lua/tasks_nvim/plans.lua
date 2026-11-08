@@ -1038,6 +1038,27 @@ function M.close(id, opts)
       return fail("cannot write " .. readme_path .. ": " .. tostring(rwerr))
     end
   end
+  if not readme_old then
+    -- a new area has no Backlog index yet: this finish makes it, with the row
+    local wrote, rwerr = mutate.readme_create(readme_path, plan.area, "FEATURES", rel, readme_row)
+    if not wrote then
+      -- as above: the plan file goes back before the restore drops the finished copy
+      local back, b_err = fsio.create_exclusive(plan.path, old_text)
+      if not back and not fsio.is_file(plan.path) then
+        checkpoint.forget(cp, target)
+        return fail(
+          "cannot write " .. readme_path .. ": " .. tostring(rwerr),
+          ("%s (cannot restore it: %s; the finished copy %s holds the text)"):format(
+            plan.path,
+            tostring(b_err),
+            target
+          )
+        )
+      end
+      return fail("cannot write " .. readme_path .. ": " .. tostring(rwerr))
+    end
+    readme_state = "updated"
+  end
   checkpoint.discard(cp)
   return { id = id, from = plan.path, to = target, readme = readme_state }, nil
 end

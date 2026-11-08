@@ -7,6 +7,7 @@ the version is not tagged yet (the repository is not published).
 
 ### Added
 
+- `tasks new --created=YYYY-MM-DD` for a task written down later (the title may start with `--`: `--title=...` or after a `--`).
 - `tasks-export/1` (additive): `tasks.groupings` has a read-only field `project` (after `phase`: a task stands in the project of its plan, or in its own), `GroupField` knows it, and a saved view may group by it and select `select.projects` (`sel_projects` in its file). `plan --project=` draws a `Plan` column in the stage tables, and the overview block of a project has a head (title, status, stages, goal).
 - `:Tasks new` form: a `Project:` line (and `project=` pre-fill) for a task that belongs to a project itself.
 
@@ -52,6 +53,7 @@ the version is not tagged yet (the repository is not published).
 
 ### Fixed
 
+- `done` and a plan's close make `<area>/Backlog/README.md` when a new area has none (they only warned and added no row; a rollback removes a README the run made).
 - `tasks.lists`: the schema took no `overdue` in the options of a stored list, so a list saved with `--overdue` made the document invalid.
 - `tasks-ops/1` dry run: an `after` (or `blocked_by` of a `set`) on a task an earlier `new` of the same request would create was refused as `after-dangling`, though the real run accepts it; the dry run now counts those tasks as existing, so both judge the request alike: also for a bare `[[slug]]` to one of them, for a repeated title (the dry run reports the `-2` id the real run takes) and for a circle that runs through one of them (a hard stage gate). Operations on such a task (`set`, `done`, `tick_step`, `answer`, `append_note`, `add_steps`, `set_body`, `reopen`, `attach`) see the file `new` would write and answer as the real run does (`would_change`, `would_done` with the version `new` writes, so its confirm token holds as long as no earlier operation of the request changes that task); `reorder` and `move_area` of it are still `not_found` in a dry run.
 - The `## Plan` section is found when its heading has more than one space or a tab after `##` (`##  Plan`): progress, `tick_all` and `add_steps` missed its steps before.

@@ -801,11 +801,14 @@ return function(H)
   has(readme_crlf, "crlf-done.md")
   ok(not readme_crlf:gsub("\r\n", ""):find("\n", 1, true), "README stays pure CRLF")
 
-  -- a README that does not exist: the move still works, and says so
+  -- a README that does not exist (a new area): this finish makes it, with the row
   vim.fn.delete(root .. "/ALL/Backlog/README.md")
   F.task(H, root, "ALL", "no-readme", F.meta("No readme", "open"))
   local nr_done = assert(mutate.done("ALL/no-readme", o))
-  eq(nr_done.readme, "missing")
+  eq(nr_done.readme, "updated")
+  local made_readme = H.read(root .. "/ALL/Backlog/README.md")
+  has(made_readme, "# ALL -- Backlog")
+  has(made_readme, "2026-10-03_no-readme.md")
   ok(H.exists(root .. "/ALL/Backlog/TASKS/2026-10-03_no-readme.md"))
 
   -- no checkpoint directory is left behind after successful runs

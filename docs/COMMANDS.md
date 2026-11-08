@@ -286,6 +286,10 @@ opens with the same title and ref filled in.
 :'<,'>Tasks new lib.nvim                    " title = first selected line, refs = this file:line
 ```
 
+On the command line `tasks new <area> <title> --created=YYYY-MM-DD` puts a task on the record on an earlier day (history written
+down later; `updated` stays today). A title that starts with `--` goes in as `--title=--diagnose ...` (or after a `--`
+that ends the options).
+
 ### `:Tasks set <id> key=value ...`
 
 Changes frontmatter of an *open* task and sets `updated` -- but only when something really
@@ -622,6 +626,9 @@ so a finished task can be traced back to its code afterwards. `commits=` adds to
 `commits` (a commit named twice is listed once); `:Tasks set <id> commits=[...]` replaces the
 list at any time, and `tasks check` reports a malformed entry (`bad-commit`). `done_in` stays
 free text.
+
+A finished task is entered into the Backlog index `<area>/Backlog/README.md`; an area that has none yet (a new one) gets the file
+with that first row, as closing a plan does.
 
 **A routine** (`repeat: 8w`, see [ENGINE.md](ENGINE.md#routines-repeat)) starts its next round when it is finished: the
 finished round goes to `Backlog/` as always, and a new open task with the slug `<base>-<due>` takes its place. The CLI

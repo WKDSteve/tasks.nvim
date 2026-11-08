@@ -109,6 +109,8 @@ return function(H)
         "actor",
         "after",
         "category",
+        -- history written down later: a shell flag, not a field of the form
+        "created",
         "due",
         "effort",
         "kind",
