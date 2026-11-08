@@ -290,6 +290,7 @@ end
 ---@field links? string  # Web addresses, comma separated.
 ---@field after? string  # Task ids, comma separated.
 ---@field plan? string
+---@field project? string
 ---@field phase? string
 ---@field due? string    # `YYYY-MM-DD`.
 ---@field start? string  # `YYYY-MM-DD`.
@@ -339,6 +340,7 @@ function M.open(opts)
       links = opts.links,
       after = opts.after,
       plan = opts.plan,
+      project = opts.project,
       phase = opts.phase,
       due = opts.due,
       start = opts.start,

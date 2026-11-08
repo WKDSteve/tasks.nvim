@@ -181,7 +181,7 @@ local function selection(ticks)
 end
 
 ---Fresh form text.
----@param opts? { area?: string, title?: string, summary?: string, areas?: string[], tags?: string, other?: string, refs?: string, links?: string, after?: string, plan?: string, phase?: string, due?: string, start?: string, ticks?: table<string, string|string[]>, hint?: string, lang?: "de"|"en" }
+---@param opts? { area?: string, title?: string, summary?: string, areas?: string[], tags?: string, other?: string, refs?: string, links?: string, after?: string, plan?: string, project?: string, phase?: string, due?: string, start?: string, ticks?: table<string, string|string[]>, hint?: string, lang?: "de"|"en" }
 ---  `ticks` overrides the ticked values per field name; `hint` is the second line (the keys of the user's setup);
 ---  `lang` picks the headings of the body sections (default `de`).
 ---@return string[] lines
@@ -240,6 +240,7 @@ function M.template(opts)
   lines[#lines + 1] = "Links: " .. (opts.links or "")
   lines[#lines + 1] = "After: " .. (opts.after or "")
   lines[#lines + 1] = "Plan: " .. (opts.plan or "")
+  lines[#lines + 1] = "Project: " .. (opts.project or "")
   lines[#lines + 1] = "Phase: " .. (opts.phase or "")
   lines[#lines + 1] = "Due: " .. (opts.due or "")
   lines[#lines + 1] = "Start: " .. (opts.start or "")
@@ -262,6 +263,7 @@ end
 ---@field links string
 ---@field after string   # Task ids, comma separated.
 ---@field plan string
+---@field project string  # A task of a project itself (instead of `Plan:`).
 ---@field phase string
 ---@field due string     # `YYYY-MM-DD` or empty.
 ---@field start string   # `YYYY-MM-DD` or empty.
@@ -284,6 +286,7 @@ function M.parse(lines)
     links = "",
     after = "",
     plan = "",
+    project = "",
     phase = "",
     due = "",
     start = "",
@@ -333,6 +336,7 @@ function M.parse(lines)
           or key == "links"
           or key == "after"
           or key == "plan"
+          or key == "project"
           or key == "phase"
           or key == "due"
           or key == "start"
@@ -483,8 +487,8 @@ function M.validate(parsed, areas, root, lang)
     end
     opts.web_links = links
   end
-  -- the relations are judged by the engine (`after-dangling`, `plan-unknown`, `plan-phase`), the dates here too
-  for _, key in ipairs({ "after", "plan", "phase" }) do
+  -- the relations are judged by the engine (`after-dangling`, `plan-unknown`, `project-unknown`, `plan-phase`), the dates here too
+  for _, key in ipairs({ "after", "plan", "project", "phase" }) do
     local text = trim(parsed[key])
     if text ~= "" then
       opts[key] = text

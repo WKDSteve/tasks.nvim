@@ -230,6 +230,7 @@ return function(H)
     "phase",
     "plan",
     "prio",
+    "project",
     "refs",
     "scope",
     "severity",
@@ -245,7 +246,7 @@ return function(H)
   end
   vim.list_extend(
     in_form,
-    { "tags", "refs", "links", "summary", "after", "plan", "phase", "due", "start" }
+    { "tags", "refs", "links", "summary", "after", "plan", "project", "phase", "due", "start" }
   )
   table.sort(in_form)
   eq(in_form, FORM_FIELDS, "the fields of the :Tasks new form")
@@ -253,14 +254,8 @@ return function(H)
   for name in pairs(require("tasks_nvim.ops").NEW_FIELDS) do
     -- the slug comes from the title; `waits_for` creates a task that is parked from the start, which no form offers
     -- (a task is parked with a reason later: `set <id> waits_for=<key>`); a routine is made with `repeat=` on the
-    -- command line or `set`, not by the form; a task of a project itself (`project`) has no field in the form yet
-    if
-      name ~= "slug"
-      and name ~= "waits_for"
-      and name ~= "repeat"
-      and name ~= "repeat_from"
-      and name ~= "project"
-    then
+    -- command line or `set`, not by the form
+    if name ~= "slug" and name ~= "waits_for" and name ~= "repeat" and name ~= "repeat_from" then
       engine_new[#engine_new + 1] = name
     end
   end
@@ -289,11 +284,15 @@ return function(H)
   eq(rv.opts.phase, "build")
   eq(rv.opts.due, "2026-09-01")
   eq(rv.opts.start, "2026-08-01")
+  local pj = form.template({ area = "ALL", title = "T", project = "ALL/the-project" })
+  ok(find(pj, "Project: ALL/the-project"), "prefilled")
+  eq(assert(form.validate(form.parse(pj), { "ALL" })).opts.project, "ALL/the-project")
   local blank =
     assert(form.validate(form.parse(form.template({ area = "ALL", title = "T" })), { "ALL" }))
   ok(
     blank.opts.after == nil
       and blank.opts.plan == nil
+      and blank.opts.project == nil
       and blank.opts.phase == nil
       and blank.opts.due == nil
       and blank.opts.start == nil,
