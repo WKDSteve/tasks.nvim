@@ -475,6 +475,7 @@ local function closed_text(block, closed, shared, root)
   if
     block.attrs.area
     or block.attrs["for"]
+    or block.attrs.overview
     or block.scope == "all"
     or vault.has_area(root, block.scope)
   then

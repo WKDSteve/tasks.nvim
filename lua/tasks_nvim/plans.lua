@@ -515,6 +515,9 @@ function M.new(area, opts)
         { code = "invalid_argument" }
     end
     local raw = vim.trim(tostring(opts.project))
+    if raw:find("[\r\n]") then
+      return nil, "project must be one line", { code = "invalid_argument" }
+    end
     link_resolver = link_resolver or wikilinks.resolver(root)
     local pid, perr2 = wikilinks.typed_id(raw, "project", link_resolver)
     if not pid then

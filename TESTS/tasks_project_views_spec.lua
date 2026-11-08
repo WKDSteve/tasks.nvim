@@ -233,5 +233,15 @@ return function(H)
   eq(refreshed.changed, true)
   eq(refreshed.refreshed, { "mobile" })
   eq(H.read(doc), written)
+  -- a plan finished a moment ago whose slug is the block's name does not turn the overview into its "done" line
+  local with_closed = assert(
+    plan_scope.refresh_document(
+      doc,
+      root,
+      { ["cascade.nvim/mobile"] = "Plan cascade.nvim/mobile is done" }
+    )
+  )
+  eq(with_closed.changed, false)
+  eq(H.read(doc), written)
   eq(run({ "projects", "--of=ALL/mobile", "--write=" .. doc, "--scope=mobile", "--check" }).code, 0)
 end

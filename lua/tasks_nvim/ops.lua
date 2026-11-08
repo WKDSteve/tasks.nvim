@@ -927,6 +927,7 @@ local function do_new(op, ctx)
     -- a dry run: the ids and slugs earlier `new` ops of the request take, as the real run has them on disk by then
     reserved = ctx.dry and ctx.created or nil,
     link_resolver = link_resolver(ctx),
+    relations_judged = true,
   })
   new_opts.web_links, new_opts.links = fields.links, nil
   -- `repeat` is a word of Lua: `mutate.new` calls the field `repeat_every`
@@ -1418,7 +1419,7 @@ local function close_file(op, ctx, kind)
     local file, ferr = require("tasks_nvim.plans").find(op.id, { root = ctx.root })
     if not file then
       local held = scan.find_done(op.id, { root = ctx.root })
-      if held then
+      if held and require("tasks_nvim.projects").finished_kind(held) == "plan" then
         return { ok = true, id = op.id, outcome = "unchanged", changed_ids = {} }
       end
       return refuse("not_found", tostring(ferr))
@@ -1451,7 +1452,7 @@ local function close_file(op, ctx, kind)
     local file, ferr = require("tasks_nvim.projects").find(op.id, { root = ctx.root })
     if not file then
       local held = scan.find_done(op.id, { root = ctx.root })
-      if held then
+      if held and require("tasks_nvim.projects").finished_kind(held) == "project" then
         return { ok = true, id = op.id, outcome = "unchanged", changed_ids = {} }
       end
       return refuse("not_found", tostring(ferr))

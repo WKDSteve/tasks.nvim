@@ -139,6 +139,7 @@
 ---@field body? string                # The body in place of the template's sections.
 ---@field dry_run? boolean            # Only the id it would get; nothing is created.
 ---@field reserved? table<string, any>   # Ids taken though no file has them yet (a dry run: earlier `new` ops).
+---@field relations_judged? boolean       # The caller judged `after`, `plan`, `project`, `phase` itself (the write door does): `new` does not refuse plan and project together.
 ---@field lang? "de"|"en"             # Language of the body headings (default "de").
 ---@field status? string
 ---@field summary? string

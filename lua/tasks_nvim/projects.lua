@@ -201,6 +201,17 @@ function M.is_finished_plan(item)
   return meta.areas ~= nil or meta.phase_order ~= nil or meta.gate ~= nil or meta.target ~= nil
 end
 
+---What a finished item of a Backlog is: `"plan"`, `"project"` (told by `closed_kind`) or `"task"`.
+---@param item Tasks.Task
+---@return "plan"|"project"|"task"
+function M.finished_kind(item)
+  local meta = item.meta or {}
+  if meta.closed_kind == "project" then
+    return "project"
+  end
+  return M.is_finished_plan(item) and "plan" or "task"
+end
+
 ---Every finished item of every area's Backlog (finished tasks and closed plan files), through the parse cache.
 ---@param opts? { root?: string, link_resolver?: Tasks.LinkResolver }
 ---@return Tasks.Task[]

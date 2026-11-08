@@ -1219,6 +1219,10 @@ function M.new(area, opts)
   end
   local project
   if opts.project ~= nil then
+    if opts.plan ~= nil and not opts.relations_judged then
+      -- the write door judges the relations itself (`edges.validate`, with the details a front end shows)
+      return nil, "a task has plan: or project:, not both"
+    end
     local id, typed = plan_ref(opts.project, resolver, "project")
     if not id then
       return nil, typed --[[@as string]]

@@ -357,4 +357,41 @@ return function(H)
   eq(closed.plans_closed, { "lib.nvim/hand-plan" })
   eq(closed.projects_closed, { "ALL/hand" })
   eq(closed.changed_ids, { "lib.nvim/hand-plan", "ALL/hand" })
+
+  -- ── review fixes ──
+  -- a close of something already finished is "unchanged" only when it was finished as that kind
+  eq(one({ { op = "plan_close", id = "lib.nvim/hand-plan" } }).outcome, "unchanged")
+  eq(one({ { op = "project_close", id = "ALL/hand" } }).outcome, "unchanged")
+  eq(
+    one({ { op = "project_close", id = "lib.nvim/hand-plan" } }).error.code,
+    "not_found",
+    "a plan is no project"
+  )
+  eq(
+    one({ { op = "plan_close", id = "ALL/hand" } }).error.code,
+    "not_found",
+    "a project is no plan"
+  )
+  F.task(H, root, "lib.nvim", "gone", F.meta("Gone", "done"))
+  local done_task = one({ { op = "plan_close", id = "lib.nvim/gone" } })
+  eq(done_task.ok, false, "a task id is neither")
+  -- a project named over several lines is refused, as plans.set refuses it
+  local two_lines, perr, pinfo = plans.new("lib.nvim", {
+    root = root,
+    today = F.TODAY,
+    title = "Two lines",
+    project = "[[ALL/hand" .. string.char(10) .. "]]",
+  })
+  eq(two_lines, nil)
+  eq(pinfo.code, "invalid_argument", tostring(perr))
+  -- a task has plan: or project:, not both
+  local together, berr = require("tasks_nvim.mutate").new("lib.nvim", {
+    root = root,
+    today = F.TODAY,
+    title = "Both",
+    plan = "lib.nvim/the-plan",
+    project = "ALL/hand",
+  })
+  eq(together, nil)
+  ok(tostring(berr):find("not both", 1, true), tostring(berr))
 end
