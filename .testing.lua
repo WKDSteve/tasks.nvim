@@ -39,6 +39,9 @@ return {
       "git",
       -- the test-script spec runs scripts/test.sh in a throwaway project with a stand-in nvim
       "bash",
+      -- the launcher spec runs bin/tasks (sh) and bin/tasks.cmd (cmd) like a user does
+      "sh",
+      "cmd",
     },
   },
   -- gated: a failed conformance check makes `scripts/test.sh conformance` exit 1 (docs/CONFORMANCE.md of testing.nvim)

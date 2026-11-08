@@ -191,6 +191,8 @@ form = {...} }`, for example `keys = { form = { cancel = false } }` ([docs/BINDI
 
 ## Headless
 
+With `bin/` of this checkout on the PATH (`bin/tasks`, `bin/tasks.cmd` on Windows) the short form `tasks <command> ...` does the same as the long call below.
+
 ```sh
 export TASKS_VAULT=~/vault
 nvim --headless -u NONE -l scripts/tasks.lua list --status=doing
