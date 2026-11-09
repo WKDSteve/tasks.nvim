@@ -21,6 +21,7 @@ local harvest = require("lib.nvim.harvest")
 local notify = require("lib.nvim.notify").create("[tasks]")
 
 local check = require("tasks_nvim.check")
+local claims = require("tasks_nvim.claims")
 local filter_opts = require("tasks_nvim.filter_opts")
 local fsio = require("tasks_nvim.fsio")
 local index = require("tasks_nvim.index")
@@ -2377,6 +2378,75 @@ function M.task_done(ctx)
       finish_task(id, opts)
     end
   )
+end
+
+-- ── task claim / unclaim ─────────────────────────────────────────────────────
+
+---The file of an open task, to bring its buffers up to date after a claim set or took the status.
+---@param id string
+local function refresh_task_buffers(id)
+  local task = scan.find(id)
+  if task and task.path then
+    refresh_buffers(task.path)
+  end
+end
+
+---`:Tasks claim <id> [for=4h] [by=<name>] [note=<why>] [--renew] [--force]`: reserve a task while somebody works on it
+---(`tasks_nvim.claims`, the verb the CLI has). Without `by=` the editor is `cdx:<session>` in a Claude Code session,
+---else `<user>@<host>`.
+---@param ctx table
+function M.task_claim(ctx)
+  if not no_stray_words(ctx) then
+    return
+  end
+  local id = ctx.args.id
+  local res, err = claims.acquire(id, {
+    by = ctx.kv.by,
+    for_ = ctx.kv["for"],
+    note = ctx.kv.note,
+    renew = ctx.flags.renew == true,
+    force = ctx.flags.force == true,
+  })
+  if not res then
+    notify.error(tostring(err))
+    return
+  end
+  if res.taken_over then
+    notify.warn(
+      ("took over the claim of %s (%s)"):format(res.taken_over.by, claims.describe(res.taken_over))
+    )
+  end
+  refresh_task_buffers(id)
+  notify.info(
+    ("%s %s for %s until %s"):format(
+      res.renewed and "renewed" or "claimed",
+      id,
+      res.claim.by,
+      res.claim.until_
+    )
+  )
+end
+
+---`:Tasks unclaim <id> [by=<name>] [note=<why>] [status=open|parked|decision] [--force]`: give a task back (the status
+---it goes back to: `open` unless said otherwise).
+---@param ctx table
+function M.task_unclaim(ctx)
+  if not no_stray_words(ctx) then
+    return
+  end
+  local id = ctx.args.id
+  local res, err = claims.release(id, {
+    by = ctx.kv.by,
+    note = ctx.kv.note,
+    status = ctx.kv.status,
+    force = ctx.flags.force == true,
+  })
+  if not res then
+    notify.error(tostring(err))
+    return
+  end
+  refresh_task_buffers(id)
+  notify.info(("unclaimed %s: %s"):format(id, res.status or "-"))
 end
 
 -- ── task template / open ─────────────────────────────────────────────────────

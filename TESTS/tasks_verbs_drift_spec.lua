@@ -19,8 +19,6 @@ return function(H)
     "call",
     "check",
     "ci",
-    -- the editor has no `:Tasks claim` yet (a claim is made by an agent or a script; `by` of the editor is user@host)
-    "claim",
     "export",
     "import",
     "init-vault",
@@ -33,7 +31,6 @@ return function(H)
     "project-close",
     "projects",
     "show",
-    "unclaim",
   }
   local ONLY_COMPOSER = { "folder", "open", "planfile", "preview" }
   local OPTIONS = {
@@ -147,11 +144,15 @@ return function(H)
     },
     -- the editor asks before it changes many tasks (`--yes` skips the question)
     ["release"] = { composer = { "yes" }, cli = { "no-index" } },
+    -- the editor names itself (`cdx:<session>` or user@host), the CLI takes `--by`; `for` and `note` are key=value
+    -- words in the editor, so they count with the options of the CLI that the editor's flags do not name
+    ["claim"] = { composer = {}, cli = { "by", "for", "note" } },
     ["set"] = { composer = {}, cli = { "by", "force", "no-index", "note" } },
     -- the editor takes testing.nvim's path from setup({ sheet_run = { testing_cli } })
     ["sheet-run"] = { composer = {}, cli = { "testing-cli" } },
     -- the editor asks in a dialog and reads the answer from the buffer
     ["sheet-ai"] = { composer = {}, cli = { "from", "testing-cli", "yes" } },
+    ["unclaim"] = { composer = {}, cli = { "by", "note", "status" } },
     ["template"] = {
       composer = { "force", "to" },
       cli = { "effort", "kind", "lang", "prio", "tags", "title" },

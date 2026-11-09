@@ -7,6 +7,7 @@ the version is not tagged yet (the repository is not published).
 
 ### Added
 
+- `:Tasks claim <id> [for=4h] [by=<name>] [note=<why>] [--renew] [--force]` and `:Tasks unclaim <id> [by=] [note=] [status=open|parked|decision] [--force]`: the claim verbs of the CLI in the editor (same engine, `tasks_nvim.claims`); the open task buffers are refreshed, the editor is `cdx:<session>` in a Claude Code session, else `<user>@<host>`.
 - The short command `tasks` (`bin/tasks` for POSIX shells, `bin/tasks.cmd` for Windows): runs `scripts/tasks.lua`, hands the exit code through, and says so when `nvim` is missing or the launcher is away from its checkout.
 - `tasks new --created=YYYY-MM-DD` for a task written down later, not after today (the title may start with `--`: `--title=...` or after a `--`).
 - `tasks new` warns on stderr when its `--plan`, `--project` or `--phase` names nothing (the task is still made; `check` reports it later).

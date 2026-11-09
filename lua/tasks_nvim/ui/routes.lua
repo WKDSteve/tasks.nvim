@@ -943,6 +943,70 @@ local function nested_routes()
     },
 
     {
+      path = { "task", "claim" },
+      args = {
+        {
+          name = "id",
+          type = "TASK_ID",
+          desc = "Id of the task to reserve, as area/slug",
+        },
+      },
+      kv = {
+        { key = "for", type = "STRING", desc = "How long (45m, 2h; default 4h, at most 24h)" },
+        {
+          key = "by",
+          type = "STRING",
+          desc = "Who works on it (default: cdx:<session> or user@host)",
+        },
+        {
+          key = "note",
+          type = "STRING",
+          desc = "Why, with --force (taking a claim of somebody else)",
+        },
+      },
+      flags = {
+        { name = "renew", bool = true, desc = "Prolong a claim of your own" },
+        { name = "force", bool = true, desc = "Pass a claim of somebody else (needs note=<why>)" },
+      },
+      desc = "Reserve an open task while you work on it (status doing, a claim file outside the task); an expired claim is taken over, one of somebody else is refused unless --force with note=",
+      run = function(ctx)
+        cmd().task_claim(ctx)
+      end,
+    },
+
+    {
+      path = { "task", "unclaim" },
+      args = {
+        {
+          name = "id",
+          type = "TASK_ID",
+          desc = "Id of the task to give back, as area/slug",
+        },
+      },
+      kv = {
+        {
+          key = "by",
+          type = "STRING",
+          desc = "Who gives it back (default: cdx:<session> or user@host)",
+        },
+        { key = "note", type = "STRING", desc = "Why, with --force (a claim of somebody else)" },
+        {
+          key = "status",
+          type = "STRING",
+          values = { "open", "parked", "decision" },
+          desc = "The status it goes back to (default open)",
+        },
+      },
+      flags = {
+        { name = "force", bool = true, desc = "Pass a claim of somebody else (needs note=<why>)" },
+      },
+      desc = "Give a reserved task back: the claim goes, the status returns to open (or status=parked|decision); a claim of somebody else is refused unless --force with note=",
+      run = function(ctx)
+        cmd().task_unclaim(ctx)
+      end,
+    },
+
+    {
       path = { "task", "attach" },
       args = {
         {

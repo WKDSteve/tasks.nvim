@@ -442,4 +442,68 @@ return function(H)
   local listed = run({ "list", "lib.nvim", "--ready", "--format=ids", "--by=chat-2" })
   ok(not listed.out:find(ready_a, 1, true), "the CLI list: " .. listed.out)
   ok(listed.out:find(ready_b, 1, true))
+
+  -- ── the editor: `:Tasks claim` and `:Tasks unclaim` (the same engine, the words of the editor) ──────────────────────
+  local cmd = require("tasks_nvim.ui.cmd")
+  require("tasks_nvim.vault").set_root(root)
+  local told = {}
+  local real_notify = vim.notify
+  vim.notify = function(msg)
+    told[#told + 1] = tostring(msg)
+  end
+  local function said()
+    local all = table.concat(told, "\n")
+    told = {}
+    return all
+  end
+  local ed = task("editor-claim")
+  cmd.task_claim({
+    rest = {},
+    args = { id = ed },
+    kv = { by = "me@here", ["for"] = "2h" },
+    flags = {},
+  })
+  has(said(), "claimed " .. ed .. " for me@here until")
+  eq(claims.read(root, ed).by, "me@here")
+  eq(scan.find(ed, { root = root }).status, "doing")
+  -- again with the same name: a claim of one's own is renewed only with --renew, else it is just made again
+  cmd.task_claim({
+    rest = {},
+    args = { id = ed },
+    kv = { by = "me@here" },
+    flags = { renew = true },
+  })
+  has(said(), "renewed " .. ed)
+  -- another name is refused and nothing changes; --force without a note is refused too
+  cmd.task_claim({ rest = {}, args = { id = ed }, kv = { by = "other@there" }, flags = {} })
+  has(said(), "is claimed by me@here")
+  cmd.task_claim({
+    rest = {},
+    args = { id = ed },
+    kv = { by = "other@there" },
+    flags = { force = true },
+  })
+  ok(said() ~= "", "--force without a note says why not")
+  eq(claims.read(root, ed).by, "me@here", "a refused claim changes nothing")
+  -- a stray word and a bad duration are said, and nothing is claimed
+  local plain = task("editor-plain")
+  cmd.task_claim({ rest = { "oops" }, args = { id = plain }, kv = {}, flags = {} })
+  has(said(), "unexpected argument: oops")
+  cmd.task_claim({ rest = {}, args = { id = plain }, kv = { ["for"] = "9d" }, flags = {} })
+  has(said(), "at most 24 hours")
+  eq(claims.read(root, plain), nil, "nothing was claimed")
+  -- unclaim: somebody else's claim is refused, the owner gives it back, the status returns
+  cmd.task_unclaim({ rest = {}, args = { id = ed }, kv = { by = "other@there" }, flags = {} })
+  ok(said() ~= "", "a claim of somebody else is refused")
+  eq(claims.read(root, ed).by, "me@here")
+  cmd.task_unclaim({
+    rest = {},
+    args = { id = ed },
+    kv = { by = "me@here", status = "parked" },
+    flags = {},
+  })
+  has(said(), "unclaimed " .. ed .. ": parked")
+  eq(claims.read(root, ed), nil, "the claim is gone")
+  eq(scan.find(ed, { root = root }).status, "parked")
+  vim.notify = real_notify
 end

@@ -622,6 +622,13 @@ claim is taken over. `--force --note=<why>` passes a claim of somebody else. `se
 `--by`, `--force` and `--note`; `next` takes `--by` and leaves out what others work on. `show` prints `claim: <by> since ... until ...`.
 `unclaim` is the verb for giving back (`release <key>` belongs to the parked tasks). Details: [ENGINE.md](ENGINE.md#claims).
 
+### `:Tasks claim <id>` and `:Tasks unclaim <id>`
+
+The two verbs of the section above in the editor, on the same engine: `:Tasks claim lib.nvim/the-task for=2h by=me@host [note=<why>] [--renew] [--force]`
+and `:Tasks unclaim lib.nvim/the-task [by=<name>] [status=open|parked|decision] [note=<why>] [--force]`. Without `by=` the editor is
+`cdx:<8 characters of $CLAUDE_CODE_SESSION_ID>` inside a Claude Code session, else `<user>@<host>`. The result is one line (`claimed`,
+`renewed`, `unclaimed`); a refusal names the owner. The buffers of the task are brought up to date.
+
 ### `:Tasks done <id> [done_in=...] [commits=repo@sha,...] [date=YYYY-MM-DD] [--yes]`
 
 `commits` is the list of every commit made for the task, `repo@sha` each (7-40 hex digits),

@@ -21,6 +21,7 @@ return function(H)
       "open",
       "task answer",
       "task attach",
+      "task claim",
       "task done",
       "task estimate",
       "task folderize",
@@ -37,6 +38,7 @@ return function(H)
       "task sheet-ai",
       "task sheet-run",
       "task template",
+      "task unclaim",
       "task waits",
       "tasks",
       "tasks index",
@@ -46,6 +48,7 @@ return function(H)
   eq(paths(routes.routes({ flat = true })), {
     "answer",
     "attach",
+    "claim",
     "done",
     "estimate",
     "folder",
@@ -65,6 +68,7 @@ return function(H)
     "sheet-ai",
     "sheet-run",
     "template",
+    "unclaim",
     "waits",
   }, "the flat grammar of `:Tasks`: no two routes share a path")
   eq(#routes.routes({ flat = true }), #routes.routes(), "same number of routes")
