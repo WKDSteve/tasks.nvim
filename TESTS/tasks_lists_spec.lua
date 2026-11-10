@@ -495,6 +495,28 @@ return function(H)
     return nil
   end)
   has(table.concat(labels, "\n"), "abnahme-by-hand (1)  [builtin]", "the menu shows the count")
+  -- A list without an area of its own keeps the dashboard's area when applied: it is counted there, not in the vault.
+  eq(
+    core.list_counts((lists.all()), root, "other-area")["abnahme-by-hand"],
+    0,
+    "counted in the area shown"
+  )
+  eq(core.list_counts((lists.all()), root, "lib.nvim")["abnahme-by-hand"], 1)
+  labels = {}
+  menu(
+    { root = root, filter = {}, sort = "default", persist = false, area = "other-area" },
+    function(items)
+      for _, item in ipairs(items) do
+        labels[#labels + 1] = item.label
+      end
+      return nil
+    end
+  )
+  has(
+    table.concat(labels, "\n"),
+    "abnahme-by-hand (0)  [builtin]",
+    "the menu counts in the dashboard's area"
+  )
   local state = { root = root, filter = {}, sort = "default", persist = false }
   ok(menu(state, pick("quick-wins")), "the menu hands control back")
   eq(state.sort, "roi", "applying a list sets its sort")

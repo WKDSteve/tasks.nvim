@@ -677,7 +677,7 @@ function M.lists_menu(state, after)
   for _, n in ipairs(notes) do
     notify.warn(n)
   end
-  local ok_counts, counts = pcall(core.list_counts, entries, state.root)
+  local ok_counts, counts = pcall(core.list_counts, entries, state.root, state.area)
   if not ok_counts then
     counts = {}
   end

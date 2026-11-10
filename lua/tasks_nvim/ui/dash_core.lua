@@ -140,8 +140,9 @@ end
 ---resolve (the menu says why when it is applied).
 ---@param entries Tasks.ListEntry[]
 ---@param root string
+---@param area? string  The area the dashboard shows: a list without an area of its own keeps it when applied.
 ---@return table<string, integer> counts  By list name.
-function M.list_counts(entries, root)
+function M.list_counts(entries, root, area)
   local out = {}
   local all = scan.all({ root = root })
   if not all then
@@ -158,7 +159,8 @@ function M.list_counts(entries, root)
     local resolved = require("tasks_nvim.lists").resolve(e.def)
     if resolved and not resolved.filter.stale_refs then
       local tasks = open
-      local wanted = resolved.area and scan.area_set(root, resolved.area)
+      local scope = resolved.area or area
+      local wanted = scope and scan.area_set(root, scope)
       if wanted then
         tasks = vim.tbl_filter(function(t)
           return wanted[t.area] == true
