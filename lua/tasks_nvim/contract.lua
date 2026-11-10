@@ -94,6 +94,7 @@ M.CAPABILITIES = {
   "reopen",
   "reorder",
   "repeat",
+  "rounds",
   "set_body",
   "snapshot",
   "task",
@@ -1115,6 +1116,22 @@ function M.task(id, opts)
       end, q.options),
     })
   end, found.questions and found.questions.items or {})
+  -- a routine: its finished rounds (capability `rounds`); they lie in the Backlog, outside the revision
+  local rounds, rounds_truncated = done_flow.rounds(found, { root = view.root })
+  if rounds then
+    doc.rounds = vim.tbl_map(function(r)
+      local t = r.task
+      return json.object({
+        id = t.id,
+        done = r.done,
+        due = model.is_date(t.due) and t.due or nil,
+        status = model.is_status(t.status) and t.status or nil,
+        done_in = t.done_in,
+        commits = (t.commits and #t.commits > 0) and vim.list_slice(t.commits, 1) or nil,
+      })
+    end, rounds)
+    doc.rounds_truncated = rounds_truncated or nil
+  end
   return seal(doc, rev_of(view, { doc.task })), nil
 end
 

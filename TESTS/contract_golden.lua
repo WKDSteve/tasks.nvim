@@ -36,6 +36,53 @@ G.cases = {
   { name = "groupings", method = "groupings" },
   { name = "views", method = "views" },
   { name = "task-alpha", method = "task", request = '{"params":{"id":"lib.nvim/alpha"}}' },
+  {
+    -- a routine with its finished rounds (capability `rounds`): two earlier rounds of the same stem, newest first; a
+    -- finished task of that stem without `repeat` and a routine of another stem are no rounds of it
+    name = "task-routine",
+    method = "task",
+    fresh = true,
+    request = function(root)
+      local function write(path, text)
+        vim.fn.mkdir(vim.fs.dirname(path), "p")
+        local fh = assert(io.open(path, "wb"))
+        fh:write(text)
+        fh:close()
+      end
+      local function file(title, status, extra)
+        return ("---\ntitle: %s\nstatus: %s\n%screated: 2026-01-01\nupdated: 2026-01-01\n---\n\nA routine.\n"):format(
+          title,
+          status,
+          extra
+        )
+      end
+      write(
+        root .. "/lib.nvim/ROADMAP/tasks/backup-check-2026-03-01.md",
+        file("Backup check", "open", "repeat: 4w\ndue: 2026-03-01\n")
+      )
+      write(
+        root .. "/lib.nvim/Backlog/TASKS/2026-01-03_backup-check.md",
+        file(
+          "Backup check",
+          "done",
+          "repeat: 4w\ndue: 2026-01-01\ndone_in: lib.nvim@aaa1111\ncommits: [lib.nvim@aaa1111]\n"
+        )
+      )
+      write(
+        root .. "/lib.nvim/Backlog/TASKS/2026-02-02_backup-check-2026-01-31.md",
+        file("Backup check", "done", "repeat: 4w\ndue: 2026-01-31\n")
+      )
+      write(
+        root .. "/lib.nvim/Backlog/TASKS/2026-01-05_backup-check-2026-01-04.md",
+        file("Backup check, once", "done", "due: 2026-01-04\n")
+      )
+      write(
+        root .. "/lib.nvim/Backlog/TASKS/2026-01-06_backup-checks.md",
+        file("Other routine", "done", "repeat: 1w\ndue: 2026-01-05\n")
+      )
+      return '{"params":{"id":"lib.nvim/backup-check-2026-03-01"}}'
+    end,
+  },
   { name = "bodies-page", method = "bodies", request = '{"params":{"limit":3,"offset":1}}' },
   {
     name = "estimate",

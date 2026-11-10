@@ -38,6 +38,7 @@
     "reopen",
     "reorder",
     "repeat",
+    "rounds",
     "set_body",
     "snapshot",
     "task",

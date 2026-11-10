@@ -1,0 +1,68 @@
+{
+  "body": "\nA routine.\n",
+  "body_truncated": false,
+  "digest": "sha256:6e214eccbbced108",
+  "engine": {
+    "git": "0000000",
+    "nvim": "0.0.0",
+    "version": "0.1.0-test"
+  },
+  "generated_at": "2026-01-01T00:00:00Z",
+  "kind": "tasks.task",
+  "plugin": "tasks.nvim",
+  "questions": [],
+  "rev": "rev:e3eb79",
+  "rounds": [
+    {
+      "done": "2026-02-02",
+      "due": "2026-01-31",
+      "id": "lib.nvim/backup-check-2026-01-31",
+      "status": "done"
+    },
+    {
+      "commits": [
+        "lib.nvim@aaa1111"
+      ],
+      "done": "2026-01-03",
+      "done_in": "lib.nvim@aaa1111",
+      "due": "2026-01-01",
+      "id": "lib.nvim/backup-check",
+      "status": "done"
+    }
+  ],
+  "schema": 1,
+  "steps": [],
+  "task": {
+    "after": [],
+    "area": "lib.nvim",
+    "blocked_by": [],
+    "category": [],
+    "created": "2026-01-01",
+    "due": "2026-03-01",
+    "etag": "sha256:db2ef92300c9469e",
+    "file": "lib.nvim/ROADMAP/tasks/backup-check-2026-03-01.md",
+    "folder": false,
+    "group": "open|-",
+    "id": "lib.nvim/backup-check-2026-03-01",
+    "problems": [],
+    "readiness": {
+      "leverage": 0,
+      "open_blockers": [],
+      "rank": 6,
+      "stage": 0,
+      "state": "ready"
+    },
+    "refs": [],
+    "repeat": "4w",
+    "slug": "backup-check-2026-03-01",
+    "status": "open",
+    "summary": "A routine.",
+    "tags": [],
+    "title": "Backup check",
+    "updated": "2026-01-01",
+    "valid": true
+  },
+  "vault": {
+    "id": "vault"
+  }
+}

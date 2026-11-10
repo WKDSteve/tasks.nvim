@@ -524,6 +524,21 @@ export type TaskDocument = Head & {
       chosen: boolean;
     }[];
   }[];
+  /**
+   * Only for a routine (`task.repeat`; capability `rounds`): its finished rounds, newest first, at most 100. A round is a task file below `<area>/Backlog/` that carries `repeat` and shares the routine's slug without the due date a round adds. `done` is the date in its file name (absent without one). The rounds lie outside the revision, as in `tasks.finished`.
+   */
+  rounds?: {
+    id: string;
+    done?: Date;
+    due?: Date;
+    status?: Status;
+    done_in?: string;
+    commits?: string[];
+  }[];
+  /**
+   * Present (true) when the routine has more finished rounds than `rounds` holds.
+   */
+  rounds_truncated?: true;
 };
 /**
  * tasks.next: what to start, with the reason; or why there is nothing.

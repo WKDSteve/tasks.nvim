@@ -1981,6 +1981,27 @@
             },
             "additionalProperties": false
           }
+        },
+        "rounds": {
+          "description": "Only for a routine (`task.repeat`; capability `rounds`): its finished rounds, newest first, at most 100. A round is a task file below `<area>/Backlog/` that carries `repeat` and shares the routine's slug without the due date a round adds. `done` is the date in its file name (absent without one). The rounds lie outside the revision, as in `tasks.finished`.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id"],
+            "properties": {
+              "id": { "type": "string" },
+              "done": { "$ref": "#/$defs/Date" },
+              "due": { "$ref": "#/$defs/Date" },
+              "status": { "$ref": "#/$defs/Status" },
+              "done_in": { "type": "string" },
+              "commits": { "type": "array", "items": { "type": "string" } }
+            },
+            "additionalProperties": false
+          }
+        },
+        "rounds_truncated": {
+          "description": "Present (true) when the routine has more finished rounds than `rounds` holds.",
+          "const": true
         }
       },
       "unevaluatedProperties": false

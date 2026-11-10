@@ -395,6 +395,53 @@ local function read_routine(id, opts)
   return { task = task, text = text }
 end
 
+---The stem all rounds of one routine share: the slug without the due date a later round carries (`-YYYY-MM-DD`), cut
+---so that a due date still fits below `mutate.MAX_SLUG`. Each round is the file `<stem>-<due>`.
+---@param slug string
+---@return string stem
+function M.round_base(slug)
+  local base = slug:gsub("%-%d%d%d%d%-%d%d%-%d%d$", "")
+  return (base:sub(1, mutate.MAX_SLUG - #"-YYYY-MM-DD"):gsub("%-+$", ""))
+end
+
+---The most earlier rounds `M.rounds` hands back.
+M.ROUNDS_MAX = 100
+
+---The finished rounds of a routine, newest first: the task files below `<area>/Backlog/` that are routines (`repeat`)
+---and share the routine's stem (`M.round_base`). The day a round was finished is the date in its name. Nil for a task
+---that is no routine; at most `ROUNDS_MAX` rounds (`truncated` says that more were finished).
+---@param task Tasks.Task
+---@param opts? { root?: string }
+---@return { task: Tasks.Task, done: string|nil }[]|nil rounds
+---@return boolean truncated
+function M.rounds(task, opts)
+  if not model.is_repeat(task.repeat_every) then
+    return nil, false
+  end
+  local stem = M.round_base(task.slug)
+  local out = {}
+  for _, t in ipairs(scan.backlog(task.area, opts) or {}) do
+    if t.repeat_every ~= nil and t.id ~= task.id and M.round_base(t.slug) == stem then
+      out[#out + 1] = {
+        task = t,
+        done = model.done_date(t.path) or model.done_date(vim.fs.dirname(t.path)),
+      }
+    end
+  end
+  -- newest first; a round with no date in its name last; the id breaks a tie, so the order is the same on every run
+  table.sort(out, function(a, b)
+    if (a.done or "") ~= (b.done or "") then
+      return (a.done or "") > (b.done or "")
+    end
+    return a.task.id > b.task.id
+  end)
+  local truncated = #out > M.ROUNDS_MAX
+  if truncated then
+    out = vim.list_slice(out, 1, M.ROUNDS_MAX)
+  end
+  return out, truncated
+end
+
 ---Start the next round of a routine whose finish just succeeded.
 ---@param routine { task: Tasks.Task, text: string }
 ---@param opts table
@@ -430,10 +477,7 @@ local function start_next_round(routine, opts)
     return nil, tostring(uerr)
   end
   text = reopen_boxes(text)
-  -- the base of the slug: without the date a round before this one carries; room is left for the date
-  local base = task.slug:gsub("%-%d%d%d%d%-%d%d%-%d%d$", "")
-  base = base:sub(1, mutate.MAX_SLUG - #due - 1):gsub("%-+$", "")
-  local slug = base .. "-" .. due
+  local slug = M.round_base(task.slug) .. "-" .. due
   local path = vault.tasks_dir(root, task.area) .. "/" .. slug .. ".md"
   local ok, werr = fsio.create_exclusive(path, text)
   if not ok then

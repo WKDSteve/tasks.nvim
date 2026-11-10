@@ -86,6 +86,7 @@ return function(H)
     "reopen",
     "reorder",
     "repeat",
+    "rounds",
     "set_body",
     "tick_step",
     "vault_marker",
@@ -617,6 +618,9 @@ return function(H)
   contract.LIMITS.body_bytes = limit
   eq({ #cut.body, cut.body_truncated }, { 10, true }, "a long body is cut and says so")
   golden("task-alpha")
+  eq(one.rounds, nil, "a task that is no routine has no rounds")
+  -- a routine: its finished rounds from the Backlog, newest first
+  golden("task-routine")
 
   -- ── bodies ──
   local bodies = call("bodies", { limit = 3, offset = 1 })

@@ -233,6 +233,48 @@ return function(H)
     "lib.nvim/sweep-2027-03-02",
     "the date of the round before is replaced, not piled up"
   )
+  -- the history: the open round knows the rounds before it (newest first, with what each one was finished with)
+  local third = assert(scan.find("lib.nvim/sweep-2027-03-02", { root = root }))
+  local rounds, truncated = done_flow.rounds(third, { root = root })
+  eq(
+    vim.tbl_map(function(r)
+      return { r.task.id, r.done, table.concat(r.task.commits or {}, ",") }
+    end, rounds),
+    {
+      -- a next round starts without the commits of the one before
+      { "lib.nvim/sweep-2027-01-05", "2027-01-05", "" },
+      { "lib.nvim/sweep", "2026-11-10", "repo@aaaaaaa" },
+    },
+    "the finished rounds of the routine, newest first"
+  )
+  eq(truncated, false)
+  local max = done_flow.ROUNDS_MAX
+  done_flow.ROUNDS_MAX = 1
+  local cut_rounds, cut = done_flow.rounds(third, { root = root })
+  done_flow.ROUNDS_MAX = max
+  eq({ #cut_rounds, cut_rounds[1].task.id, cut }, { 1, "lib.nvim/sweep-2027-01-05", true })
+  eq(
+    done_flow.rounds(
+      { id = "lib.nvim/sweep-x", area = "lib.nvim", slug = "sweep-x" },
+      { root = root }
+    ),
+    nil,
+    "no routine, no rounds"
+  )
+  -- the stem: the due date of a round goes, a long slug is cut so that one fits
+  eq(done_flow.round_base("sweep-2027-01-05"), "sweep")
+  eq(done_flow.round_base("sweep"), "sweep")
+  local long = ("a"):rep(55) .. "-b"
+  eq(
+    done_flow.round_base(long),
+    ("a"):rep(49),
+    "cut to room for -YYYY-MM-DD, no dash left at the end"
+  )
+  eq(
+    done_flow.round_base(("a"):rep(49) .. "-2027-01-05"),
+    ("a"):rep(49),
+    "a later round has the same stem"
+  )
   local checked = assert(require("tasks_nvim.check").run({ root = root }))
   for _, f in ipairs(checked.findings) do
     ok(f.code ~= "duplicate-id", "no id is open and finished at once: " .. f.message)
