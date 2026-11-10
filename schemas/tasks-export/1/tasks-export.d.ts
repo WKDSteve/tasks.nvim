@@ -1067,6 +1067,7 @@ export interface NamedList {
     value?: string;
     actor?: string;
     tag?: string;
+    sheet?: string;
     stale?: string;
     plan?: string;
     phase?: string;

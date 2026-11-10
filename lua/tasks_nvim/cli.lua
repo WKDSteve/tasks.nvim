@@ -67,7 +67,7 @@ commands:
        [--waits-for=key,key|none]
        [--stale=<days>|refs] [--stale-refs] [--blocked] [--reminders] [--ready|--waiting] [--unestimated] [--quick-win]
        [--overdue] [--due-before=YYYY-MM-DD] [--starts-after=YYYY-MM-DD]
-       [--sheet=red,stale,never,inbox,manual,green,unknown|any]
+       [--sheet=red,stale,never,inbox,manual,green,unknown|any|none]
        [--sort=default|prio-effort|severity|frecency|roi|due|created-desc|created-asc|updated-desc|updated-asc|remind|title]
        [--format=tsv|ids|json] [--done]   open tasks, sorted; one line each
        (--format=json: the tasks.list document in plan order or that of --sort, with [--limit=1..100] [--offset=N]; --done: the finished tasks)
@@ -85,7 +85,7 @@ commands:
         --overdue / --due-before=<day>: the `due:` date is before today / before that day; --starts-after=<day>: the
         `start:` date is after it; a task without the date never matches; --sort=due: earliest due first, undated last;
         --sheet: the state of the test-sheet block testing.nvim wrote into the task, its worst sheet (inbox:
-        green and waiting for your judgement), any: a task with the block; nothing is run)
+        green and waiting for your judgement), any: a task with the block, none: a task without it; nothing is run)
   plan-new <area> <title> [--areas=a,b] [--target=<id>] [--phases=a,b,c] [--gate=hard] [--summary=text]
                                           create ROADMAP/plans/<slug>.md; tasks join it with plan=<id> phase=<word>
   plan-close <area>/<slug>                finish a plan by hand (refused while a member task is open); the project it
@@ -303,6 +303,7 @@ local SPECS = {
       "value",
       "actor",
       "tag",
+      "sheet",
       "stale",
       "plan",
       "phase",
@@ -966,6 +967,7 @@ local function def_from_options(opt)
     "value",
     "actor",
     "tag",
+    "sheet",
     "stale",
     "plan",
     "phase",

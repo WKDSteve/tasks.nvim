@@ -165,8 +165,9 @@ lists = {
 }
 ```
 
-Three are built in (`quick-wins`, `small-and-important`, `unestimated`); a saved list of the same name replaces a
-built-in one, a list of `setup()` replaces a saved one ([docs/COMMANDS.md](docs/COMMANDS.md#tasks-lists)). The headless CLI
+Six are built in (`quick-wins`, `small-and-important`, `unestimated`, and the three groups of the acceptance:
+`abnahme-inbox`, `abnahme-manual`, `abnahme-by-hand` = `--tag=needs-live-test --sheet=none`); the dashboard's lists menu
+shows how many open tasks each selects. A saved list of the same name replaces a built-in one, a list of `setup()` replaces a saved one ([docs/COMMANDS.md](docs/COMMANDS.md#tasks-lists)). The headless CLI
 has no `setup()`: it knows the built-in and the saved lists.
 
 **Area groups.** A group is a name that stands for several areas wherever a filter takes one: `tasks list nvim`,

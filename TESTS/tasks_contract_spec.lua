@@ -553,7 +553,19 @@ return function(H)
     for _, l in ipairs(doc.lists) do
       names[#names + 1] = l.name .. ":" .. l.source
     end
-    eq(names, { "quick-wins:builtin", "small-and-important:builtin", "unestimated:builtin" })
+    eq(names, {
+      "abnahme-by-hand:builtin",
+      "abnahme-inbox:builtin",
+      "abnahme-manual:builtin",
+      "quick-wins:builtin",
+      "small-and-important:builtin",
+      "unestimated:builtin",
+    })
+    eq(
+      by_name(doc)["abnahme-by-hand"].options,
+      { tag = "needs-live-test", sheet = "none", status = "open,doing,decision" },
+      "the sheet filter of a list is an option word"
+    )
     eq(by_name(doc)["small-and-important"].options, {
       status = "open,doing",
       prio = "<=2",
@@ -589,7 +601,7 @@ return function(H)
     config.merge({ lists = {} })
     H.write(state, "{not json")
     doc = call("lists")
-    eq(#doc.lists, 3, "only the built-in lists are left")
+    eq(#doc.lists, 6, "only the built-in lists are left")
     local text = table.concat(doc.notes, "\n")
     has(text, "saved lists not used")
     lacks(text, "lists-state", "the state file is not named")

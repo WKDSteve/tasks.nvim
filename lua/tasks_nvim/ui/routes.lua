@@ -532,7 +532,7 @@ local LIST_FLAGS = {
     type = "STRING",
     values = vim.list_extend(
       vim.deepcopy(require("tasks_nvim.sheets").STATES),
-      { "unknown", "any" }
+      { "unknown", "any", "none" }
     ),
     desc = "Only tasks whose test sheets are in one of these states (any = has sheets)",
   },

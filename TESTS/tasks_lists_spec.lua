@@ -136,7 +136,30 @@ return function(H)
   local names = vim.tbl_map(function(e)
     return e.name
   end, (lists.all()))
-  eq(names, { "quick-wins", "small-and-important", "unestimated" }, "the built-in lists, sorted")
+  eq(names, {
+    "abnahme-by-hand",
+    "abnahme-inbox",
+    "abnahme-manual",
+    "quick-wins",
+    "small-and-important",
+    "unestimated",
+  }, "the built-in lists, sorted")
+  -- the acceptance: the three groups as lists, through the parser of the command line
+  eq(
+    assert(lists.resolve(lists.get("abnahme-by-hand").def)).filter.sheet,
+    { "none" },
+    "abnahme-by-hand: the live checks without a sheet"
+  )
+  eq(assert(lists.resolve(lists.get("abnahme-inbox").def)).filter.sheet, { "inbox" })
+  eq(assert(lists.resolve(lists.get("abnahme-manual").def)).filter.sheet, { "manual" })
+  -- `sheet` is a field of a list: saved from the dashboard's filter, written as a word, checked like one
+  local sheet_def = lists.from_filter({ sheet = { "none" }, tag = { "needs-live-test" } })
+  eq(sheet_def, { sheet = "none", tag = "needs-live-test" }, "the sheet filter is saved")
+  eq(
+    lists.words(assert(lists.normalize("hand", sheet_def))),
+    { "--tag=needs-live-test", "--sheet=none" }
+  )
+  has(problem("hand", { sheet = "purple" }), "unknown state in --sheet")
   eq(lists.get("quick-wins").source, "builtin")
   local _, gerr = lists.get("nope")
   has(gerr, "unknown list 'nope'")
@@ -444,6 +467,34 @@ return function(H)
   end
 
   vim.fn.delete(lists.path())
+  -- each list says how many open tasks it selects: the acceptance groups with their count
+  F.task(
+    H,
+    root,
+    "lib.nvim",
+    "hand-check",
+    F.meta("Hand check", "open", { { "tags", "[needs-live-test]" } }),
+    "\n## Akzeptanz\n\n- [ ] on a real account\n"
+  )
+  F.task(
+    H,
+    root,
+    "lib.nvim",
+    "hand-parked",
+    F.meta("Hand parked", "parked", { { "tags", "[needs-live-test]" } }),
+    "\nLater.\n"
+  )
+  local counts = core.list_counts((lists.all()), root)
+  eq(counts["abnahme-by-hand"], 1, "by hand: the open live check, not the parked one")
+  eq(counts["abnahme-inbox"], 0, "no sheet waits here")
+  local labels = {}
+  menu({ root = root, filter = {}, sort = "default", persist = false }, function(items)
+    for _, item in ipairs(items) do
+      labels[#labels + 1] = item.label
+    end
+    return nil
+  end)
+  has(table.concat(labels, "\n"), "abnahme-by-hand (1)  [builtin]", "the menu shows the count")
   local state = { root = root, filter = {}, sort = "default", persist = false }
   ok(menu(state, pick("quick-wins")), "the menu hands control back")
   eq(state.sort, "roi", "applying a list sets its sort")

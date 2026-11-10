@@ -6,7 +6,7 @@
 ---
 ---     { status = "open,doing", effort = "<=S", value = ">=4", sort = "roi", desc = "small and worth it" }
 ---
---- Fields: `status prio effort kind category severity value actor tag stale plan phase` (strings, `prio` / `value` /
+--- Fields: `status prio effort kind category severity value actor tag sheet stale plan phase` (strings, `prio` / `value` /
 --- `stale` may be numbers), `blocked reminders overdue unestimated stale_refs quick_win` (booleans), `readiness`
 --- (`ready` | `waiting`), `sort` (`model.SORTS`), `area` (one area, default all) and `desc` (one line of text).
 ---
@@ -71,6 +71,7 @@ end
 ---@field value? string|integer
 ---@field actor? string
 ---@field tag? string
+---@field sheet? string
 ---@field stale? string|integer
 ---@field plan? string
 ---@field phase? string
@@ -104,6 +105,7 @@ local FIELDS = {
   value = "stringnum",
   actor = "string",
   tag = "string",
+  sheet = "string",
   stale = "stringnum",
   plan = "string",
   phase = "string",
@@ -131,6 +133,7 @@ M.FIELD_ORDER = {
   "value",
   "actor",
   "tag",
+  "sheet",
   "stale",
   "plan",
   "phase",
@@ -147,6 +150,21 @@ M.FIELD_ORDER = {
 ---The lists every install has. Replace one by saving or configuring a list of the same name.
 ---@type table<string, Tasks.ListDef>
 M.BUILTIN = {
+  -- The acceptance (tasks-desktop's view "Abnahme"): the open live checks that wait for a person, in three groups.
+  ["abnahme-inbox"] = {
+    desc = "Acceptance: test sheet green by machine, waiting for your judgement",
+    sheet = "inbox",
+  },
+  ["abnahme-manual"] = {
+    desc = "Acceptance: test sheet to do by hand",
+    sheet = "manual",
+  },
+  ["abnahme-by-hand"] = {
+    desc = "Acceptance: live checks without a test sheet (needs-live-test), by hand",
+    tag = "needs-live-test",
+    sheet = "none",
+    status = "open,doing,decision",
+  },
   ["quick-wins"] = {
     desc = "Value and effort at the quick-win thresholds, best return first",
     quick_win = true,
@@ -199,6 +217,7 @@ local function option_map(def)
     value = def.value,
     actor = def.actor,
     tag = def.tag,
+    sheet = def.sheet,
     stale = def.stale,
     plan = def.plan,
     phase = def.phase,
@@ -343,6 +362,7 @@ function M.from_filter(filter, sort, area, desc)
     waits_for = joined(f.waits_for),
     actor = joined(f.actor),
     tag = joined(f.tag),
+    sheet = joined(f.sheet),
     plan = joined(f.plan),
     phase = joined(f.phase),
     stale = f.stale and tostring(f.stale) or nil,

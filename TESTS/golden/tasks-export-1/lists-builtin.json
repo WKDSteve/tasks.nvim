@@ -1,5 +1,5 @@
 {
-  "digest": "sha256:8c9b3f42348e2082",
+  "digest": "sha256:7b47490ea465e634",
   "engine": {
     "git": "0000000",
     "nvim": "0.0.0",
@@ -8,6 +8,35 @@
   "generated_at": "2026-01-01T00:00:00Z",
   "kind": "tasks.lists",
   "lists": [
+    {
+      "desc": "Acceptance: live checks without a test sheet (needs-live-test), by hand",
+      "name": "abnahme-by-hand",
+      "options": {
+        "sheet": "none",
+        "status": "open,doing,decision",
+        "tag": "needs-live-test"
+      },
+      "source": "builtin",
+      "summary": "Acceptance: live checks without a test sheet (needs-live-test), by hand"
+    },
+    {
+      "desc": "Acceptance: test sheet green by machine, waiting for your judgement",
+      "name": "abnahme-inbox",
+      "options": {
+        "sheet": "inbox"
+      },
+      "source": "builtin",
+      "summary": "Acceptance: test sheet green by machine, waiting for your judgement"
+    },
+    {
+      "desc": "Acceptance: test sheet to do by hand",
+      "name": "abnahme-manual",
+      "options": {
+        "sheet": "manual"
+      },
+      "source": "builtin",
+      "summary": "Acceptance: test sheet to do by hand"
+    },
     {
       "desc": "Value and effort at the quick-win thresholds, best return first",
       "name": "quick-wins",

@@ -1804,8 +1804,15 @@ function M.filter(tasks, f)
         keep = false
       end
     end
-    -- the test-sheet block: its state, or `any` for a task that has one
-    if keep and sheet_set and not (t.sheets and (sheet_set.any or sheet_set[t.sheets.state])) then
+    -- the test-sheet block: its state, `any` for a task that has one, `none` for a task without it
+    if
+      keep
+      and sheet_set
+      and not (
+        (t.sheets and (sheet_set.any or sheet_set[t.sheets.state]))
+        or (t.sheets == nil and sheet_set.none)
+      )
+    then
       keep = false
     end
     if keep and f.unestimated and t.value ~= nil and M.effort_days(t.effort) ~= nil then

@@ -7,6 +7,7 @@ the version is not tagged yet (the repository is not published).
 
 ### Added
 
+- `list --sheet=none`: the tasks without a test-sheet block (`tasks list --tag=needs-live-test --sheet=none` is the live checks done by hand). Named lists take the field `sheet`, the dashboard shows it as the chip `[sheet: ...]`, and three built-in lists are the groups of the acceptance: `abnahme-inbox` (`--sheet=inbox`), `abnahme-manual` (`--sheet=manual`) and `abnahme-by-hand` (`--tag=needs-live-test --sheet=none`, open, doing or decision). The lists menu of the dashboard (`gl`) shows how many open tasks each list selects. `tasks-export/1` (additive): `NamedList.options.sheet`.
 - `tasks-export/1` (additive, capability `rounds`): `tasks.task` of a routine (`repeat`) carries `rounds`, its finished rounds newest first (`id`, `done`, `due`, `status`, `done_in`, `commits`; at most 100, `rounds_truncated` beyond): the history of a routine for a client.
 - `:Tasks claim <id> [for=4h] [by=<name>] [note=<why>] [--renew] [--force]` and `:Tasks unclaim <id> [by=] [note=] [status=open|parked|decision] [--force]`: the claim verbs of the CLI in the editor (same engine, `tasks_nvim.claims`); the open task buffers are refreshed, the editor is `cdx:<session>` in a Claude Code session, else `<user>@<host>`.
 - The short command `tasks` (`bin/tasks` for POSIX shells, `bin/tasks.cmd` for Windows): runs `scripts/tasks.lua`, hands the exit code through, and says so when `nvim` is missing or the launcher is away from its checkout.

@@ -1339,6 +1339,7 @@
             "value": { "type": "string" },
             "actor": { "type": "string" },
             "tag": { "type": "string" },
+            "sheet": { "type": "string" },
             "stale": { "type": "string" },
             "plan": { "type": "string" },
             "phase": { "type": "string" },

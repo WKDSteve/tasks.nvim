@@ -252,9 +252,9 @@ function M.parse(opt)
     end
     local sheets = require("tasks_nvim.sheets")
     for _, s in ipairs(list) do
-      if not (sheets.is_state(s) or s == "unknown" or s == "any") then
+      if not (sheets.is_state(s) or s == "unknown" or s == "any" or s == "none") then
         return nil,
-          ("unknown state in --sheet: %s (expected %s, unknown or any)"):format(
+          ("unknown state in --sheet: %s (expected %s, unknown, any or none)"):format(
             s,
             table.concat(sheets.STATES, ", ")
           )

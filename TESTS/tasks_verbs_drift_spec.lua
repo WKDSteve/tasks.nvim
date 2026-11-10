@@ -89,6 +89,7 @@ return function(H)
         "ready",
         "reminders",
         "severity",
+        "sheet",
         "sort",
         "stale",
         "stale-refs",

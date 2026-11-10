@@ -677,11 +677,21 @@ function M.lists_menu(state, after)
   for _, n in ipairs(notes) do
     notify.warn(n)
   end
+  local ok_counts, counts = pcall(core.list_counts, entries, state.root)
+  if not ok_counts then
+    counts = {}
+  end
   ---@type { label: string, run: fun() }[]
   local items = {}
   for _, e in ipairs(entries) do
+    local n = counts[e.name]
     items[#items + 1] = {
-      label = ("%s  [%s]  %s"):format(e.name, e.source, lists.summary(e.def)),
+      label = ("%s%s  [%s]  %s"):format(
+        e.name,
+        n and (" (" .. n .. ")") or "",
+        e.source,
+        lists.summary(e.def)
+      ),
       run = function()
         apply_list(state, e)
         after()

@@ -135,6 +135,51 @@ function M.with_root(f, root)
   return f
 end
 
+---How many open tasks each named list selects, from one pass over the vault (the lists menu shows it). A list that
+---checks refs (`stale_refs`) is not counted (that asks git, which a menu does not wait for), nor one that does not
+---resolve (the menu says why when it is applied).
+---@param entries Tasks.ListEntry[]
+---@param root string
+---@return table<string, integer> counts  By list name.
+function M.list_counts(entries, root)
+  local out = {}
+  local all = scan.all({ root = root })
+  if not all then
+    return out
+  end
+  local open = {}
+  for _, t in ipairs(all) do
+    if model.is_open_status(t.status) then
+      open[#open + 1] = t
+    end
+  end
+  local shared
+  for _, e in ipairs(entries) do
+    local resolved = require("tasks_nvim.lists").resolve(e.def)
+    if resolved and not resolved.filter.stale_refs then
+      local tasks = open
+      local wanted = resolved.area and scan.area_set(root, resolved.area)
+      if wanted then
+        tasks = vim.tbl_filter(function(t)
+          return wanted[t.area] == true
+        end, open)
+      end
+      local kept = model.filter(tasks, resolved.filter)
+      local readiness = resolved.filter.readiness
+      if readiness then
+        -- as `load` judges it: from the plan of the whole vault, made once for every list that asks
+        if shared == nil then
+          local ran, got = pcall(plan_scope.shared, root, { all = all, errors = {} })
+          shared = ran and got or false
+        end
+        kept = shared and plan_scope.filter_readiness(kept, readiness, root, shared) or kept
+      end
+      out[e.name] = #kept
+    end
+  end
+  return out
+end
+
 ---Scan, keep the open tasks, filter and sort -- what `:Tasks list` shows. With `defer_refs` a `stale_refs` filter
 ---runs no check: the list is cut by `ref_stale` when given (else not by refs at all), and `ref_candidates` holds the
 ---tasks every other criterion kept -- what the caller hands to `staleness.compute_async`.
@@ -545,6 +590,9 @@ function M.chips(f)
   end
   if f.tag and #f.tag > 0 then
     chips[#chips + 1] = "tag: " .. joined(f.tag)
+  end
+  if f.sheet and #f.sheet > 0 then
+    chips[#chips + 1] = "sheet: " .. joined(f.sheet)
   end
   if f.stale then
     chips[#chips + 1] = ("stale: >=%dd"):format(f.stale)

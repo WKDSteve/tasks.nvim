@@ -47,7 +47,7 @@ lowercase word `all` is the keyword; `ALL` with capitals is the area of that nam
 | `--ready` / `--waiting` | the tasks that can be started now (nothing open blocks them; a `decision` counts: it waits for you, not for a task) / the tasks that wait on an open blocker. One definition for the plan, the dashboard, `next` and these flags, judged against every open task of the vault (a blocker in another area counts). The two exclude each other |
 | `--unestimated` | missing the effort or the value |
 | `--quick-win` | a quick win: value and effort at the thresholds of `setup({ quick_wins })` (default value 4+, effort S-). Shorthand for `--value=>=N --effort=<=X`, so it cannot be combined with `--value` or `--effort` (an error, never a silent pick) |
-| `--sheet=` | the state of the test-sheet block that `testing sheets report --tasks` (testing.nvim) wrote into the task, by its worst sheet: `red` (failed or does not load), `stale`, `never` (never ran), `inbox` (green, waiting for your judgement), `manual`, `green`, `unknown` (no states line, none of these words in it, or broken block markers; `show` says which); `any` is every task with the block. A comma list; a task without the block never matches. Nothing is run: it is what the last report wrote. Headless `list` and `:Tasks list --sheet=` (the dashboard opens with only those tasks; its line shows `[sheet: <state>]` and `show` the counts) |
+| `--sheet=` | the state of the test-sheet block that `testing sheets report --tasks` (testing.nvim) wrote into the task, by its worst sheet: `red` (failed or does not load), `stale`, `never` (never ran), `inbox` (green, waiting for your judgement), `manual`, `green`, `unknown` (no states line, none of these words in it, or broken block markers; `show` says which); `any` is every task with the block, `none` every task without it (`--tag=needs-live-test --sheet=none`: the live checks that are done by hand; with `--status=open,doing,decision`, or as the list `@abnahme-by-hand`, the third group of the acceptance). A comma list; a task without the block matches only `none`. Nothing is run: it is what the last report wrote. Headless `list` and `:Tasks list --sheet=` (the dashboard opens with only those tasks; its line shows `[sheet: <state>]` and `show` the counts) |
 | `--sort=default` / `prio-effort` / `severity` / `frecency` / `roi` / `due` / `created-desc` / `created-asc` / `updated-desc` / `updated-asc` / `remind` / `title` (`due`: earliest `due:` first, tasks without one last; the dates: a task without the date last in both directions, a tie in the default order; `title`: alphabetical regardless of case; not with `--done`; the dashboard's `o` cycle stops after `due`, a saved list can use any of them) | the order (`roi`: highest `value / effort` first, tasks without both numbers after the ones with a figure, each group in the default order): `default` is status, prio, area, slug; `prio-effort` is status, prio, then effort ascending (important and small first, no effort last of its prio); `severity` is `critical` first, then `high`, `medium`, `low`, no severity last, each group in the default order; `frecency` is what the dashboard opened or changed most first (see below), the rest in the default order |
 | `--to=` | where the list goes: `buffer` (default), `clipboard`, `qf`, `file:<path>`, `echo`, `mdview` (Markdown written to a temp file and shown in the browser by [mdview.nvim](https://github.com/WKDSteve/mdview.nvim); see [Browser preview](#browser-preview-mdview)) |
 | `--format=md` / `--format=csv` | table (default) or CSV with the extra columns tags, blocked by, summary, path, severity, value, roi, actor, waits for; a `file:` target ending in `.csv` implies `csv`. A CSV cell that starts with `=`, `+`, `-`, `@` or a tab gets a leading `'`, so a title like `=HYPERLINK(...)` is text, not a formula, when the file is opened in a spreadsheet |
@@ -94,7 +94,7 @@ counts, the active filter chips and, when it is not the default, the sort order:
 | `f` | set a filter chip: pick `status`, `prio`, `effort` (`XS`..`XL`, `<=S`, `<=M`), `kind`, `category`, `severity`, `value`, `actor`, `tag`, `blocked`, `reminders` (toggle: shown as the chip `[reminder due]`), `overdue` (toggle: the chip `[overdue]`, the `due:` date is before today), `unestimated`, `quick-win` (toggle: value and effort at the quick-win thresholds, shown as the one chip `[quick-win]`), `stale-refs` (toggle: shows the chip `[stale: refs]`),
 `plan` and `phase` (the plans and stages in use), `readiness` (`ready` / `waiting`: the same cut as `list --ready` / `--waiting`, which the dashboard keeps when it was
 opened with them) or "clear all", then a value (`(any)` clears one chip) |
-| `gl` (input window `<M-l>`) | named lists: pick one to make it the view (its filter, sort and area), `Save the current filter and sort as a list ...` (asks for a name; replacing a saved list asks first), `Rename a saved list ...`, `Delete a saved list ...`. Lists of `setup()` and built-in lists cannot be deleted here |
+| `gl` (input window `<M-l>`) | named lists, each with the number of open tasks it selects (`abnahme-by-hand (26)`; a list that checks refs is not counted): pick one to make it the view (its filter, sort and area), `Save the current filter and sort as a list ...` (asks for a name; replacing a saved list asks first), `Rename a saved list ...`, `Delete a saved list ...`. Lists of `setup()` and built-in lists cannot be deleted here |
 | `o` | cycle the sort order: `default` -> `prio-effort` (small first within a prio) -> `severity` (critical first) -> `frecency` (most opened / changed first) -> `default`; a non-default order shows as `[sort: ...]` in the title |
 | `e` | export the marked (else all shown) tasks: scratch buffer, clipboard, quickfix or a file, as Markdown or CSV, or "Preview in browser (mdview)" -- the `--to=` sinks |
 | `v` | switch to the **stage view**: tasks grouped by stage ("Stage 1 · 5 tasks · not parallel"), what each waits for, tasks without plan, edge or dependants in an "Unsorted" block; `v` again returns to the list (marks and filter stay) |
@@ -499,7 +499,7 @@ and writes everything in one batch.
 ### Tasks lists
 
 A **list** is a filter combination plus a sort order (and optionally one area) under a name. Its fields are the option
-words of `:Tasks list`, written as strings: `status prio effort kind category severity value actor tag stale plan phase`,
+words of `:Tasks list`, written as strings: `status prio effort kind category severity value actor tag sheet stale plan phase`,
 the booleans `blocked reminders overdue unestimated stale_refs quick_win`, `readiness` (`ready` or `waiting`), `sort`, `area` and a one-line
 `desc`. A list is checked by the same parser as the command line and a complaint names the list; an unknown key is an
 error, never ignored.
@@ -507,7 +507,12 @@ error, never ignored.
 Three sources, the later one wins by name:
 
 1. **built in**: `quick-wins` (the quick-win definition, best return first), `small-and-important` (prio 1-2, effort S
-   or less, startable now), `unestimated` (missing an effort or a value);
+   or less, startable now), `unestimated` (missing an effort or a value), and the three groups of the acceptance (the
+   view "Abnahme" of tasks-desktop): `abnahme-inbox` (`--sheet=inbox`: the test sheet is green by machine and waits for
+   your judgement), `abnahme-manual` (`--sheet=manual`: a sheet to do by hand) and `abnahme-by-hand`
+   (`--tag=needs-live-test --sheet=none --status=open,doing,decision`: a live check without a sheet - real accounts,
+   another machine, use over days). The worst sheet decides `inbox` and `manual`: a task with a red and a waiting sheet
+   is `red` here, while the acceptance view shows it with its waiting points and the red sheet named;
 2. **saved**: a small state file (`stdpath("state")/tasks/lists.json`, or `$TASKS_LISTS_FILE`), written from the
    dashboard (`gl`) or by `tasks lists save`. A saved list may replace a built-in one;
 3. **`setup({ lists = {...} })`**: your config, which cannot be changed or deleted from the dashboard or the CLI (edit

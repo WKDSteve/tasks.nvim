@@ -162,9 +162,16 @@ return function(H)
     "any: a task with the block"
   )
   eq(ids({ sheet = { "red" } }), {}, "nobody is red")
+  eq(ids({ sheet = { "none" } }), { "lib.nvim/plain" }, "none: a task without the block")
+  eq(
+    ids({ sheet = { "none", "green" } }),
+    { "lib.nvim/green", "lib.nvim/plain" },
+    "none in a list of states: without the block, or with that state"
+  )
 
   local fo = require("tasks_nvim.filter_opts")
   eq(fo.parse({ sheet = "inbox,red" }).sheet, { "inbox", "red" })
+  eq(fo.parse({ sheet = "none" }).sheet, { "none" }, "none is a word of --sheet")
   local _, ferr = fo.parse({ sheet = "purple" })
   has(ferr, "unknown state in --sheet: purple")
   local _, eerr = fo.parse({ sheet = "" })
@@ -222,12 +229,51 @@ return function(H)
     "list --sheet=any (a block with broken markers too)"
   )
   eq(run({ "list", "--sheet=purple" }).code, 2, "an unknown state is bad usage")
+  has(run({ "list", "--sheet=purple" }).err, "unknown, any or none", "the message names none")
+  -- the third group of the acceptance: the live checks without a sheet, by tag
+  F.task(
+    H,
+    root,
+    "lib.nvim",
+    "by-hand",
+    F.meta("By hand", "open", { { "tags", "[needs-live-test]" } }),
+    "\n## Akzeptanz\n\n- [ ] on a real account\n"
+  )
+  F.task(
+    H,
+    root,
+    "lib.nvim",
+    "with-sheet",
+    F.meta("With sheet", "open", { { "tags", "[needs-live-test]" } }),
+    "\n" .. block("w=inbox")
+  )
+  local hand = run({ "list", "--tag=needs-live-test", "--sheet=none", "--format=ids" })
+  eq(hand.code, 0, hand.err)
+  eq(
+    vim.trim(hand.out),
+    "lib.nvim/by-hand",
+    "--tag=needs-live-test --sheet=none: by hand, without a sheet"
+  )
+  local listed_hand = run({ "list", "@abnahme-by-hand", "--format=ids" })
+  eq(listed_hand.code, 0, listed_hand.err)
+  eq(vim.trim(listed_hand.out), "lib.nvim/by-hand", "the built-in list says the same")
+  local listed_inbox = run({ "list", "@abnahme-inbox", "--format=ids" })
+  eq(
+    vim.trim(listed_inbox.out),
+    "lib.nvim/with-sheet",
+    "abnahme-inbox: the sheet waiting for judgement"
+  )
 
   -- ── the dashboard line ─────────────────────────────────────────────────────
   local core = require("tasks_nvim.ui.dash_core")
   local w = core.widths(all)
   has(core.line(by["lib.nvim/checked"], w), "[sheet: never]", "the dashboard line shows the state")
   lacks(core.line(by["lib.nvim/plain"], w), "[sheet:", "and nothing without the block")
+  has(
+    core.header({}, { sheet = { "none" } }),
+    "[sheet: none]",
+    "the filter is a chip of the header"
+  )
   local hl
   for _, p in ipairs(core.parts(by["lib.nvim/green"], w)) do
     if p[1]:find("[sheet:", 1, true) then
