@@ -319,6 +319,9 @@ G.cases = {
   },
 }
 
+---The variables besides `TASKS_*` the engine reads that name this machine's setup or session.
+G.MACHINE_VARS = { NVIM_CONFIG_DIR = true, CLAUDE_CODE_SESSION_ID = true }
+
 ---Run `fn` with the clock and the engine info fixed, then put them back.
 ---@generic T
 ---@param fn fun(): T
@@ -331,6 +334,17 @@ function G.fixed(fn)
   local lists_path, lists_cfg = lists.path(), config.get().lists or {}
   lists.set_path(vim.fn.tempname() .. "/none/lists.json")
   config.merge({ lists = {} })
+  -- Nor the variables that point the engine at this machine's data or setup (`$TASKS_MARKER_DOCS` names documents
+  -- of the real vault, and a note about one put a path of this machine into result-run.json): every `TASKS_*`
+  -- and the few others the engine reads are gone while a golden is made, and back afterwards.
+  local env = {}
+  for name, value in pairs(vim.fn.environ()) do
+    local upper = name:upper()
+    if upper:match("^TASKS_") or G.MACHINE_VARS[upper] then
+      env[name] = value
+      vim.env[name] = nil
+    end
+  end
   contract.clock = function()
     return "2026-01-01T00:00:00Z"
   end
@@ -338,6 +352,9 @@ function G.fixed(fn)
     return { version = "0.1.0-test", git = "0000000", nvim = "0.0.0" }
   end
   local ok, res = pcall(fn)
+  for name, value in pairs(env) do
+    vim.env[name] = value
+  end
   contract.clock, contract.engine_info = clock, engine
   lists.set_path(lists_path)
   config.merge({ lists = lists_cfg })

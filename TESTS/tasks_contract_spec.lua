@@ -1154,6 +1154,38 @@ return function(H)
   golden("error-unsupported-schema")
   golden("error-unknown-parameter")
 
+  -- ── a golden is made from the fixture alone: no variable of this machine reaches it ──
+  -- `$TASKS_MARKER_DOCS` names marker documents of the real vault. With it set, the write of result-run tried to
+  -- refresh them, and its note put a path of this machine into the golden (and failed the compare of a client).
+  local marker_env = vim.env.TASKS_MARKER_DOCS
+  local marker_doc = H.tmpdir() .. "/real-vault/ROADMAP.md"
+  vim.env.TASKS_MARKER_DOCS = marker_doc
+  local ok_run, err_run = pcall(golden, "result-run")
+  local after = vim.env.TASKS_MARKER_DOCS
+  vim.env.TASKS_MARKER_DOCS = marker_env
+  ok(ok_run, "result-run is its golden with $TASKS_MARKER_DOCS set: " .. tostring(err_run))
+  eq(after, marker_doc, "...and the variable is back after the render")
+  -- and no golden names a path of a machine (a drive, a home or temp folder)
+  for name, kind in vim.fs.dir(golden_files.dir) do
+    if kind == "file" then
+      local text = H.read(golden_files.dir .. "/" .. name)
+      for _, pattern in ipairs({
+        "%f[%a]%a:[/\\]",
+        "/home/",
+        "/Users/",
+        "\\Users\\",
+        "/tmp/",
+        "AppData",
+      }) do
+        eq(
+          text:find(pattern, 1, pattern:sub(1, 1) ~= "%"),
+          nil,
+          name .. " names no path of a machine (" .. pattern .. ")"
+        )
+      end
+    end
+  end
+
   -- a document over the limit is an error, not a cut-off document
   local max = contract.doc.MAX_DOC_BYTES
   contract.doc.MAX_DOC_BYTES = 200
