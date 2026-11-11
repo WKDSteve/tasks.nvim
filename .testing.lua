@@ -12,6 +12,8 @@ return {
   -- Dependencies (directory names) put on the runtimepath: $<NAME>_DIR, .deps/<name>, ../<name>,
   -- stdpath('data')/lazy/<name>.
   deps = { "lib.nvim" },
+  -- Used when it is installed (never required): --changed then selects by the module graph of docmap.nvim.
+  deps_optional = { "docmap.nvim" },
   -- "none" = all specs in one nvim, "file" = one nvim per spec file
   -- (nothing leaks from one file into the next).
   -- "file": the specs register user commands, highlight groups and snacks globals and leave buffers behind;
