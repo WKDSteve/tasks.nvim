@@ -184,6 +184,12 @@ return function(H)
   local back = core.filter_from_stored(vim.json.decode(vim.json.encode(opts)))
   eq(core.chips(back), core.chips(full))
   eq(core.filter_from_stored({ prio = "1,3" }).prio, { 1, 3 })
+  -- the state of the test sheets and the claim are kept too: a dashboard opened again shows the same tasks
+  local kept = { sheet = { "inbox", "none" }, claimed = { "foreign" } }
+  eq(core.filter_to_options(kept), { sheet = "inbox,none", claimed = "foreign" })
+  local kept_back =
+    core.filter_from_stored(vim.json.decode(vim.json.encode(core.filter_to_options(kept))))
+  eq({ kept_back.sheet, kept_back.claimed }, { { "inbox", "none" }, { "foreign" } })
   eq(
     core.filter_from_stored({ status = "nonsense" }),
     {},

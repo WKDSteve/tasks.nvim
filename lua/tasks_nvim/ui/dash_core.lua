@@ -910,6 +910,12 @@ function M.filter_to_options(f)
   if f.phase and #f.phase > 0 then
     o.phase = joined(f.phase)
   end
+  if f.sheet and #f.sheet > 0 then
+    o.sheet = joined(f.sheet)
+  end
+  if f.claimed and #f.claimed > 0 then
+    o.claimed = joined(f.claimed)
+  end
   return o
 end
 
@@ -941,6 +947,8 @@ function M.filter_from_stored(opts)
     plan = type(opts.plan) == "string" and opts.plan or nil,
     project = type(opts.project) == "string" and opts.project or nil,
     phase = type(opts.phase) == "string" and opts.phase or nil,
+    sheet = type(opts.sheet) == "string" and opts.sheet or nil,
+    claimed = type(opts.claimed) == "string" and opts.claimed or nil,
   })
   if f and (opts.readiness == "ready" or opts.readiness == "waiting") then
     f.readiness = opts.readiness
