@@ -25,10 +25,8 @@ return function(H)
     -- `intent` takes a document of another app; the editor fills `:Tasks new` from it later
     "intent",
     "migrate-actor",
-    "plan-close",
     "plan-new",
     "plans",
-    "project-close",
     "projects",
     "show",
   }
@@ -39,6 +37,9 @@ return function(H)
       composer = {},
       cli = { "by", "clipboard", "force", "latest", "name", "no-index", "note" },
     },
+    -- the editor asks before it finishes; the CLI never asks
+    ["plan-close"] = { composer = { "yes" }, cli = {} },
+    ["project-close"] = { composer = { "yes" }, cli = {} },
     ["done"] = {
       composer = { "yes" },
       cli = {

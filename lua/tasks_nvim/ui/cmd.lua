@@ -2382,6 +2382,92 @@ function M.task_done(ctx)
   )
 end
 
+-- ── plan-close / project-close ───────────────────────────────────────────────
+
+---What holds a plan or a project open, in one line.
+---@param res Tasks.CloseByHand
+---@return string
+local function holding_text(res)
+  local n = #res.holding
+  local s = n == 1 and "" or "s"
+  local what = res.kind == "plan" and ("task" .. s) or ("task" .. s .. " or plan" .. s)
+  return ("%s still has %d open %s: %s"):format(res.id, n, what, table.concat(res.holding, ", "))
+end
+
+---`:Tasks plan-close <id> [--yes]` / `:Tasks project-close <id> [--yes]`: finish a plan or a project that does not finish
+---by itself (`done_flow.close_by_hand`, the CLI's verbs). The engine is asked first (a dry run): a refusal names what
+---holds it open and nothing is asked; else a question, which `--yes` skips.
+---@param ctx table
+---@param kind "plan"|"project"
+function M.close_by_hand(ctx, kind)
+  if #ctx.rest > 0 then
+    notify.error("unexpected argument: " .. table.concat(ctx.rest, " "))
+    return
+  end
+  local plan_view = require("tasks_nvim.plan_view")
+  local id = ctx.args.id
+  local preview = done_flow.close_by_hand(kind, id, { dry_run = true })
+  if preview.already then
+    notify.info(("%s is already finished (%s)"):format(id, preview.already))
+    return
+  end
+  if preview.holding then
+    notify.error(holding_text(preview))
+    return
+  end
+  if preview.err then
+    notify.error(preview.err)
+    return
+  end
+  local function run()
+    local res = done_flow.close_by_hand(kind, id, {})
+    for _, note in ipairs(res.notes) do
+      notify.warn(note)
+    end
+    if res.holding then
+      notify.error(holding_text(res))
+      return
+    end
+    if res.err then
+      notify.error(res.err)
+      return
+    end
+    for _, plan_id in ipairs(res.plans_closed) do
+      notify.info(plan_view.plan_closed_text(plan_id, res.plan_summaries[plan_id]))
+    end
+    for _, project_id in ipairs(res.projects.closed) do
+      notify.info(plan_view.project_closed_text(project_id, res.projects.summaries[project_id]))
+    end
+    for _, note in ipairs(res.projects.notes) do
+      notify.warn(note)
+    end
+  end
+  if ctx.flags.yes then
+    run()
+    return
+  end
+  local file = (kind == "project" and require("tasks_nvim.projects") or require("tasks_nvim.plans")).find(
+    id
+  )
+  confirm.yesno(
+    ("Finish %s %s by hand?\n\n%s\n\nIt moves to Backlog/FEATURES/%s_%s.md."):format(
+      kind,
+      id,
+      file and file.title or id,
+      model.today(),
+      file and file.slug or id
+    ),
+    "finish",
+    function(accepted)
+      if not accepted then
+        notify.info(("cancelled -- the %s stays open"):format(kind))
+        return
+      end
+      run()
+    end
+  )
+end
+
 -- ── task claim / unclaim ─────────────────────────────────────────────────────
 
 ---The file of an open task, to bring its buffers up to date after a claim set or took the status.

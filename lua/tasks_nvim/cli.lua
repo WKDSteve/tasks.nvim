@@ -1229,97 +1229,51 @@ local function say_closed(ctx, plans_closed, plan_summaries, projects)
   end
 end
 
-commands["plan-close"] = function(ctx)
+---`plan-close <id>` / `project-close <id>`: finish by hand (`done_flow.close_by_hand`), the same as `:Tasks plan-close`.
+---@param ctx table
+---@param kind "plan"|"project"
+---@return integer
+local function close_by_hand(ctx, kind)
   local args, eo = ctx.args, ctx.eo
   local id = args.pos[1]
   if not id or #args.pos > 1 then
-    ctx.warn("error: usage: plan-close <area>/<slug>")
+    ctx.warn(("error: usage: %s-close <area>/<slug>"):format(kind))
     return 2
   end
-  local file, ferr = require("tasks_nvim.plans").find(id, { root = eo.root })
-  if not file then
-    -- finished already: closing again is not an error
-    local held = require("tasks_nvim.scan").find_done(id, { root = eo.root })
-    if held then
-      ctx.say(("already	%s	%s"):format(id, held.path))
-      return 0
-    end
-    ctx.warn("error: " .. tostring(ferr))
-    return 1
+  local res = done_flow.close_by_hand(kind, id, { root = eo.root, today = eo.today })
+  if res.already then
+    ctx.say(("already	%s	%s"):format(id, res.already))
+    return 0
   end
-  local opts = { root = eo.root, today = eo.today, date = eo.today }
-  local res = done_flow.close_plans({ id }, opts)
-  for _, note in ipairs(res.notes) do
-    ctx.warn("warn: " .. note)
-  end
-  if #res.closed == 0 then
-    local holding = res.refused[id]
-    if holding then
-      ctx.warn(
-        ("error: %s still has %d open task%s: %s"):format(
-          id,
-          #holding,
-          #holding == 1 and "" or "s",
-          table.concat(holding, ", ")
-        )
-      )
-    else
-      ctx.warn("error: " .. id .. " was not closed")
-    end
-    return 1
-  end
-  local project_ids = {}
-  for _, plan_id in ipairs(res.closed) do
-    project_ids[#project_ids + 1] = res.projects[plan_id]
-  end
-  say_closed(ctx, res.closed, res.summaries, done_flow.close_projects(project_ids, opts))
-  done_flow.refresh_marker_docs({ root = eo.root, closed = res.summaries })
-  return 0
-end
-
-commands["project-close"] = function(ctx)
-  local args, eo = ctx.args, ctx.eo
-  local id = args.pos[1]
-  if not id or #args.pos > 1 then
-    ctx.warn("error: usage: project-close <area>/<slug>")
-    return 2
-  end
-  local file, ferr = require("tasks_nvim.projects").find(id, { root = eo.root })
-  if not file then
-    local held = require("tasks_nvim.scan").find_done(id, { root = eo.root })
-    if held then
-      ctx.say(("already	%s	%s"):format(id, held.path))
-      return 0
-    end
-    ctx.warn("error: " .. tostring(ferr))
-    return 1
-  end
-  local res = done_flow.close_projects(
-    { id },
-    { root = eo.root, today = eo.today, date = eo.today }
-  )
-  if #res.closed == 0 then
+  -- a plan's notes come before the verdict; a project's only with a refusal (its finish says them in `say_closed`)
+  if kind == "plan" or res.holding or res.err then
     for _, note in ipairs(res.notes) do
       ctx.warn("warn: " .. note)
     end
-    local holding = res.refused[id]
-    if holding then
-      ctx.warn(
-        ("error: %s still has %d open task%s or plan%s: %s"):format(
-          id,
-          #holding,
-          #holding == 1 and "" or "s",
-          #holding == 1 and "" or "s",
-          table.concat(holding, ", ")
-        )
-      )
-    else
-      ctx.warn("error: " .. id .. " was not closed")
-    end
+  end
+  if res.holding then
+    local n = #res.holding
+    local s = n == 1 and "" or "s"
+    local what = kind == "plan" and ("task" .. s) or ("task" .. s .. " or plan" .. s)
+    ctx.warn(
+      ("error: %s still has %d open %s: %s"):format(id, n, what, table.concat(res.holding, ", "))
+    )
     return 1
   end
-  say_closed(ctx, {}, {}, res)
+  if res.err then
+    ctx.warn("error: " .. res.err)
+    return 1
+  end
+  say_closed(ctx, res.plans_closed, res.plan_summaries, res.projects)
   return 0
+end
+
+commands["plan-close"] = function(ctx)
+  return close_by_hand(ctx, "plan")
+end
+
+commands["project-close"] = function(ctx)
+  return close_by_hand(ctx, "project")
 end
 
 commands["next"] = function(ctx)

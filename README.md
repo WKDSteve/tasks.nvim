@@ -65,6 +65,8 @@ sessions that run without an editor. Nothing is stored anywhere but in the files
   the task, expiring) so two chats or an agent and you do not take the same one; `:Tasks unclaim <id>` gives it back
   (the same verbs headless, [docs/COMMANDS.md](docs/COMMANDS.md)). The dashboard marks a claimed line `[claim: mine]` or
   `[claim: <who>]`, and `--claimed=own|foreign|none` lists the tasks by their claim.
+- **Finish a plan by hand**: a plan whose last task went elsewhere does not finish by itself; `:Tasks plan-close <id>`
+  (and `:Tasks project-close <id>`) finishes it after a question, and `check` names such plans (`plan-no-open-task`).
 - **Finish safely**: `:Tasks done` moves the file to `Backlog/`, adds a row to its README, regenerates the index,
   and restores everything byte for byte if a step fails.
 - **Dashboard** (needs [snacks.nvim](https://github.com/folke/snacks.nvim); a plain list without it): filter chips,

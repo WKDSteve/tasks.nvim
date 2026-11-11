@@ -231,6 +231,82 @@ function M.close_plans(plan_ids, opts)
   return out
 end
 
+---@class Tasks.CloseByHand
+---@field kind "plan"|"project"
+---@field id string
+---@field already? string                     # The file of the finished item: it was finished before (no error).
+---@field err? string                         # No such open plan or project, or a step that failed.
+---@field holding? string[]                   # What holds it open (open tasks, for a project open plans too): refused.
+---@field plans_closed string[]               # The plan finished (a plan close), empty otherwise.
+---@field plan_summaries table<string, Tasks.PlanSummary>
+---@field projects Tasks.ClosedProjects       # The projects finished with it (a plan close: the one the plan was the last of).
+---@field notes string[]                      # Steps that said something on the way.
+---@field dry_run? boolean                    # Nothing was written: `plans_closed` / `projects` say what would be.
+
+---Finish a plan or a project by hand (the CLI's `plan-close` / `project-close`, `:Tasks plan-close` / `project-close`):
+---refused while something holds it open, "already" for one that is finished; a plan close finishes its project with it
+---when the plan was what held the project open. `opts.dry_run` writes nothing and says what would happen.
+---@param kind "plan"|"project"
+---@param id string
+---@param opts? { root?: string, today?: string, dry_run?: boolean }
+---@return Tasks.CloseByHand
+function M.close_by_hand(kind, id, opts)
+  opts = opts or {}
+  ---@type Tasks.CloseByHand
+  local out = {
+    kind = kind,
+    id = id,
+    plans_closed = {},
+    plan_summaries = {},
+    projects = { closed = {}, summaries = {}, refused = {}, notes = {} },
+    notes = {},
+    dry_run = opts.dry_run or nil,
+  }
+  local finder = kind == "project" and projects.find or plans.find
+  local file, ferr = finder(id, { root = opts.root })
+  if not file then
+    -- finished already: closing again is not an error
+    local held = scan.find_done(id, { root = opts.root })
+    if held then
+      out.already = held.path
+    else
+      out.err = tostring(ferr)
+    end
+    return out
+  end
+  local run = { root = opts.root, today = opts.today, date = opts.today, dry_run = opts.dry_run }
+  if kind == "project" then
+    local res = M.close_projects({ id }, run)
+    out.projects = res
+    vim.list_extend(out.notes, res.notes)
+    if #res.closed == 0 then
+      out.holding = res.refused[id]
+      out.err = out.holding == nil and (id .. " was not closed") or nil
+    end
+    return out
+  end
+  local res = M.close_plans({ id }, run)
+  vim.list_extend(out.notes, res.notes)
+  if #res.closed == 0 then
+    out.holding = res.refused[id]
+    out.err = out.holding == nil and (id .. " was not closed") or nil
+    return out
+  end
+  out.plans_closed = res.closed
+  out.plan_summaries = res.summaries
+  local project_ids = {}
+  for _, plan_id in ipairs(res.closed) do
+    project_ids[#project_ids + 1] = res.projects[plan_id]
+  end
+  if opts.dry_run then
+    -- a dry run of the plan closes nothing, so no project can be judged by it: what it would take is not said
+    return out
+  end
+  out.projects = M.close_projects(project_ids, run)
+  M.refresh_marker_docs({ root = opts.root, closed = res.summaries })
+  return out
+end
+
 ---@class Tasks.ProjectSummary
 ---@field title? string
 ---@field plans integer            # Plans of the project, finished ones included.

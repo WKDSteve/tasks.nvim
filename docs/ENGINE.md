@@ -168,7 +168,8 @@ stage (behind status and effective prio). `plan: <area>/<slug>` and `phase: <wor
 `tasks_nvim.plans`); a plan with a `phase_order` puts its tasks in stages -- soft by default, real blockers with
 `gate: hard` (then `ready`, `next`, `list --ready` and the plan all see them: one definition). None of these fields
 appears in the generated index. `check`: `bad-after`, `bad-order`, `bad-plan`, `bad-phase` (errors), `after-self`,
-`after-dangling` (errors), `plan-unknown` (error), `plan-area`, `plan-phase`, `plan-target-unknown` (warnings),
+`after-dangling` (errors), `plan-unknown` (error), `plan-area`, `plan-phase`, `plan-target-unknown`, `plan-no-open-task` (a plan
+in `doing` with no open task left: `plan-close` it, or give it tasks), `project-no-open-work` (the same for a project) (warnings),
 `plan-acceptance-uncovered` (a hint for a task with steps), and a broken plan file reports its own codes.
 
 `blocked_by`, `after` and `plan` may hold Obsidian wikilinks instead of ids (`"[[<slug>]]"`, `"[[<area>/<slug>|Alias]]"`,

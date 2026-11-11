@@ -1177,6 +1177,30 @@ local function nested_routes()
     },
 
     {
+      path = { "task", "plan-close" },
+      args = {
+        { name = "id", type = "TASK_PLAN", desc = "Id of the plan to finish, as area/slug" },
+      },
+      flags = { { name = "yes", bool = true, desc = "Finish without asking for confirmation" } },
+      desc = "Finish a plan by hand that does not finish by itself (no open task left): refused while a task holds it open; it moves to Backlog/FEATURES, and its project with it when the plan was the last",
+      run = function(ctx)
+        cmd().close_by_hand(ctx, "plan")
+      end,
+    },
+
+    {
+      path = { "task", "project-close" },
+      args = {
+        { name = "id", type = "STRING", desc = "Id of the project to finish, as area/slug" },
+      },
+      flags = { { name = "yes", bool = true, desc = "Finish without asking for confirmation" } },
+      desc = "Finish a project by hand (only parked plans or nothing left): refused while an own task or an open plan holds it; it moves to Backlog/FEATURES",
+      run = function(ctx)
+        cmd().close_by_hand(ctx, "project")
+      end,
+    },
+
+    {
       path = { "task", "next" },
       args = {
         {

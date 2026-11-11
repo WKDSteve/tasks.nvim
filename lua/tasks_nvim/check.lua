@@ -480,6 +480,28 @@ local function plan_file_findings(findings, open_ids, names, scan_opts, is_finis
       end
     end
   end
+  -- a plan that is being worked on (`doing`) with no open task left does not finish by itself (its last task was
+  -- moved away, or finished before the plan named it): say how to finish it. A plan in `planning` may be new, a parked
+  -- one waits on purpose.
+  local has_open = {}
+  for _, t in pairs(open_ids) do
+    if t.plan then
+      has_open[t.plan] = true
+    end
+  end
+  for _, file in ipairs(files) do
+    if checked[file.area] and file.status == "doing" and not has_open[file.id] then
+      add(
+        findings,
+        "warn",
+        "plan-no-open-task",
+        file,
+        ("no open task left in the plan: finish it by hand (plan-close %s), or give it tasks"):format(
+          file.id
+        )
+      )
+    end
+  end
 end
 
 ---Project files, the plans that name one (`project:`, `phase:`) and the tasks that name one themselves, reported for
@@ -497,6 +519,19 @@ local function project_findings(findings, open_ids, names, scan_opts, is_finishe
     checked[n] = true
   end
   local project_files = projects.all(scan_opts) or {}
+  local plan_files = plans.all(scan_opts) or {}
+  -- what keeps a project busy: an open plan that names it, an open task of its own
+  local busy = {}
+  for _, p in ipairs(plan_files) do
+    if p.project and p.status ~= "parked" then
+      busy[p.project] = true
+    end
+  end
+  for _, t in pairs(open_ids) do
+    if t.project then
+      busy[t.project] = true
+    end
+  end
   local by_id = {}
   for _, file in ipairs(project_files) do
     by_id[file.id] = file
@@ -516,6 +551,18 @@ local function project_findings(findings, open_ids, names, scan_opts, is_finishe
           "target " .. file.target .. " does not exist"
         )
       end
+      -- a project being worked on with no open plan and no own open task does not finish by itself either
+      if file.status == "doing" and not busy[file.id] then
+        add(
+          findings,
+          "warn",
+          "project-no-open-work",
+          file,
+          ("no open plan and no open task of its own left: finish it by hand (project-close %s)"):format(
+            file.id
+          )
+        )
+      end
       if file.gate == "hard" then
         add(
           findings,
@@ -527,7 +574,7 @@ local function project_findings(findings, open_ids, names, scan_opts, is_finishe
       end
     end
   end
-  for _, file in ipairs(plans.all(scan_opts) or {}) do
+  for _, file in ipairs(plan_files) do
     if checked[file.area] then
       if file.phase and not file.project then
         add(
