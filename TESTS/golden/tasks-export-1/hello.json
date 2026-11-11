@@ -27,6 +27,7 @@
     "ops",
     "order",
     "plan_close",
+    "plan_compare",
     "plan_for",
     "plan_new",
     "plan_set",

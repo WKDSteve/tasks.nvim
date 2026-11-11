@@ -112,6 +112,12 @@ local methods = {
       return contract.estimate(params, opts)
     end,
   },
+  plan_compare = {
+    params = { ids = "string_list" },
+    run = function(params, opts)
+      return contract.plan_compare(params, opts)
+    end,
+  },
   plan_for = {
     params = { id = "string", direction = "string" },
     run = function(params, opts)

@@ -29,6 +29,9 @@
       "$ref": "#/$defs/PlanFor"
     },
     {
+      "$ref": "#/$defs/PlanCompare"
+    },
+    {
       "$ref": "#/$defs/Check"
     },
     {
@@ -1527,6 +1530,102 @@
           "type": "integer",
           "minimum": 0,
           "description": "How many of the tasks were taken with assumed values."
+        },
+        "incomplete": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "unevaluatedProperties": false
+    },
+    "PlanCompareRow": {
+      "description": "One open plan of tasks.plan_compare. `tasks`: its open and finished tasks, the open ones by readiness state. `effort`: open days (with the range of the sizes), finished days, open tasks without an effort. `path`: the critical path of the plan's open tasks alone (a blocker outside the plan takes no part). `weekly_done`: members finished in each of the last `weeks` weeks, oldest first (the last week ends `today`). `forecast_weeks`: weeks the open tasks would still take, `low` at the pace of the best of those weeks, `high` at their average; absent when nothing was finished in them or nothing is open. `phase_now`: the first stage of the plan's `phase_order` that still has an open task.",
+      "type": "object",
+      "required": ["id", "title", "stages", "tasks", "progress", "effort", "path", "weekly_done"],
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "status": { "type": "string" },
+        "project": { "type": "string" },
+        "stages": { "type": "integer", "minimum": 0 },
+        "phase_now": { "type": "string" },
+        "tasks": {
+          "type": "object",
+          "required": ["open", "done", "ready", "decision", "waiting", "stuck", "freed", "parked"],
+          "properties": {
+            "open": { "type": "integer", "minimum": 0 },
+            "done": { "type": "integer", "minimum": 0 },
+            "ready": { "type": "integer", "minimum": 0 },
+            "decision": { "type": "integer", "minimum": 0 },
+            "waiting": { "type": "integer", "minimum": 0 },
+            "stuck": { "type": "integer", "minimum": 0 },
+            "freed": { "type": "integer", "minimum": 0 },
+            "parked": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": false
+        },
+        "progress": { "type": "number", "minimum": 0, "maximum": 1 },
+        "effort": {
+          "type": "object",
+          "required": ["open_days", "open_low", "open_high", "done_days", "open_without"],
+          "properties": {
+            "open_days": { "type": "number", "minimum": 0 },
+            "open_low": { "type": "number", "minimum": 0 },
+            "open_high": { "type": "number", "minimum": 0 },
+            "done_days": { "type": "number", "minimum": 0 },
+            "open_without": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": false
+        },
+        "path": {
+          "type": "object",
+          "required": ["days", "unknown_effort"],
+          "properties": {
+            "days": { "type": "number", "minimum": 0 },
+            "unknown_effort": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": false
+        },
+        "last_done": { "$ref": "#/$defs/Date" },
+        "weekly_done": { "type": "array", "items": { "type": "integer", "minimum": 0 } },
+        "forecast_weeks": {
+          "type": "object",
+          "required": ["low", "high"],
+          "properties": {
+            "low": { "type": "integer", "minimum": 1 },
+            "high": { "type": "integer", "minimum": 1 }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "PlanCompare": {
+      "description": "tasks.plan_compare (capability `plan_compare`): the open plans side by side, one row each in the order of the vault (`ids` narrows it to some). The figures are the engine's; a page that compares plans only sorts and draws them. The finished tasks lie outside the revision, as in `tasks.finished`.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/Head"
+        }
+      ],
+      "type": "object",
+      "required": ["kind", "rev", "digest", "today", "weeks", "plans", "incomplete"],
+      "properties": {
+        "kind": {
+          "const": "tasks.plan_compare"
+        },
+        "rev": {
+          "$ref": "#/$defs/Rev"
+        },
+        "digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "today": { "$ref": "#/$defs/Date" },
+        "weeks": { "type": "integer", "minimum": 1 },
+        "plans": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/PlanCompareRow" }
         },
         "incomplete": {
           "type": "array",

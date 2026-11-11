@@ -83,6 +83,7 @@ M.CAPABILITIES = {
   "ops",
   "order",
   "plan_close",
+  "plan_compare",
   "plan_for",
   "plan_new",
   "plan_set",
@@ -1377,6 +1378,90 @@ function M.estimate(params, opts)
   doc.quick_wins = vim.list_slice(sums.quick_wins, 1)
   doc.unestimated = vim.list_slice(sums.unestimated, 1)
   doc.assumed = n_assumed
+  doc.incomplete = view.errors
+  return seal(doc, rev_of(view, entries)), nil
+end
+
+---The open plans side by side (`tasks_nvim.plan_compare`): per plan its tasks (open, finished, open by state), its
+---effort (open with the range of the sizes, finished, open without an effort), the rest of its own critical path, the
+---first stage still open and the pace of the last weeks with a range of weeks it would still take. `ids` (plan ids)
+---narrows it to those plans, in the order of the vault; an id that is no open plan is refused by name. The finished
+---tasks lie outside the revision, as in `tasks.finished`.
+---@param params? { ids?: string[] }
+---@param opts? { root?: string, today?: string, view?: Tasks.ContractView }
+---@return table|nil doc
+---@return Tasks.ContractError|string|nil err
+function M.plan_compare(params, opts)
+  params = params or {}
+  opts = opts or {}
+  local today = opts.today or model.today()
+  if not model.is_date(today) then
+    return nil,
+      { code = "invalid_argument", message = "today must be YYYY-MM-DD", retryable = false }
+  end
+  local view, err = opts.view, nil
+  if not view then
+    view, err = M.view(opts)
+  end
+  if not view then
+    return nil, err
+  end
+  local files = view.files
+  if params.ids ~= nil then
+    local known = {}
+    for _, f in ipairs(view.files) do
+      known[f.id] = true
+    end
+    local want = {}
+    for _, id in ipairs(params.ids) do
+      if not known[id] then
+        return nil,
+          {
+            code = "invalid_argument",
+            message = ("ids: '%s' is no open plan"):format(id),
+            retryable = false,
+          }
+      end
+      want[id] = true
+    end
+    files = vim.tbl_filter(function(f)
+      return want[f.id] == true
+    end, view.files)
+  end
+  local projects_mod = require("tasks_nvim.projects")
+  local finished = #files > 0 and projects_mod.finished_items({ root = view.root }) or {}
+  local rows = require("tasks_nvim.plan_compare").rows(files, {
+    open = view.open,
+    nodes = view.plan.nodes,
+    index = view.shared.index,
+    finished = finished,
+    today = today,
+    is_finished_plan = projects_mod.is_finished_plan,
+  })
+  local entries = {}
+  for _, t in ipairs(view.open) do
+    entries[#entries + 1] = { id = t.id, etag = t.etag or etag_of(t.path) }
+  end
+  local doc = M.head("tasks.plan_compare", view.root)
+  doc.today = today
+  doc.weeks = require("tasks_nvim.plan_compare").WEEKS
+  doc.plans = vim.tbl_map(function(r)
+    return {
+      id = r.id,
+      title = r.title,
+      status = r.status,
+      project = r.project,
+      stages = r.stages,
+      phase_now = r.phase_now,
+      tasks = json.object(r.tasks),
+      progress = r.progress,
+      effort = json.object(r.effort),
+      path = json.object(r.path),
+      last_done = r.last_done,
+      weekly_done = r.weekly_done,
+      forecast_weeks = r.forecast_weeks and json.object(r.forecast_weeks) or nil,
+    }
+  end, rows)
   doc.incomplete = view.errors
   return seal(doc, rev_of(view, entries)), nil
 end

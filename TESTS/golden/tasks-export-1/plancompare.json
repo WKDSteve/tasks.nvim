@@ -1,0 +1,62 @@
+{
+  "digest": "sha256:57e77c8a98529af8",
+  "engine": {
+    "git": "0000000",
+    "nvim": "0.0.0",
+    "version": "0.1.0-test"
+  },
+  "generated_at": "2026-01-01T00:00:00Z",
+  "incomplete": [],
+  "kind": "tasks.plan_compare",
+  "plans": [
+    {
+      "effort": {
+        "done_days": 2,
+        "open_days": 1,
+        "open_high": 1.6,
+        "open_low": 0.7,
+        "open_without": 0
+      },
+      "forecast_weeks": {
+        "high": 8,
+        "low": 2
+      },
+      "id": "lib.nvim/the-plan",
+      "last_done": "2025-12-30",
+      "path": {
+        "days": 0.5,
+        "unknown_effort": 0
+      },
+      "phase_now": "build",
+      "progress": 0.33,
+      "project": "lib.nvim/the-project",
+      "stages": 2,
+      "status": "doing",
+      "tasks": {
+        "decision": 0,
+        "done": 1,
+        "freed": 0,
+        "open": 2,
+        "parked": 0,
+        "ready": 2,
+        "stuck": 0,
+        "waiting": 0
+      },
+      "title": "The plan",
+      "weekly_done": [
+        0,
+        0,
+        0,
+        1
+      ]
+    }
+  ],
+  "plugin": "tasks.nvim",
+  "rev": "rev:e56dd1",
+  "schema": 1,
+  "today": "2026-01-02",
+  "vault": {
+    "id": "vault"
+  },
+  "weeks": 4
+}

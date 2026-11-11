@@ -12,6 +12,7 @@ export type TasksExport =
   | Bodies
   | Estimate
   | PlanFor
+  | PlanCompare
   | Check
   | TaskDocument
   | Next
@@ -431,6 +432,18 @@ export type PlanFor = Head & {
    * The cycles whose members are all among `nodes`.
    */
   cycles: string[][];
+  incomplete: string[];
+};
+/**
+ * tasks.plan_compare (capability `plan_compare`): the open plans side by side, one row each in the order of the vault (`ids` narrows it to some). The figures are the engine's; a page that compares plans only sorts and draws them. The finished tasks lie outside the revision, as in `tasks.finished`.
+ */
+export type PlanCompare = Head & {
+  kind: "tasks.plan_compare";
+  rev: Rev;
+  digest: Digest;
+  today: Date;
+  weeks: number;
+  plans: PlanCompareRow[];
   incomplete: string[];
 };
 /**
@@ -1078,6 +1091,45 @@ export interface NamedList {
     stale_refs?: true;
     quick_win?: true;
     readiness?: "ready" | "waiting";
+  };
+}
+/**
+ * One open plan of tasks.plan_compare. `tasks`: its open and finished tasks, the open ones by readiness state. `effort`: open days (with the range of the sizes), finished days, open tasks without an effort. `path`: the critical path of the plan's open tasks alone (a blocker outside the plan takes no part). `weekly_done`: members finished in each of the last `weeks` weeks, oldest first (the last week ends `today`). `forecast_weeks`: weeks the open tasks would still take, `low` at the pace of the best of those weeks, `high` at their average; absent when nothing was finished in them or nothing is open. `phase_now`: the first stage of the plan's `phase_order` that still has an open task.
+ */
+export interface PlanCompareRow {
+  id: string;
+  title: string;
+  status?: string;
+  project?: string;
+  stages: number;
+  phase_now?: string;
+  tasks: {
+    open: number;
+    done: number;
+    ready: number;
+    decision: number;
+    waiting: number;
+    stuck: number;
+    freed: number;
+    parked: number;
+  };
+  progress: number;
+  effort: {
+    open_days: number;
+    open_low: number;
+    open_high: number;
+    done_days: number;
+    open_without: number;
+  };
+  path: {
+    days: number;
+    unknown_effort: number;
+  };
+  last_done?: Date;
+  weekly_done: number[];
+  forecast_weeks?: {
+    low: number;
+    high: number;
   };
 }
 export interface TaskBrief {

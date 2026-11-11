@@ -89,6 +89,8 @@ G.cases = {
     method = "estimate",
     request = '{"params":{"ids":["lib.nvim/alpha","lib.nvim/beta","lib.nvim/gamma"],"assume":[{"id":"lib.nvim/alpha","effort":"M","value":4}]}}',
   },
+  -- the open plans side by side: the plan of the fixture with a finished member, its pace over the last weeks
+  { name = "plancompare", method = "plan_compare" },
   { name = "planfor", method = "plan_for", request = '{"params":{"id":"cascade.nvim/iota"}}' },
   { name = "check", method = "check", request = '{"params":{"area":"lib.nvim"}}' },
   { name = "next", method = "next", request = '{"params":{"n":3}}' },

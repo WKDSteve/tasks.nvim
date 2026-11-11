@@ -731,6 +731,14 @@ return function(H)
   )
   golden("estimate")
 
+  -- ── plan_compare: the open plans side by side, on the state of the snapshot ──
+  local compared = call("plan_compare", nil, { today = "2026-01-02" })
+  eq(compared.kind, "tasks.plan_compare")
+  eq(compared.rev, snap.rev, "the rev of the snapshot: both documents are one state")
+  eq(#compared.plans, #snap.plans, "one row per open plan of the snapshot")
+  eq(compared.plans[1].tasks.open, 2, "the two open tasks of the plan")
+  ok(vim.tbl_contains(call("hello").capabilities, "plan_compare"), "hello names the capability")
+
   -- ── plan_for: what a task needs, and what waits for it ──
   local needs = call("plan_for", { id = "cascade.nvim/iota" })
   eq(
