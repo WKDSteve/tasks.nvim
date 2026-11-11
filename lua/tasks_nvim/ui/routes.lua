@@ -540,7 +540,7 @@ local LIST_FLAGS = {
     name = "claimed",
     type = "STRING",
     values = vim.deepcopy(require("tasks_nvim.claims").FILTER_VALUES),
-    desc = "Only tasks claimed by this name (own), by somebody else (foreign), or by nobody (none)",
+    desc = "Only tasks whose claim is own, foreign (somebody else's) or none (free)",
   },
   {
     name = "sort",
