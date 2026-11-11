@@ -1245,11 +1245,9 @@ local function close_by_hand(ctx, kind)
     ctx.say(("already	%s	%s"):format(id, res.already))
     return 0
   end
-  -- a plan's notes come before the verdict; a project's only with a refusal (its finish says them in `say_closed`)
-  if kind == "plan" or res.holding or res.err then
-    for _, note in ipairs(res.notes) do
-      ctx.warn("warn: " .. note)
-    end
+  -- the notes of the plan or project come before the verdict (those of a project a plan took with it after it)
+  for _, note in ipairs(res.notes) do
+    ctx.warn("warn: " .. note)
   end
   if res.holding then
     local n = #res.holding

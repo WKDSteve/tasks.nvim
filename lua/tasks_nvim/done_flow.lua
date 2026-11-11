@@ -277,7 +277,9 @@ function M.close_by_hand(kind, id, opts)
   local run = { root = opts.root, today = opts.today, date = opts.today, dry_run = opts.dry_run }
   if kind == "project" then
     local res = M.close_projects({ id }, run)
-    out.projects = res
+    -- its notes once, in `notes`: `projects.notes` is for the projects a plan close took with it
+    out.projects =
+      { closed = res.closed, summaries = res.summaries, refused = res.refused, notes = {} }
     vim.list_extend(out.notes, res.notes)
     if #res.closed == 0 then
       out.holding = res.refused[id]

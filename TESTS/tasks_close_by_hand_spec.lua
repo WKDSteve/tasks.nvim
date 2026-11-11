@@ -157,6 +157,20 @@ return function(H)
     eq(asked, nil)
     has(text, "lib.nvim/empty is already finished")
 
+    -- a note of a project close is said once (the shared step keeps it in `notes` only)
+    local real_close_projects = done_flow.close_projects
+    done_flow.close_projects = function(ids, opts)
+      local res = real_close_projects(ids, opts)
+      res.notes = { "a note of the project close" }
+      return res
+    end
+    file_of("projects", "noted", "status: doing\nareas: [lib.nvim]\nphase_order: []")
+    local noted_ok, noted_text = pcall(run, "project-close lib.nvim/noted --yes")
+    done_flow.close_projects = real_close_projects
+    ok(noted_ok, tostring(noted_text))
+    local _, count = noted_text:gsub("a note of the project close", "")
+    eq(count, 1, "the note is said once: " .. noted_text)
+
     -- a project by hand, --yes skips the question
     H.write(
       ("%s/%s/ROADMAP/projects/alone.md"):format(root, area),
