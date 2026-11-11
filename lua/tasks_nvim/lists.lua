@@ -6,7 +6,7 @@
 ---
 ---     { status = "open,doing", effort = "<=S", value = ">=4", sort = "roi", desc = "small and worth it" }
 ---
---- Fields: `status prio effort kind category severity value actor tag sheet stale plan phase` (strings, `prio` / `value` /
+--- Fields: `status prio effort kind category severity value actor tag sheet claimed stale plan phase` (strings, `prio` / `value` /
 --- `stale` may be numbers), `blocked reminders overdue unestimated stale_refs quick_win` (booleans), `readiness`
 --- (`ready` | `waiting`), `sort` (`model.SORTS`), `area` (one area, default all) and `desc` (one line of text).
 ---
@@ -72,6 +72,7 @@ end
 ---@field actor? string
 ---@field tag? string
 ---@field sheet? string
+---@field claimed? string
 ---@field stale? string|integer
 ---@field plan? string
 ---@field phase? string
@@ -106,6 +107,7 @@ local FIELDS = {
   actor = "string",
   tag = "string",
   sheet = "string",
+  claimed = "string",
   stale = "stringnum",
   plan = "string",
   phase = "string",
@@ -134,6 +136,7 @@ M.FIELD_ORDER = {
   "actor",
   "tag",
   "sheet",
+  "claimed",
   "stale",
   "plan",
   "phase",
@@ -218,6 +221,7 @@ local function option_map(def)
     actor = def.actor,
     tag = def.tag,
     sheet = def.sheet,
+    claimed = def.claimed,
     stale = def.stale,
     plan = def.plan,
     phase = def.phase,
@@ -363,6 +367,7 @@ function M.from_filter(filter, sort, area, desc)
     actor = joined(f.actor),
     tag = joined(f.tag),
     sheet = joined(f.sheet),
+    claimed = joined(f.claimed),
     plan = joined(f.plan),
     phase = joined(f.phase),
     stale = f.stale and tostring(f.stale) or nil,

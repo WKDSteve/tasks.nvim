@@ -86,6 +86,8 @@
 ---@field starts_after? string        # `YYYY-MM-DD`: only tasks that start after that day.
 ---@field reminders? boolean         # A reminder (`remind:`) that is due: its date is today or earlier.
 ---@field unestimated? boolean        # Missing the effort or the value (the tasks `estimate` walks).
+---@field claimed? string|string[]   # The claim of the task (`tasks_nvim.claims`): `own`, `foreign` (a valid claim of somebody else), `none` (free or expired).
+---@field claim_classes? table<string, { class: string, by: string }>  # The claims to judge by (`claims.classes`); read from the vault of `ref_opts.root` when not given.
 ---@field sheet? string|string[]     # The state of the test-sheet block (`tasks_nvim.sheets`: red, stale, never, inbox, manual, green, unknown) or `any`; a task without the block never matches.
 ---@field stale? integer              # Not updated for at least this many days (undated counts as stale).
 ---@field stale_refs? boolean         # A file named in `refs` changed after `updated` (`tasks.staleness`; reads files and git).

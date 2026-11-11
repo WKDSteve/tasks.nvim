@@ -271,6 +271,7 @@ end
 ---@field states table<string, Tasks.PlanState>
 ---@field open_blockers table<string, string[]>
 ---@field sums Tasks.Rollup
+---@field claims? table<string, { class: "own"|"foreign", by: string }>  # The tasks claimed now (`claims.classes`).
 
 ---Work it out for the shown tasks. Fail-open: when the vault cannot be read the list simply shows no readiness
 ---(the counts fall back to what the files say), it never breaks the dashboard.
@@ -293,6 +294,12 @@ function M.readiness(tasks, root, shared)
     out.states[t.id] = state
     out.open_blockers[t.id] = open
   end
+  -- who works on what now: a claim file that cannot be read marks nothing (fail-open, as above)
+  local vroot = require("tasks_nvim.vault").root({ root = root })
+  local ok_claims, claims = pcall(function()
+    return vroot and require("tasks_nvim.claims").classes(vroot) or {}
+  end)
+  out.claims = ok_claims and claims or {}
   return out
 end
 
@@ -312,6 +319,12 @@ function M.signature(tasks, ready, built)
       M.search_text(t),
       M.blocked_hint(t, ready and ready.open_blockers[t.id]) or "",
       ready and ready.states[t.id] or "",
+      -- a claim lives beside the task file: taking or giving one back changes no task file
+      ready
+          and ready.claims
+          and ready.claims[t.id]
+          and (ready.claims[t.id].class .. ":" .. ready.claims[t.id].by)
+        or "",
       st and ("%d.%d"):format(st.mtime.sec, st.mtime.nsec) or "?",
     }, "\t")
   end
@@ -371,6 +384,20 @@ function M.blocked_hint(t, open)
   return "\226\134\144 " .. blockers[1] .. more -- "←"
 end
 
+---The mark of a task somebody works on now (`tasks_nvim.claims`): `[claim: mine]` for a claim of this name,
+---`[claim: <who>]` for one of somebody else, nil for a task nobody holds.
+---@param claim? { class: "own"|"foreign", by: string }
+---@return { [1]: string, [2]: string }|nil
+function M.claim_mark(claim)
+  if not claim then
+    return nil
+  end
+  if claim.class == "own" then
+    return { "  [claim: mine]", "DiagnosticOk" }
+  end
+  return { "  [claim: " .. claim.by .. "]", "DiagnosticWarn" }
+end
+
 ---One list line as `{ text, highlight }` chunks: prio, status, effort, area,
 ---title, blocker hint. The same shape `Snacks.picker` formats return.
 ---@param t Tasks.Task
@@ -411,6 +438,10 @@ function M.parts(t, w, ready)
   if t.sheets then
     parts[#parts + 1] =
       { "  [sheet: " .. t.sheets.state .. "]", M.SHEET_HL[t.sheets.state] or "Comment" }
+  end
+  local claim_mark = M.claim_mark(ready and ready.claims and ready.claims[t.id])
+  if claim_mark then
+    parts[#parts + 1] = claim_mark
   end
   local hint = M.blocked_hint(t, ready and ready.open_blockers[t.id])
   if hint then
@@ -595,6 +626,9 @@ function M.chips(f)
   end
   if f.sheet and #f.sheet > 0 then
     chips[#chips + 1] = "sheet: " .. joined(f.sheet)
+  end
+  if f.claimed and #f.claimed > 0 then
+    chips[#chips + 1] = "claimed: " .. joined(f.claimed)
   end
   if f.stale then
     chips[#chips + 1] = ("stale: >=%dd"):format(f.stale)

@@ -1729,6 +1729,13 @@ function M.filter(tasks, f)
     plan_projects = require("tasks_nvim.projects").plan_projects(files)
   end
   local sheet_set = to_set(f.sheet)
+  local claimed_set = to_set(f.claimed)
+  local claim_classes = f.claim_classes
+  if claimed_set and not claim_classes then
+    -- the claims live beside the task files (`.claims/`): read at each call, as the plan files above
+    local vroot = require("tasks_nvim.vault").root({ root = f.ref_opts and f.ref_opts.root })
+    claim_classes = vroot and require("tasks_nvim.claims").classes(vroot) or {}
+  end
   local effort_max = f.effort_max and M.effort_days(f.effort_max) or nil
   local today = f.today or M.today()
   -- `--stale=refs`: the caller may hand in a ready map (`f.ref_stale`); else the
@@ -1814,6 +1821,13 @@ function M.filter(tasks, f)
       )
     then
       keep = false
+    end
+    -- the claim: own, foreign, or none (free or expired)
+    if keep and claimed_set then
+      local claim = claim_classes[t.id]
+      if not claimed_set[claim and claim.class or "none"] then
+        keep = false
+      end
     end
     if keep and f.unestimated and t.value ~= nil and M.effort_days(t.effort) ~= nil then
       keep = false

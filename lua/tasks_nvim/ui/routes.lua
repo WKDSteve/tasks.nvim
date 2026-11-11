@@ -537,6 +537,12 @@ local LIST_FLAGS = {
     desc = "Only tasks whose test sheets are in one of these states (any = has sheets)",
   },
   {
+    name = "claimed",
+    type = "STRING",
+    values = vim.deepcopy(require("tasks_nvim.claims").FILTER_VALUES),
+    desc = "Only tasks claimed by this name (own), by somebody else (foreign), or by nobody (none)",
+  },
+  {
     name = "sort",
     type = "STRING",
     enum = model.SORTS,
@@ -587,8 +593,9 @@ local function filter_flags(extra)
     waiting = true,
     reminders = true,
     overdue = true,
-    -- the state of a task's test sheets is about the list of tasks, not a plan or an estimate
+    -- the state of a task's test sheets, and who holds a task now, are about the list of tasks, not a plan or an estimate
     sheet = true,
+    claimed = true,
     -- (the commands that take these filters name their own `--plan`, with their own words)
     plan = true,
   }

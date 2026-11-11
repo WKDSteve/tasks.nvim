@@ -79,6 +79,7 @@ return function(H)
         "area",
         "blocked",
         "category",
+        "claimed",
         "desc",
         "effort",
         "kind",

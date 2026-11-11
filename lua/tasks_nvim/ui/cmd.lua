@@ -317,6 +317,7 @@ local function filter_note(flags)
     "actor",
     "tag",
     "sheet",
+    "claimed",
   }) do
     if flags[name] ~= nil then
       parts[#parts + 1] = ("%s=%s"):format(name, flags[name])
@@ -973,6 +974,7 @@ function M.list(ctx)
     project = flags.project,
     phase = flags.phase,
     sheet = flags.sheet,
+    claimed = flags.claimed,
   })
   if not filter then
     notify.error(tostring(ferr))

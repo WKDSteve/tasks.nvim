@@ -1343,6 +1343,7 @@
             "actor": { "type": "string" },
             "tag": { "type": "string" },
             "sheet": { "type": "string" },
+            "claimed": { "type": "string" },
             "stale": { "type": "string" },
             "plan": { "type": "string" },
             "phase": { "type": "string" },

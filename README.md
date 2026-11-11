@@ -63,7 +63,8 @@ sessions that run without an editor. Nothing is stored anywhere but in the files
   reasons ("30 parked, 25 waiting for mac"), `--waits-for=` lists a group, `:Tasks release mac` brings it back.
 - **Reserve while you work**: `:Tasks claim <id> [for=4h]` marks an open task as taken (status `doing`, a claim file outside
   the task, expiring) so two chats or an agent and you do not take the same one; `:Tasks unclaim <id>` gives it back
-  (the same verbs headless, [docs/COMMANDS.md](docs/COMMANDS.md)).
+  (the same verbs headless, [docs/COMMANDS.md](docs/COMMANDS.md)). The dashboard marks a claimed line `[claim: mine]` or
+  `[claim: <who>]`, and `--claimed=own|foreign|none` lists the tasks by their claim.
 - **Finish safely**: `:Tasks done` moves the file to `Backlog/`, adds a row to its README, regenerates the index,
   and restores everything byte for byte if a step fails.
 - **Dashboard** (needs [snacks.nvim](https://github.com/folke/snacks.nvim); a plain list without it): filter chips,

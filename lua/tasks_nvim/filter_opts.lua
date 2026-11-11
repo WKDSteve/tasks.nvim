@@ -47,7 +47,7 @@ end
 ---words the same way. Unknown words are an error, never silently ignored.
 ---`stale` may be a number, a digit string or `refs` (same as `stale_refs`: a
 ---file named in `refs` changed since `updated`); `today` is passed through.
----@param opt { plan?: string, project?: string, phase?: string, status?: string, prio?: string|integer, effort?: string, kind?: string, tag?: string, category?: string, severity?: string, waits_for?: string, value?: string|integer, actor?: string, stale?: string|integer, stale_refs?: boolean, blocked?: boolean, reminders?: boolean, overdue?: boolean, due_before?: string, starts_after?: string, unestimated?: boolean, quick_win?: boolean, sheet?: string, today?: string }
+---@param opt { plan?: string, project?: string, phase?: string, status?: string, prio?: string|integer, effort?: string, kind?: string, tag?: string, category?: string, severity?: string, waits_for?: string, value?: string|integer, actor?: string, stale?: string|integer, stale_refs?: boolean, blocked?: boolean, reminders?: boolean, overdue?: boolean, due_before?: string, starts_after?: string, unestimated?: boolean, quick_win?: boolean, sheet?: string, claimed?: string, today?: string }
 ---@return Tasks.Filter|nil filter
 ---@return string|nil err
 function M.parse(opt)
@@ -261,6 +261,18 @@ function M.parse(opt)
       end
     end
     f.sheet = list
+  end
+  if opt.claimed ~= nil then
+    local list, lerr = listed(opt.claimed, "claimed")
+    if not list then
+      return nil, lerr
+    end
+    for _, c in ipairs(list) do
+      if not vim.tbl_contains(require("tasks_nvim.claims").FILTER_VALUES, c) then
+        return nil, ("unknown value in --claimed: %s (expected own, foreign or none)"):format(c)
+      end
+    end
+    f.claimed = list
   end
   if opt.blocked then
     f.blocked = true

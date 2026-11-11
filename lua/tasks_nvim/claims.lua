@@ -596,6 +596,28 @@ function M.record_override(id, before, opts)
   return res ~= nil
 end
 
+---The tasks of the vault that are claimed now, by id: `own` (a valid claim of `opts.by`, default `default_name()`) or
+---`foreign` (a valid claim of somebody else), with who holds it. An expired claim is none. Reads only.
+---@param root string
+---@param opts? { by?: string, now?: string }
+---@return table<string, { class: "own"|"foreign", by: string }>
+function M.classes(root, opts)
+  opts = opts or {}
+  local by = opts.by or M.default_name()
+  local now = opts.now or M.now()
+  local out = {}
+  for id, claim in pairs(M.list(root)) do
+    local state = M.state(claim, by, now)
+    if state == "own" or state == "foreign" then
+      out[id] = { class = state, by = claim.by }
+    end
+  end
+  return out
+end
+
+---The values of the filter `claimed` (`own`, `foreign`, `none`: free or expired).
+M.FILTER_VALUES = { "own", "foreign", "none" }
+
 ---How a claim reads in one line.
 ---@param claim Tasks.Claim
 ---@return string
