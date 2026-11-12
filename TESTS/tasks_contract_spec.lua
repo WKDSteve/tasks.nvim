@@ -64,7 +64,12 @@ return function(H)
   eq(hello.vault.id, "vault", "the vault is named by its folder, never by its path")
   eq(hello.engine, { version = "0.1.0-test", git = "0000000", nvim = "0.0.0" })
   -- the local day of the engine, for a caller without a time zone (the hub's reminders)
-  eq(hello.today, require("tasks_nvim.model").today(), "hello names the engine's today")
+  -- (the day now, or the one a minute ago: the call may have been just before midnight)
+  local engine_day = require("tasks_nvim.model").today()
+  ok(
+    hello.today == engine_day or hello.today == os.date("%Y-%m-%d", os.time() - 60),
+    "hello names the engine's today: " .. tostring(hello.today)
+  )
   eq(call("hello", nil, { today = "2026-03-04" }).today, "2026-03-04", "the seam of the specs")
   -- every method is a capability, plus the features that are no method of their own
   local expected_caps = api.methods()
