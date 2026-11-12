@@ -1,4 +1,5 @@
 -- TESTS/tasks_moves_spec.lua -- moves.preview: moving a task to another area, stage 1. What would break is reported;
+-- @scans-data (what it lists is a fixture vault in a temp folder; a changed helper of TESTS/ selects it anyway)
 -- nothing is written.
 
 ---@diagnostic disable: need-check-nil

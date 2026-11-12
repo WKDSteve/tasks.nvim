@@ -1,4 +1,5 @@
 -- TESTS/tasks_read_hardening_spec.lua -- the read side stays inside the vault: network and device refs are no refs,
+-- @scans-data (what it lists is a fixture vault in a temp folder; a changed helper of TESTS/ selects it anyway)
 -- an absolute ref only reaches the places it was told to look in, and a link (symbolic link, junction) is no way out
 -- of the vault (a linked task file, a linked folder, a linked area).
 

@@ -1,4 +1,5 @@
 -- TESTS/tasks_project_ops_spec.lua -- the write door and projects: `project_new`, `plan_new` with a project, `plan_set`,
+-- @scans-data (what it lists is a fixture vault in a temp folder; a changed helper of TESTS/ selects it anyway)
 -- `project_set`, `plan_close`, `project_close`, and the relations a task may name (`project:`).
 
 ---@diagnostic disable: need-check-nil, param-type-mismatch

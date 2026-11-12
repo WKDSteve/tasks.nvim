@@ -1,4 +1,5 @@
 -- TESTS/tasks_done_preview_spec.lua -- done_preview: what finishing a task would do, with nothing written, and a
+-- @scans-data (what it lists is a fixture vault in a temp folder; a changed helper of TESTS/ selects it anyway)
 -- confirm token that binds the version of the file that was shown.
 
 ---@diagnostic disable: need-check-nil

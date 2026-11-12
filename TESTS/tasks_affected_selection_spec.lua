@@ -32,9 +32,10 @@ return function(H)
   })
   eq(r.all, false, tostring(r.all_reason))
   eq(r.source, "heuristic")
-  -- 70 of 111 on 2026-11-12; 109 before the vault scanners declared `-- @scans-data`
+  -- 60 of 111 on 2026-11-12 (70 before the specs that list a temp vault declared `-- @scans-data`, 109 before the
+  -- vault scanners did)
   ok(
-    #r.files <= #specs * 3 / 4,
+    #r.files <= #specs * 0.56,
     ("%d of %d specs: a change of api.lua reaches nearly every spec"):format(#r.files, #specs)
   )
 

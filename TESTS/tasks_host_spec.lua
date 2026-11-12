@@ -1,4 +1,5 @@
 -- TESTS/tasks_host_spec.lua -- the persistent engine: the line protocol of `tasks_nvim.host` and the real
+-- @scans-data (what it lists is a fixture vault in a temp folder; a changed helper of TESTS/ selects it anyway)
 -- `scripts/tasks-host.lua` in a child Neovim.
 --
 -- The rule it holds: a question through the host gets the document `api.call` gives, byte for byte.

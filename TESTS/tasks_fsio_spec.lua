@@ -1,4 +1,5 @@
 -- TESTS/tasks/tasks_fsio_spec.lua -- tasks.fsio: atomic writes.
+-- @scans-data (what it lists is a fixture vault in a temp folder; a changed helper of TESTS/ selects it anyway)
 
 return function(H)
   local eq, ok = H.eq, H.ok

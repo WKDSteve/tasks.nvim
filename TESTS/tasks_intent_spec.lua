@@ -1,4 +1,5 @@
 -- TESTS/tasks_intent_spec.lua -- taking an intent `wkd-intent/1`: the target's check (copies of the golden examples of
+-- @scans-data (what it lists is a fixture vault in a temp folder; a changed helper of TESTS/ selects it anyway)
 -- appkit/schemas/wkd-intent/1 in TESTS/intent/), what `tasks.new` and `tasks.show` do, refs of registered namespaces
 -- through the ops door, `find`, the handshake and the CLI verb `intent`.
 

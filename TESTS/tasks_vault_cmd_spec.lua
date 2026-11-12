@@ -1,4 +1,5 @@
 -- TESTS/tasks_vault_cmd_spec.lua -- `:TasksVault`: the paths and writes of tasks_nvim.vault_ops, the handlers of
+-- @scans-data (what it lists is a fixture vault in a temp folder; a changed helper of TESTS/ selects it anyway)
 -- tasks_nvim.ui.vault_cmd (clipboard, paste, link, open, find, grep, new, create, the one "no vault" notice) and the
 -- registration with its completion.
 

@@ -1,4 +1,5 @@
 -- TESTS/tasks_attach_ui_spec.lua -- the "attach a screenshot" entries of the editor: the new-task form (a third
+-- @scans-data (what it lists is a fixture vault in a temp folder; a changed helper of TESTS/ selects it anyway)
 -- answer to "attach assets?") and the dashboard (an action, and the entry of the plain list). All of them end in
 -- `cmd.attach_screenshot`, which is the clipboard image, else the newest screenshot, through the same
 -- `attach_source` as `:Tasks attach <id> from=...`. The clipboard and the screenshot folder are fakes behind the

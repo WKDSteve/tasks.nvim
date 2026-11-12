@@ -1,4 +1,5 @@
 -- TESTS/tasks_project_close_spec.lua -- finishing the last plan or own task of a project finishes the project: the done
+-- @scans-data (what it lists is a fixture vault in a temp folder; a changed helper of TESTS/ selects it anyway)
 -- chain (`done_flow`), the preview, a batch, and the hand-made `plan-close` / `project-close`.
 
 ---@diagnostic disable: need-check-nil, param-type-mismatch

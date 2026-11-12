@@ -1,4 +1,5 @@
 -- TESTS/tasks_ops_spec.lua -- tasks-ops/1, the write door: the shape of a request, every operation, dry runs, limits,
+-- @scans-data (what it lists is a fixture vault in a temp folder; a changed helper of TESTS/ selects it anyway)
 -- what a front end may not write, the answers a client has to handle (conflict, refused relation, partial success), and
 -- two writers at once.
 

@@ -1,4 +1,5 @@
 -- TESTS/tasks_block_lists_spec.lua -- a task file whose list properties are YAML block lists (what Obsidian's
+-- @scans-data (what it lists is a fixture vault in a temp folder; a changed helper of TESTS/ selects it anyway)
 -- Properties editor writes) is a valid task: `check` has no `frontmatter-invalid`, the lists are read, and
 -- `mutate.set` keeps the style of the lists it does not change.
 

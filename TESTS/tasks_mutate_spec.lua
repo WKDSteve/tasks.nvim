@@ -1,4 +1,5 @@
 -- TESTS/tasks/tasks_mutate_spec.lua -- tasks.mutate: template, new, set, done, the Backlog README.
+-- @scans-data (what it lists is a fixture vault in a temp folder; a changed helper of TESTS/ selects it anyway)
 
 ---@diagnostic disable: duplicate-set-field, need-check-nil
 -- Why: a value is bound with assert()/ok() in the same body, so a nil fails the spec at that line; specs replace module functions with test doubles on purpose.

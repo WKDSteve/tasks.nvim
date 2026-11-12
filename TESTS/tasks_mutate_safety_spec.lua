@@ -1,4 +1,5 @@
 -- TESTS/tasks/tasks_mutate_safety_spec.lua -- hardening of the write paths: a failure in the middle of
+-- @scans-data (what it lists is a fixture vault in a temp folder; a changed helper of TESTS/ selects it anyway)
 -- `attach` / `done` leaves no half state (and says so when it cannot undo it), names that Windows treats
 -- as devices are never created, and long whitespace runs do not make the input trimming quadratic.
 

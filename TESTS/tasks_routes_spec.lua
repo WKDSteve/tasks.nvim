@@ -1,4 +1,5 @@
 -- TESTS/tasks_routes_spec.lua -- the :Tasks command layer: composer parsing, dispatch,
+-- @scans-data (what it lists is a fixture vault in a temp folder; a changed helper of TESTS/ selects it anyway)
 -- delivery targets, completion, prompts. Engine rules are covered by the other specs; this one drives the
 -- real composer command (registered here as :TaskT with the very routes the host verb gets) against a
 -- fixture vault.

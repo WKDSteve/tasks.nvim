@@ -1,4 +1,5 @@
 -- TESTS/tasks_staleness_spec.lua -- `--stale=refs`: tasks.staleness (ref classification, resolution,
+-- @scans-data (what it lists is a fixture vault in a temp folder; a changed helper of TESTS/ selects it anyway)
 -- git and mtime dating, caps), the filter option, the CLI `list --stale-refs` and the dashboard filter state.
 
 ---@diagnostic disable: need-check-nil

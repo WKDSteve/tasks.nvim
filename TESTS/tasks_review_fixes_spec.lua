@@ -1,4 +1,5 @@
 -- TESTS/tasks_review_fixes_spec.lua -- regressions of the SEC/ERR rule review of 2026-10-05: linear escaping of
+-- @scans-data (what it lists is a fixture vault in a temp folder; a changed helper of TESTS/ selects it anyway)
 -- table cells (a backslash run in front of `|` stays escaped), no quadratic parse of a file with many opaque
 -- keys, `fsio.read` refuses what is not a small regular file, and C1 control characters never reach an asset name.
 

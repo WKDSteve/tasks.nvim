@@ -1,4 +1,5 @@
 -- TESTS/tasks_contract_spec.lua -- the read contract `tasks-export/1`: documents, the dispatcher, golden files.
+-- @scans-data (what it lists is a fixture vault in a temp folder; a changed helper of TESTS/ selects it anyway)
 --
 -- The golden files (TESTS/golden/tasks-export-1/*.json) are what a client of the contract can rely on byte for byte.
 -- A change of a document is a change of the contract: look at the diff, then regenerate them on purpose with
