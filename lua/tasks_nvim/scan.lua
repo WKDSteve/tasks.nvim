@@ -1,4 +1,5 @@
 ---@module 'tasks_nvim.scan'
+-- @scans-data: the folders it lists and the paths it names are task vaults, never the files of this plugin
 ---@brief Collect task files for one area or the whole vault.
 ---@description
 --- Walks `<area>/ROADMAP/tasks/` (open tasks) and `<area>/Backlog/` (finished

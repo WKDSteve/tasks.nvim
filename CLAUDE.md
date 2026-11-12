@@ -18,7 +18,8 @@ bash scripts/contract.sh              # schema, goldens, typen (Schritt `contrac
   normal.
 - Module laden andere nur per literalem `require("...")` (auch in `pcall(require, "...")`), nie per
   berechnetem Namen: sonst hat der Modul-Graph von docmap.nvim keine Kante, `--changed` wählt alle Specs.
-  `TESTS/tasks_static_requires_spec.lua` wacht darüber; optionale Plugins über `soft.check`.
+  `TESTS/tasks_static_requires_spec.lua` wacht darüber; optionale Plugins über `soft.check`. Ein Modul, das
+  Vault-Ordner listet, trägt `-- @scans-data` im Kopf (sonst gilt es testing.nvim als Leser des Projekts).
 
 ## Den Vertrag ändern (neues Dokument, neues Feld, neue Methode)
 

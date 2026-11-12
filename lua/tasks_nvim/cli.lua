@@ -1,4 +1,5 @@
 ---@module 'tasks_nvim.cli'
+-- @scans-data: the folders it lists and the paths it names are task vaults, never the files of this plugin
 ---@brief Command-line front end of the task engine: `list`, `index`, `new`, `set`, `done`, `attach`, `folderize`, `check`, `template`, `areas`, `export`, `waits`, `release`.
 ---@description
 --- `run(argv, io)` parses one command line, calls the engine and prints plain,

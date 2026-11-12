@@ -1,4 +1,5 @@
 ---@module 'tasks_nvim.check'
+-- @scans-data: the folders it lists and the paths it names are task vaults, never the files of this plugin
 ---@brief The rule checker for the task files (concept section 9).
 ---@description
 --- Reads the open tasks, the finished ones in `Backlog/` and the generated

@@ -1,4 +1,5 @@
 ---@module 'tasks_nvim.wikilinks'
+-- @scans-data: the folders it lists and the paths it names are task vaults, never the files of this plugin
 ---@brief Obsidian wikilinks in `blocked_by`, `after`, `plan` and a plan file's `target`: read them as task ids, write ids as wikilinks on request.
 ---@description
 --- A reference to a task or a plan is a plain id (`<area>/<slug>`) or, as Obsidian writes it, a wikilink in quotes:

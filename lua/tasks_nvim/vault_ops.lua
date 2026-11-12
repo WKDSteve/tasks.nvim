@@ -1,4 +1,5 @@
 ---@module 'tasks_nvim.vault_ops'
+-- @scans-data: the folders it lists and the paths it names are task vaults, never the files of this plugin
 ---@brief What `:TasksVault` does with the vault itself: where a part of an area is, which area a path belongs to,
 ---@brief a note in the Backlog, a new vault. No notifications, no windows.
 ---@description

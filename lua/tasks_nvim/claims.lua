@@ -1,4 +1,5 @@
 ---@module 'tasks_nvim.claims'
+-- @scans-data: the folders it lists and the paths it names are task vaults, never the files of this plugin
 ---@brief Reservation of a task for the time somebody works on it (a claim), so two agents do not take the same task.
 ---@description
 --- A claim says WHO works on an open task, SINCE when and UNTIL when (it expires: a chat that died blocks nothing for
