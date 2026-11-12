@@ -55,6 +55,11 @@ return {
       require("tasks_nvim").setup({ vault = _G.root })
 
       _G.norm = function(p) return vim.fs.normalize(p or "") end
+      -- the same folder: the temp folder of macOS is a link (/var -> /private/var), and one side may be resolved
+      _G.same = function(a, b)
+        local function real(p) return vim.fs.normalize(vim.uv.fs_realpath(p or "") or p or "") end
+        return a ~= nil and b ~= nil and real(a) == real(b)
+      end
       _G.ends = function(s, tail) s = _G.norm(s); return s:sub(-#tail) == tail end
       _G.last = function(list) return list[#list] end
       _G.buf_has = function(text)
@@ -72,7 +77,7 @@ return {
     -- clipboard, paste, link
     { keys = ":TasksVault clipboard lib.nvim<CR>" },
     {
-      expect = [[_G.norm(_G.last(_G.copied)) == _G.backlog]],
+      expect = [[_G.same(_G.last(_G.copied), _G.backlog)]],
       note = "the path of the Backlog of lib.nvim is copied",
     },
     { keys = ":enew<CR>" },
@@ -99,19 +104,19 @@ return {
     },
     { keys = ":TasksVault tree lib.nvim tasks<CR>" },
     {
-      expect = [[_G.last(_G.explored) == _G.backlog .. "/TASKS"]],
+      expect = [[_G.same(_G.last(_G.explored), _G.backlog .. "/TASKS")]],
       note = "the folder of the part (tasks: Backlog/TASKS) in the explorer",
     },
 
     -- find, grep
     { keys = ":TasksVault find lib.nvim<CR>" },
     {
-      expect = [[_G.last(_G.picked).action == "files" and _G.last(_G.picked).root == _G.backlog]],
+      expect = [[_G.last(_G.picked).action == "files" and _G.same(_G.last(_G.picked).root, _G.backlog)]],
       note = "a picker of files rooted at the Backlog",
     },
     { keys = ":TasksVault grep lib.nvim all<CR>" },
     {
-      expect = [[_G.last(_G.picked).action == "grep" and _G.last(_G.picked).root == _G.root .. "/lib.nvim"]],
+      expect = [[_G.last(_G.picked).action == "grep" and _G.same(_G.last(_G.picked).root, _G.root .. "/lib.nvim")]],
       note = "a content search over the whole area",
     },
 
@@ -157,7 +162,7 @@ return {
       note = ":TasksVault create --force --yes <dir> work",
     },
     {
-      expect = [[vim.fn.isdirectory(_G.other .. "/work") == 1 and _G.norm(require("tasks_nvim.vault").root()) == _G.norm(_G.other)]],
+      expect = [[vim.fn.isdirectory(_G.other .. "/work") == 1 and _G.same(require("tasks_nvim.vault").root(), _G.other)]],
       note = "the vault and its area are made and used for this session",
     },
     {
