@@ -674,6 +674,10 @@
           },
           "description": "The versions of the contract this engine speaks."
         },
+        "today": {
+          "$ref": "#/$defs/Date",
+          "description": "The day the engine counts as today: the local day of its machine (a `due:` or `remind:` day has come when it is this day or earlier). Additive."
+        },
         "capabilities": {
           "type": "array",
           "items": {

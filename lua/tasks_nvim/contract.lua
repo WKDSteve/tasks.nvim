@@ -687,8 +687,9 @@ M.relative = relative
 
 -- ── documents ────────────────────────────────────────────────────────────────
 
----The handshake: what this engine is and can do. Reads no task.
----@param opts? { root?: string }
+---The handshake: what this engine is and can do, and the day it counts as today (the local day of its machine: a
+---caller without a time zone of its own, the hub, asks it here when a `remind:` day has come). Reads no task.
+---@param opts? { root?: string, today?: string }
 ---@return table doc
 function M.hello(opts)
   -- `hello` answers for a vault whose marker file is refused too: it names the problem (`marker.problem`) instead of
@@ -706,6 +707,8 @@ function M.hello(opts)
     })
   end
   doc.schemas = { M.SCHEMA }
+  local today = opts and opts.today or model.today()
+  doc.today = model.is_date(today) and today or nil
   doc.capabilities = vim.list_slice(M.CAPABILITIES, 1)
   doc.limits = json.object(vim.deepcopy(M.LIMITS))
   local efforts = vim.list_slice(model.EFFORTS, 1)
