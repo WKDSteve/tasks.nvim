@@ -79,26 +79,55 @@ function M.setup(opts)
   -- plugin); the engine facade does not reach into the front end.
 end
 
+-- Loaded on first access. Each name is a literal `require`, so the module graph (docmap.nvim,
+-- `testing run --changed`) has an edge to it; a computed `"tasks_nvim." .. key` would make the graph
+-- assume this module loads anything under `tasks_nvim.`.
 local SUBMODULES = {
-  vault = true,
-  model = true,
-  filter_opts = true,
-  scan = true,
-  index = true,
-  mutate = true,
-  check = true,
-  staleness = true,
-  frecency = true,
-  ci = true,
-  cli = true,
-  batch = true,
-  resolve = true,
+  vault = function()
+    return require("tasks_nvim.vault")
+  end,
+  model = function()
+    return require("tasks_nvim.model")
+  end,
+  filter_opts = function()
+    return require("tasks_nvim.filter_opts")
+  end,
+  scan = function()
+    return require("tasks_nvim.scan")
+  end,
+  index = function()
+    return require("tasks_nvim.index")
+  end,
+  mutate = function()
+    return require("tasks_nvim.mutate")
+  end,
+  check = function()
+    return require("tasks_nvim.check")
+  end,
+  staleness = function()
+    return require("tasks_nvim.staleness")
+  end,
+  frecency = function()
+    return require("tasks_nvim.frecency")
+  end,
+  ci = function()
+    return require("tasks_nvim.ci")
+  end,
+  cli = function()
+    return require("tasks_nvim.cli")
+  end,
+  batch = function()
+    return require("tasks_nvim.batch")
+  end,
+  resolve = function()
+    return require("tasks_nvim.resolve")
+  end,
 }
 
 return setmetatable(M, {
   __index = function(t, key)
     if SUBMODULES[key] then
-      local mod = require("tasks_nvim." .. key)
+      local mod = SUBMODULES[key]()
       rawset(t, key, mod)
       return mod
     end

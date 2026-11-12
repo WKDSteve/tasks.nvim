@@ -108,7 +108,7 @@ local function cmd()
 end
 
 -- "statusline" reports into the shared lib.nvim.progress registry, like picker.lua.
-local progress_mod = soft.require("lib.nvim.progress")
+local progress_mod = soft.check(nil, pcall(require, "lib.nvim.progress"))
 ---@param title string
 local function new_progress(title)
   if not progress_mod then
@@ -122,7 +122,7 @@ local function persist(state)
   if not state.persist then
     return
   end
-  local store = soft.require("lib.nvim.store.project")
+  local store = soft.check(nil, pcall(require, "lib.nvim.store.project"))
   if store then
     pcall(
       store.save,
@@ -137,7 +137,7 @@ end
 ---@return Tasks.Filter filter
 ---@return string sort
 local function remembered(root)
-  local store = soft.require("lib.nvim.store.project")
+  local store = soft.check(nil, pcall(require, "lib.nvim.store.project"))
   if not store then
     return {}, "default"
   end
@@ -1782,7 +1782,9 @@ local told_no_snacks = false
 function open_state(state, opts)
   opts = opts or {}
   local backend = opts.backend or settings().backend or "auto"
-  local Snacks = backend ~= "select" and backend ~= "kit" and soft.require("snacks", { "picker" })
+  local Snacks = backend ~= "select"
+      and backend ~= "kit"
+      and soft.check({ "picker" }, pcall(require, "snacks"))
     or nil
   if backend == "auto" and not Snacks then
     backend = "kit"

@@ -26,26 +26,122 @@ function M.check()
 
   -- lib.nvim is a hard dependency; these are the submodules the engine and the front ends call.
   local required = {
-    { "lib.nvim.markdown.frontmatter", "task files are read and written through it" },
-    { "lib.nvim.fs.collect_recursive", "the vault scan" },
-    { "lib.nvim.checkpoint", "`done` rolls back from it" },
-    { "lib.nvim.bindings.usercmd.composer", "the :Tasks command" },
-    { "lib.nvim.harvest", "delivery of lists (--to=)" },
-    { "lib.nvim.notify", "messages" },
-    { "lib.nvim.fs.read", "file reads" },
-    { "lib.nvim.fs.mkdirp", "creating folders" },
-    { "lib.nvim.fs.scan_cached", "the cached vault scan (completion)" },
-    { "lib.nvim.cross.fs.mutate", "moving and removing files" },
-    { "lib.nvim.ui.list", "quickfix delivery (--to=qf)" },
-    { "lib.nvim.harvest.render", "Markdown and CSV tables" },
-    { "lib.nvim.cross.fs.expand_path", "`--to=file:` paths" },
-    { "lib.nvim.cross.fs.separators.unify_slashes", "path normalisation" },
-    { "lib.nvim.cross.platform.is_windows", "platform checks" },
-    { "lib.nvim.system.env", "the repos folder for `--stale=refs`" },
+    {
+      "lib.nvim.markdown.frontmatter",
+      "task files are read and written through it",
+      function()
+        return require("lib.nvim.markdown.frontmatter")
+      end,
+    },
+    {
+      "lib.nvim.fs.collect_recursive",
+      "the vault scan",
+      function()
+        return require("lib.nvim.fs.collect_recursive")
+      end,
+    },
+    {
+      "lib.nvim.checkpoint",
+      "`done` rolls back from it",
+      function()
+        return require("lib.nvim.checkpoint")
+      end,
+    },
+    {
+      "lib.nvim.bindings.usercmd.composer",
+      "the :Tasks command",
+      function()
+        return require("lib.nvim.bindings.usercmd.composer")
+      end,
+    },
+    {
+      "lib.nvim.harvest",
+      "delivery of lists (--to=)",
+      function()
+        return require("lib.nvim.harvest")
+      end,
+    },
+    {
+      "lib.nvim.notify",
+      "messages",
+      function()
+        return require("lib.nvim.notify")
+      end,
+    },
+    {
+      "lib.nvim.fs.read",
+      "file reads",
+      function()
+        return require("lib.nvim.fs.read")
+      end,
+    },
+    {
+      "lib.nvim.fs.mkdirp",
+      "creating folders",
+      function()
+        return require("lib.nvim.fs.mkdirp")
+      end,
+    },
+    {
+      "lib.nvim.fs.scan_cached",
+      "the cached vault scan (completion)",
+      function()
+        return require("lib.nvim.fs.scan_cached")
+      end,
+    },
+    {
+      "lib.nvim.cross.fs.mutate",
+      "moving and removing files",
+      function()
+        return require("lib.nvim.cross.fs.mutate")
+      end,
+    },
+    {
+      "lib.nvim.ui.list",
+      "quickfix delivery (--to=qf)",
+      function()
+        return require("lib.nvim.ui.list")
+      end,
+    },
+    {
+      "lib.nvim.harvest.render",
+      "Markdown and CSV tables",
+      function()
+        return require("lib.nvim.harvest.render")
+      end,
+    },
+    {
+      "lib.nvim.cross.fs.expand_path",
+      "`--to=file:` paths",
+      function()
+        return require("lib.nvim.cross.fs.expand_path")
+      end,
+    },
+    {
+      "lib.nvim.cross.fs.separators.unify_slashes",
+      "path normalisation",
+      function()
+        return require("lib.nvim.cross.fs.separators.unify_slashes")
+      end,
+    },
+    {
+      "lib.nvim.cross.platform.is_windows",
+      "platform checks",
+      function()
+        return require("lib.nvim.cross.platform.is_windows")
+      end,
+    },
+    {
+      "lib.nvim.system.env",
+      "the repos folder for `--stale=refs`",
+      function()
+        return require("lib.nvim.system.env")
+      end,
+    },
   }
   local lib_ok = true
   for _, req in ipairs(required) do
-    if pcall(require, req[1]) then
+    if pcall(req[3]) then
       ok(("%s -- %s"):format(req[1], req[2]))
     else
       lib_ok = false
@@ -192,12 +288,30 @@ function M.check()
     info("pickers.nvim not found -- `:Tasks folder` uses a plain vim.ui.select list")
   end
   local soft = {
-    { "lib.nvim.progress", "a progress entry while the dashboard writes" },
-    { "lib.nvim.store.project", "remembering the dashboard filter and sort" },
-    { "lib.nvim.fs.watch", "live refresh of the dashboard" },
+    {
+      "lib.nvim.progress",
+      "a progress entry while the dashboard writes",
+      function()
+        return require("lib.nvim.progress")
+      end,
+    },
+    {
+      "lib.nvim.store.project",
+      "remembering the dashboard filter and sort",
+      function()
+        return require("lib.nvim.store.project")
+      end,
+    },
+    {
+      "lib.nvim.fs.watch",
+      "live refresh of the dashboard",
+      function()
+        return require("lib.nvim.fs.watch")
+      end,
+    },
   }
   for _, req in ipairs(soft) do
-    if pcall(require, req[1]) then
+    if pcall(req[3]) then
       ok(("%s -- %s"):format(req[1], req[2]))
     else
       info(("%s not found (older lib.nvim?) -- no %s"):format(req[1], req[2]))

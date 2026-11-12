@@ -16,6 +16,9 @@ bash scripts/contract.sh              # schema, goldens, typen (Schritt `contrac
 - Die Specs laufen einzeln mit `bash scripts/test.sh --filter <teil>`. Der Filter
   ist ein Teilstring des Dateinamens; die Zeile `PARTIAL | ...` ist bei einem Filter
   normal.
+- Module laden andere nur per literalem `require("...")` (auch in `pcall(require, "...")`), nie per
+  berechnetem Namen: sonst hat der Modul-Graph von docmap.nvim keine Kante, `--changed` wählt alle Specs.
+  `TESTS/tasks_static_requires_spec.lua` wacht darüber; optionale Plugins über `soft.check`.
 
 ## Den Vertrag ändern (neues Dokument, neues Feld, neue Methode)
 

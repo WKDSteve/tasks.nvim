@@ -55,7 +55,7 @@ function M.yesno(msg, yes_label, cb, opts)
     cb(accepted)
   end
   -- the shared recipe: "No" first and focused, N and Y as keys, `ask` for a question nobody asked for
-  local dialog = require("tasks_nvim.soft").require("lib.nvim.ui.dialog", { "yesno" })
+  local dialog = require("tasks_nvim.soft").check({ "yesno" }, pcall(require, "lib.nvim.ui.dialog"))
   if dialog then
     local shown = pcall(dialog.yesno, msg, yes_label, answer, opts)
     if shown or answered then
@@ -86,7 +86,8 @@ function M.choose(msg, choices, cb)
     answered = true
     cb(index)
   end
-  local dialog = require("tasks_nvim.soft").require("lib.nvim.ui.dialog", { "choose" })
+  local dialog =
+    require("tasks_nvim.soft").check({ "choose" }, pcall(require, "lib.nvim.ui.dialog"))
   if dialog then
     local ok = pcall(dialog.choose, msg, choices, 1, function(index)
       answer(type(index) == "number" and index > 0 and index or nil)

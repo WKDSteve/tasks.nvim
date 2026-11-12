@@ -158,7 +158,7 @@ function M.toggle_here(buf)
   local before = lines[lnum]
   local was_ticked = before:match("%[[xX]%]") ~= nil
   local done = false
-  local cascade = require("tasks_nvim.soft").require("cascade", { "toggle_checkbox" })
+  local cascade = require("tasks_nvim.soft").check({ "toggle_checkbox" }, pcall(require, "cascade"))
   if cascade then
     -- Cascade may cycle through more states than ticked/unticked; only the
     -- unticked -> ticked flip is taken from it, the way back is ours.

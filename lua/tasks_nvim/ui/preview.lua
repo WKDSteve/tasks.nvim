@@ -74,7 +74,10 @@ local function default_probe()
   if vim.fn.exists(":MDView") == 2 then
     return true, nil
   end
-  if require("tasks_nvim.soft").available("mdview") and vim.fn.exists(":MDView") == 2 then
+  if
+    require("tasks_nvim.soft").check(nil, pcall(require, "mdview")) ~= nil
+    and vim.fn.exists(":MDView") == 2
+  then
     return true, nil
   end
   return false, MISSING

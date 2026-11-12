@@ -1253,7 +1253,7 @@ function M.ask_new_fields(given, cb)
     cb(values)
   end
 
-  local kit = soft.require("ui.kit", { "form" })
+  local kit = soft.check({ "form" }, pcall(require, "ui.kit"))
   if kit then
     kit.form({
       fields = fields,
@@ -2697,11 +2697,11 @@ end
 ---@return table|nil command  `pickers.command`
 ---@return table|nil engine
 local function pickers_backend()
-  local command = soft.require("pickers.command", { "dispatch" })
+  local command = soft.check({ "dispatch" }, pcall(require, "pickers.command"))
   if not command then
     return nil, nil
   end
-  local engines = soft.require("pickers.engines", { "load" })
+  local engines = soft.check({ "load" }, pcall(require, "pickers.engines"))
   if not engines then
     return nil, nil
   end

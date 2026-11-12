@@ -247,17 +247,16 @@ return function(H)
 
   -- ── soft dependencies: missing, or present but without the function we call, both mean "not available" ──
   local soft = require("tasks_nvim.soft")
-  eq(soft.require("no.such.plugin"), nil, "a missing module")
+  eq(soft.check(nil, pcall(require, "no.such.plugin")), nil, "a missing module")
   eq(
-    soft.require("tasks_nvim.fsio", { "no_such_function" }),
+    soft.check({ "no_such_function" }, pcall(require, "tasks_nvim.fsio")),
     nil,
     "a module without the field we need"
   )
   ok(
-    soft.require("tasks_nvim.fsio", { "read", "write_atomic" }) ~= nil,
+    soft.check({ "read", "write_atomic" }, pcall(require, "tasks_nvim.fsio")) ~= nil,
     "a module that has what we need"
   )
-  ok(soft.available("tasks_nvim.fsio"), "available() is require() > nil")
 
   -- ── a TASKS.md that is not a generated index is never overwritten or removed ──
   local own = root .. "/cascade.nvim/ROADMAP/TASKS.md"
