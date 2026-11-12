@@ -33,6 +33,7 @@ local M = {}
 ---@field clipboard? Lib.ClipboardImage.Opts # Passed to `clipboard_image.save` (specs).
 ---@field upload_dir? string                 # `upload`: the folder of the caller the file lies in.
 ---@field upload? string                     # `upload`: the plain name of the file in that folder.
+---@field exact? boolean                     # `upload`: the asset is called `name` or nothing is attached (no counter).
 
 ---The folders screenshots usually land in, per system.
 ---@param os_name? "windows"|"macos"|"linux"
@@ -155,7 +156,7 @@ function M.attach(id, mode, opts)
     index = opts.index,
   }
   local res, aerr
-  if opts.name and mode ~= "upload" then
+  if opts.name and (mode ~= "upload" or opts.exact) then
     res, aerr = mutate.attach(id, src, vim.tbl_extend("force", base, { name = opts.name }))
   else
     local name = opts.name or M.default_name(id, ext, opts.now)

@@ -3080,6 +3080,9 @@ local function asset_name(name)
   return n, nil
 end
 
+---The name an asset gets for `name` (trimmed, blanks as `-`), or nil and why it is not a name an asset may have.
+M.asset_name = asset_name
+
 ---Copy a file into a task's `assets/` folder and give back the Markdown to link
 ---it. A plain task file becomes a folder task first. `opts.name` renames the
 ---copy; an asset of that name that already exists is an error, never replaced.

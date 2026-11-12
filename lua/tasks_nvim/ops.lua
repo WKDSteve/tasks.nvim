@@ -60,7 +60,9 @@
 ---    (`latest`) becomes an asset of the task (a plain task becomes a folder task); the answer has `asset`, `link` and no
 ---    `inverse`. A request names no path of this machine; a dry run reads neither the clipboard nor a folder.
 ---    `from` `upload` takes the file `upload` (a plain name) from the folder the caller of the engine named with
----    `upload_dir`, and the asset is called `name`
+---    `upload_dir`, and the asset is called `name` (a taken name gets a counter); with `exact` it is called `name` or
+---    nothing is attached: a name the task has already is `exists`, in a dry run too (a file sent again after its
+---    answer was lost arrives once)
 ---
 --- Rules the door keeps:
 ---  - **the shape is checked first**, for the whole request: an unknown operation or field, a wrong type, too many
@@ -202,7 +204,7 @@ local FIELDS = {
     if_match = "string",
   },
   view_delete = { id = "string", if_match = "string" },
-  attach = { id = "string", from = "string", name = "string", upload = "string" },
+  attach = { id = "string", from = "string", name = "string", upload = "string", exact = "boolean" },
   claim = {
     id = "string",
     by = "string",
@@ -1739,6 +1741,8 @@ local function do_attach(op, ctx)
     end
   elseif op.upload ~= nil then
     return refuse("invalid_argument", "attach: upload belongs to from: 'upload'")
+  elseif op.exact ~= nil then
+    return refuse("invalid_argument", "attach: exact belongs to from: 'upload'")
   end
   -- The caller named the folders, and none: only the clipboard (the folders of the system are not looked into).
   if
@@ -1756,6 +1760,16 @@ local function do_attach(op, ctx)
   local task, ferr = mutate.find_open(op.id, ctx.root, drafts)
   if not task then
     return mutate_failure(ctx, ferr)
+  end
+  -- `exact`: an asset of this name is there already (the same file, sent again): nothing is attached twice.
+  local taken = "attach: the task has an asset of this name already"
+  if op.exact and task.folder then
+    local name = mutate.asset_name(op.name)
+    if
+      name and fsio.is_file(fsio.dirname(task.path) .. "/" .. mutate.ASSETS_DIR .. "/" .. name)
+    then
+      return refuse("exists", taken)
+    end
   end
   local entry = {
     ok = true,
@@ -1778,6 +1792,7 @@ local function do_attach(op, ctx)
       {
         name = op.name,
         upload = op.upload,
+        exact = op.exact == true or nil,
       }
     )
   )
@@ -1789,6 +1804,10 @@ local function do_attach(op, ctx)
     end
     if op.from == "upload" and tostring(err):find("the upload is not there", 1, true) then
       return refuse("invalid_argument", "attach: the upload is not there")
+    end
+    -- Taken between the look above and the copy (the message of `mutate.attach` names a path: not passed on).
+    if op.exact and tostring(err):find("^asset exists:") then
+      return refuse("exists", taken)
     end
     return mutate_failure(ctx, err)
   end

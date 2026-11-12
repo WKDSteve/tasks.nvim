@@ -227,6 +227,45 @@ return function(H)
   )
   eq(again.asset, "assets/report-2.pdf", vim.inspect(again))
 
+  -- `exact`: the name or nothing. A file sent again after its answer was lost is not attached twice, and a dry run (the
+  -- hub's look before the transfer) says so already; the message names no path.
+  for _, dry_look in ipairs({ false, true }) do
+    local twice = one({
+      {
+        op = "attach",
+        id = u.id,
+        from = "upload",
+        upload = "abc123",
+        name = "report.pdf",
+        exact = true,
+      },
+    }, dry_look and { dry_run = true } or nil, { upload_dir = inbox })
+    eq(twice.ok, false, vim.inspect(twice))
+    eq((twice.error or {}).code, "exists", vim.inspect(twice))
+    ok(
+      not tostring((twice.error or {}).message):find(root, 1, true),
+      "no path: " .. vim.inspect(twice)
+    )
+  end
+  ok(not fsio.is_file(vim.fs.dirname(uploaded.path) .. "/assets/report-3.pdf"), "no third copy")
+  local fresh = one({
+    {
+      op = "attach",
+      id = u.id,
+      from = "upload",
+      upload = "abc123",
+      name = "voice.webm",
+      exact = true,
+    },
+  }, nil, { upload_dir = inbox })
+  eq(fresh.asset, "assets/voice.webm", vim.inspect(fresh))
+  local wrong = one({ { op = "attach", id = u.id, from = "clipboard", exact = true } })
+  eq((wrong.error or {}).code, "invalid_argument", vim.inspect(wrong))
+  ok(
+    tostring((wrong.error or {}).message):find("exact belongs to from", 1, true),
+    vim.inspect(wrong)
+  )
+
   -- A dry run looks at nothing.
   local v = new_task("Attach by upload, dry")
   local dry_upload = one(
