@@ -13,6 +13,8 @@
 ---  - `unknown-status`, `unknown-kind`, `unknown-category`, `unknown-severity`,
 ---    `bad-prio`, `bad-effort`, `bad-date`, `bad-link` (a `links` entry that is no http(s) address)
 ---  - `start-after-due`: the `start` date is later than the `due` date
+---  - `bad-time`: `remind_at` is not a time of day (`HH:MM`); `remind-at-without-remind` (warning): `remind_at` and no
+---    `remind` day
 ---  - `effort-without-plan` (warning): an open task (not `parked`) bigger than L and in no plan
 ---  - `overdue` (warning): an open task (not `parked`) whose `due` date is before today (`opts.today`)
 ---  - `severity-without-bug-or-security` (warning): `severity` on a task that is

@@ -145,6 +145,7 @@ export type Snapshot = Head & {
     area: string;
     title: string;
     remind: Date;
+    remind_at?: string;
     etag?: Etag;
     done_in?: string;
   }[];
@@ -942,6 +943,10 @@ export interface TaskEntry {
    * A calendar day, YYYY-MM-DD.
    */
   remind?: string;
+  /**
+   * The local time of day (HH:MM) the reminder of the `remind` day is sent; only beside `remind`. Without it the reminder goes with the notice of the day. Additive.
+   */
+  remind_at?: string;
   /**
    * A calendar day, YYYY-MM-DD.
    */

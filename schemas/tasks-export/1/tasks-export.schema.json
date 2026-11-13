@@ -432,6 +432,11 @@
           "$ref": "#/$defs/Date",
           "description": "When to look at the task again (a reminder). The date only: whether it is due is for the reader to say, so that a digest does not change with the day."
         },
+        "remind_at": {
+          "type": "string",
+          "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$",
+          "description": "The local time of day (HH:MM) the reminder of the `remind` day is sent; only beside `remind`. Without it the reminder goes with the notice of the day. Additive."
+        },
         "due": {
           "$ref": "#/$defs/Date",
           "description": "When the task is due (optional). Not the reminder: `remind` brings a task back, `due` is a deadline. The date only; whether it is overdue is for the reader to say."
@@ -928,6 +933,7 @@
               "area": { "type": "string" },
               "title": { "type": "string" },
               "remind": { "$ref": "#/$defs/Date" },
+              "remind_at": { "type": "string", "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$" },
               "etag": { "$ref": "#/$defs/Etag" },
               "done_in": { "type": "string" }
             },

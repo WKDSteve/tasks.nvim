@@ -700,6 +700,14 @@ end
 ---`YYYY-MM-DD` that is a real calendar date.
 ---@param s any
 ---@return boolean
+---A time of day, `HH:MM` (00:00 to 23:59): the hour a reminder of its day is sent (`remind_at`).
+---@param s any
+---@return boolean
+function M.is_time(s)
+  return type(s) == "string"
+    and (s:match("^[01]%d:[0-5]%d$") ~= nil or s:match("^2[0-3]:[0-5]%d$") ~= nil)
+end
+
 function M.is_date(s)
   if type(s) ~= "string" then
     return false
@@ -1150,6 +1158,21 @@ function M.parse_text(text, ctx)
         if not M.is_date(date) then
           bad("bad-date", ("%s '%s' is not a date (YYYY-MM-DD)"):format(field, date))
         end
+      end
+    end
+    -- the hour a reminder is sent on its day; it belongs to `remind`
+    local remind_at = as_text(meta.remind_at, "remind_at", bad)
+    if remind_at then
+      task.remind_at = remind_at
+      if not M.is_time(remind_at) then
+        bad("bad-time", ("remind_at '%s' is not a time of day (HH:MM)"):format(remind_at))
+      elseif not M.is_date(task.remind) then
+        hints[#hints + 1] = {
+          code = "remind-at-without-remind",
+          msg = ("remind_at %s without a remind day: it says nothing until remind is set (or remove the key)"):format(
+            remind_at
+          ),
+        }
       end
     end
     if M.is_date(task.start) and M.is_date(task.due) and task.start > task.due then

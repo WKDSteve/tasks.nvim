@@ -237,6 +237,7 @@ local function done_reminders(root)
       area = task.area,
       title = task.title,
       remind = task.remind,
+      remind_at = model.is_time(task.remind_at) and task.remind_at or nil,
       etag = etag_of(task.path),
       done_in = task.done_in,
     })
@@ -312,6 +313,9 @@ local function task_entry(root, task, node, rank)
     updated = model.is_date(task.updated) and task.updated or nil,
     -- the date only; whether it is due is for the reader to say (a digest does not change with the day)
     remind = model.is_date(task.remind) and task.remind or nil,
+    -- the hour the reminder of that day is sent (only beside a valid day)
+    remind_at = model.is_date(task.remind) and model.is_time(task.remind_at) and task.remind_at
+      or nil,
     due = model.is_date(task.due) and task.due or nil,
     start = model.is_date(task.start) and task.start or nil,
     claim = M.claim_entry(root, task.id),

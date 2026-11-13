@@ -695,6 +695,7 @@ local SETTABLE = {
   "commits",
   "created",
   "remind",
+  "remind_at",
   "due",
   "start",
   "repeat",
@@ -845,6 +846,12 @@ local FIELD_NORMALIZERS = {
   remind = function(value, _, ctx)
     -- a date, or days / weeks from today: the file always holds the date
     return model.resolve_remind(value, (ctx.opts and ctx.opts.today) or model.today())
+  end,
+  remind_at = function(value)
+    if not model.is_time(value) then
+      return nil, ("remind_at must be a time of day (HH:MM), got %s"):format(tostring(value))
+    end
+    return value
   end,
   severity = one_of("severity", model.is_severity, model.SEVERITIES),
   waits_for = function(value)
@@ -1613,7 +1620,12 @@ function M.set(id, patch, opts)
   if not task then
     -- A reminder is bookkeeping, not a change of what was finished: it may be set and taken away on a finished task,
     -- and nothing else may.
-    local only_remind = next(patch) == "remind" and next(patch, "remind") == nil
+    local only_remind = next(patch) ~= nil
+    for key in pairs(patch) do
+      if key ~= "remind" and key ~= "remind_at" then
+        only_remind = false
+      end
+    end
     local finished = only_remind and scan.find_done(id, { root = root }) or nil
     if not finished then
       return nil, ferr
@@ -1645,6 +1657,22 @@ function M.set(id, patch, opts)
     local status, waits = status_and_waits(pairs_)
     if waits ~= nil and waits ~= M.REMOVE and status ~= nil and status ~= "parked" then
       return nil, waits_for_status_error(status)
+    end
+  end
+  -- A time of day belongs to a reminder day: taking the day away takes the time with it, and a time needs a day.
+  do
+    local remind, at, day_given, at_given = task.remind, task.remind_at, false, false
+    for _, p in ipairs(pairs_) do
+      if p[1] == "remind" then
+        remind, day_given = p[2] ~= M.REMOVE and p[2] or nil, true
+      elseif p[1] == "remind_at" then
+        at, at_given = p[2] ~= M.REMOVE and p[2] or nil, true
+      end
+    end
+    if day_given and remind == nil and not at_given and task.remind_at ~= nil then
+      pairs_[#pairs_ + 1] = { "remind_at", M.REMOVE }
+    elseif at_given and at ~= nil and not model.is_date(remind) then
+      return nil, "remind_at needs a remind day: set remind=<date> too"
     end
   end
   -- due and start together: a patch that touches one of them must leave a file that does not start after it is due.
@@ -2261,6 +2289,7 @@ function M.reopen(id, opts)
     { "status", status },
     { "done_in", M.REMOVE },
     { "remind", M.REMOVE },
+    { "remind_at", M.REMOVE },
     { "updated", today },
   }
   if status ~= "parked" then
