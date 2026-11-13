@@ -1,5 +1,5 @@
 {
-  "digest": "sha256:57e77c8a98529af8",
+  "digest": "sha256:3d700593c5e29e9c",
   "engine": {
     "git": "0000000",
     "nvim": "0.0.0",
@@ -10,6 +10,10 @@
   "kind": "tasks.plan_compare",
   "plans": [
     {
+      "areas": [
+        "lib.nvim",
+        "cascade.nvim"
+      ],
       "effort": {
         "done_days": 2,
         "open_days": 1,
@@ -28,6 +32,7 @@
         "unknown_effort": 0
       },
       "phase_now": "build",
+      "prio": 2,
       "progress": 0.33,
       "project": "lib.nvim/the-project",
       "stages": 2,
@@ -43,6 +48,11 @@
         "waiting": 0
       },
       "title": "The plan",
+      "value": {
+        "avg": 4,
+        "sum": 4,
+        "without": 1
+      },
       "weekly_done": [
         0,
         0,

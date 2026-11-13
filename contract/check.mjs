@@ -163,6 +163,9 @@ mutate("an estimate that counts assumptions as text", "estimate", (d) => (d.assu
 mutate("a plan comparison without its pace", "plancompare", (d) => delete d.plans[0].weekly_done);
 mutate("a plan comparison with progress over one", "plancompare", (d) => (d.plans[0].progress = 1.5));
 mutate("a plan comparison with a forecast of no weeks", "plancompare", (d) => (d.plans[0].forecast_weeks.low = 0));
+mutate("a plan comparison with a prio of zero", "plancompare", (d) => (d.plans[0].prio = 0));
+mutate("a plan comparison with a value that lacks its sum", "plancompare", (d) => delete d.plans[0].value.sum);
+mutate("a plan comparison with a due day that is no date", "plancompare", (d) => (d.plans[0].target_due = "soon"));
 mutate("a body without its etag", "bodies-page", (d) => delete d.items[0].etag);
 mutate("a body page with a field nobody defined", "bodies-page", (d) => (d.items[0].path = "x"));
 mutate("a waits_for that is no key", "list-waits-for", (d) => (d.items[0].waits_for = "My Mac"));

@@ -1404,7 +1404,8 @@ end
 
 ---The open plans side by side (`tasks_nvim.plan_compare`): per plan its tasks (open, finished, open by state), its
 ---effort (open with the range of the sizes, finished, open without an effort), the rest of its own critical path, the
----first stage still open and the pace of the last weeks with a range of weeks it would still take. `ids` (plan ids)
+---first stage still open, the pace of the last weeks with a range of weeks it would still take, the value and the best
+---prio of its open tasks, its areas, and the due day of its target against the slow end of that range. `ids` (plan ids)
 ---narrows it to those plans, in the order of the vault; an id that is no open plan is refused by name. The finished
 ---tasks lie outside the revision, as in `tasks.finished`.
 ---@param params? { ids?: string[] }
@@ -1480,6 +1481,13 @@ function M.plan_compare(params, opts)
       last_done = r.last_done,
       weekly_done = r.weekly_done,
       forecast_weeks = r.forecast_weeks and json.object(r.forecast_weeks) or nil,
+      areas = vim.list_slice(r.areas, 1),
+      value = json.object(r.value),
+      prio = r.prio,
+      target = r.target,
+      target_due = r.target_due,
+      due_in_days = r.due_in_days,
+      forecast_late = r.forecast_late,
     }
   end, rows)
   doc.incomplete = view.errors

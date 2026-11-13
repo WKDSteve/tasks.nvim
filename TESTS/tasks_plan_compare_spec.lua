@@ -34,7 +34,10 @@ return function(H)
     )
   end
 
-  plan_file("p", "title: Plan P\nstatus: doing\nareas: [lib.nvim]\nphase_order: [one, two]")
+  plan_file(
+    "p",
+    "title: Plan P\nstatus: doing\nareas: [lib.nvim, cascade.nvim]\nphase_order: [one, two]\ntarget: lib.nvim/t1"
+  )
   plan_file("q", "title: Plan Q\nstatus: planning\nareas: [lib.nvim]\nphase_order: []")
   -- a chain t2 -> t1 (S then M: the path is 1.5 days), a task without an effort; all of plan p
   F.task(
@@ -44,6 +47,8 @@ return function(H)
     "t2",
     F.meta("T2", "open", {
       { "effort", "S" },
+      { "value", "5" },
+      { "prio", "2" },
       { "plan", "lib.nvim/p" },
       { "phase", "one" },
     })
@@ -55,6 +60,9 @@ return function(H)
     "t1",
     F.meta("T1", "open", {
       { "effort", "M" },
+      { "value", "2" },
+      { "prio", "3" },
+      { "due", "2026-02-01" },
       { "plan", "lib.nvim/p" },
       { "phase", "two" },
       { "blocked_by", "[lib.nvim/t2]" },
@@ -119,6 +127,17 @@ return function(H)
   eq(p.last_done, "2026-01-10")
   eq(p.phase_now, "one", "the first stage that still has an open task")
   eq(p.stages, 2)
+  eq(p.areas, { "lib.nvim", "cascade.nvim" }, "the areas the plan names, in its order")
+  eq(
+    p.value,
+    { sum = 7, avg = 3.5, without = 1 },
+    "5 + 2; the average is over the two that carry a value, the third is counted as without"
+  )
+  eq(p.prio, 2, "the best prio of the open tasks (1 is best)")
+  eq(p.target, "lib.nvim/t1")
+  eq(p.target_due, "2026-02-01", "the due day of the target task")
+  eq(p.due_in_days, 22, "from today to that day")
+  eq(p.forecast_late, true, "4 weeks at the average pace are 28 days, the day is 22 away")
 
   local q = doc.plans[2]
   eq(
@@ -129,6 +148,9 @@ return function(H)
   eq(q.forecast_weeks, nil, "no range from nothing")
   eq(q.phase_now, nil)
   eq(q.weekly_done, { 0, 0, 0, 0 })
+  eq(q.areas, { "lib.nvim" })
+  eq(q.value, { sum = 0, without = 0 }, "no open task: no average")
+  eq({ q.prio, q.target, q.target_due, q.due_in_days, q.forecast_late }, {}, "nothing to say")
 
   -- `ids` narrows it; an id that is no open plan is refused by name
   local only =
@@ -148,6 +170,47 @@ return function(H)
     assert(contract.plan_compare({ ids = { "lib.nvim/p" } }, { root = root, today = "2026-03-01" }))
   eq(later.plans[1].weekly_done, { 0, 0, 0, 0 })
   eq(later.plans[1].forecast_weeks, nil)
+  eq(later.plans[1].due_in_days, -28, "the due day has passed: negative")
+  eq(
+    later.plans[1].forecast_late,
+    nil,
+    "without a forecast there is nothing to compare the day with"
+  )
+
+  -- a day far enough away is not late; the day itself (28 days for 28 days of forecast) is not late either
+  local function with_due(day)
+    F.task(
+      H,
+      root,
+      area,
+      "t1",
+      F.meta("T1", "open", {
+        { "effort", "M" },
+        { "value", "2" },
+        { "prio", "3" },
+        { "due", day },
+        { "plan", "lib.nvim/p" },
+        { "phase", "two" },
+        { "blocked_by", "[lib.nvim/t2]" },
+      })
+    )
+    return assert(contract.plan_compare({ ids = { "lib.nvim/p" } }, { root = root, today = TODAY })).plans[1]
+  end
+  eq(with_due("2026-02-07").forecast_late, false, "28 days away, 28 days of forecast: in time")
+  eq(with_due("2026-02-06").forecast_late, true, "one day less: late")
+  -- a target that is finished (not among the open tasks) has no due day to hold the plan to
+  plan_file(
+    "p",
+    "title: Plan P\nstatus: doing\nareas: [lib.nvim]\nphase_order: [one, two]\ntarget: lib.nvim/d1"
+  )
+  local gone = assert(
+    contract.plan_compare({ ids = { "lib.nvim/p" } }, { root = root, today = TODAY })
+  ).plans[1]
+  eq(
+    { gone.target, gone.target_due, gone.forecast_late },
+    { "lib.nvim/d1" },
+    "the id stays, no due day"
+  )
 
   -- through the dispatcher, with the engine's `today`
   local text = require("tasks_nvim.api").call("plan_compare", nil, { root = root, today = TODAY })

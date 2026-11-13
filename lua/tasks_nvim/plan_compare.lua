@@ -13,6 +13,11 @@
 ---   average. No range when nothing was finished in those weeks or nothing is open: a range from nothing would be a
 ---   guess. It counts tasks, not their effort.
 --- - **phase_now**: the first stage of `phase_order` that still has an open task.
+--- - **value** and **prio**: what the open tasks are worth (the sum and the average of their `value`, and how many
+---   carry none) and the best `prio` among them (1 is best). Absent average and prio when no open task has one.
+--- - **target_due**: the `due` of the plan's target task while that task is open, `due_in_days` from today (negative
+---   when it has passed) and `forecast_late`: the slow end of the forecast (`forecast_weeks.high`) lies after that
+---   day. Only with both a due day and a forecast: without a pace there is nothing to compare the day with.
 ---
 --- Pure given its inputs: the caller reads the vault (`contract.plan_compare`).
 --- Not its job: sorting or choosing plans for a page (a client does that), the plan of one plan (`plan`).
@@ -49,6 +54,13 @@ end
 ---@field last_done? string               # The newest day a member was finished.
 ---@field weekly_done integer[]           # `WEEKS` counts, oldest first.
 ---@field forecast_weeks? { low: integer, high: integer }
+---@field areas string[]                  # The areas the plan names.
+---@field value { sum: integer, avg?: number, without: integer }   # Over the open tasks; `avg` over those that carry a value, two decimals.
+---@field prio? integer                   # The best (lowest) prio of the open tasks.
+---@field target? string                  # The plan's target task (an id).
+---@field target_due? string              # Its `due`, while it is open.
+---@field due_in_days? integer            # From today to `target_due`; negative when it has passed.
+---@field forecast_late? boolean          # `forecast_weeks.high` weeks from today end after `target_due`.
 
 ---The rows for `files` (open plan files), in their order.
 ---@param files Tasks.PlanFile[]
@@ -67,6 +79,10 @@ function M.rows(files, ctx)
       done_of[item.plan] = done_of[item.plan] or {}
       table.insert(done_of[item.plan], item)
     end
+  end
+  local due_of = {}
+  for _, t in ipairs(ctx.open) do
+    due_of[t.id] = t.due
   end
   local out = {}
   for _, f in ipairs(files) do
@@ -88,6 +104,8 @@ function M.rows(files, ctx)
     effort.open_high = round2(sums.range.high)
     effort.open_without = sums.n_without_effort
     local open_phases = {}
+    local value = { sum = 0, without = 0 }
+    local valued, prio = 0, nil
     for _, t in ipairs(open) do
       local node = ctx.nodes[t.id]
       local state = node and node.state
@@ -97,6 +115,18 @@ function M.rows(files, ctx)
       if t.phase then
         open_phases[t.phase] = true
       end
+      if t.value then
+        value.sum = value.sum + t.value
+        valued = valued + 1
+      else
+        value.without = value.without + 1
+      end
+      if t.prio and (prio == nil or t.prio < prio) then
+        prio = t.prio
+      end
+    end
+    if valued > 0 then
+      value.avg = round2(value.sum / valued)
     end
     local done_days, last_done = 0, nil
     local weekly = {}
@@ -137,6 +167,12 @@ function M.rows(files, ctx)
         break
       end
     end
+    local target_due = f.target and due_of[f.target] or nil
+    local due_in_days = target_due and model.days_between(ctx.today, target_due) or nil
+    local forecast_late
+    if due_in_days and forecast then
+      forecast_late = forecast.high * 7 > due_in_days
+    end
     local critical = plan.build(open, ctx.index).critical
     local total = #open + #done
     out[#out + 1] = {
@@ -153,6 +189,13 @@ function M.rows(files, ctx)
       last_done = last_done,
       weekly_done = weekly,
       forecast_weeks = forecast,
+      areas = f.areas or {},
+      value = value,
+      prio = prio,
+      target = f.target,
+      target_due = due_in_days and target_due or nil,
+      due_in_days = due_in_days,
+      forecast_late = forecast_late,
     }
   end
   return out
