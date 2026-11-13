@@ -41,6 +41,10 @@ export type Hello = Head & {
    */
   today?: string;
   /**
+   * The local time of day of the engine's machine, HH:MM, beside `today`: a caller without a time zone sends the reminders of the day from an hour of the person's choice. Additive.
+   */
+  time?: string;
+  /**
    * What it can answer; show only what is listed.
    */
   capabilities: string[];

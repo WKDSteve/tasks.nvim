@@ -241,7 +241,7 @@ local methods = {
 local api = api_mod.make({
   doc = contract.doc,
   methods = methods,
-  engine_opts = { "root", "today" },
+  engine_opts = { "root", "today", "time" },
   patterns = contract.ERROR_PATTERNS,
   root_of = function(engine_opts, opts)
     local root = require("tasks_nvim.vault").root(engine_opts)
@@ -268,10 +268,10 @@ function M.methods()
   return api.methods()
 end
 
----Answer one request. `request` is the JSON text (or an already decoded table), `opts` is `{ root?, today?, indent? }`.
+---Answer one request. `request` is the JSON text (or an already decoded table), `opts` is `{ root?, today?, time?, indent? }`.
 ---@param name string
 ---@param request string|table|nil
----@param opts? { root?: string, today?: string, indent?: integer }
+---@param opts? { root?: string, today?: string, time?: string, indent?: integer }
 ---@return string text   # the canonical bytes of one document (an answer or a `tasks.error`)
 ---@return string|nil code  # the code of the error document
 function M.call(name, request, opts)

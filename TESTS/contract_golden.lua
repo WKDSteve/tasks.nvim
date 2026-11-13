@@ -7,6 +7,7 @@ G.dir = vim.fs.dirname(debug.getinfo(1, "S").source:sub(2)) .. "/golden/tasks-ex
 
 ---The day the write cases run on (`updated` of a changed task, the date in a finished file's name).
 G.today = "2026-01-02"
+G.time = "09:30"
 
 ---The version tag of a task file of the vault.
 ---@param root string
@@ -384,7 +385,7 @@ function G.render(root, case, build)
     local text = require("tasks_nvim.api").call(
       case.method,
       request,
-      { root = root, indent = 2, today = G.today }
+      { root = root, indent = 2, today = G.today, time = G.time }
     )
     return text .. "\n"
   end)

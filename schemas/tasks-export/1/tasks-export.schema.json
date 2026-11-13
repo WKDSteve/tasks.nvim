@@ -678,6 +678,11 @@
           "$ref": "#/$defs/Date",
           "description": "The day the engine counts as today: the local day of its machine (a `due:` or `remind:` day has come when it is this day or earlier). Additive."
         },
+        "time": {
+          "type": "string",
+          "pattern": "^[0-2][0-9]:[0-5][0-9]$",
+          "description": "The local time of day of the engine's machine, HH:MM, beside `today`: a caller without a time zone sends the reminders of the day from an hour of the person's choice. Additive."
+        },
         "capabilities": {
           "type": "array",
           "items": {

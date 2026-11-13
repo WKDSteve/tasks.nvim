@@ -70,6 +70,12 @@ return function(H)
     hello.today == engine_day or hello.today == os.date("%Y-%m-%d", os.time() - 60),
     "hello names the engine's today: " .. tostring(hello.today)
   )
+  ok(
+    tostring(hello.time):match("^[0-2]%d:[0-5]%d$") ~= nil,
+    "hello names the local time: " .. tostring(hello.time)
+  )
+  eq(call("hello", nil, { time = "07:45" }).time, "07:45", "the seam of the specs")
+  eq(call("hello", nil, { time = "7:45" }).time, nil, "a time not of the form HH:MM is left out")
   eq(call("hello", nil, { today = "2026-03-04" }).today, "2026-03-04", "the seam of the specs")
   -- every method is a capability, plus the features that are no method of their own
   local expected_caps = api.methods()

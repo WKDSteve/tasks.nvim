@@ -7,6 +7,7 @@ the version is not tagged yet (the repository is not published).
 
 ### Added
 
+- `tasks-export/1` (additive): `tasks.hello` carries `time`, the local time of day (`HH:MM`) beside `today`: the hub of tasks-desktop sends the reminders of a day as one notice from an hour the person sets (08:00 by default), not at midnight.
 - `tasks-export/1` (additive): `tasks.hello` carries `today`, the local day of the engine's machine. A caller without a time zone of its own (the hub of tasks-desktop, which sends a notice when a `remind:` day comes) asks it here instead of reckoning in UTC.
 - `tasks-ops/1` (additive): `attach` with `from: upload` takes `exact: true`: the asset is called `name` or nothing is attached, and a name the task has already is `exists` instead of a counter, in a dry run too. A file a phone sends again after its answer was lost then arrives once (tasks-mobile through the hub's upload route).
 - `:Tasks plan-close <id>` and `:Tasks project-close <id>` (`--yes`): finish a plan or a project by hand in the editor, after a dry run of the engine and a question; the CLI's `plan-close` / `project-close` and the editor share `done_flow.close_by_hand`. `check` warns `plan-no-open-task` (a plan in `doing` without an open task does not finish by itself) and `project-no-open-work` (a project in `doing` with no open, unparked plan and no own open task).

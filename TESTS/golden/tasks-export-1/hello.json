@@ -388,6 +388,7 @@
   "schemas": [
     1
   ],
+  "time": "09:30",
   "today": "2026-01-02",
   "vault": {
     "id": "vault"
