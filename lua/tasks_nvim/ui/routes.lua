@@ -22,7 +22,7 @@
 ---    routes filter, a write target (`new`, `folder`, `index`) takes one area only
 ---  - `TASK_ID`: `<area>/<slug>` of an open task; `allow_done = true` also
 ---    accepts a finished one (and completes it, unless `complete_done = false`: `task set` takes a finished task
----    for `remind=` only, so its candidates stay the open ones)
+---    for `remind=` and `remind_at=` only, so its candidates stay the open ones)
 ---
 --- Not its job: running anything (`tasks_cmd`), rendering (`tasks_view`).
 
@@ -664,6 +664,7 @@ local function set_kv()
     commits = "Every commit made for the task, repo@sha each (replaces the list)",
     created = "Creation date, YYYY-MM-DD",
     remind = "Look at the task again on this date (YYYY-MM-DD, or +7d / +2w from today)",
+    remind_at = "Hour the reminder of that day is sent (HH:MM, needs remind)",
     due = FIELD_DESC.due,
     start = FIELD_DESC.start,
     ["repeat"] = FIELD_DESC["repeat"],
@@ -828,11 +829,11 @@ local function nested_routes()
           type = "TASK_ID",
           allow_done = true,
           complete_done = false,
-          desc = "Id of the task, as area/slug (a finished task takes remind= only)",
+          desc = "Id of the task, as area/slug (a finished task takes remind= and remind_at= only)",
         },
       },
       kv = set_kv(),
-      desc = "Change frontmatter of an open task (key=value, a value may hold spaces, an empty value removes the key) and regenerate the index; a finished task takes remind= only (set it, or take it away)",
+      desc = "Change frontmatter of an open task (key=value, a value may hold spaces, an empty value removes the key) and regenerate the index; a finished task takes remind= and remind_at= only (set them, or take them away)",
       run = function(ctx)
         cmd().task_set(ctx)
       end,
