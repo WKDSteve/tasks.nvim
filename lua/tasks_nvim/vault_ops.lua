@@ -166,18 +166,23 @@ function M.match_area(names, typed)
 end
 
 ---`path` as written from the folder of `from_file` (forward slashes, `./` not added, `..` where needed). The
----two have no common root (another drive): the absolute path.
+---two have no common root (another drive): the absolute path. Both are taken as the file system resolves them when
+---they exist: a folder reached through a link (macOS: /var is /private/var; a junction on Windows) is the same folder,
+---and one side resolved and the other not would give a path through the root.
 ---@param from_file string  the file the link is written into; "" or nil for no file (the working directory)
 ---@param path string
 ---@return string
 function M.relative_to(from_file, path)
+  local function real(p)
+    return fsio.norm(vim.uv.fs_realpath(p) or p)
+  end
   local base
   if type(from_file) == "string" and from_file ~= "" then
-    base = fsio.norm(vim.fn.fnamemodify(from_file, ":p:h"))
+    base = real(vim.fn.fnamemodify(from_file, ":p:h"))
   else
-    base = fsio.norm(vim.fn.getcwd())
+    base = real(vim.fn.getcwd())
   end
-  local target = fsio.norm(path)
+  local target = real(path)
   local function segments(p)
     local out = {}
     for seg in p:gmatch("[^/]+") do

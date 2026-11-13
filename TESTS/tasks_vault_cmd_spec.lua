@@ -68,6 +68,25 @@ return function(H)
   -- ── relative paths and links ────────────────────────────────────────────────
   eq(ops.relative_to(root .. "/a/b/c.md", root .. "/a/x/y.md"), "../x/y.md")
   eq(ops.relative_to(root .. "/a/c.md", root .. "/a/dir"), "dir")
+  -- a folder reached through a link is the same folder (macOS: /var is /private/var): the link stays relative
+  do
+    local real_dir = H.tmpdir() .. "/real-vault"
+    vim.fn.mkdir(real_dir .. "/lib.nvim/Backlog", "p")
+    local linked = H.tmpdir() .. "/linked-vault"
+    local made = vim.uv.fs_symlink(real_dir, linked, { dir = true, junction = true })
+    if made then
+      eq(
+        ops.relative_to(linked .. "/notes.md", real_dir .. "/lib.nvim/Backlog"),
+        "lib.nvim/Backlog",
+        "the file through the link, the target resolved"
+      )
+      eq(
+        ops.relative_to(real_dir .. "/notes.md", linked .. "/lib.nvim/Backlog"),
+        "lib.nvim/Backlog",
+        "the other way round"
+      )
+    end
+  end
   eq(ops.markdown_link("lib backlog", "../x.md"), "[lib backlog](../x.md)")
   eq(
     ops.markdown_link("t", "my dir/x.md"),
