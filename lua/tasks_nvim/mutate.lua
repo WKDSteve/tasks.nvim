@@ -543,6 +543,32 @@ end
 ---@param value any
 ---@return string[]|nil list
 ---@return string|nil err
+---The addresses of a `remind_to` value: a list of strings (a string is split at commas), each an e-mail address
+---(`model.is_email`), once each (without regard to case), at most `model.MAX_REMIND_TO`.
+---@param value any
+---@return string[]|nil list
+---@return string|nil err
+local function email_list(value)
+  local list, err = string_list(value, "remind_to")
+  if not list then
+    return nil, err
+  end
+  local seen, out = {}, {}
+  for _, address in ipairs(list) do
+    if not model.is_email(address) then
+      return nil, ("remind_to item '%s' is not an e-mail address"):format(address)
+    end
+    if not seen[address:lower()] then
+      seen[address:lower()] = true
+      out[#out + 1] = address
+    end
+  end
+  if #out > model.MAX_REMIND_TO then
+    return nil, ("remind_to takes at most %d addresses, got %d"):format(model.MAX_REMIND_TO, #out)
+  end
+  return out, nil
+end
+
 local function link_list(value)
   local list, err = string_list(value, "links")
   if not list then
@@ -696,6 +722,7 @@ local SETTABLE = {
   "created",
   "remind",
   "remind_at",
+  "remind_to",
   "due",
   "start",
   "repeat",
@@ -847,6 +874,7 @@ local FIELD_NORMALIZERS = {
     -- a date, or days / weeks from today: the file always holds the date
     return model.resolve_remind(value, (ctx.opts and ctx.opts.today) or model.today())
   end,
+  remind_to = list_or_remove(email_list),
   remind_at = function(value)
     if not model.is_time(value) then
       return nil, ("remind_at must be a time of day (HH:MM), got %s"):format(tostring(value))
@@ -1622,7 +1650,7 @@ function M.set(id, patch, opts)
     -- and nothing else may.
     local only_remind = next(patch) ~= nil
     for key in pairs(patch) do
-      if key ~= "remind" and key ~= "remind_at" then
+      if key ~= "remind" and key ~= "remind_at" and key ~= "remind_to" then
         only_remind = false
       end
     end
@@ -1659,20 +1687,26 @@ function M.set(id, patch, opts)
       return nil, waits_for_status_error(status)
     end
   end
-  -- A time of day belongs to a reminder day: taking the day away takes the time with it, and a time needs a day.
+  -- A time of day and the addresses belong to a reminder day: taking the day away takes them with it, and neither
+  -- goes without a day.
   do
-    local remind, at, day_given, at_given = task.remind, task.remind_at, false, false
+    local remind, day_given = task.remind, false
+    local given = {}
     for _, p in ipairs(pairs_) do
       if p[1] == "remind" then
         remind, day_given = p[2] ~= M.REMOVE and p[2] or nil, true
-      elseif p[1] == "remind_at" then
-        at, at_given = p[2] ~= M.REMOVE and p[2] or nil, true
+      elseif p[1] == "remind_at" or p[1] == "remind_to" then
+        given[p[1]] = p[2]
       end
     end
-    if day_given and remind == nil and not at_given and task.remind_at ~= nil then
-      pairs_[#pairs_ + 1] = { "remind_at", M.REMOVE }
-    elseif at_given and at ~= nil and not model.is_date(remind) then
-      return nil, "remind_at needs a remind day: set remind=<date> too"
+    for _, key in ipairs({ "remind_at", "remind_to" }) do
+      local has = key == "remind_at" and task.remind_at ~= nil
+        or key == "remind_to" and task.remind_to ~= nil
+      if day_given and remind == nil and given[key] == nil and has then
+        pairs_[#pairs_ + 1] = { key, M.REMOVE }
+      elseif given[key] ~= nil and given[key] ~= M.REMOVE and not model.is_date(remind) then
+        return nil, ("%s needs a remind day: set remind=<date> too"):format(key)
+      end
     end
   end
   -- due and start together: a patch that touches one of them must leave a file that does not start after it is due.
@@ -2290,6 +2324,7 @@ function M.reopen(id, opts)
     { "done_in", M.REMOVE },
     { "remind", M.REMOVE },
     { "remind_at", M.REMOVE },
+    { "remind_to", M.REMOVE },
     { "updated", today },
   }
   if status ~= "parked" then

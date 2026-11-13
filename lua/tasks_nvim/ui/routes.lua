@@ -665,6 +665,7 @@ local function set_kv()
     created = "Creation date, YYYY-MM-DD",
     remind = "Look at the task again on this date (YYYY-MM-DD, or +7d / +2w from today)",
     remind_at = "Hour the reminder of that day is sent (HH:MM, needs remind)",
+    remind_to = "E-mail addresses the reminder goes to (comma-separated)",
     due = FIELD_DESC.due,
     start = FIELD_DESC.start,
     ["repeat"] = FIELD_DESC["repeat"],
@@ -829,11 +830,11 @@ local function nested_routes()
           type = "TASK_ID",
           allow_done = true,
           complete_done = false,
-          desc = "Id of the task, as area/slug (a finished task takes remind= and remind_at= only)",
+          desc = "Id of the task, as area/slug (a finished task takes the remind keys only)",
         },
       },
       kv = set_kv(),
-      desc = "Change frontmatter of an open task (key=value, a value may hold spaces, an empty value removes the key) and regenerate the index; a finished task takes remind= and remind_at= only (set them, or take them away)",
+      desc = "Change frontmatter of an open task (key=value, a value may hold spaces, an empty value removes the key) and regenerate the index; a finished task takes remind=, remind_at= and remind_to= only (set them, or take them away)",
       run = function(ctx)
         cmd().task_set(ctx)
       end,

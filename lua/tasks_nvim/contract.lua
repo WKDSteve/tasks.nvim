@@ -238,6 +238,10 @@ local function done_reminders(root)
       title = task.title,
       remind = task.remind,
       remind_at = model.is_time(task.remind_at) and task.remind_at or nil,
+      remind_to = (function()
+        local ok = vim.tbl_filter(model.is_email, task.remind_to or {})
+        return #ok > 0 and ok or nil
+      end)(),
       etag = etag_of(task.path),
       done_in = task.done_in,
     })
@@ -316,6 +320,12 @@ local function task_entry(root, task, node, rank)
     -- the hour the reminder of that day is sent (only beside a valid day)
     remind_at = model.is_date(task.remind) and model.is_time(task.remind_at) and task.remind_at
       or nil,
+    -- the e-mail addresses the reminder of that day is sent to (only valid ones, only beside a valid day)
+    remind_to = (function()
+      local ok = model.is_date(task.remind) and vim.tbl_filter(model.is_email, task.remind_to or {})
+        or {}
+      return #ok > 0 and ok or nil
+    end)(),
     due = model.is_date(task.due) and task.due or nil,
     start = model.is_date(task.start) and task.start or nil,
     claim = M.claim_entry(root, task.id),

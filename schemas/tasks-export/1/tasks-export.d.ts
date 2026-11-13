@@ -146,6 +146,21 @@ export type Snapshot = Head & {
     title: string;
     remind: Date;
     remind_at?: string;
+    /**
+     * @maxItems 10
+     */
+    remind_to?:
+      | []
+      | [string]
+      | [string, string]
+      | [string, string, string]
+      | [string, string, string, string]
+      | [string, string, string, string, string]
+      | [string, string, string, string, string, string]
+      | [string, string, string, string, string, string, string]
+      | [string, string, string, string, string, string, string, string]
+      | [string, string, string, string, string, string, string, string, string]
+      | [string, string, string, string, string, string, string, string, string, string];
     etag?: Etag;
     done_in?: string;
   }[];
@@ -947,6 +962,23 @@ export interface TaskEntry {
    * The local time of day (HH:MM) the reminder of the `remind` day is sent; only beside `remind`. Without it the reminder goes with the notice of the day. Additive.
    */
   remind_at?: string;
+  /**
+   * The e-mail addresses the reminder of the `remind` day is sent to (only valid ones, only beside `remind`). Additive.
+   *
+   * @maxItems 10
+   */
+  remind_to?:
+    | []
+    | [string]
+    | [string, string]
+    | [string, string, string]
+    | [string, string, string, string]
+    | [string, string, string, string, string]
+    | [string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string, string];
   /**
    * A calendar day, YYYY-MM-DD.
    */

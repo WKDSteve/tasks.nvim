@@ -435,6 +435,8 @@ file that is there (also not a refused one). Nobody else writes it: a person edi
 | `unknown-status`, `unknown-kind`, `unknown-category`, `unknown-severity`, `bad-prio`, `bad-effort`, `bad-value`, `bad-actor`, `bad-date`, `bad-link` | a field has a value outside its enum / format (`bad-link`: a `links` entry that is no `http://` / `https://` address) |
 | `start-after-due` | the `start` date is later than the `due` date |
 | `bad-time` | `remind_at` is not a time of day (`HH:MM`, 00:00 to 23:59) |
+| `bad-email` | a `remind_to` entry is not an e-mail address, or the list names more than 10 |
+| `remind-to-without-remind` (warning) | `remind_to` on a task without a `remind` day: nobody is reminded until a day is set |
 | `remind-at-without-remind` (warning) | `remind_at` on a task without a `remind` day: it says nothing until a day is set (`set remind=` takes the time away with the day) |
 | `effort-without-plan` (warning) | an open task that is not `parked` is bigger than L (`XL`, or more than `3d`) and has no `plan:`; it belongs in a plan, nothing is converted |
 | `overdue` (warning) | an open task that is not `parked` has a `due` date before today (`tasks.check` takes the day from the request, so a golden stays the same all year). It changes with the calendar, not with a commit: under `tasks ci --strict` (warnings fail) a task turns the run red on the day after its `due` |

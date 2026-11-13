@@ -886,6 +886,24 @@ end
 ---character. Nothing else (`javascript:`, `file:`, a relative path) is a link: a front end draws it clickable.
 ---@param s any
 ---@return boolean
+---The most addresses a reminder is sent to (`remind_to`).
+M.MAX_REMIND_TO = 10
+
+---An e-mail address as `remind_to` takes it: `local@domain.tld`, at most 254 characters, no blank, no control, none of
+---`<>,;"()[]\` (a list or a display name is no address), and a dot in the domain.
+---@param s any
+---@return boolean
+function M.is_email(s)
+  if type(s) ~= "string" or #s > 254 or s:find('[%s%c<>,;"()%[%]\\]') then
+    return false
+  end
+  local localpart, domain = s:match("^([^@]+)@([^@]+)$")
+  return localpart ~= nil
+    and #localpart <= 64
+    and domain:match("^[%w][%w%-%.]*%.[%a][%w%-]*$") ~= nil
+    and not domain:find("..", 1, true)
+end
+
 function M.is_web_link(s)
   if type(s) ~= "string" or s:find("[%s%c]") then
     return false
@@ -1158,6 +1176,28 @@ function M.parse_text(text, ctx)
         if not M.is_date(date) then
           bad("bad-date", ("%s '%s' is not a date (YYYY-MM-DD)"):format(field, date))
         end
+      end
+    end
+    -- the addresses a reminder is sent to by e-mail; they belong to `remind`
+    local remind_to = as_list(meta.remind_to, "remind_to", bad)
+    if #remind_to > 0 then
+      task.remind_to = remind_to
+      for _, address in ipairs(remind_to) do
+        if not M.is_email(address) then
+          bad("bad-email", ("remind_to entry '%s' is not an e-mail address"):format(address))
+        end
+      end
+      if #remind_to > M.MAX_REMIND_TO then
+        bad(
+          "bad-email",
+          ("remind_to names %d addresses, at most %d"):format(#remind_to, M.MAX_REMIND_TO)
+        )
+      end
+      if not M.is_date(meta.remind) then
+        hints[#hints + 1] = {
+          code = "remind-to-without-remind",
+          msg = "remind_to without a remind day: nobody is reminded until remind is set (or remove the key)",
+        }
       end
     end
     -- the hour a reminder is sent on its day; it belongs to `remind`
