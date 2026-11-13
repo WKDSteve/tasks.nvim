@@ -54,7 +54,7 @@ end
 ---@field last_done? string               # The newest day a member was finished.
 ---@field weekly_done integer[]           # `WEEKS` counts, oldest first.
 ---@field forecast_weeks? { low: integer, high: integer }
----@field areas string[]                  # The areas the plan names.
+---@field areas string[]                  # The plan's own area, then the other areas it names.
 ---@field value { sum: integer, avg?: number, without: integer }   # Over the open tasks; `avg` over those that carry a value, two decimals.
 ---@field prio? integer                   # The best (lowest) prio of the open tasks.
 ---@field target? string                  # The plan's target task (an id).
@@ -173,6 +173,14 @@ function M.rows(files, ctx)
     if due_in_days and forecast then
       forecast_late = forecast.high * 7 > due_in_days
     end
+    -- A plan that names no area is one of its own area (as `plans` reads it), so the own area always comes
+    -- first: a choice of plans by area must not lose the plans that say nothing.
+    local areas = { f.area }
+    for _, a in ipairs(f.areas or {}) do
+      if a ~= f.area then
+        areas[#areas + 1] = a
+      end
+    end
     local critical = plan.build(open, ctx.index).critical
     local total = #open + #done
     out[#out + 1] = {
@@ -189,7 +197,7 @@ function M.rows(files, ctx)
       last_done = last_done,
       weekly_done = weekly,
       forecast_weeks = forecast,
-      areas = f.areas or {},
+      areas = areas,
       value = value,
       prio = prio,
       target = f.target,

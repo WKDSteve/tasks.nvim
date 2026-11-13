@@ -36,9 +36,9 @@ return function(H)
 
   plan_file(
     "p",
-    "title: Plan P\nstatus: doing\nareas: [lib.nvim, cascade.nvim]\nphase_order: [one, two]\ntarget: lib.nvim/t1"
+    "title: Plan P\nstatus: doing\nareas: [cascade.nvim, lib.nvim]\nphase_order: [one, two]\ntarget: lib.nvim/t1"
   )
-  plan_file("q", "title: Plan Q\nstatus: planning\nareas: [lib.nvim]\nphase_order: []")
+  plan_file("q", "title: Plan Q\nstatus: planning\nphase_order: []")
   -- a chain t2 -> t1 (S then M: the path is 1.5 days), a task without an effort; all of plan p
   F.task(
     H,
@@ -127,7 +127,11 @@ return function(H)
   eq(p.last_done, "2026-01-10")
   eq(p.phase_now, "one", "the first stage that still has an open task")
   eq(p.stages, 2)
-  eq(p.areas, { "lib.nvim", "cascade.nvim" }, "the areas the plan names, in its order")
+  eq(
+    p.areas,
+    { "lib.nvim", "cascade.nvim" },
+    "the plan's own area first, then the others it names; the own one is not repeated"
+  )
   eq(
     p.value,
     { sum = 7, avg = 3.5, without = 1 },
@@ -148,7 +152,7 @@ return function(H)
   eq(q.forecast_weeks, nil, "no range from nothing")
   eq(q.phase_now, nil)
   eq(q.weekly_done, { 0, 0, 0, 0 })
-  eq(q.areas, { "lib.nvim" })
+  eq(q.areas, { "lib.nvim" }, "a plan that names no area is one of its own area")
   eq(q.value, { sum = 0, without = 0 }, "no open task: no average")
   eq({ q.prio, q.target, q.target_due, q.due_in_days, q.forecast_late }, {}, "nothing to say")
 
