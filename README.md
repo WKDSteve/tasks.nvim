@@ -279,3 +279,25 @@ a message that says so (update lib.nvim); `tasks_usrcmds_help_style_spec` (shape
 ## License
 
 [MIT](LICENSE)
+
+<!-- connections:begin (written by the app-icons tool of the workshop; change integrations.json there, not this block) -->
+## Connections
+
+![tasks.nvim: what it uses and what uses it](assets/graphs/tasks.nvim.png)
+
+**Uses**
+
+- [ai.nvim](https://github.com/WKDSteve/ai.nvim): `:Tasks sheet-ai ask` sends the hand-over to ai.nvim (`ai.ask`) and puts the answer back into the buffer. ([picture](assets/graphs/pair/tasks.nvim--ai.nvim.png))
+- [cascade.nvim](https://github.com/WKDSteve/cascade.nvim): The task form of tasks.nvim cycles values with cascade.nvim when it is installed. ([picture](assets/graphs/pair/tasks.nvim--cascade.nvim.png))
+- [mdview.nvim](https://github.com/WKDSteve/mdview.nvim): tasks.nvim offers `:Tasks preview` and `--to=mdview` when mdview.nvim is installed. ([picture](assets/graphs/pair/tasks.nvim--mdview.nvim.png))
+- [pickers.nvim](https://github.com/WKDSteve/pickers.nvim): `:Tasks folder` of tasks.nvim uses pickers.nvim (`pickers.command`). ([picture](assets/graphs/pair/tasks.nvim--pickers.nvim.png))
+- [rules.nvim](https://github.com/WKDSteve/rules.nvim): `import --from-rules` of tasks.nvim turns a work list of rules.nvim (`rules-work-list/1`) into tasks of an area. ([picture](assets/graphs/pair/tasks.nvim--rules.nvim.png))
+- [ui.nvim](https://github.com/WKDSteve/ui.nvim): The task form of tasks.nvim is built on the kit of ui.nvim (`ui.kit`) when it is installed. ([picture](assets/graphs/pair/tasks.nvim--ui.nvim.png))
+- [lib.nvim](https://github.com/WKDSteve/lib.nvim): the shared base of the plugins.
+
+**Used by**
+
+- [gopath.nvim](https://github.com/WKDSteve/gopath.nvim): gopath.nvim turns a task id under the cursor into its task file with the resolver of tasks.nvim (`tasks_nvim.resolve`). ([picture](assets/graphs/pair/gopath.nvim--tasks.nvim.png))
+- [tasks-desktop](https://github.com/WKDSteve/tasks-desktop): tasks-desktop runs tasks.nvim as its engine, pinned in `engine.lock`: the engine is the only writer, the app shows and sends operations. ([picture](assets/graphs/pair/tasks-desktop--tasks.nvim.png))
+- [testing.nvim](https://github.com/WKDSteve/testing.nvim): A test sheet of testing.nvim names the task of the vault it belongs to (`task = "<area>/<id>"`). ([picture](assets/graphs/pair/testing.nvim--tasks.nvim.png))
+<!-- connections:end -->
