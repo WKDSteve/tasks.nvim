@@ -288,6 +288,7 @@ a message that says so (update lib.nvim); `tasks_usrcmds_help_style_spec` (shape
 **Uses**
 
 - [ai.nvim](https://github.com/WKDSteve/ai.nvim): `:Tasks sheet-ai ask` sends the hand-over to ai.nvim (`ai.ask`) and puts the answer back into the buffer. ([picture](assets/graphs/pair/tasks.nvim--ai.nvim.png))
+- [appkit](https://github.com/WKDSteve/appkit): `tasks intent` takes a `wkd-intent/1` (its schema lives in appkit) and checks it as untrusted input before it creates or shows a task. ([picture](assets/graphs/pair/tasks.nvim--appkit.png))
 - [cascade.nvim](https://github.com/WKDSteve/cascade.nvim): The task form of tasks.nvim cycles values with cascade.nvim when it is installed. ([picture](assets/graphs/pair/tasks.nvim--cascade.nvim.png))
 - [mdview.nvim](https://github.com/WKDSteve/mdview.nvim): tasks.nvim offers `:Tasks preview` and `--to=mdview` when mdview.nvim is installed. ([picture](assets/graphs/pair/tasks.nvim--mdview.nvim.png))
 - [pickers.nvim](https://github.com/WKDSteve/pickers.nvim): `:Tasks folder` of tasks.nvim uses pickers.nvim (`pickers.command`). ([picture](assets/graphs/pair/tasks.nvim--pickers.nvim.png))
