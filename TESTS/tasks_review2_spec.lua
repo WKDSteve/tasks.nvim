@@ -124,6 +124,62 @@ return function(H)
     eq(#docs, 0, "unset again: no document")
   end
 
+  -- ── $TASKS_MARKER_DOCS belongs to the vault of $TASKS_VAULT: a finish in another vault leaves it alone ──
+  do
+    local done_flow = require("tasks_nvim.done_flow")
+    local doc = H.tmpdir() .. "/REAL-HANDOVER.md"
+    local s, f = plan_view.block_markers("lib.nvim")
+    local stale = "# Doc\n\n" .. s .. "\nSTALE\n" .. f .. "\n"
+    H.write(doc, stale)
+    local real_vault = H.tmpdir() .. "/the-real-vault"
+    vim.fn.mkdir(real_vault, "p")
+    local env_docs, env_vault = vim.env.TASKS_MARKER_DOCS, vim.env.TASKS_VAULT
+    vim.env.TASKS_MARKER_DOCS = doc
+    vim.env.TASKS_VAULT = real_vault
+
+    eq(
+      #done_flow.marker_docs({ root = root }),
+      0,
+      "another vault than the one of the environment: not its documents"
+    )
+    local member =
+      mutate.new("lib.nvim", vim.tbl_extend("force", o, { title = "Other vault member" }))
+    local flow = assert(done_flow.run(member.id, o))
+    eq(flow.docs_refreshed, {}, "the finish refreshed nothing")
+    eq(H.read(doc), stale, "and the document of the real vault is as it was")
+    eq(
+      #done_flow.marker_docs({ root = real_vault }),
+      1,
+      "in the vault of the environment the variable applies"
+    )
+    vim.env.TASKS_VAULT = (root:gsub("/", "\\")) .. "\\"
+    eq(
+      #done_flow.marker_docs({ root = root }),
+      1,
+      "the same vault spelled another way is the same vault"
+    )
+    vim.env.TASKS_VAULT = nil
+    eq(
+      #done_flow.marker_docs({ root = root }),
+      1,
+      "without $TASKS_VAULT there is nothing to compare with"
+    )
+
+    -- the documents of setup() are not the environment's: they apply in any vault
+    vim.env.TASKS_MARKER_DOCS = nil
+    vim.env.TASKS_VAULT = real_vault
+    local config = require("tasks_nvim.config")
+    local before = vim.deepcopy(config.get())
+    config.merge({ chain = { marker_docs = { doc } }, extra_areas = before.extra_areas })
+    eq(
+      #done_flow.marker_docs({ root = root }),
+      1,
+      "a document of setup() applies wherever the work is"
+    )
+    config.merge({ extra_areas = before.extra_areas })
+    vim.env.TASKS_MARKER_DOCS, vim.env.TASKS_VAULT = env_docs, env_vault
+  end
+
   -- ── a task of a status nobody knows is not "everything is done" ──
   do
     local lonely = F.vault(H)

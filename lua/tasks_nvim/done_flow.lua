@@ -64,8 +64,15 @@ local M = {}
 ---The documents whose marker blocks a finish refreshes: `setup({ chain = { marker_docs } })` plus `$TASKS_MARKER_DOCS`
 ---(comma separated; the headless CLI has no `setup`, so this is how it learns them, as `$TASKS_EXTRA_AREAS` is).
 ---Each file once, however it is spelled.
+---
+---The documents of the environment belong to the vault of the environment: while `$TASKS_VAULT` names a
+---vault and the work is in ANOTHER one (`--vault`, a throwaway vault of a test, a second vault switched to),
+---`$TASKS_MARKER_DOCS` is left out. A finish in a test vault would otherwise rewrite the plan blocks of the
+---real documents from the test vault's tasks. Without `$TASKS_VAULT` there is nothing to compare with and
+---the variable applies; the documents of `setup()` apply in any vault.
+---@param opts? { root?: string }
 ---@return string[]
-function M.marker_docs()
+function M.marker_docs(opts)
   local out, seen = {}, {}
   ---@param doc any
   local function add(doc)
@@ -82,6 +89,13 @@ function M.marker_docs()
     add(doc)
   end
   local env = vim.env.TASKS_MARKER_DOCS
+  local env_vault = vim.env.TASKS_VAULT
+  if env and env ~= "" and env_vault and env_vault ~= "" then
+    local root = vault.root(opts)
+    if root and not fsio.same_path(fsio.norm(env_vault), root) then
+      env = nil
+    end
+  end
   if env and env ~= "" then
     for doc in env:gmatch("[^,]+") do
       add(doc)
@@ -102,7 +116,7 @@ end
 function M.refresh_marker_docs(opts)
   opts = opts or {}
   local refreshed, notes = {}, {}
-  local docs = M.marker_docs()
+  local docs = M.marker_docs(opts)
   if #docs == 0 then
     return refreshed, notes
   end

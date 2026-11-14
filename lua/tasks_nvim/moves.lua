@@ -143,7 +143,7 @@ function M.preview(id, to_area, opts)
       out.references[#out.references + 1] = { kind = "plan_target", id = file.id }
     end
   end
-  for _, doc in ipairs(done_flow.marker_docs()) do
+  for _, doc in ipairs(done_flow.marker_docs({ root = root })) do
     local text = fsio.read(doc)
     if text and text:find(id, 1, true) then
       out.references[#out.references + 1] = { kind = "document", path = doc }

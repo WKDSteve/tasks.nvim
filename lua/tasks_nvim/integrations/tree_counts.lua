@@ -16,9 +16,9 @@
 --- Nothing is watched and nothing is read while nobody listens (`on_change`); the last listener that
 --- leaves closes every handle.
 ---
---- Known limits: an area that gets its `ROADMAP/` folder while a reader listens is watched from the
---- next `refresh()` on (the write hook still reports what this Neovim does there). An index that is out
---- of date shows an out-of-date count; `:Tasks check` reports such an index.
+--- An area that gets its `ROADMAP/` folder while a reader listens is watched from the first index this
+--- Neovim writes there; one that somebody else creates is seen at the next `refresh()`. An index that
+--- is out of date shows an out-of-date count; `:Tasks check` reports such an index.
 ---
 --- Seam for specs: `M.start_watch` (the handle factory).
 
@@ -51,8 +51,9 @@ local state = { root = nil, counts = {}, badges = {} }
 local listeners = {}
 local next_listener = 0
 
----@type table[]  the watch handles
+---@type table<string, table>  area -> its watch handle
 local handles = {}
+local handle_count = 0
 ---@type fun()|nil
 local unhook = nil
 
@@ -225,44 +226,53 @@ end
 M.start_watch = nil
 
 local function stop_watching()
-  for _, handle in ipairs(handles) do
+  for _, handle in pairs(handles) do
     pcall(handle.stop)
   end
   handles = {}
+  handle_count = 0
+end
+
+---Watch `<area>/ROADMAP`, when the area has that folder and is not watched yet.
+---@param area string
+local function watch_area(area)
+  local root = state.root
+  if not root or handles[area] or handle_count >= M.MAX_HANDLES then
+    return
+  end
+  local start = M.start_watch
+  if not start then
+    local watch = soft.check({ "start" }, pcall(require, "lib.nvim.fs.watch"))
+    start = watch and watch.start
+  end
+  local dir = root .. "/" .. area .. "/ROADMAP"
+  if not start or not fsio.is_dir(dir) then
+    return
+  end
+  -- No filter by file name: an atomic write ends on the name of its temp file as often as on
+  -- `TASKS.md`. Reading the head again is cheap, and little else happens in `ROADMAP/` itself.
+  local handle = start(dir, function()
+    vim.schedule(function()
+      if state.root == root then
+        M.refresh_area(area, true)
+      end
+    end)
+  end, { debounce_ms = 150 })
+  if handle then
+    handles[area] = handle
+    handle_count = handle_count + 1
+  end
 end
 
 ---Watch `<area>/ROADMAP` of every area that has one.
 local function start_watching()
   stop_watching()
   local root = state.root
-  local start = M.start_watch
-  if not start then
-    local watch = soft.check({ "start" }, pcall(require, "lib.nvim.fs.watch"))
-    start = watch and watch.start
-  end
-  if not (root and start) then
+  if not root then
     return
   end
   for _, area in ipairs(vault.areas(root)) do
-    if #handles >= M.MAX_HANDLES then
-      break
-    end
-    local dir = root .. "/" .. area.name .. "/ROADMAP"
-    if fsio.is_dir(dir) then
-      local name = area.name
-      -- No filter by file name: an atomic write ends on the name of its temp file as often as on
-      -- `TASKS.md`. Reading the head again is cheap, and little else happens in `ROADMAP/` itself.
-      local handle = start(dir, function()
-        vim.schedule(function()
-          if state.root == root then
-            M.refresh_area(name, true)
-          end
-        end)
-      end, { debounce_ms = 150 })
-      if handle then
-        handles[#handles + 1] = handle
-      end
-    end
+    watch_area(area.name)
   end
 end
 
@@ -279,6 +289,9 @@ function M.on_change(fn)
     unhook = index.on_write(function(root, result)
       if state.root and fsio.same_path(root, state.root) then
         M.refresh_area(result.area, true)
+        -- an area that got its first task (and with it `ROADMAP/`) while a tree listens: from now
+        -- on what others write there is seen too
+        watch_area(result.area)
       end
     end)
     -- Not in this call: a tree subscribes while it opens, and reading the heads of a large vault takes
@@ -317,7 +330,7 @@ end
 ---How many folders are watched right now (for `:checkhealth` and the specs).
 ---@return integer
 function M.watched()
-  return #handles
+  return handle_count
 end
 
 return M

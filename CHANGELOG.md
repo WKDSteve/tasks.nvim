@@ -69,6 +69,8 @@ the version is not tagged yet (the repository is not published).
 
 ### Fixed
 
+- `$TASKS_MARKER_DOCS` is left alone while `$TASKS_VAULT` names a vault and the work is in another one (`--vault`, a second vault switched to, a throwaway vault of a test): a `done` there refreshed the plan blocks of the real documents from the other vault's tasks, or reported "no such open project" for them. Without `$TASKS_VAULT` the variable applies as before, and the documents of `setup({ chain = { marker_docs } })` apply in any vault. `done_flow.marker_docs` takes `{ root }`.
+- The tree badges watch an area that gets its first task while a tree is open (`integrations.tree_counts`): its `ROADMAP/` is watched from the first index written there, not only after the tree was opened again.
 - `check`: the finding `asset-unused` named the area instead of the image (`assets/lib.nvim is not linked`); it names the asset now.
 - `done` and a plan's close make `<area>/Backlog/README.md` when a new area has none (they only warned and added no row; a rollback removes a README the run made).
 - `tasks.lists`: the schema took no `overdue` in the options of a stored list, so a list saved with `--overdue` made the document invalid.

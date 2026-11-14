@@ -146,6 +146,25 @@ return function(H)
   eq(#emitted, 1)
   eq(emitted[1], counts.badge_paths(root, "lib.nvim"), "exactly the keys of that area")
 
+  -- an area gets its first task while the tree listens: it has a badge, and it is watched from now on
+  emitted = {}
+  F.task(H, root, "nvim-config", "first", F.meta("First", "open"))
+  eq(assert(index.write_area("nvim-config", { root = root })).action, "written")
+  eq(decorator.get(key .. "/nvim-config").text, "1")
+  eq(counts.watched(), 3, "the new ROADMAP folder is watched")
+  eq(watched[#watched].path, root .. "/nvim-config/ROADMAP")
+  eq(assert(index.write_area("nvim-config", { root = root })).action, "unchanged")
+  eq(counts.watched(), 3, "and only once")
+  vim.fn.delete(root .. "/nvim-config/ROADMAP", "rf")
+  eq(assert(index.write_area("nvim-config", { root = root })).action, "unchanged")
+  watched[#watched].fire()
+  ok(
+    vim.wait(1000, function()
+      return decorator.get(key .. "/nvim-config") == nil
+    end, 10),
+    "its watcher reads the area like any other"
+  )
+
   -- the same count, other rows: nothing to redraw for the badge
   emitted = {}
   F.task(H, root, "lib.nvim", "delta", F.meta("Delta renamed", "doing"))
@@ -310,7 +329,7 @@ return function(H)
   unsubscribe_source()
   eq(stopped, 0, "the decorator still listens")
   unsubscribe()
-  eq(stopped, 2, "the last listener closes every handle")
+  eq(stopped, 3, "the last listener closes every handle")
   eq(counts.watched(), 0)
   F.task(H, root, "lib.nvim", "epsilon", F.meta("Epsilon", "open"))
   eq(assert(index.write_area("lib.nvim", { root = root })).action, "written")

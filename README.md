@@ -175,6 +175,10 @@ Six are built in (`quick-wins`, `small-and-important`, `unestimated`, and the th
 shows how many open tasks each selects. A saved list of the same name replaces a built-in one, a list of `setup()` replaces a saved one ([docs/COMMANDS.md](docs/COMMANDS.md#tasks-lists)). The headless CLI
 has no `setup()`: it knows the built-in and the saved lists.
 
+`chain.marker_docs` of `setup()` applies in any vault. The documents of `$TASKS_MARKER_DOCS` belong to the vault of
+`$TASKS_VAULT`: while that variable names a vault and the work is in another one (`--vault`, a second vault switched
+to, a throwaway vault of a test), they are left alone.
+
 **Area groups.** A group is a name that stands for several areas wherever a filter takes one: `tasks list nvim`,
 `tasks next nvim`, `tasks plans nvim`, `:Tasks list nvim`, the dashboard and tasks-desktop show the tasks of every
 member area. Members are the areas whose name matches `include` (exact names or `*`/`?` globs) and none of
