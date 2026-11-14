@@ -261,6 +261,34 @@ function M.stage_area(area, opts)
   return result, err
 end
 
+---Who wants to know that an index file changed on disk (`M.on_write`).
+---@type table<integer, fun(root: string, result: Tasks.IndexResult)>
+local write_listeners = {}
+local next_listener = 0
+
+---Call `fn(root, result)` after `write_area` wrote or removed an index file (never in check mode, never for an
+---unchanged file). For readers that keep something derived from the index, the tree badges of
+---`tasks_nvim.integrations.tree_counts` for one. A listener that raises is skipped: a reader must not be able
+---to fail a write that already happened.
+---@param fn fun(root: string, result: Tasks.IndexResult)
+---@return fun() remove
+function M.on_write(fn)
+  next_listener = next_listener + 1
+  local id = next_listener
+  write_listeners[id] = fn
+  return function()
+    write_listeners[id] = nil
+  end
+end
+
+---@param root string
+---@param result Tasks.IndexResult
+local function announce(root, result)
+  for _, fn in pairs(write_listeners) do
+    pcall(fn, root, result)
+  end
+end
+
 ---`action` is `written`, `removed`, `unchanged`, or (check mode) `stale` with a
 ---`reason`: `missing` (no file, but open tasks), `outdated` (content differs),
 ---`orphan` (a file although no task is open). A directory that could not be
@@ -330,6 +358,7 @@ function M.write_area(area, opts)
         return nil, "cannot remove " .. path .. ": " .. tostring(err)
       end
       result.action = "removed"
+      announce(root, result)
     end
     return result
   end
@@ -351,6 +380,7 @@ function M.write_area(area, opts)
     return nil, "cannot write " .. path .. ": " .. tostring(err)
   end
   result.action = "written"
+  announce(root, result)
   return result
 end
 

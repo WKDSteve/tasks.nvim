@@ -18,7 +18,7 @@ local state = vim.deepcopy(DEFAULTS)
 ---@type table<string, boolean>
 local given = {}
 
----@alias Tasks.ConfigType "string"|"vaults"|"vault_rules"|"boolean"|"string_list"|"posint"|"keymap"|"backend"|"value"|"effort"|"lists"|"area_groups"|"finished_window"|"links"|"form_mode"
+---@alias Tasks.ConfigType "string"|"vaults"|"vault_rules"|"boolean"|"string_list"|"posint"|"keymap"|"backend"|"value"|"effort"|"lists"|"area_groups"|"finished_window"|"links"|"form_mode"|"tree"
 
 ---@type table<string, Tasks.ConfigType|table<string, Tasks.ConfigType>>
 local SCHEMA = {
@@ -41,6 +41,7 @@ local SCHEMA = {
   attach = { screenshot_dirs = "string_list", max_age_s = "posint" },
   completion = { finished = "finished_window" },
   form = { mode = "form_mode" },
+  tree = "tree",
   keys = { dashboard = "keymap", dashboard_input = "keymap", form = "keymap" },
 }
 
@@ -191,6 +192,28 @@ local function check(kind, value)
       return true, value, nil
     end
     return false, nil, "true, false or the number of days to go back"
+  elseif kind == "tree" then
+    local why = "true, false or { keys = { done = <key>, claim = <key> } }"
+    if type(value) == "boolean" then
+      return true, value, nil
+    end
+    if type(value) ~= "table" then
+      return false, nil, why
+    end
+    local kept = { keys = {} }
+    for name, sub in pairs(value) do
+      if name ~= "keys" or type(sub) ~= "table" then
+        return false, nil, why
+      end
+      for action, key in pairs(sub) do
+        local is_key = type(key) == "string" or key == false or is_string_list(key)
+        if (action ~= "done" and action ~= "claim") or not is_key then
+          return false, nil, why
+        end
+        kept.keys[action] = key
+      end
+    end
+    return true, kept, nil
   elseif kind == "posint" then
     if type(value) == "number" and value > 0 and value == math.floor(value) then
       return true, value, nil

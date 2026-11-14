@@ -39,6 +39,7 @@ sessions that run without an editor. Nothing is stored anywhere but in the files
 - [Quickstart](#quickstart)
 - [Configuration](#configuration)
 - [Headless](#headless)
+- [In a tree view](#in-a-tree-view)
 - [For other plugins: task ids in any text](#for-other-plugins-task-ids-in-any-text)
 - [Documentation](#documentation)
 - [Tests](#tests)
@@ -154,6 +155,7 @@ require("tasks_nvim").setup({
   lists = {},                                                                   -- named lists, see below
   area_groups = {},                                                             -- area groups on top of <vault>/area-groups.json, see below
   quick_wins = { min_value = 4, max_effort = "S" },                              -- what counts as a quick win (both written on the task)
+  tree = true,                                                                  -- the vault in a tree view: true, false or { keys = { done = "<key>", claim = "<key>" } }
 })
 ```
 
@@ -213,6 +215,32 @@ nvim --headless -u NONE -l scripts/tasks-html.lua --out=tasks.html   # one-file 
 The CI gate can *run* `<vault>/TOOLS/scripts/md_lint.lua`, code that lives in the vault, so it refuses to until
 you pass `--trust-vault-lint` (or `--md-lint=<your own copy>`, or `--no-lint`; [docs/ENGINE.md](docs/ENGINE.md)). A finished task needs `<area>/Backlog/README.md` to get its row; without
 the file `done` says so and moves the task anyway.
+
+## In a tree view
+
+A tree that reads `lib.nvim.tree.registry` shows the vault without another line of configuration. Today that is
+the own tree of [filetree.nvim](https://github.com/WKDSteve/filetree.nvim) (`adapter = "native"`); `setup()` only
+leaves four entries at the registry, and without such a tree nobody reads them.
+
+| | |
+| --- | --- |
+| Badge | Next to an area folder of the vault, its `ROADMAP` and its `ROADMAP/tasks`: how many tasks are open. |
+| View `tasks` | The areas that have open tasks, below each its tasks in the order of the index, with the status at the right (`:Filetree source tasks`, or the view bar). A task is its file: `<CR>` opens it, the preview and the path actions work on it. Without a vault the view says why it is empty. |
+| Actions | "Finish this task" (`tasks.done`) and "Claim this task" (`tasks.claim`), in the tree's menu on every task: a node of the view, or the task file in the file view. They run `:Tasks done` (which asks first) and `:Tasks claim`. With several tasks marked, all are claimed and the first is finished. |
+
+```lua
+require("tasks_nvim").setup({
+  tree = { keys = { done = "gD", claim = "gC" } }, -- the actions on keys of the tree buffer as well
+  -- tree = false,                                 -- register nothing
+})
+```
+
+The badge is never the result of a scan while the tree draws: it is the number in the heading of
+`<area>/ROADMAP/TASKS.md`, read once per area when the tree starts to show badges. It follows when this Neovim
+writes an index (a task created, finished, moved) and, through one file watcher per `<area>/ROADMAP` while a tree
+is open, when the CLI, another Neovim or a `git pull` does. An index that is out of date shows an out-of-date
+number (`:Tasks check` reports it, `:Tasks index` writes it). The task files of an area are read when its node in
+the view is opened.
 
 ## For other plugins: task ids in any text
 
@@ -275,6 +303,10 @@ runner gives every spec its own sandboxed data folder. Without snacks.nvim the s
 `vim.ui.select` fallback has its own spec that always runs. The option-float texts are different: a lib.nvim that
 cannot list the undescribed options (`composer.help.undocumented`) is too old, and `tasks_usrcmds_help_spec` fails with
 a message that says so (update lib.nvim); `tasks_usrcmds_help_style_spec` (shape of the texts) runs on any lib.nvim.
+
+`tasks_tree_drive_spec` presses the tree actions in the real own tree of filetree.nvim. That plugin is no dependency,
+so the run needs `FILETREE_NVIM_DIR=<checkout>` and passes with a note without it (the suite and the CI leave it out):
+`FILETREE_NVIM_DIR=../filetree.nvim nvim --clean --headless -u NONE -l TESTS/tasks_tree_drive_spec.lua`.
 
 ## License
 

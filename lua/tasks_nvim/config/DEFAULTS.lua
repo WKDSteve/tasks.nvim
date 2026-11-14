@@ -72,6 +72,7 @@
 ---@field completion Tasks.CompletionConfig
 ---@field keys Tasks.KeysConfig
 ---@field form Tasks.FormConfig
+---@field tree boolean|Tasks.Tree.Opts  The vault in a tree view that reads `lib.nvim.tree.registry` (the own tree of filetree.nvim): a count of open tasks on the area folders, a view `tasks`, and the actions "finish" and "claim" on a task. `true`: registered, the actions in the tree's menu; `{ keys = { done = "<key>", claim = "<key>" } }`: on those keys in the tree buffer as well; `false`: nothing is registered.
 
 ---@class Tasks.FormConfig
 ---@field mode "float"|"split"|"vsplit"|"current"  Window of the `:Tasks new` form: a centered float, a split below, a vertical split or the current window. `:Tasks new mode=...` overrides it for one call.
@@ -97,6 +98,7 @@ return {
   attach = { screenshot_dirs = {}, max_age_s = 300 },
   completion = { finished = true },
   form = { mode = "float" },
+  tree = true,
   keys = {
     dashboard = {
       status = "s",

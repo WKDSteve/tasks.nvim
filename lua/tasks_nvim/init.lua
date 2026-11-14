@@ -35,6 +35,7 @@ local M = {}
 ---@field dashboard? { watch?: boolean, debounce_ms?: integer }
 ---@field staleness? { git_timeout_ms?: integer, budget_ms?: integer, repo_bases?: string[] }
 ---@field ci? { lint_timeout_ms?: integer }
+---@field tree? boolean|Tasks.Tree.Opts  # The vault in a tree view (`tasks_nvim.integrations.tree`); `false` registers nothing.
 -- Defaults and validation: `tasks_nvim.config`.
 
 ---Tell the engine where the vault is. Safe to call twice; every call starts from the defaults.
@@ -75,6 +76,17 @@ function M.setup(opts)
       require("tasks_nvim.ui.reminder_hint").schedule()
     end)
   end
+  -- The vault in a tree view: entries at lib.nvim's registry, read by filetree.nvim's own tree when there is one.
+  -- Registering loads no front end and reads no file; `tree = false` takes the entries out again.
+  local tree = config.get().tree
+  pcall(function()
+    local integration = require("tasks_nvim.integrations.tree")
+    if tree == false then
+      integration.unregister()
+    else
+      integration.register(type(tree) == "table" and tree or nil)
+    end
+  end)
   -- `:Tasks` is registered by `plugin/tasks_nvim.lua` (which a plugin manager sources when it loads the
   -- plugin); the engine facade does not reach into the front end.
 end

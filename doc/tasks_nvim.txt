@@ -53,6 +53,7 @@ blockers, plan or estimate is valid and stays visible everywhere.
     completion = { finished = true },   -- true, false or N days
     quick_wins = { min_value = 4, max_effort = "S" },
     lists = {},
+    tree = true,                        -- true, false or { keys = { done =, claim = } }
   })
 <
 
@@ -93,6 +94,13 @@ blockers, plan or estimate is valid and stays visible everywhere.
                            the task (off by default: it adds an autocommand).
   reminders.on_start       One line shortly after startup when reminders (`remind:`) are due
                            (once per session, only with a UI; `false` turns it off).
+  tree                     The vault in a tree view that reads lib.nvim's tree registry (the
+                           own tree of filetree.nvim): a count of open tasks next to an area
+                           folder, a view `tasks` (areas, below them their open tasks), and
+                           the actions "finish" and "claim" on a task in the tree's menu.
+                           `{ keys = { done = "gD", claim = "gC" } }` puts the actions on
+                           keys of the tree buffer; `false` registers nothing. The count is
+                           read from the heading of `ROADMAP/TASKS.md`, never by a scan.
   keys.dashboard           Dashboard list keys: action = key, or false.
   keys.dashboard_input     Dashboard input-window keys (normal and insert).
   form.mode                Window of the `:Tasks new` form: "float" (default), "split",

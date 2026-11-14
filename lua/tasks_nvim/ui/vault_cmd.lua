@@ -636,6 +636,11 @@ function M.switch(ctx)
   -- loading the UI for a headless switch
   local dash = package.loaded["tasks_nvim.ui.dash"]
   local reopened = dash and dash.follow_vault(root) or 0
+  -- the badges and the view of a tree follow too (only when a tree ever asked for them)
+  local tree_counts = package.loaded["tasks_nvim.integrations.tree_counts"]
+  if tree_counts then
+    tree_counts.reload()
+  end
   notify.info(
     ("Vault: %s = %s%s"):format(
       name,

@@ -8,7 +8,13 @@ return {
   -- How the spec files are run: "auto" = sniffed per file, "h" = on the project's own TESTS/harness.lua,
   -- "script" = a self-running script in its own process.
   -- TESTS/sheets_spec.lua is busted style: one case per test sheet (`sheet:<id>`, testing sheets report).
-  dialect = { ["TESTS/sheets_spec.lua"] = "busted", ["*"] = "h" },
+  -- TESTS/tasks_tree_drive_spec.lua drives the own tree of filetree.nvim on that plugin's bench, which sets up and
+  -- quits the editor itself: a script in its own process (it passes with a note where filetree.nvim is not found).
+  dialect = {
+    ["TESTS/sheets_spec.lua"] = "busted",
+    ["TESTS/tasks_tree_drive_spec.lua"] = "script",
+    ["*"] = "h",
+  },
   -- Dependencies (directory names) put on the runtimepath: $<NAME>_DIR, .deps/<name>, ../<name>,
   -- stdpath('data')/lazy/<name>.
   deps = { "lib.nvim" },
@@ -22,7 +28,14 @@ return {
   -- Environment variables the specs read; a child editor inherits an allowlist only (never secrets).
   -- SNACKS_DIR: the dashboard specs find snacks.nvim there (the runner isolates stdpath('data'), so scripts/test.sh
   -- looks snacks.nvim up and sets it).
-  env_allow = { "REPOS_DIR", "SNACKS_DIR", "TASKS_REQUIRE_SNACKS" },
+  -- FILETREE_NVIM_DIR, UI_NVIM_DIR: where the tree drive spec finds filetree.nvim and what it needs.
+  env_allow = {
+    "REPOS_DIR",
+    "SNACKS_DIR",
+    "TASKS_REQUIRE_SNACKS",
+    "FILETREE_NVIM_DIR",
+    "UI_NVIM_DIR",
+  },
   -- The guards (docs/GUARDS.md of testing.nvim). The suite is clean on all of them, so they all fail the run.
   guards = {
     fs = "error",
