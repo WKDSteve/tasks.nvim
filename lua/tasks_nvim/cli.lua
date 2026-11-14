@@ -152,6 +152,9 @@ commands:
                                           an expired claim is taken over, one of somebody else is refused
   unclaim <area>/<slug> [--by=<name>] [--status=open|parked|decision] [--force --note=<why>]
                                           give it back (a doing task goes to open); `done` releases by itself
+  attach <area>/<slug> <file> [--name=n] [--kind=video|image|screenshot]
+                                          --kind: into assets/videos/, assets/images/ or assets/screenshots/
+                                          (--clipboard and --latest are screenshots without it)
   attach <area>/<slug> <file> [--name=n]  copy a file to <slug>/assets/ (a plain task becomes a
                                           folder task) and print the Markdown link
   attach <area>/<slug> --clipboard [--name=n]
@@ -392,7 +395,7 @@ local SPECS = {
   },
   -- `latest` is both: `--latest` (the configured screenshot folders) and `--latest=<folder>`.
   attach = {
-    value = { "name", "latest", "by", "note" },
+    value = { "name", "kind", "latest", "by", "note" },
     flag = { "no-index", "clipboard", "latest", "force" },
   },
   folderize = { value = { "by", "note" }, flag = { "no-index", "force" } },
@@ -1806,8 +1809,13 @@ function commands.attach(ctx)
   end
   if not id or (sourced and file) or (not sourced and not file) or #args.pos > 2 then
     ctx.warn(
-      "error: usage: attach <area>/<slug> <file> [--name=n]  |  attach <area>/<slug> --clipboard|--latest[=<folder>]"
+      "error: usage: attach <area>/<slug> <file> [--name=n] [--kind=video|image|screenshot]  |  attach <area>/<slug> --clipboard|--latest[=<folder>]"
     )
+    return 2
+  end
+  local kind = args.opt.kind --[[@as string|nil]]
+  if kind ~= nil and not mutate.asset_dir(kind) then
+    ctx.warn("error: --kind takes " .. mutate.ASSET_KINDS_TEXT)
     return 2
   end
   local res, err, too_old
@@ -1817,6 +1825,7 @@ function commands.attach(ctx)
         root = eo.root,
         today = eo.today,
         name = args.opt.name --[[@as string|nil]],
+        kind = kind,
         dir = type(from_latest) == "string" and from_latest or nil,
         index = not args.opt["no-index"],
         by = args.opt.by --[[@as string|nil]],
@@ -1834,6 +1843,7 @@ function commands.attach(ctx)
         root = eo.root,
         today = eo.today,
         name = args.opt.name --[[@as string|nil]],
+        kind = kind,
         index = not args.opt["no-index"],
       }, claim_opts(args.opt))
     )

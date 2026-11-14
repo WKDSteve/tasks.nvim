@@ -80,6 +80,39 @@ return function(H)
     ok(vim.uv.fs_stat(vim.fs.dirname(folder.path) .. "/" .. res.rel), "the asset is in assets/")
     has(said(), "attached " .. t1.id, "said so")
 
+    ok(
+      res.rel:find("^assets/screenshots/"),
+      "a screenshot lies in assets/screenshots/: " .. res.rel
+    )
+
+    -- ── `:Tasks attach <id> <file> kind=video`: the file goes into the folder of its kind ──
+    local movie = H.tmpdir() .. "/ui-movie.webm"
+    local mh = assert(io.open(movie, "wb"))
+    mh:write("video")
+    mh:close()
+    notes = {}
+    cmd.task_attach({
+      rest = {},
+      args = { id = t1.id, file = movie },
+      kv = { from = "", name = "", dir = "", kind = "video" },
+    })
+    ok(
+      vim.uv.fs_stat(vim.fs.dirname(folder.path) .. "/assets/videos/ui-movie.webm"),
+      "the video is in assets/videos/: " .. said()
+    )
+    notes = {}
+    cmd.task_attach({
+      rest = {},
+      args = { id = t1.id, file = movie },
+      kv = { from = "", name = "", dir = "", kind = "movies" },
+    })
+    has(said(), "kind= takes", "an unknown kind is refused")
+    eq(
+      vim.uv.fs_stat(vim.fs.dirname(folder.path) .. "/assets/ui-movie.webm"),
+      nil,
+      "and nothing was attached"
+    )
+
     -- ── no clipboard image: the newest screenshot ──
     local shots = H.tmpdir() .. "/shots"
     vim.fn.mkdir(shots, "p")
@@ -132,8 +165,8 @@ return function(H)
     local made =
       assert(scan.find("lib.nvim/form-with-a-shot", { root = root }), "the task was created")
     ok(made.path:match("/form%-with%-a%-shot/form%-with%-a%-shot%.md$"), "as a folder task")
-    local assets = vim.fn.glob(vim.fs.dirname(made.path) .. "/assets/*", false, true)
-    eq(#assets, 1, "with the screenshot in assets/")
+    local assets = vim.fn.glob(vim.fs.dirname(made.path) .. "/assets/screenshots/*", false, true)
+    eq(#assets, 1, "with the screenshot in assets/screenshots/")
     -- the task is open in a window, so the link is put at its cursor (the buffer, not yet the file)
     local text = ""
     for _, b in ipairs(vim.api.nvim_list_bufs()) do

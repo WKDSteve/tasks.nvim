@@ -3029,6 +3029,29 @@ local IMAGE_EXT =
 ---Folder inside a folder task that `attach` puts files in.
 M.ASSETS_DIR = "assets"
 
+---The folder below `assets/` for each kind of asset: a video, an image, a screenshot. An asset without a kind lies in
+---`assets/` itself.
+---@type table<string, string>
+M.ASSET_KIND_DIRS = { video = "videos", image = "images", screenshot = "screenshots" }
+
+---What `kind` may be, for a message.
+M.ASSET_KINDS_TEXT = "'video', 'image' or 'screenshot'"
+
+---The folder of an asset below the task folder: `assets`, or `assets/<folder of the kind>`.
+---@param kind any  # nil: no kind
+---@return string|nil dir
+---@return string|nil err  # `kind` is none of the kinds
+function M.asset_dir(kind)
+  if kind == nil then
+    return M.ASSETS_DIR, nil
+  end
+  local sub = type(kind) == "string" and M.ASSET_KIND_DIRS[kind] or nil
+  if not sub then
+    return nil, "asset kind must be " .. M.ASSET_KINDS_TEXT
+  end
+  return M.ASSETS_DIR .. "/" .. sub, nil
+end
+
 ---Move a plain task file into its own folder: `tasks/<slug>.md` becomes
 ---`tasks/<slug>/<slug>.md`.
 ---@param root string
@@ -3060,13 +3083,17 @@ end
 ---@param plain string        the path the task had before
 ---@param folder_file string  the path `to_folder` gave it
 ---@param asset string        the file the failed copy may have left behind
+---@param asset_dir string    the folder of the asset below the task folder (`assets`, `assets/videos`)
 ---@return boolean ok
 ---@return string|nil err
-local function undo_folder(plain, folder_file, asset)
+local function undo_folder(plain, folder_file, asset, asset_dir)
   local dir = fsio.dirname(folder_file)
   local uv = vim.uv or vim.loop
   if fsio.is_file(asset) then
     pcall(fsio.remove, asset)
+  end
+  if asset_dir ~= M.ASSETS_DIR then
+    pcall(uv.fs_rmdir, dir .. "/" .. asset_dir)
   end
   pcall(uv.fs_rmdir, dir .. "/" .. M.ASSETS_DIR)
   local moved, err = fsio.rename(folder_file, plain)
@@ -3150,9 +3177,11 @@ M.asset_name = asset_name
 ---Copy a file into a task's `assets/` folder and give back the Markdown to link
 ---it. A plain task file becomes a folder task first. `opts.name` renames the
 ---copy; an asset of that name that already exists is an error, never replaced.
+---`opts.kind` (`video`, `image`, `screenshot`) puts the copy into the folder of its kind below `assets/`
+---(`assets/videos/`, `assets/images/`, `assets/screenshots/`); without it the copy lies in `assets/` itself.
 ---@param id string
 ---@param src string                 # The file to attach.
----@param opts? { root?: string, today?: string, name?: string, index?: boolean }
+---@param opts? { root?: string, today?: string, name?: string, kind?: string, index?: boolean }
 ---@return { id: string, path: string, asset: string, rel: string, link: string, folderized: boolean, updated_err?: string, index?: Tasks.IndexResult, index_err?: string }|nil result
 ---@return string|nil err
 function M.attach(id, src, opts)
@@ -3171,6 +3200,10 @@ function M.attach(id, src, opts)
   local name, nerr = asset_name(opts.name or (src:match("([^/]*)$") or src))
   if not name then
     return nil, nerr
+  end
+  local asset_dir, kerr = M.asset_dir(opts.kind)
+  if not asset_dir then
+    return nil, kerr
   end
   local today = opts.today or model.today()
   if not model.is_date(today) then
@@ -3193,7 +3226,7 @@ function M.attach(id, src, opts)
     end
     path, folderized = dest, true
   end
-  local asset = fsio.dirname(path) .. "/" .. M.ASSETS_DIR .. "/" .. name
+  local asset = fsio.dirname(path) .. "/" .. asset_dir .. "/" .. name
   local copied, cerr = fsio.copy_whole(src, asset)
   if not copied then
     local why = fsio.is_copy_exists(cerr) and ("asset exists: " .. asset .. " (pass --name=)")
@@ -3202,7 +3235,7 @@ function M.attach(id, src, opts)
       return nil, why
     end
     -- The conversion was only a means to an end: a failed attach leaves the task as it was.
-    local undone, uerr = undo_folder(task.path, path, asset)
+    local undone, uerr = undo_folder(task.path, path, asset, asset_dir)
     if undone then
       return nil, why
     end
@@ -3217,7 +3250,7 @@ function M.attach(id, src, opts)
       )
   end
 
-  local rel = M.ASSETS_DIR .. "/" .. name
+  local rel = asset_dir .. "/" .. name
   local ext = name:match("%.([%w]+)$")
   local is_image = ext ~= nil and IMAGE_EXT[ext:lower()] == true
   local link = (is_image and "![%s](%s)" or "[%s](%s)"):format(name, rel)

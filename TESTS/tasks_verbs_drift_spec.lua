@@ -35,7 +35,7 @@ return function(H)
     ["answer"] = { composer = {}, cli = { "no-index" } },
     ["attach"] = {
       composer = {},
-      cli = { "by", "clipboard", "force", "latest", "name", "no-index", "note" },
+      cli = { "by", "clipboard", "force", "kind", "latest", "name", "no-index", "note" },
     },
     -- the editor asks before it finishes; the CLI never asks
     ["plan-close"] = { composer = { "yes" }, cli = {} },

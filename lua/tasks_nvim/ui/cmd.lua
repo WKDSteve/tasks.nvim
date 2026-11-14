@@ -2268,8 +2268,10 @@ local function report_attach(res, before)
   )
 end
 
----`:Tasks attach <id> <file> [name=<file name>]`, or `:Tasks attach <id> from=clipboard|latest [dir=<folder>]`:
----copy the file (the clipboard image, the newest screenshot) into `assets/` and put the Markdown link at the
+---`:Tasks attach <id> <file> [name=<file name>] [kind=video|image|screenshot]`, or
+---`:Tasks attach <id> from=clipboard|latest [dir=<folder>]`:
+---copy the file (the clipboard image, the newest screenshot) into `assets/` (the folder of its kind below it:
+---`assets/screenshots/` for the clipboard and the newest screenshot) and put the Markdown link at the
 ---cursor of the task when it is open in a window, else into the `+` register, and say so.
 ---@param ctx table
 function M.task_attach(ctx)
@@ -2280,6 +2282,11 @@ function M.task_attach(ctx)
   local before = scan.find(ctx.args.id)
   local from = ctx.kv.from ~= "" and ctx.kv.from or nil
   local name = ctx.kv.name ~= "" and ctx.kv.name or nil
+  local kind = ctx.kv.kind ~= "" and ctx.kv.kind or nil
+  if kind ~= nil and not mutate.asset_dir(kind) then
+    notify.error("kind= takes video, image or screenshot, got " .. kind)
+    return
+  end
   local res, err, too_old
   if from then
     if ctx.args.file and ctx.args.file ~= "" then
@@ -2292,6 +2299,7 @@ function M.task_attach(ctx)
     end
     res, err, too_old = require("tasks_nvim.attach_source").attach(ctx.args.id, from, {
       name = name,
+      kind = kind,
       dir = ctx.kv.dir ~= "" and ctx.kv.dir or nil,
     })
     if not res and too_old then
@@ -2304,7 +2312,11 @@ function M.task_attach(ctx)
     -- The composer's FILE type has resolved `~` and variables already (and checked the file is
     -- there). A second `vim.fn.expand` would read `[1]` in `shot[1].png` as a wildcard (attaching
     -- `shot1.png` instead) and run a backtick in a downloaded file's name through the shell.
-    res, err = mutate.attach(ctx.args.id, vim.fn.fnamemodify(ctx.args.file, ":p"), { name = name })
+    res, err = mutate.attach(
+      ctx.args.id,
+      vim.fn.fnamemodify(ctx.args.file, ":p"),
+      { name = name, kind = kind }
+    )
   end
   if not res then
     -- The engine speaks CLI (`--name=`); here the same option is `name=<file name>`.

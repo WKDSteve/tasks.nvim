@@ -54,13 +54,17 @@ return function(H)
   eq(e.ok, true, vim.inspect(e))
   eq(e.outcome, "changed")
   eq(e.id, a.id)
-  eq(e.asset, "assets/shot.png", "the asset is named relative to the task folder")
-  eq(e.link, "![shot.png](assets/shot.png)", "the answer carries the link")
+  eq(e.asset, "assets/screenshots/shot.png", "the asset is named relative to the task folder")
+  eq(e.link, "![shot.png](assets/screenshots/shot.png)", "the answer carries the link")
   eq(e.changed_ids[1], a.id)
   ok(e.etag_after, "the version after is told")
   local task = assert(scan.find(a.id, { root = root }))
   eq(task.folder, true, "a plain task became a folder task")
-  eq(fsio.is_file(fsio.dirname(task.path) .. "/assets/shot.png"), true, "the image is in assets/")
+  eq(
+    fsio.is_file(fsio.dirname(task.path) .. "/assets/screenshots/shot.png"),
+    true,
+    "the image is in assets/screenshots/"
+  )
   eq(
     e.file,
     "lib.nvim/ROADMAP/tasks/" .. a.id:match("([^/]+)$") .. "/" .. a.id:match("([^/]+)$") .. ".md"
@@ -74,7 +78,7 @@ return function(H)
   local slug = a.id:match("([^/]+)$")
   ok(
     e2.asset:match(
-      "^assets/" .. slug:gsub("%p", "%%%0") .. "%-%d%d%d%d%-%d%d%-%d%d%-%d%d%d%d%.png$"
+      "^assets/screenshots/" .. slug:gsub("%p", "%%%0") .. "%-%d%d%d%d%-%d%d%-%d%d%-%d%d%d%d%.png$"
     ),
     "the default name is <slug>-<date>-<HHMM>.png: " .. e2.asset
   )
@@ -98,7 +102,7 @@ return function(H)
     dirs = { shots },
   })
   eq(latest.ok, true, vim.inspect(latest))
-  eq(latest.asset, "assets/latest.png")
+  eq(latest.asset, "assets/screenshots/latest.png")
 
   -- too old: told, not guessed
   local d = new_task("Attach too old")
@@ -168,7 +172,11 @@ return function(H)
     ops = { { op = "attach", id = g.id, from = "latest", name = "named.png" } },
   })
   eq(named.results and named.results[1].ok, true, vim.inspect(named))
-  eq(named.results[1].asset, "assets/named.png", "the newest image of the folder that was named")
+  eq(
+    named.results[1].asset,
+    "assets/screenshots/named.png",
+    "the newest image of the folder that was named"
+  )
 
   -- a named folder without a new image: refused, and the answer names no folder and no file of this machine
   local empty = H.tmpdir() .. "/no-shots-here"
@@ -226,6 +234,123 @@ return function(H)
     { upload_dir = inbox }
   )
   eq(again.asset, "assets/report-2.pdf", vim.inspect(again))
+
+  -- `kind`: the asset goes into the folder of its kind below `assets/`, and the link names that folder. Without a kind
+  -- an upload lies in `assets/` itself (above); the clipboard and the screenshot folders are screenshots (above).
+  local kd = new_task("Attach by kind")
+  for _, case in ipairs({
+    {
+      kind = "video",
+      name = "clip.webm",
+      rel = "assets/videos/clip.webm",
+      link = "[clip.webm](assets/videos/clip.webm)",
+    },
+    {
+      kind = "image",
+      name = "photo.jpg",
+      rel = "assets/images/photo.jpg",
+      link = "![photo.jpg](assets/images/photo.jpg)",
+    },
+    {
+      kind = "screenshot",
+      name = "screen.png",
+      rel = "assets/screenshots/screen.png",
+      link = "![screen.png](assets/screenshots/screen.png)",
+    },
+  }) do
+    local kinded = one({
+      {
+        op = "attach",
+        id = kd.id,
+        from = "upload",
+        upload = "abc123",
+        name = case.name,
+        kind = case.kind,
+      },
+    }, nil, { upload_dir = inbox })
+    eq(kinded.ok, true, vim.inspect(kinded))
+    eq(kinded.asset, case.rel, "the asset names the folder of its kind")
+    eq(kinded.link, case.link, "and so does the link")
+    local kt = assert(scan.find(kd.id, { root = root }))
+    ok(fsio.is_file(vim.fs.dirname(kt.path) .. "/" .. case.rel), case.rel .. " is there")
+    ok(
+      not fsio.is_file(vim.fs.dirname(kt.path) .. "/assets/" .. case.name),
+      "and not in assets/ itself"
+    )
+  end
+  -- A taken name gets its counter inside the folder of the kind; the same name in another folder is another asset.
+  local counted = one({
+    {
+      op = "attach",
+      id = kd.id,
+      from = "upload",
+      upload = "abc123",
+      name = "clip.webm",
+      kind = "video",
+    },
+  }, nil, { upload_dir = inbox })
+  eq(counted.asset, "assets/videos/clip-2.webm", vim.inspect(counted))
+  local elsewhere = one({
+    { op = "attach", id = kd.id, from = "upload", upload = "abc123", name = "clip.webm" },
+  }, nil, { upload_dir = inbox })
+  eq(elsewhere.asset, "assets/clip.webm", vim.inspect(elsewhere))
+  -- `exact` looks into the folder of the kind: taken there is `exists`, the same name without a kind is free.
+  local taken_kind = one({
+    {
+      op = "attach",
+      id = kd.id,
+      from = "upload",
+      upload = "abc123",
+      name = "photo.jpg",
+      kind = "image",
+      exact = true,
+    },
+  }, { dry_run = true }, { upload_dir = inbox })
+  eq((taken_kind.error or {}).code, "exists", vim.inspect(taken_kind))
+  local free_flat = one({
+    {
+      op = "attach",
+      id = kd.id,
+      from = "upload",
+      upload = "abc123",
+      name = "photo.jpg",
+      exact = true,
+    },
+  }, { dry_run = true }, { upload_dir = inbox })
+  eq(free_flat.ok, true, vim.inspect(free_flat))
+  -- A kind that is none is refused before anything is read or made, in a dry run too, also for the clipboard.
+  local kb = new_task("Attach by a bad kind")
+  for _, bad in ipairs({ "videos", "", "../x", "Video" }) do
+    for _, dry_look in ipairs({ false, true }) do
+      local no_kind = one({
+        {
+          op = "attach",
+          id = kb.id,
+          from = "upload",
+          upload = "abc123",
+          name = "x.bin",
+          kind = bad,
+        },
+      }, dry_look and { dry_run = true } or nil, { upload_dir = inbox })
+      eq(no_kind.ok, false, vim.inspect(no_kind))
+      eq((no_kind.error or {}).code, "invalid_argument", vim.inspect(no_kind))
+      ok(tostring(no_kind.error.message):find("kind must be", 1, true), vim.inspect(no_kind))
+    end
+  end
+  local bad_clip = one(
+    { { op = "attach", id = kb.id, from = "clipboard", kind = "nope" } },
+    nil,
+    { clipboard = clipboard(PNG) }
+  )
+  eq((bad_clip.error or {}).code, "invalid_argument", vim.inspect(bad_clip))
+  eq(assert(scan.find(kb.id, { root = root })).folder, false, "the task was not touched")
+  -- The clipboard with a kind named goes where the kind says.
+  local clip_image = one(
+    { { op = "attach", id = kb.id, from = "clipboard", name = "pasted.png", kind = "image" } },
+    nil,
+    { clipboard = clipboard(PNG) }
+  )
+  eq(clip_image.asset, "assets/images/pasted.png", vim.inspect(clip_image))
 
   -- `exact`: the name or nothing. A file sent again after its answer was lost is not attached twice, and a dry run (the
   -- hub's look before the transfer) says so already; the message names no path.

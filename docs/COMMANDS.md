@@ -386,12 +386,15 @@ document (testing.nvim docs/SHEETS.md, "Hand over to an AI"); a vault or reposit
 refused. Command line: `sheet-ai draft|explain <id>` prints the document; `sheet-ai accept|bug <id> --from=<answer
 file>` shows the sheet or the bug task and writes it only with `--yes`.
 
-### `:Tasks attach <id> <file> [name=<file name>]` / `attach <id> from=clipboard|latest [dir=<folder>]` / `task folderize <id>`
+### `:Tasks attach <id> <file> [name=<file name>] [kind=video|image|screenshot]` / `attach <id> from=clipboard|latest [dir=<folder>]` / `task folderize <id>`
 
 A task may be a folder `tasks/<slug>/<slug>.md` that holds assets (concept section 12.2).
 `attach` copies the file into `<slug>/assets/` -- a plain task file becomes a folder task
 first -- and puts the Markdown link (`![name](assets/name)` for images) at the cursor of the task when it is open
 in a window, else in the `+` register.
+`kind=video|image|screenshot` puts the copy into the folder of its kind below it (`assets/videos/`,
+`assets/images/`, `assets/screenshots/`), and the link names that folder; without `kind=` a file lies in `assets/`
+itself. Assets attached before stay where they are.
 `name=` renames the copy; an asset that already exists is never replaced. Spaces in the file
 name become hyphens, and names Windows treats as devices (`nul`, `con`, ...) are refused. The
 file argument is resolved once, by the composer (`~`, `$VAR`, `%VAR%`) and never expanded a second time,
@@ -401,7 +404,8 @@ leaves the task as it was (no half-made folder task). `folderize` converts a tas
 attaching anything. Windows showing
 the old task file follow it. `task new ... --folder` creates a folder task from the start.
 
-**Screenshot in one step.** Instead of a file, `from=clipboard` stores the image on the clipboard as a PNG, and
+**Screenshot in one step.** Instead of a file, `from=clipboard` stores the image on the clipboard as a PNG in
+`assets/screenshots/` (a screenshot is a kind of its own; `kind=image` puts it into `assets/images/` instead), and
 `from=latest` the newest image of the screenshot folders (`attach.screenshot_dirs`, default: the usual folder of
 the system, e.g. `~/Pictures/Screenshots`; `dir=<folder>` for one call) -- only when it was modified within
 `attach.max_age_s` seconds (default 300), otherwise nothing is attached and the message names the file, so a week-old

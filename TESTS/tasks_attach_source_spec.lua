@@ -53,10 +53,10 @@ return function(H)
   local task = new_task("Clip shot")
   local res, err = attach(task.id, "clipboard", { clipboard = clipboard(PNG) })
   ok(res, "the clipboard image is attached: " .. tostring(err))
-  eq(res.rel, "assets/clip-shot-2026-10-19-1432.png", "named from slug and time")
+  eq(res.rel, "assets/screenshots/clip-shot-2026-10-19-1432.png", "named from slug and time")
   eq(
     res.link,
-    "![clip-shot-2026-10-19-1432.png](assets/clip-shot-2026-10-19-1432.png)",
+    "![clip-shot-2026-10-19-1432.png](assets/screenshots/clip-shot-2026-10-19-1432.png)",
     "an image link"
   )
   ok(res.folderized, "a plain task became a folder task")
@@ -66,14 +66,14 @@ return function(H)
   local again = attach(task.id, "clipboard", { clipboard = clipboard(PNG) })
   eq(
     again.rel,
-    "assets/clip-shot-2026-10-19-1432-2.png",
+    "assets/screenshots/clip-shot-2026-10-19-1432-2.png",
     "the same minute again: a counter, nothing replaced"
   )
   local third = attach(task.id, "clipboard", { clipboard = clipboard(PNG) })
-  eq(third.rel, "assets/clip-shot-2026-10-19-1432-3.png", "and again")
+  eq(third.rel, "assets/screenshots/clip-shot-2026-10-19-1432-3.png", "and again")
 
   local named = attach(task.id, "clipboard", { clipboard = clipboard(PNG), name = "mine.png" })
-  eq(named.rel, "assets/mine.png", "a given name is used as it is")
+  eq(named.rel, "assets/screenshots/mine.png", "a given name is used as it is")
   local dup, dup_err =
     attach(task.id, "clipboard", { clipboard = clipboard(PNG), name = "mine.png" })
   ok(
@@ -106,7 +106,11 @@ return function(H)
   local lt = new_task("Latest shot")
   local lres, lerr = attach(lt.id, "latest", { dir = shots, max_age_s = 300 })
   ok(lres, "the newest recent screenshot is attached: " .. tostring(lerr))
-  eq(lres.rel, "assets/latest-shot-2026-10-19-1432.jpg", "the extension of the source, lower case")
+  eq(
+    lres.rel,
+    "assets/screenshots/latest-shot-2026-10-19-1432.jpg",
+    "the extension of the source, lower case"
+  )
   has(lres.source, "Fresh.JPG")
 
   local stale_dir = H.tmpdir() .. "/stale-shots"
@@ -154,6 +158,11 @@ return function(H)
     end
   end
   ok(#unused >= 1, "attached but unlinked images are reported")
+  -- A screenshot lies in `assets/screenshots/`: the check looks there too and names the folder.
+  ok(
+    table.concat(unused, "\n"):find("assets/screenshots/", 1, true),
+    "the finding names the folder of the kind: " .. table.concat(unused, " | ")
+  )
   ok(checked.ok, "only warnings")
 
   -- ---- CLI -----------------------------------------------------------------------------
@@ -189,7 +198,17 @@ return function(H)
   H.write(fresh_dir .. "/now.png", PNG)
   local c2, out2 = run(with("attach", ct.id, "--latest=" .. fresh_dir))
   eq(c2, 0, "--latest=<folder> attaches the newest recent image")
-  has(out2, "attached\t" .. ct.id .. "\tassets/cli-shot-")
+  has(out2, "attached\t" .. ct.id .. "\tassets/screenshots/cli-shot-")
+
+  -- `--kind`: a file goes into the folder of its kind; a word that is no kind is a usage error.
+  local movie = H.tmpdir() .. "/cli-movie.webm"
+  H.write(movie, "video")
+  local ck, outk = run(with("attach", ct.id, movie, "--kind=video"))
+  eq(ck, 0, "--kind=video attaches")
+  has(outk, "attached\t" .. ct.id .. "\tassets/videos/cli-movie.webm")
+  local cb, _, errb = run(with("attach", ct.id, movie, "--kind=movies"))
+  eq(cb, 2, "an unknown kind is a usage error")
+  has(errb, "--kind takes")
 
   local old_dir = H.tmpdir() .. "/cli-old"
   H.write(old_dir .. "/o.png", PNG)

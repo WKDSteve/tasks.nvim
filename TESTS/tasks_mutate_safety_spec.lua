@@ -133,6 +133,23 @@ return function(H)
   eq(H.read(index_path), index_before, "the index still points at the plain file")
   ok(not scan.find(plain.id, { root = root }).folder)
 
+  -- the same with a kind: the folder of the kind the copy made (`assets/videos/`) goes with the rest
+  with_stub(fsio, "copy_whole", function(_, to)
+    vim.fn.mkdir(vim.fs.dirname(to), "p")
+    return false, "stubbed copy failure"
+  end, function()
+    local res, err =
+      mutate.attach(plain.id, asset_file("a.webm"), vim.tbl_extend("force", o, { kind = "video" }))
+    ok(res == nil and err, "the failing copy fails attach")
+    lacks(err, "turned into a folder task", "the folder conversion was undone, nothing to mention")
+  end)
+  ok(H.exists(plain.path), "the task is a plain file again (kind)")
+  ok(
+    not H.exists(root .. "/lib.nvim/ROADMAP/tasks/plain-one"),
+    "no folder is left, the kind's folder neither"
+  )
+  eq(H.read(index_path), index_before, "the index still points at the plain file (kind)")
+
   -- when the conversion cannot be undone either, say so and keep the index true to the disk
   local plain2 = assert(mutate.new("lib.nvim", vim.tbl_extend("force", o, { title = "Plain two" })))
   local real_rename = fsio.rename

@@ -155,6 +155,8 @@ A wrong key or value is ignored with a message and listed in
                                          The quick wins, best return first, and the
                                          small tasks that miss a value.
   :Tasks attach {id} {file} [name=]      Copy a file into `assets/`.
+                                         `kind=video|image|screenshot`: into the
+                                         folder of its kind below it.
   :Tasks folderize {id}                  Make a plain task a folder task.
   :Tasks template [--to=]                The task file template.
   :Tasks open {id|part}                  Open the task file; a part of the name is

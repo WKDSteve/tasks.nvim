@@ -279,8 +279,9 @@ local function dangling_assets(task)
   return missing
 end
 
----Images directly in a folder task's `assets/` that the task's text does not mention as `assets/<name>`
----(a percent-encoded link counts).
+---Images in a folder task's `assets/`, and in the folders of the kinds below it (`assets/images/`,
+---`assets/screenshots/`, `assets/videos/`: where `attach` puts an asset with a kind), that the task's text does not
+---mention as `assets/<name>` (a percent-encoded link counts). A name below a kind's folder is `<folder>/<name>`.
 ---@param task Tasks.Task
 ---@return string[] names
 local function unused_assets(task)
@@ -288,25 +289,27 @@ local function unused_assets(task)
   if not text then
     return {}
   end
-  local dir = fsio.dirname(task.path) .. "/assets"
-  local handle = vim.uv.fs_scandir(dir)
-  if not handle then
-    return {}
-  end
   local decoded = text:gsub("%%(%x%x)", function(hex)
     return string.char(tonumber(hex, 16))
   end)
   local unused = {}
-  while true do
-    local name, kind = vim.uv.fs_scandir_next(handle)
-    if not name then
-      break
-    end
-    local ext = name:match("%.([%w]+)$")
-    if kind ~= "directory" and ext and IMAGE_EXT[ext:lower()] then
-      local needle = "assets/" .. name
-      if not text:find(needle, 1, true) and not decoded:find(needle, 1, true) then
-        unused[#unused + 1] = name
+  local subs = { "" }
+  for _, sub in pairs(require("tasks_nvim.mutate").ASSET_KIND_DIRS) do
+    subs[#subs + 1] = sub .. "/"
+  end
+  for _, sub in ipairs(subs) do
+    local handle = vim.uv.fs_scandir(fsio.dirname(task.path) .. "/assets/" .. sub)
+    while handle do
+      local name, kind = vim.uv.fs_scandir_next(handle)
+      if not name then
+        break
+      end
+      local ext = name:match("%.([%w]+)$")
+      if kind ~= "directory" and ext and IMAGE_EXT[ext:lower()] then
+        local needle = "assets/" .. sub .. name
+        if not text:find(needle, 1, true) and not decoded:find(needle, 1, true) then
+          unused[#unused + 1] = sub .. name
+        end
       end
     end
   end
@@ -881,7 +884,7 @@ function M.run(opts)
             "warn",
             "asset-unused",
             t,
-            "assets/" .. name .. " is not linked from the task"
+            "assets/" .. asset .. " is not linked from the task"
           )
         end
       end

@@ -154,6 +154,9 @@ function M.attach(id, mode, opts)
     root = opts.root,
     today = opts.today,
     index = opts.index,
+    -- The image on the clipboard and the newest image of the screenshot folders are screenshots, wherever the call
+    -- comes from (the editor, the command line, a page); a file somebody sent has the kind its sender names, or none.
+    kind = opts.kind or (mode ~= "upload" and "screenshot" or nil),
   }
   local res, aerr
   if opts.name and (mode ~= "upload" or opts.exact) then

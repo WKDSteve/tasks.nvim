@@ -285,6 +285,21 @@ return function(H)
   local _, notask = mutate.attach("lib.nvim/nope", log, o)
   has(notask, "no such open task")
 
+  -- a kind puts the copy into its folder below assets/, and the link names it
+  local vid = asset_file("demo.webm", "video-bytes")
+  local att3 = assert(mutate.attach(plain2.id, vid, vim.tbl_extend("force", o, { kind = "video" })))
+  eq(att3.rel, "assets/videos/demo.webm")
+  eq(att3.link, "[demo.webm](assets/videos/demo.webm)")
+  eq(H.read(att3.asset), "video-bytes")
+  ok(
+    att3.asset:find("/assets/videos/demo.webm", 1, true),
+    "the file lies in the folder of its kind"
+  )
+  local _, badkind = mutate.attach(plain2.id, vid, vim.tbl_extend("force", o, { kind = "movies" }))
+  has(badkind, "asset kind must be")
+  local _, climbing = mutate.attach(plain2.id, vid, vim.tbl_extend("force", o, { kind = "../.." }))
+  has(climbing, "asset kind must be")
+
   -- ── check ───────────────────────────────────────────────────────────────
   assert(index.write_area("lib.nvim", { root = root }))
   local res = assert(check.run({ root = root }))
@@ -298,7 +313,7 @@ return function(H)
   end
   -- the screenshot was attached but its link was never put into the text: an unused image
   eq(codes(res), { "warn:asset-unused" }, "an attached image nobody links is reported")
-  has(res.findings[1].message, "assets/")
+  has(res.findings[1].message, "assets/Screen-Shot-1.PNG", "the finding names the asset")
   ok(res.ok, "an unused asset is only a warning")
   local linked = root .. "/lib.nvim/ROADMAP/tasks/needs-shot/needs-shot.md"
   H.write(linked, H.read(linked) .. "\n" .. att.link .. "\n")

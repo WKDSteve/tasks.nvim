@@ -1043,8 +1043,14 @@ local function nested_routes()
           desc = "Instead of a file: the clipboard image or the newest screenshot",
         },
         { key = "dir", type = "STRING", desc = "With from=latest: the folder to look into" },
+        {
+          key = "kind",
+          type = "STRING",
+          values = { "video", "image", "screenshot" },
+          desc = "Folder of the copy below assets/: videos, images or screenshots",
+        },
       },
-      desc = "Copy a file (screenshot, log), the clipboard image (from=clipboard) or the newest screenshot (from=latest) into the task's assets/ folder, turning a plain task into a folder task, and put the Markdown link at the cursor of the task when it is open, else in the + register; name=<file name> renames the copy",
+      desc = "Copy a file (screenshot, log), the clipboard image (from=clipboard) or the newest screenshot (from=latest) into the task's assets/ folder (kind=video|image|screenshot: into the folder of its kind below it; the clipboard image and the newest screenshot go to assets/screenshots/), turning a plain task into a folder task, and put the Markdown link at the cursor of the task when it is open, else in the + register; name=<file name> renames the copy",
       run = function(ctx)
         cmd().task_attach(ctx)
       end,

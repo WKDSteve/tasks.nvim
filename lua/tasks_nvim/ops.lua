@@ -204,7 +204,14 @@ local FIELDS = {
     if_match = "string",
   },
   view_delete = { id = "string", if_match = "string" },
-  attach = { id = "string", from = "string", name = "string", upload = "string", exact = "boolean" },
+  attach = {
+    id = "string",
+    from = "string",
+    name = "string",
+    upload = "string",
+    exact = "boolean",
+    kind = "string",
+  },
   claim = {
     id = "string",
     by = "string",
@@ -1744,6 +1751,16 @@ local function do_attach(op, ctx)
   elseif op.exact ~= nil then
     return refuse("invalid_argument", "attach: exact belongs to from: 'upload'")
   end
+  -- The folder of the asset below `assets/`: the one of its kind. The clipboard and the screenshot folders hold
+  -- screenshots (the kind they get without one named); an upload without a kind lies in `assets/` itself.
+  local kind = op.kind
+  if kind == nil and op.from ~= "upload" then
+    kind = "screenshot"
+  end
+  local asset_dir = mutate.asset_dir(kind)
+  if not asset_dir then
+    return refuse("invalid_argument", "attach: kind must be " .. mutate.ASSET_KINDS_TEXT)
+  end
   -- The caller named the folders, and none: only the clipboard (the folders of the system are not looked into).
   if
     op.from == "latest"
@@ -1765,9 +1782,7 @@ local function do_attach(op, ctx)
   local taken = "attach: the task has an asset of this name already"
   if op.exact and task.folder then
     local name = mutate.asset_name(op.name)
-    if
-      name and fsio.is_file(fsio.dirname(task.path) .. "/" .. mutate.ASSETS_DIR .. "/" .. name)
-    then
+    if name and fsio.is_file(fsio.dirname(task.path) .. "/" .. asset_dir .. "/" .. name) then
       return refuse("exists", taken)
     end
   end
@@ -1791,6 +1806,7 @@ local function do_attach(op, ctx)
       ctx.attach or {},
       {
         name = op.name,
+        kind = kind,
         upload = op.upload,
         exact = op.exact == true or nil,
       }
