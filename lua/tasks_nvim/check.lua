@@ -286,7 +286,8 @@ local function ui_findings(findings, hints, t, words)
   end
   local tags = {}
   for _, tag in ipairs(t.tags or {}) do
-    if vim.tbl_contains(M.UI_TAGS, tag) then
+    -- a tag written by hand may be `UI`: the rule is about the word, not its case
+    if vim.tbl_contains(M.UI_TAGS, tag:lower()) then
       tags[#tags + 1] = tag
     end
   end
