@@ -134,4 +134,28 @@ return function(H)
     0,
     "examples/vault has a stale TASKS.md"
   )
+  -- every link of a generated index opens a file (what Obsidian follows from `ROADMAP/TASKS.md`; the hand check of
+  -- docs/OBSIDIAN.md keeps only what needs the app itself)
+  local vault = require("tasks_nvim.vault")
+  local links = 0
+  for _, area in ipairs(vault.areas(example)) do
+    local index_path = example .. "/" .. area.name .. "/ROADMAP/TASKS.md"
+    local f = io.open(index_path, "rb")
+    if f then
+      local text = f:read("*a")
+      f:close()
+      for target in text:gmatch("%]%(([^)%s]+)%)") do
+        if not target:match("^%a[%w+.-]*:") then
+          links = links + 1
+          local target_file =
+            vim.fs.normalize(vim.fs.dirname(index_path) .. "/" .. target:gsub("#.*$", ""))
+          ok(
+            H.exists(target_file),
+            area.name .. "/ROADMAP/TASKS.md links " .. target .. ", which is not there"
+          )
+        end
+      end
+    end
+  end
+  ok(links >= 4, "the example indexes link their tasks (" .. links .. ")")
 end
