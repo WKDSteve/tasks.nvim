@@ -1251,11 +1251,16 @@ return function(H)
       eq(complete("TaskT open lib.nvim b"), { "backlog" })
 
       F.task(H, root, "lib.nvim", "weird-status", F.meta("Weird", "weird"))
-      -- ids of OPEN tasks only (cache may be a few seconds old: wait it out)
-      vim.wait(3100, function()
-        return false
-      end)
+      -- ids of OPEN tasks only; the completion keeps its walk for a few seconds, the reset makes it read again (no
+      -- fixed wait: on a busy Windows runner the file ran over its 60 s)
+      complete("TaskT task set lib.nvim/")
+      F.task(H, root, "lib.nvim", "just-written", F.meta("Just written", "open"))
+      routes.reset_complete_cache()
       local ids = complete("TaskT task set lib.nvim/")
+      ok(
+        vim.tbl_contains(ids, "lib.nvim/just-written"),
+        "after the reset a new task completes at once"
+      )
       ok(vim.tbl_contains(ids, "lib.nvim/alpha"), "open task ids complete")
       ok(not vim.tbl_contains(ids, "lib.nvim/gamma-decision"), "finished tasks do not")
       ok(

@@ -48,34 +48,49 @@ return function(H)
 
   local have_git = vim.fn.executable("git") == 1
 
-  ---@param args string[]
-  ---@param date string|nil  `YYYY-MM-DDTHH:MM:SS` local time for the commit
-  local function git(args, date)
-    local cmd = { "git", "-C", lib_repo, "-c", "user.name=t", "-c", "user.email=t@example.org" }
-    vim.list_extend(cmd, args)
-    local env = date and { GIT_AUTHOR_DATE = date, GIT_COMMITTER_DATE = date } or nil
-    local res = vim.system(cmd, { text = true, env = env }):wait()
-    eq(res.code, 0, "git " .. table.concat(args, " ") .. ": " .. tostring(res.stderr))
-  end
-
-  ---@param rel string
-  ---@param text string
-  ---@param date string
-  local function commit(rel, text, date)
-    H.write(lib_repo .. "/" .. rel, text)
-    git({ "add", "--", rel })
-    git({ "commit", "-q", "-m", "touch " .. rel }, date)
+  ---A repository with these commits, in three git calls (init, one `fast-import`, `reset` for the index) instead of
+  ---two per commit: every git process is slow to start on a busy Windows runner, and the file ran over its 60 s there.
+  ---The work tree gets the last text of each file.
+  ---@param repo string
+  ---@param commits { rel: string, text: string, day: integer[] }[]  # `day` = { year, month, day }, at 12:00 local
+  local function git_repo(repo, commits)
+    local function run(args, stdin)
+      local cmd = { "git", "-C", repo, "-c", "user.name=t", "-c", "user.email=t@example.org" }
+      vim.list_extend(cmd, args)
+      local res = vim.system(cmd, { text = true, stdin = stdin }):wait()
+      eq(res.code, 0, "git " .. table.concat(args, " ") .. ": " .. tostring(res.stderr))
+    end
+    vim.fn.mkdir(repo, "p")
+    run({ "init", "-q", "-b", "main" })
+    local stream = {}
+    for i, c in ipairs(commits) do
+      local at = os.time({ year = c.day[1], month = c.day[2], day = c.day[3], hour = 12 })
+      local msg = "touch " .. c.rel
+      stream[#stream + 1] = ("commit refs/heads/main\nmark :%d\ncommitter t <t@example.org> %d +0000\n"):format(
+        i,
+        at
+      )
+      stream[#stream + 1] = ("data %d\n%s\n"):format(#msg, msg)
+      if i > 1 then
+        stream[#stream + 1] = ("from :%d\n"):format(i - 1)
+      end
+      stream[#stream + 1] = ("M 100644 inline %s\ndata %d\n%s\n"):format(c.rel, #c.text, c.text)
+      H.write(repo .. "/" .. c.rel, c.text)
+    end
+    run({ "fast-import", "--quiet" }, table.concat(stream))
+    run({ "reset", "-q" })
   end
 
   vim.fn.mkdir(lib_repo, "p")
   if have_git then
-    git({ "init", "-q" })
-    commit("lua/a.lua", "return 1\n", "2026-09-01T12:00:00")
-    commit("lua/b.lua", "return 2\n", "2026-09-01T12:00:00")
-    commit("lua/sub/c.lua", "return 3\n", "2026-09-01T12:00:00")
-    -- a.lua and sub/c.lua change again on 2026-10-01; b.lua stays at 2026-09-01
-    commit("lua/a.lua", "return 11\n", "2026-10-01T12:00:00")
-    commit("lua/sub/c.lua", "return 33\n", "2026-10-01T12:00:00")
+    git_repo(lib_repo, {
+      { rel = "lua/a.lua", text = "return 1\n", day = { 2026, 9, 1 } },
+      { rel = "lua/b.lua", text = "return 2\n", day = { 2026, 9, 1 } },
+      { rel = "lua/sub/c.lua", text = "return 3\n", day = { 2026, 9, 1 } },
+      -- a.lua and sub/c.lua change again on 2026-10-01; b.lua stays at 2026-09-01
+      { rel = "lua/a.lua", text = "return 11\n", day = { 2026, 10, 1 } },
+      { rel = "lua/sub/c.lua", text = "return 33\n", day = { 2026, 10, 1 } },
+    })
   else
     for _, rel in ipairs({ "lua/a.lua", "lua/b.lua", "lua/sub/c.lua" }) do
       H.write(lib_repo .. "/" .. rel, "x\n")
@@ -359,20 +374,7 @@ return function(H)
   -- it every task) to the mtime fallback.
   if have_git then
     local other_repo = repos .. "/other.nvim"
-    ---@param args string[]
-    ---@param date? string
-    local function git_other(args, date)
-      local cmd = { "git", "-C", other_repo, "-c", "user.name=t", "-c", "user.email=t@example.org" }
-      vim.list_extend(cmd, args)
-      local env = date and { GIT_AUTHOR_DATE = date, GIT_COMMITTER_DATE = date } or nil
-      local res = vim.system(cmd, { text = true, env = env }):wait()
-      eq(res.code, 0, "git " .. table.concat(args, " ") .. ": " .. tostring(res.stderr))
-    end
-    vim.fn.mkdir(other_repo, "p")
-    git_other({ "init", "-q" })
-    H.write(other_repo .. "/lua/o.lua", "return 1\n")
-    git_other({ "add", "--", "lua/o.lua" })
-    git_other({ "commit", "-q", "-m", "o" }, "2026-10-02T12:00:00")
+    git_repo(other_repo, { { rel = "lua/o.lua", text = "return 1\n", day = { 2026, 10, 2 } } })
 
     add("leaves-repo", "2026-09-15", { "../other.nvim/lua/o.lua", "lua/a.lua" })
     add("dotdot-inside", "2026-09-15", { "lua/sub/../a.lua" })

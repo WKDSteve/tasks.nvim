@@ -45,6 +45,8 @@ local COMPLETE_TTL = 3
 local list_cache = { at = 0 }
 ---@type { at: integer, root: string|nil, ids: string[]|nil, setting: boolean|integer|nil }
 local done_cache = { at = 0 }
+---Set by `reset_complete_cache`: the next read walks the folders again instead of taking the walk of the last seconds.
+local refresh_next = false
 
 ---@return table
 local function cmd()
@@ -70,6 +72,14 @@ local function now_ms()
   return (vim.uv or vim.loop).now()
 end
 
+---Forget what the completions read in the last `COMPLETE_TTL` seconds: the next `<Tab>` reads the vault again (a
+---spec that just wrote a task need not wait the seconds out).
+function M.reset_complete_cache()
+  list_cache = { at = 0 }
+  done_cache = { at = 0 }
+  refresh_next = true
+end
+
 ---@return Tasks.Task[]
 local function cached_open()
   local root = vault.root()
@@ -80,7 +90,8 @@ local function cached_open()
   then
     return list_cache.open
   end
-  local ok, open = pcall(scan.open_tasks, { ttl_seconds = COMPLETE_TTL })
+  local ok, open = pcall(scan.open_tasks, { ttl_seconds = COMPLETE_TTL, refresh = refresh_next })
+  refresh_next = false
   if not ok or not open then
     return {}
   end
