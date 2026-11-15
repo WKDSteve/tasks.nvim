@@ -32,12 +32,33 @@ return function(H)
   })
   eq(r.all, false, tostring(r.all_reason))
   eq(r.source, "heuristic")
-  -- 60 of 111 on 2026-11-12 (70 before the specs that list a temp vault declared `-- @scans-data`, 109 before the
-  -- vault scanners did)
+  -- 62 of 115 on 2026-11-16; 60 of 111 on 2026-11-12 (70 before the specs that list a temp vault declared
+  -- `-- @scans-data`, 109 before the vault scanners did)
   ok(
     #r.files <= #specs * 0.56,
     ("%d of %d specs: a change of api.lua reaches nearly every spec"):format(#r.files, #specs)
   )
+
+  -- the specs that list the project itself (TESTS/, lua/) never declare `-- @scans-data`: whatever changes, they stay
+  -- in the selection, for the reason that they list it (a directive there would hide a change from them)
+  local chosen = {}
+  for _, f in ipairs(r.files) do
+    chosen[f] = true
+  end
+  for _, spec in ipairs({
+    "TESTS/tasks_static_requires_spec.lua",
+    "TESTS/tasks_affected_selection_spec.lua",
+  }) do
+    local f = assert(io.open(root .. "/" .. spec, "rb"))
+    local text = f:read("*a")
+    f:close()
+    ok(not text:find("\n%-%- @scans%-data"), spec .. " reads the project: no -- @scans-data")
+    ok(chosen[spec], spec .. " is selected for a change of api.lua")
+    ok(
+      tostring(r.reason[spec]):find("lists directories", 1, true) ~= nil,
+      spec .. ": " .. tostring(r.reason[spec])
+    )
+  end
 
   -- the vault scanners say what they list: no seed of every change
   for _, mod in ipairs({ "check", "cli", "scan", "claims", "vault_ops", "wikilinks" }) do
