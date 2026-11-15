@@ -30,6 +30,7 @@ local SCHEMA = {
   dashboard = { watch = "boolean", debounce_ms = "posint", backend = "backend" },
   staleness = { git_timeout_ms = "posint", budget_ms = "posint", repo_bases = "string_list" },
   ci = { lint_timeout_ms = "posint", trust_vault_lint = "boolean" },
+  check = { ui_words_off = "string_list" },
   next = { popup = "boolean", cdx_hint = "boolean" },
   chain = { marker_docs = "string_list" },
   quick_wins = { min_value = "value", max_effort = "effort" },

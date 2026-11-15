@@ -2135,11 +2135,15 @@ function commands.check(ctx)
   for _, f in ipairs(res.findings) do
     ctx.say(check.format(f, root))
   end
+  for _, f in ipairs(res.hints or {}) do
+    ctx.say(check.format(f, root))
+  end
   ctx.say(
-    ("check: %d finding(s) (%d error, %d warning) in %d area(s), %d task file(s) read"):format(
+    ("check: %d finding(s) (%d error, %d warning, %d hint) in %d area(s), %d task file(s) read"):format(
       #res.findings,
       res.errors,
       res.warnings,
+      #(res.hints or {}),
       res.areas,
       res.tasks
     )

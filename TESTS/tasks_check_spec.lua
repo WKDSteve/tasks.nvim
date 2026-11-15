@@ -146,6 +146,87 @@ return function(H)
   end, {}, function()
     remove(tasks .. "waiting.md")
   end)
+  -- R19: the category ux says "touches the surface"; a UI tag without it is a warning, a UI word in the title a hint
+  local function hint_codes(res)
+    local out = {}
+    for _, f in ipairs(res.hints) do
+      eq(f.severity, "info", "a hint is info")
+      out[#out + 1] = f.id .. ":" .. f.code
+    end
+    return out
+  end
+  expect("a UI tag without the category ux", function()
+    F.task(
+      H,
+      root,
+      "lib.nvim",
+      "tagged",
+      F.meta("Updater", "open", { { "tags", "[webui, perf]" } })
+    )
+  end, { "warn:ui-tag-without-ux" }, function()
+    remove(tasks .. "tagged.md")
+  end)
+  expect("a UI tag with the category ux", function()
+    F.task(
+      H,
+      root,
+      "lib.nvim",
+      "tagged",
+      F.meta("Dialog", "open", { { "tags", "[dashboard]" }, { "category", "[ux]" } })
+    )
+  end, {}, function()
+    remove(tasks .. "tagged.md")
+  end)
+  expect("a UI tag on a parked task counts", function()
+    F.task(H, root, "lib.nvim", "tagged", F.meta("T", "parked", { { "tags", "[ui]" } }))
+  end, { "warn:ui-tag-without-ux" }, function()
+    remove(tasks .. "tagged.md")
+  end)
+  do
+    local titles = {
+      ["w-1"] = "Das Hauptfenster merkt sich die Groesse",
+      ["w-2"] = "Knopf zum Speichern",
+      ["w-3"] = "Detailansicht zeigt Anhaenge",
+      ["w-4"] = "UI-Kit: neue Farben",
+      ["w-5"] = "Open the view in a split",
+      ["w-6"] = "Oberflächen der App vereinheitlichen",
+      ["w-7"] = "Buttons stay aligned",
+      -- mechanics stay quiet: no UI word, a word that only contains one, Windows the system
+      ["q-1"] = "Updater laedt im Hintergrund",
+      ["q-2"] = "Review the preview cache",
+      ["q-3"] = "Windows-CI: the routes spec is slow",
+      ["q-4"] = "Build fails on GUIX",
+    }
+    for slug, title in pairs(titles) do
+      F.task(H, root, "lib.nvim", slug, F.meta(title, "open"))
+    end
+    F.task(H, root, "lib.nvim", "w-ux", F.meta("Dialog fuer X", "open", { { "category", "[ux]" } }))
+    reindex()
+    local res = run()
+    eq(codes(res), {}, "a UI word is never a finding")
+    eq(res.warnings, 0, "a hint is no warning")
+    local got = hint_codes(res)
+    table.sort(got)
+    local want = {}
+    for i = 1, 7 do
+      want[i] = ("lib.nvim/w-%d:ui-word-without-ux"):format(i)
+    end
+    eq(got, want, "a hint for each UI word, none for mechanics or a ux task")
+    eq(hint_codes(run({ ui_words = false })), {}, "ui_words = false: no hint")
+    eq(
+      check.format(res.hints[1], root),
+      "lib.nvim/ROADMAP/tasks/w-1.md  info ui-word-without-ux  the title says 'fenster': category ux if it touches the surface"
+    )
+    require("tasks_nvim.config").merge({ check = { ui_words_off = { root } } })
+    eq(hint_codes(run()), {}, "ui_words_off names the vault: no hint")
+    require("tasks_nvim.config").merge({})
+    eq(#hint_codes(run()), 7, "the default: on")
+    for slug in pairs(titles) do
+      remove(tasks .. slug .. ".md")
+    end
+    remove(tasks .. "w-ux.md")
+    reindex()
+  end
   expect("bad date", function()
     F.task(H, root, "lib.nvim", "bad-date", F.meta("T", "parked", { { "created", "2026-02-30" } }))
   end, { "bad-date" }, function()

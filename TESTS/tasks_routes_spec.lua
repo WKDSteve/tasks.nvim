@@ -138,6 +138,8 @@ return function(H)
           { "prio", "1" },
           { "effort", "M" },
           { "tags", "[ui, release]" },
+          -- a UI tag goes with the category ux (rule R19, `ui-tag-without-ux`)
+          { "category", "[ux]" },
           { "created", today },
           { "updated", today },
         }),

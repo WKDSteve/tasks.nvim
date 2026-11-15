@@ -1172,10 +1172,14 @@ function M.index(ctx)
     for _, f in ipairs(res.findings) do
       lines[#lines + 1] = check.format(f, root)
     end
-    local summary = ("tasks check: %d finding(s) (%d error, %d warning) in %d area(s), %d task file(s) read"):format(
+    for _, f in ipairs(res.hints or {}) do
+      lines[#lines + 1] = check.format(f, root)
+    end
+    local summary = ("tasks check: %d finding(s) (%d error, %d warning, %d hint) in %d area(s), %d task file(s) read"):format(
       #res.findings,
       res.errors,
       res.warnings,
+      #(res.hints or {}),
       res.areas,
       res.tasks
     )

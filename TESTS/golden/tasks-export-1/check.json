@@ -1,6 +1,6 @@
 {
   "areas": 1,
-  "digest": "sha256:0a925a906b8ac4a2",
+  "digest": "sha256:d01ce528fdf6dbe3",
   "engine": {
     "git": "0000000",
     "nvim": "0.0.0",
@@ -57,6 +57,14 @@
     },
     {
       "area": "lib.nvim",
+      "code": "ui-tag-without-ux",
+      "file": "lib.nvim/ROADMAP/tasks/alpha.md",
+      "id": "lib.nvim/alpha",
+      "message": "tag ui without category ux (the category says the task touches the surface)",
+      "severity": "warn"
+    },
+    {
+      "area": "lib.nvim",
       "code": "doing-while-blocked",
       "file": "lib.nvim/ROADMAP/tasks/beta.md",
       "id": "lib.nvim/beta",
@@ -88,10 +96,10 @@
   "rev": "rev:e56dd1",
   "schema": 1,
   "tasks": 15,
-  "total": 9,
+  "total": 10,
   "truncated": false,
   "vault": {
     "id": "vault"
   },
-  "warnings": 3
+  "warnings": 4
 }

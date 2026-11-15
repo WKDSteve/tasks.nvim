@@ -46,6 +46,9 @@
 ---keeps its default key.
 ---@alias Tasks.KeyMap table<string, string|false>
 
+---@class Tasks.CheckConfig
+---@field ui_words_off string[]  Vaults (their names in `vaults`, or their folders) where `check` gives no hint for a UI word in a title (`ui-word-without-ux`).
+
 ---@class Tasks.KeysConfig
 ---@field dashboard Tasks.KeyMap        Keys in the dashboard list window.
 ---@field dashboard_input Tasks.KeyMap  Keys in the dashboard input window (normal and insert mode).
@@ -60,6 +63,7 @@
 ---@field dashboard Tasks.DashboardConfig
 ---@field staleness Tasks.StalenessConfig
 ---@field ci Tasks.CiConfig
+---@field check Tasks.CheckConfig
 ---@field next Tasks.NextConfig
 ---@field chain Tasks.ChainConfig
 ---@field quick_wins Tasks.QuickWinsConfig
@@ -87,6 +91,7 @@ return {
   dashboard = { watch = true, debounce_ms = 250, backend = "auto" },
   staleness = { git_timeout_ms = 20000, budget_ms = 30000, repo_bases = {} },
   ci = { lint_timeout_ms = 120000, trust_vault_lint = false },
+  check = { ui_words_off = {} },
   next = { popup = true, cdx_hint = true },
   chain = { marker_docs = {} },
   quick_wins = { min_value = 4, max_effort = "S" },

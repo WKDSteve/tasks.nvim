@@ -109,7 +109,7 @@
 
 ---@class Tasks.Finding
 ---@field code string                 # Stable rule code, e.g. `unknown-status`.
----@field severity "error"|"warn"
+---@field severity "error"|"warn"|"info"  # `info` only in `Tasks.CheckResult.hints`.
 ---@field area string
 ---@field path string                 # Absolute path.
 ---@field id? string

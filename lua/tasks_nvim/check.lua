@@ -16,6 +16,11 @@
 ---  - `bad-time`: `remind_at` is not a time of day (`HH:MM`); `remind-at-without-remind` (warning): `remind_at` and no
 ---    `remind` day; `bad-email`: a `remind_to` entry is no e-mail address (or more than 10); `remind-to-without-remind`
 ---    (warning)
+---  - `ui-tag-without-ux` (warning): an open task with a tag of `M.UI_TAGS` (`ui`, `webui`, ...) and no category
+---    `ux` (vault rule R19: the category is the one source for "touches the surface", a tag only says which part)
+---  - `ui-word-without-ux` (a hint, `result.hints`, severity `info`): a word of `M.UI_WORDS` in the title of an open task
+---    that has neither the category `ux` nor a UI tag. Never an error or a warning, not in the contract document;
+---    `opts.ui_words = false` switches it off (`setup({ check = { ui_words_off = { "<vault name>" } } })`)
 ---  - `effort-without-plan` (warning): an open task (not `parked`) bigger than L and in no plan
 ---  - `overdue` (warning): an open task (not `parked`) whose `due` date is before today (`opts.today`)
 ---  - `severity-without-bug-or-security` (warning): `severity` on a task that is
@@ -86,6 +91,7 @@ local M = {}
 ---@field root? string
 ---@field area? string      # Check one area (blockers are still resolved vault-wide).
 ---@field today? string     # `YYYY-MM-DD`: the day `overdue` is judged against (default: today).
+---@field ui_words? boolean # `false`: no `ui-word-without-ux` hints (default: on).
 
 ---@class Tasks.CheckResult
 ---@field findings Tasks.Finding[]
@@ -94,6 +100,7 @@ local M = {}
 ---@field areas integer     # Areas checked.
 ---@field tasks integer     # Task files read (open and finished).
 ---@field ok boolean        # No `error` finding.
+---@field hints Tasks.Finding[]  # Hints (severity `info`): never fail a run, never counted as a warning.
 
 ---@param list Tasks.Finding[]
 ---@param severity "error"|"warn"
@@ -220,6 +227,92 @@ local function finding_less(a, b)
     return a.code < b.code
   end
   return a.message < b.message
+end
+
+---The tags that say "a part of the surface" (rule R19); the category `ux` is what says "touches the surface".
+---@type string[]
+M.UI_TAGS = { "ui", "ui-kit", "webui", "page", "overlays", "dashboard" }
+
+---Words in a title that hint at the surface. `suffix`: a German noun that also counts at the end of a compound
+---(`Hauptfenster`, `Detailansicht`) and with a plural ending; otherwise the word counts alone or with `plural`.
+---`window` has no plural on purpose: `Windows` is mostly the system.
+---@type { word: string, suffix?: boolean, plural?: string }[]
+M.UI_WORDS = {
+  { word = "fenster", suffix = true },
+  { word = "knopf", suffix = true },
+  { word = "button", plural = "buttons" },
+  { word = "dialog", suffix = true },
+  { word = "ansicht", suffix = true },
+  { word = "oberfläche", suffix = true },
+  { word = "ui" },
+  { word = "view", plural = "views" },
+  { word = "window" },
+}
+
+---German plural and case endings a `suffix` word may carry.
+local SUFFIX_ENDINGS = { "", "e", "en", "n", "s", "es" }
+
+---The first UI word in a title, `nil` when there is none.
+---@param title string
+---@return string|nil
+function M.ui_word(title)
+  for token in tostring(title):lower():gmatch("[%w\128-\255]+") do
+    for _, w in ipairs(M.UI_WORDS) do
+      if token == w.word or (w.plural and token == w.plural) then
+        return w.word
+      end
+      if w.suffix then
+        for _, ending in ipairs(SUFFIX_ENDINGS) do
+          local whole = w.word .. ending
+          if #token >= #whole and token:sub(-#whole) == whole then
+            return w.word
+          end
+        end
+      end
+    end
+  end
+  return nil
+end
+
+---Rule R19 on one open task: a UI tag without the category `ux` is a warning, a UI word in the title of a task with
+---neither is a hint.
+---@param findings Tasks.Finding[]
+---@param hints Tasks.Finding[]
+---@param t Tasks.Task
+---@param words boolean
+local function ui_findings(findings, hints, t, words)
+  if t.status == "done" or vim.tbl_contains(t.category or {}, "ux") then
+    return
+  end
+  local tags = {}
+  for _, tag in ipairs(t.tags or {}) do
+    if vim.tbl_contains(M.UI_TAGS, tag) then
+      tags[#tags + 1] = tag
+    end
+  end
+  if #tags > 0 then
+    add(
+      findings,
+      "warn",
+      "ui-tag-without-ux",
+      t,
+      ("tag %s without category ux (the category says the task touches the surface)"):format(
+        table.concat(tags, ", ")
+      )
+    )
+    return
+  end
+  local word = words and M.ui_word(t.title or "")
+  if word then
+    hints[#hints + 1] = {
+      code = "ui-word-without-ux",
+      severity = "info",
+      area = t.area,
+      path = t.path,
+      id = t.id,
+      message = ("the title says '%s': category ux if it touches the surface"):format(word),
+    }
+  end
 end
 
 ---Whether the file a link target names exists below `dir`. A target is a URL
@@ -792,6 +885,21 @@ local function claim_findings(findings, root, open_ids, names, today)
   end
 end
 
+---Whether `check` gives the `ui-word-without-ux` hints for the vault at `root`: on, unless `setup({ check = {
+---ui_words_off = { ... } } })` names the vault (its configured name or its folder).
+---@param root string
+---@return boolean
+function M.ui_words_on(root)
+  local off = (require("tasks_nvim.config").get().check or {}).ui_words_off or {}
+  local name, folder = vault.name_of(root), fsio.norm(root)
+  for _, v in ipairs(off) do
+    if v == name or fsio.norm(vim.fs.normalize(v)) == folder then
+      return false
+    end
+  end
+  return true
+end
+
 ---Run the checks.
 ---@param opts? Tasks.CheckOpts
 ---@return Tasks.CheckResult|nil result
@@ -1008,8 +1116,15 @@ function M.run(opts)
   plan_findings(findings, open_ids, names, scan_opts, is_finished)
   -- an open task past its due date: a warning, never an error (a parked task waits on purpose)
   local today = opts.today or model.today()
+  ---@type Tasks.Finding[]
+  local hints = {}
+  local words = opts.ui_words
+  if words == nil then
+    words = M.ui_words_on(root)
+  end
   for _, name in ipairs(names) do
     for _, t in ipairs(by_area[name] and by_area[name].tasks or {}) do
+      ui_findings(findings, hints, t, words)
       if t.status ~= "parked" and model.is_date(t.due) and t.due < today then
         add(findings, "warn", "overdue", t, ("due %s is before today (%s)"):format(t.due, today))
       end
@@ -1035,6 +1150,7 @@ function M.run(opts)
   claim_findings(findings, root, open_ids, names, opts.today or model.today())
 
   table.sort(findings, finding_less)
+  table.sort(hints, finding_less)
   local errors, warnings = 0, 0
   for _, f in ipairs(findings) do
     if f.severity == "error" then
@@ -1050,6 +1166,7 @@ function M.run(opts)
     areas = #names,
     tasks = task_count,
     ok = errors == 0,
+    hints = hints,
   },
     nil
 end
@@ -1063,7 +1180,9 @@ function M.format(finding, root)
   if rel:sub(1, #root + 1) == root .. "/" then
     rel = rel:sub(#root + 2)
   end
-  local tag = finding.severity == "warn" and "warn " or ""
+  local tag = (finding.severity == "warn" and "warn ")
+    or (finding.severity == "info" and "info ")
+    or ""
   -- The message and the path carry text from the files (a status, a ref, a file
   -- name): a control character in them must not reach the terminal.
   return fsio.clean(("%s  %s%s  %s"):format(rel, tag, finding.code, finding.message))
