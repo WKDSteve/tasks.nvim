@@ -253,6 +253,8 @@ function M.register(opts)
   removers[#removers + 1] = registry.source({
     name = M.SOURCE,
     title = "Tasks",
+    -- the tab of the view in the bar of the own tree of filetree.nvim (a Nerd Font glyph: a checklist)
+    icon = "\u{f0ae}",
     mutable = false,
     root = M.root_node,
     available = M.available,
