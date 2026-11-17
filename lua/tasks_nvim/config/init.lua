@@ -18,7 +18,7 @@ local state = vim.deepcopy(DEFAULTS)
 ---@type table<string, boolean>
 local given = {}
 
----@alias Tasks.ConfigType "string"|"vaults"|"vault_rules"|"boolean"|"string_list"|"posint"|"keymap"|"backend"|"value"|"effort"|"lists"|"area_groups"|"finished_window"|"links"|"form_mode"|"tree"
+---@alias Tasks.ConfigType "string"|"vaults"|"vault_rules"|"boolean"|"string_list"|"posint"|"keymap"|"backend"|"value"|"effort"|"lists"|"area_groups"|"finished_window"|"links"|"form_mode"|"tree"|"ai"
 
 ---@type table<string, Tasks.ConfigType|table<string, Tasks.ConfigType>>
 local SCHEMA = {
@@ -43,6 +43,7 @@ local SCHEMA = {
   completion = { finished = "finished_window" },
   form = { mode = "form_mode" },
   tree = "tree",
+  ai = "ai",
   keys = { dashboard = "keymap", dashboard_input = "keymap", form = "keymap" },
 }
 
@@ -154,6 +155,11 @@ local function check(kind, value)
       return true, value, nil
     end
     return false, nil, 'one of "float", "split", "vsplit", "current"'
+  elseif kind == "ai" then
+    if type(value) == "boolean" or value == "auto" then
+      return true, value, nil
+    end
+    return false, nil, 'true, false or "auto"'
   elseif kind == "links" then
     if value == "plain" or value == "wikilink" then
       return true, value, nil

@@ -54,6 +54,7 @@ blockers, plan or estimate is valid and stays visible everywhere.
     quick_wins = { min_value = 4, max_effort = "S" },
     lists = {},
     tree = true,                        -- true, false or { keys = { done =, claim = } }
+    ai = "auto",                        -- false, true or "auto"
   })
 <
 
@@ -101,6 +102,13 @@ blockers, plan or estimate is valid and stays visible everywhere.
                            `{ keys = { done = "gD", claim = "gC" } }` puts the actions on
                            keys of the tree buffer; `false` registers nothing. The count is
                            read from the heading of `ROADMAP/TASKS.md`, never by a scan.
+  ai                       The AI functions of the ai family (handing a task to an
+                           agent): false = none at all (no command, no key, no
+                           menu entry), true = always, "auto" (default) = only
+                           where ai.nvim can be loaded or ai-desktop is installed
+                           or running (its manifest in the appkit-family folder
+                           or its hub.json; only files are read). See
+                           |tasks_nvim-health|.
   keys.dashboard           Dashboard list keys: action = key, or false.
   keys.dashboard_input     Dashboard input-window keys (normal and insert).
   form.mode                Window of the `:Tasks new` form: "float" (default), "split",
@@ -265,8 +273,9 @@ A task file that is a symbolic link or a junction is not read (`check` reports
 8. HEALTH                                                     *tasks_nvim-health*
 
 `:checkhealth tasks_nvim` reports Neovim and lib.nvim, the resolved vault and
-its areas, options that `setup()` ignored, whether |:Tasks| is registered, and
-which optional pieces are present.
+its areas, options that `setup()` ignored, whether |:Tasks| is registered,
+which optional pieces are present, and under "AI functions" the option `ai`
+with what is found of ai.nvim and ai-desktop.
 
 ==============================================================================
 9. MACHINE CONTRACT                                       *tasks_nvim-contract*

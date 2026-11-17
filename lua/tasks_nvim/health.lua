@@ -317,6 +317,35 @@ function M.check()
       info(("%s not found (older lib.nvim?) -- no %s"):format(req[1], req[2]))
     end
   end
+
+  M.check_ai(start, ok, info)
+end
+
+---The section of the option `ai`: what it says, what is found, and so whether the AI functions are offered.
+---@param start fun(name: string)
+---@param ok fun(msg: string)
+---@param info fun(msg: string)
+---@return nil
+function M.check_ai(start, ok, info)
+  start("tasks.nvim: AI functions")
+  local state = require("tasks_nvim.ai").state(nil, true)
+  local found = {}
+  if state.ai_nvim then
+    found[#found + 1] = "ai.nvim"
+  end
+  local desktop = state.ai_desktop or { installed = false, running = false }
+  if desktop.running then
+    found[#found + 1] = "ai-desktop (running)"
+  elseif desktop.installed then
+    found[#found + 1] = "ai-desktop (installed, not running)"
+  end
+  local seen = #found > 0 and table.concat(found, ", ") or "neither ai.nvim nor ai-desktop"
+  local setting = state.setting == "auto" and '"auto"' or tostring(state.setting)
+  if state.on then
+    ok(("ai = %s: offered -- found: %s"):format(setting, seen))
+  else
+    info(("ai = %s: not offered -- found: %s"):format(setting, seen))
+  end
 end
 
 return M

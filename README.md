@@ -156,8 +156,15 @@ require("tasks_nvim").setup({
   area_groups = {},                                                             -- area groups on top of <vault>/area-groups.json, see below
   quick_wins = { min_value = 4, max_effort = "S" },                              -- what counts as a quick win (both written on the task)
   tree = true,                                                                  -- the vault in a tree view: true, false or { keys = { done = "<key>", claim = "<key>" } }
+  ai = "auto",                                                                  -- AI functions: false (none), true, or "auto" (only where ai.nvim or ai-desktop is found)
 })
 ```
+
+**AI functions.** AI does not push itself forward: `ai = false` turns every AI function of tasks.nvim off (no command,
+no key, no menu entry), `true` always offers them, and `"auto"` (the default) only where ai.nvim can be loaded or
+ai-desktop is installed or running on this machine (its manifest in the `appkit-family` folder or its `hub.json`; only
+files are read, nothing is started). `:checkhealth tasks_nvim` says what the option is and what is found. The hand-over
+of a task to an agent comes in a later step.
 
 **Named lists.** A list is a filter combination plus a sort order under a name, so you do not type
 `--effort=<=S --value=>=4 --sort=roi` twice. Write them in the spec, save them from the dashboard (`gl`) or with
