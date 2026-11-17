@@ -44,9 +44,12 @@ return function(H)
   eq(agent.parse_response("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\nzz\r\n"), nil)
 
   -- ── the body ───────────────────────────────────────────────────────────────
+  -- The vault as vim.fs.normalize gives it: forward slashes on Windows (a backslash is part of a name elsewhere), no
+  -- trailing slash.
+  local windows = vim.fn.has("win32") == 1
   local body = agent.payload(
     { id = "lib.nvim/x", title = "X", area = "lib.nvim" },
-    "C:\\vault",
+    windows and "C:\\vault\\" or "/vault/",
     "# X\n",
     "run",
     "split-plan"
@@ -54,7 +57,7 @@ return function(H)
   eq(body.source, "tasks.nvim")
   eq(body.task_id, "lib.nvim/x")
   eq(body.area, "lib.nvim")
-  eq(body.vault, "C:/vault", "the vault with forward slashes")
+  eq(body.vault, windows and "C:/vault" or "/vault", "the vault normalized")
   eq(body.mode, "run")
   eq(body.kind, "split-plan")
   eq(body.private, nil, "no class of the area: ai-desktop's own list decides")
