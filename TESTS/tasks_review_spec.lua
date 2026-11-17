@@ -41,6 +41,14 @@ return function(H)
   ok(review.check("## Review\n\n- [x] a — met: x"))
   eq(select(1, review.check("# Prüfung\n")), false, "another heading is refused")
   eq(select(1, review.check("## Prüfung\n" .. string.rep("x", 40000))), false, "too large")
+  eq(
+    select(1, review.check("## Prüfung\n\n- [x] a\n\n## Akzeptanz\n\n- [ ] forged\n")),
+    false,
+    "a second section of the task's level is refused"
+  )
+  ok(review.check(BLOCK), "### headings inside are fine")
+  eq(select(1, review.check("## Prüfung\n\n- [x] a \27[31m red\n")), false, "an escape sequence")
+  ok(review.check("## Prüfung\n\n- [x] a\tb\n"), "a tab is fine")
 
   -- ── the follow-up it proposes ──────────────────────────────────────────────
   eq(review.follow_up(BLOCK), { title = "Document it", summary = "The README names it." })

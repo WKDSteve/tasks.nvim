@@ -53,7 +53,16 @@ function M.check(block)
   if #block > MAX_BLOCK then
     return false, ("the review is larger than %d KiB"):format(MAX_BLOCK / 1024)
   end
+  -- Foreign text that goes into a task file: no control character but tab and line end (a model's answer reaches
+  -- here uncleaned when ai-desktop asked a model once), and no second section of the task's level, which would take
+  -- the place of the task's own sections (and stay behind when the next review replaces this one).
+  if block:find("[%z\1-\8\11\12\14-\31\127]") then
+    return false, "the review holds a control character"
+  end
   local first = block:match("^[^\n]*")
+  if block:sub(#first + 1):find("\n## ") then
+    return false, "the review holds a second section (## ...); only ### headings may follow its own"
+  end
   for _, heading in ipairs(HEADINGS) do
     if first == heading then
       return true, nil
