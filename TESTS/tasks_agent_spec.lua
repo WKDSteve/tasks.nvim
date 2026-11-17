@@ -233,6 +233,10 @@ return function(H)
   local closed_port = closed:getsockname().port
   closed:close()
   has(hand_over(closed_port, task_body), "does not answer")
+  -- A connect libuv refuses at once is said at once, not after the 5 s of the timer.
+  local t0 = vim.uv.hrtime()
+  has(hand_over(0, task_body), "cannot connect to 127.0.0.1:0")
+  ok((vim.uv.hrtime() - t0) / 1e9 < 2, "said at once")
 
   -- ── :Tasks agent ───────────────────────────────────────────────────────────
   local cmd = require("tasks_nvim.ui.cmd")

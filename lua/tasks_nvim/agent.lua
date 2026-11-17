@@ -161,7 +161,8 @@ function M.request(port, method, path, headers, body, cb)
   timer:start(TIMEOUT_MS, 0, function()
     finish(("no answer from 127.0.0.1:%d within %d s"):format(port, TIMEOUT_MS / 1000))
   end)
-  tcp:connect("127.0.0.1", port, function(cerr)
+  -- A connect that fails at once (a port libuv refuses) returns its error here and calls no callback.
+  local started, start_err = tcp:connect("127.0.0.1", port, function(cerr)
     if cerr then
       finish(("cannot connect to 127.0.0.1:%d (%s)"):format(port, cerr))
       return
@@ -196,6 +197,9 @@ function M.request(port, method, path, headers, body, cb)
     end)
     tcp:write(table.concat(lines, "\r\n") .. "\r\n\r\n" .. body)
   end)
+  if not started then
+    finish(("cannot connect to 127.0.0.1:%d (%s)"):format(port, tostring(start_err)))
+  end
 end
 
 local ffi_declared = false
