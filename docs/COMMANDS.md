@@ -386,6 +386,38 @@ document (testing.nvim docs/SHEETS.md, "Hand over to an AI"); a vault or reposit
 refused. Command line: `sheet-ai draft|explain <id>` prints the document; `sheet-ai accept|bug <id> --from=<answer
 file>` shows the sheet or the bug task and writes it only with `--yes`.
 
+### `:Tasks agent [<id>] [mode=prefill|run] [kind=handoff|review-done|draft-task|prepare-decision|split-plan]`
+
+Hands the task (the named one; without an id the task of the current buffer) to an agent, the way the button of
+tasks-desktop does. The command is there while the AI functions are on (`setup({ ai = false | true | "auto" })`,
+`tasks_nvim.ai`): out of `<Tab>` and refused while they are off.
+
+**To ai-desktop**, when it runs on this machine (`tasks_nvim.agent`):
+
+1. Its `hub.json` (in `$AI_DESKTOP_CONFIG_DIR`, else `%APPDATA%\ai-desktop`, `~/Library/Application Support/ai-desktop`,
+   `$XDG_CONFIG_HOME/ai-desktop` or `~/.config/ai-desktop`) names port, pid and instance; it counts only while that
+   process lives. Only files are read for the question whether ai-desktop is there.
+2. `GET /health` on `127.0.0.1:<port>` must answer as ai-desktop with the instance of `hub.json`: another program that
+   took the port gets no secret.
+3. `control.secret` beside `hub.json` (64 hex digits, new with every start of ai-desktop) is read for this call and
+   sent only in the `Authorization: Bearer` header. It is never shown, logged or put on a command line: the request
+   goes over `vim.uv` TCP, not through curl.
+4. On Windows `AllowSetForegroundWindow(<pid>)` (LuaJIT FFI) gives ai-desktop the right to bring its dashboard to the
+   front. Windows grants it only to the process with the last input; a Neovim in a terminal usually is not that one,
+   then the task bar button of the browser flashes instead.
+5. `POST /jobs` with `{ source: "tasks.nvim", task_id, title, markdown, vault, area, mode, kind }`; the answer names the
+   job (`prefilled`: it waits in the dashboard, `running`, `needs_confirmation`: a private area that ai-desktop asks
+   about first). The vault has no class of its areas, so none is sent: ai-desktop's own `private_areas` decide.
+
+`mode=prefill` (the default) leaves a new job that waits; `mode=run` starts it at once (Claude Code with the brief
+of `agent-brief` unless ai-desktop is set otherwise). `kind` names what the job asks for (default `handoff`). A refusal
+of ai-desktop is said with its message (`ai-desktop refused the task (403): jobs from other apps are turned off ...`).
+
+**To ai.nvim**, when ai-desktop does not run and ai.nvim can be loaded (`pcall(require, "ai")`, no hard dependency):
+the task as one prompt in the scratch buffer `tasks://agent/<id>`; `mode=run` sends it after a question and puts the
+answer below it (one answer, no tools). A message says that ai.nvim stands in. Without either: a message that names
+what is missing (`ai-desktop is installed but not running: start it`).
+
 ### `:Tasks attach <id> <file> [name=<file name>] [kind=video|image|screenshot]` / `attach <id> from=clipboard|latest [dir=<folder>]` / `task folderize <id>`
 
 A task may be a folder `tasks/<slug>/<slug>.md` that holds assets (concept section 12.2).

@@ -19,6 +19,7 @@ return function(H)
     paths(routes.routes()),
     {
       "open",
+      "task agent",
       "task answer",
       "task attach",
       "task claim",
@@ -48,6 +49,7 @@ return function(H)
     "the nested grammar (`:MyPlugins`): the old paths are unchanged, plan / next / estimate / quickwins are new"
   )
   eq(paths(routes.routes({ flat = true })), {
+    "agent",
     "answer",
     "attach",
     "claim",

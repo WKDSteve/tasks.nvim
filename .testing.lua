@@ -58,6 +58,9 @@ return {
       "sh",
       "cmd",
     },
+    -- the agent spec plays ai-desktop on a port of the loopback address and hands a task to it; nothing leaves the
+    -- machine
+    network = { "127.0.0.1" },
   },
   -- gated: a failed conformance check makes `scripts/test.sh conformance` exit 1 (docs/CONFORMANCE.md of testing.nvim)
   conformance = {

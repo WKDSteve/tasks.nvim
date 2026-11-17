@@ -2824,4 +2824,188 @@ function M.open_area(ctx)
   end)
 end
 
+---The scratch buffer `tasks://agent/<id>` with `lines` (a second call for the same task takes the same buffer).
+---@param id string
+---@param lines string[]
+---@return integer buf
+local function agent_buffer(id, lines)
+  local name = "tasks://agent/" .. id
+  local buf = -1
+  for _, b in ipairs(vim.api.nvim_list_bufs()) do
+    if vim.api.nvim_buf_get_name(b) == name then
+      buf = b
+    end
+  end
+  if buf > 0 and vim.api.nvim_buf_is_valid(buf) then
+    local win = vim.fn.bufwinid(buf)
+    if win ~= -1 then
+      vim.api.nvim_set_current_win(win)
+    else
+      vim.cmd("botright sbuffer " .. buf)
+    end
+  else
+    vim.cmd("botright new")
+    buf = vim.api.nvim_get_current_buf()
+    vim.bo[buf].buftype = "nofile"
+    vim.bo[buf].bufhidden = "hide"
+    vim.bo[buf].swapfile = false
+    vim.bo[buf].filetype = "markdown"
+    vim.api.nvim_buf_set_name(buf, name)
+  end
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+  return buf
+end
+
+---Without ai-desktop: the task as one prompt for ai.nvim, in a scratch buffer; `run` sends it after a question and
+---puts the answer below it (one answer, no tools, nothing written but the buffer).
+---@param ai_nvim table
+---@param payload table
+---@param confirm_fn fun(msg: string, label: string, cb: fun(yes: boolean))
+local function agent_ai_nvim(ai_nvim, payload, confirm_fn)
+  local prompt = require("tasks_nvim.agent").prompt(payload)
+  local buf = agent_buffer(payload.task_id, vim.split(prompt, "\n", { plain = true }))
+  if payload.mode ~= "run" then
+    notify.info(
+      ("agent: the prompt for %s is in this buffer; :Tasks agent %s mode=run sends it to ai.nvim"):format(
+        payload.task_id,
+        payload.task_id
+      )
+    )
+    return
+  end
+  confirm_fn(
+    ("Send the task %s (%d characters) to ai.nvim?"):format(payload.task_id, #prompt),
+    "send",
+    function(yes)
+      if not yes then
+        return
+      end
+      notify.info("agent: waiting for the answer of ai.nvim ...")
+      ai_nvim.ask({ prompt = prompt, context = {} }, function(ok, res)
+        vim.schedule(function()
+          if not ok then
+            local why = type(res) == "table" and res.message or tostring(res)
+            notify.error("agent: ai.nvim: " .. tostring(why))
+          elseif not vim.api.nvim_buf_is_valid(buf) then
+            notify.warn("agent: the buffer of the task is gone, the answer with it")
+          else
+            local answer = vim.split(tostring(type(res) == "table" and res.text or ""), "\r?\n")
+            vim.api.nvim_buf_set_lines(
+              buf,
+              -1,
+              -1,
+              false,
+              vim.list_extend({ "", "<!-- the answer of ai.nvim -->", "" }, answer)
+            )
+            notify.info("agent: ai.nvim answered " .. payload.task_id)
+          end
+        end)
+      end)
+    end
+  )
+end
+
+local AGENT_SAID = {
+  prefilled = "it waits in the dashboard of ai-desktop, nothing runs",
+  running = "ai-desktop runs it",
+  needs_confirmation = "ai-desktop asks first (a private area)",
+}
+
+---`:Tasks agent [<id>] [mode=prefill|run] [kind=handoff|...]`: hand the task (the named one, else the buffer's) to
+---ai-desktop's job intake (`tasks_nvim.agent`), or, without a running ai-desktop, to ai.nvim for one answer. Hidden
+---while the AI functions are off (`setup({ ai = ... })`, `tasks_nvim.ai`).
+---@param ctx table
+---@param deps? table Stand-ins for the specs: `state`, `ai_desktop`, `hand_over`, `confirm`.
+function M.task_agent(ctx, deps)
+  deps = deps or {}
+  if not no_stray_words(ctx) then
+    return
+  end
+  local ai = require("tasks_nvim.ai")
+  local agent = require("tasks_nvim.agent")
+  local state = deps.state or ai.state()
+  if not state.on then
+    notify.error(
+      state.setting == false and "agent: the AI functions are off (setup({ ai = false }))"
+        or "agent: neither ai-desktop nor ai.nvim is found on this machine"
+    )
+    return
+  end
+  local kv = ctx.kv or {}
+  local mode = kv.mode or "prefill"
+  local kind = kv.kind or "handoff"
+  if not vim.tbl_contains(agent.MODES, mode) then
+    notify.error("agent: mode is prefill or run, not " .. tostring(mode))
+    return
+  end
+  if not vim.tbl_contains(agent.KINDS, kind) then
+    notify.error(
+      "agent: kind is one of " .. table.concat(agent.KINDS, ", ") .. ", not " .. tostring(kind)
+    )
+    return
+  end
+  local id = (ctx.args or {}).id or buffer_task_id()
+  if not id or not id:match("^[%w_][^/]*/[^/]+$") then
+    notify.error("agent: name a task (area/slug), or run it from a task's buffer")
+    return
+  end
+  local task, ferr = scan.find(id)
+  if not task then
+    notify.error("agent: " .. tostring(ferr))
+    return
+  end
+  local root, rerr = require("tasks_nvim.vault").root()
+  if not root then
+    notify.error("agent: " .. tostring(rerr))
+    return
+  end
+  local file = task.path and io.open(task.path, "rb")
+  if not file then
+    notify.error("agent: cannot read " .. tostring(task.path))
+    return
+  end
+  local markdown = file:read("*a") or ""
+  file:close()
+  local payload = agent.payload(task, root, markdown, mode, kind)
+
+  local desktop = deps.ai_desktop or ai.ai_desktop()
+  if desktop.running then
+    notify.info("agent: handing " .. id .. " to ai-desktop ...")
+    local hand_over = deps.hand_over or agent.hand_over
+    hand_over(payload, function(herr, res)
+      if herr or not res then
+        notify.error("agent: " .. (herr or "no answer"))
+        return
+      end
+      notify.info(
+        ("agent: %s is with ai-desktop (job %s): %s%s"):format(
+          id,
+          res.job_id,
+          AGENT_SAID[res.status] or res.status,
+          res.note and (" (" .. res.note .. ")") or ""
+        )
+      )
+    end)
+    return
+  end
+  local has_ai, ai_nvim = pcall(require, "ai")
+  if has_ai and type(ai_nvim) == "table" and type(ai_nvim.ask) == "function" then
+    -- UI-03: a fallback says so.
+    notify.warn(
+      desktop.installed
+          and "agent: ai-desktop is installed but not running; ai.nvim answers once instead"
+        or "agent: no ai-desktop on this machine; ai.nvim answers once instead"
+    )
+    agent_ai_nvim(ai_nvim, payload, deps.confirm or function(msg, label, cb)
+      require("tasks_nvim.ui.confirm").yesno(msg, label, cb)
+    end)
+    return
+  end
+  notify.error(
+    desktop.installed
+        and "agent: ai-desktop is installed but not running: start it, then :Tasks agent again"
+      or "agent: there is no ai-desktop and no ai.nvim to hand the task to"
+  )
+end
+
 return M

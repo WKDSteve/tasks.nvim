@@ -32,7 +32,14 @@ return function(H)
     "projects",
     "show",
   }
-  local ONLY_COMPOSER = { "folder", "open", "planfile", "preview" }
+  local ONLY_COMPOSER = {
+    -- `agent` hands the task of the editor to ai-desktop (or ai.nvim); tasks-desktop has its own button
+    "agent",
+    "folder",
+    "open",
+    "planfile",
+    "preview",
+  }
   local OPTIONS = {
     ["answer"] = { composer = {}, cli = { "no-index" } },
     ["attach"] = {

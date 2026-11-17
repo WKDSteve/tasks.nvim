@@ -107,8 +107,8 @@ blockers, plan or estimate is valid and stays visible everywhere.
                            menu entry), true = always, "auto" (default) = only
                            where ai.nvim can be loaded or ai-desktop is installed
                            or running (its manifest in the appkit-family folder
-                           or its hub.json; only files are read). See
-                           |tasks_nvim-health|.
+                           or its hub.json; only files are read). It shows or
+                           hides |:Tasks| `agent`. See |tasks_nvim-health|.
   keys.dashboard           Dashboard list keys: action = key, or false.
   keys.dashboard_input     Dashboard input-window keys (normal and insert).
   form.mode                Window of the `:Tasks new` form: "float" (default), "split",
@@ -154,6 +154,19 @@ A wrong key or value is ignored with a message and listed in
                                          made for the task (added to its own).
                                          Finish and move to `Backlog/`; names
                                          what it freed and offers the next task.
+  :Tasks agent [{id}] [mode=prefill|run] [kind=handoff|review-done|draft-task|
+                prepare-decision|split-plan]
+                                         Hand the task (default: the buffer's)
+                                         to ai-desktop's job intake: its
+                                         dashboard shows it as a new job
+                                         (prefill, the default) or runs it
+                                         (run). Local only: `hub.json` and
+                                         `control.secret` of ai-desktop are
+                                         read, the secret is never shown.
+                                         Without a running ai-desktop,
+                                         ai.nvim answers once in the buffer
+                                         `tasks://agent/{id}` (run asks first).
+                                         Hidden while the option `ai` is off.
   :Tasks plan [{area}|all] [--for={id}|--plan={id}] [filters] [--ready] [--with-steps]
               [--format=] [--to=] [--write={file} [--scope=] [--check]]
                                          Ready now, decisions by leverage,

@@ -14,8 +14,8 @@
 ---   `%APPDATA%\ai-desktop`, `~/Library/Application Support/ai-desktop`, `$XDG_CONFIG_HOME/ai-desktop` or
 ---   `~/.config/ai-desktop`.
 ---
---- Only files are read (at most 4 KiB each): no network, no secret, nothing is started. Nothing is handed over yet;
---- the hand-over to an agent comes in a later step and asks `enabled()` first.
+--- Only files are read (at most 4 KiB each): no network, no secret, nothing is started. The hand-over itself
+--- (`:Tasks agent`, `tasks_nvim.agent`) asks `enabled()` first and `hub_record()` for the running ai-desktop.
 
 local M = {}
 
@@ -124,24 +124,41 @@ function M.ai_desktop()
       found.installed = true
     end
   end
-  local config = M.config_dir()
-  if config then
-    local record = read_json(vim.fs.joinpath(config, "hub.json"))
-    local pid = record and record.pid
-    if
-      record
-      and record.app == APP
-      and type(pid) == "number"
-      and pid > 0
-      and pid == math.floor(pid)
-      and type(record.port) == "number"
-      and record.port > 0
-      and alive(pid)
-    then
-      found.running = true
-    end
-  end
+  found.running = M.hub_record() ~= nil
   return found
+end
+
+---The `hub.json` of a running ai-desktop: `app`, `port`, `pid`, `instance` (a string, possibly empty), or nil when there
+---is none, it is not ai-desktop's, its numbers are not whole numbers in range or its process is not alive.
+---@return { app: string, port: integer, pid: integer, instance: string }|nil
+function M.hub_record()
+  local config = M.config_dir()
+  if not config then
+    return nil
+  end
+  local record = read_json(vim.fs.joinpath(config, "hub.json"))
+  local pid = record and record.pid
+  local port = record and record.port
+  if
+    record
+    and record.app == APP
+    and type(pid) == "number"
+    and pid > 0
+    and pid == math.floor(pid)
+    and type(port) == "number"
+    and port > 0
+    and port <= 65535
+    and port == math.floor(port)
+    and alive(pid)
+  then
+    return {
+      app = APP,
+      port = port,
+      pid = pid,
+      instance = type(record.instance) == "string" and record.instance or "",
+    }
+  end
+  return nil
 end
 
 ---Whether ai.nvim is loaded or can be loaded (`require("ai")` with a `setup`).

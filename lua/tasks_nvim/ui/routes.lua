@@ -924,6 +924,43 @@ local function nested_routes()
     },
 
     {
+      path = { "task", "agent" },
+      args = {
+        {
+          name = "id",
+          type = "TASK_ID",
+          optional = true,
+          desc = "Id of the task to hand over (default: the buffer's)",
+        },
+      },
+      kv = {
+        {
+          key = "mode",
+          type = "STRING",
+          values = { "prefill", "run" },
+          desc = "prefill (a new job that waits, the default) or run (it runs at once)",
+        },
+        {
+          key = "kind",
+          type = "STRING",
+          values = { "handoff", "review-done", "draft-task", "prepare-decision", "split-plan" },
+          desc = "What the job asks for (default handoff)",
+        },
+      },
+      -- Out of <Tab> while the AI functions are off (setup({ ai = ... })); never a health error.
+      available = function()
+        local ok, on = pcall(function()
+          return require("tasks_nvim.ai").enabled()
+        end)
+        return ok and on == true
+      end,
+      desc = "Hand the task to an agent: ai-desktop's job intake (its dashboard comes to the front; the control secret, local only), or ai.nvim for one answer when ai-desktop does not run",
+      run = function(ctx)
+        cmd().task_agent(ctx)
+      end,
+    },
+
+    {
       path = { "task", "done" },
       args = {
         {
