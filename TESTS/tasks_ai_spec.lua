@@ -63,16 +63,12 @@ return function(H)
     )
     eq(ai.ai_desktop().installed, true, "a manifest with its program: installed")
     eq(ai.state("auto").on, true, "auto with ai-desktop installed: offered")
-    write(
-      manifest,
-      "\239\187\191"
-        .. vim.json.encode({
-          schema = "appkit-installed/1",
-          app = "ai-desktop",
-          program = program,
-          env_prefix = "AI_DESKTOP",
-        })
-    )
+    write(manifest, "\239\187\191" .. vim.json.encode({
+      schema = "appkit-installed/1",
+      app = "ai-desktop",
+      program = program,
+      env_prefix = "AI_DESKTOP",
+    }))
     eq(ai.ai_desktop().installed, true, "a manifest with a byte order mark is read")
     write(
       manifest,
