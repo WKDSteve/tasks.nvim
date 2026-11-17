@@ -172,6 +172,8 @@ G.cases = {
           new("Golden dangling after", { after = { "lib.nvim/nowhere" } }),
           new("Golden unknown plan", { plan = "lib.nvim/no-plan" }),
           new("Golden unknown phase", { plan = "lib.nvim/the-plan", phase = "deploy" }),
+          -- a phase that is no kebab-case word: the details name the character and a word that would do
+          new("Golden umlaut phase", { phase = "einführung" }),
         },
       })
     end,
@@ -198,6 +200,12 @@ G.cases = {
             patch = { phase = "second" },
           },
           { op = "plan_set", id = "lib.nvim/the-plan", patch = { phase = "nope" } },
+          {
+            op = "project_new",
+            area = "lib.nvim",
+            title = "Golden umlaut project",
+            phases = { "testen", "einführung" },
+          },
           { op = "project_set", id = "lib.nvim/the-project", patch = { gate = "hard" } },
           { op = "plan_close", id = "lib.nvim/the-plan" },
           {

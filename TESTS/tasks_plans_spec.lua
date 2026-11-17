@@ -128,7 +128,7 @@ return function(H)
   has(perr, "plan:")
   local _, herr =
     mutate.new("lib.nvim", vim.tbl_extend("force", o, { title = "Bad phase", phase = "Not Ok" }))
-  has(herr, "phase must be")
+  has(herr, "phase 'Not Ok': 'N' is not allowed")
   assert(mutate.set(loose, { plan = made.id, phase = "build" }, o))
   eq(scan.find(loose, { root = root }).plan, made.id)
   assert(mutate.set(loose, { plan = mutate.REMOVE, phase = mutate.REMOVE }, o))

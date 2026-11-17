@@ -1494,13 +1494,30 @@ export interface Inverse {
   if_match?: Etag;
 }
 /**
- * Why an operation did not happen. `details` names ids, keys and values (`expected` and `actual` of a conflict, the `problems` of a refused relation), never a path.
+ * Why an operation did not happen. `details` names ids, keys and values (`expected` and `actual` of a conflict, the `problems` of a refused relation, `field`/`value`/`char`/`suggestion` of a word that is no kebab-case word), never a path.
  */
 export interface OperationError {
   code: ErrorCode;
   message: string;
   retryable: boolean;
-  details?: {};
+  details?: {
+    /**
+     * A word that must be kebab-case (a phase, an entry of the phases) was not: the field it was given for (`phase`).
+     */
+    field?: string;
+    /**
+     * The word as it was given.
+     */
+    value?: string;
+    /**
+     * The first character that is not allowed (`-` when the hyphens are wrong); absent for an empty word.
+     */
+    char?: string;
+    /**
+     * A word that would do: umlauts and ß written out (`ü` -> `ue`), lower case, other characters as single hyphens. Absent when nothing usable is left.
+     */
+    suggestion?: string;
+  };
 }
 /**
  * What moving a task to another area would do and break (stage 1 of `move_area`: a report, nothing is written).

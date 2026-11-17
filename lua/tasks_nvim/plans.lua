@@ -163,8 +163,9 @@ function M.parse(text, ctx)
     end
     plan.phase_order = model.field_list(meta.phase_order, "phase_order", bad)
     for _, p in ipairs(plan.phase_order) do
-      if not vault.valid_slug(p) then
-        bad("bad-phase", "phase_order: '" .. fsio.clean(p) .. "' is no kebab-case word")
+      local phase_err = vault.slug_error("phase_order", p)
+      if phase_err then
+        bad("bad-phase", phase_err)
       end
     end
     local gate = model.field_text(meta.gate, "gate", bad)
@@ -214,10 +215,11 @@ function M.parse(text, ctx)
       end
       local phase = model.field_text(meta.phase, "phase", bad)
       if phase then
-        if vault.valid_slug(phase) then
-          plan.phase = phase
+        local phase_err = vault.slug_error("phase", phase)
+        if phase_err then
+          bad("bad-phase", phase_err)
         else
-          bad("bad-phase", "phase: '" .. fsio.clean(phase) .. "' is no kebab-case word")
+          plan.phase = phase
         end
       end
     end
@@ -477,8 +479,9 @@ function M.new(area, opts)
     return nil, perr
   end
   for _, p in ipairs(phases) do
-    if not vault.valid_slug(p) then
-      return nil, "phases: '" .. p .. "' is no kebab-case word"
+    local serr, details = vault.slug_error("phase", p)
+    if serr then
+      return nil, serr, { code = "invalid_argument", details = details }
     end
   end
   -- the target as an id (a wikilink resolved), written as typed when it was a wikilink, else in the form `links`
@@ -529,10 +532,9 @@ function M.new(area, opts)
     end
     if opts.phase ~= nil then
       local phase = vim.trim(tostring(opts.phase))
-      if not vault.valid_slug(phase) then
-        return nil,
-          "phase must be a kebab-case word, got '" .. phase .. "'",
-          { code = "invalid_argument" }
+      local serr, details = vault.slug_error("phase", phase)
+      if serr then
+        return nil, serr, { code = "invalid_argument", details = details }
       end
       if
         #project_file.phase_order > 0 and not vim.tbl_contains(project_file.phase_order, phase)
@@ -731,6 +733,12 @@ function M.set(id, patch, opts)
               key .. " item '" .. text .. "' must not contain , [ ] quotes # or a line break",
               { code = "invalid_argument" }
           end
+          if key == "phase_order" then
+            local serr, details = vault.slug_error("phase", text)
+            if serr then
+              return nil, serr, { code = "invalid_argument", details = details }
+            end
+          end
           list[#list + 1] = text
         end
       end
@@ -754,6 +762,12 @@ function M.set(id, patch, opts)
           return nil, perr, { code = "invalid_argument" }
         end
         pairs_[#pairs_ + 1] = { key, wikilinks.is_wikilink(text) and text or pid }
+      elseif key == "phase" then
+        local serr, details = vault.slug_error("phase", text)
+        if serr then
+          return nil, serr, { code = "invalid_argument", details = details }
+        end
+        pairs_[#pairs_ + 1] = { key, text }
       else
         pairs_[#pairs_ + 1] = { key, text }
       end

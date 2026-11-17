@@ -424,6 +424,11 @@ local function mutate_failure(ctx, err, info)
   if entry.error.code == "internal" then
     entry.error.code = "invalid_argument"
   end
+  if type(info) == "table" and type(info.details) == "table" then
+    -- what a front end shows besides the message (a refused phase: `vault.slug_error`)
+    local details = vim.tbl_extend("force", entry.error.details or {}, info.details)
+    entry.error.details = json.object(details)
+  end
   return entry
 end
 
@@ -508,9 +513,10 @@ local function do_set(op, ctx)
     return refuse("invalid_argument", "set needs id and patch")
   end
   local resolver = link_resolver(ctx)
-  local pairs_, perr = mutate.check_patch(op.patch, { root = ctx.root, link_resolver = resolver })
+  local pairs_, perr, pdetails =
+    mutate.check_patch(op.patch, { root = ctx.root, link_resolver = resolver })
   if not pairs_ then
-    return refuse("invalid_argument", tostring(perr))
+    return refuse("invalid_argument", tostring(perr), pdetails)
   end
   local task, ferr = mutate.find_open(id, ctx.root, drafts_of(ctx))
   if not task then
@@ -948,10 +954,10 @@ local function do_new(op, ctx)
   end
   local proposal = {}
   if next(relation) ~= nil then
-    local pairs_, perr =
+    local pairs_, perr, pdetails =
       mutate.check_patch(relation, { root = ctx.root, link_resolver = new_opts.link_resolver })
     if not pairs_ then
-      return refuse("invalid_argument", tostring(perr))
+      return refuse("invalid_argument", tostring(perr), pdetails)
     end
     proposal = proposal_of(pairs_)
     -- the id the task will get: an open task may wait on it already, and a stage gate can close a circle through it
@@ -1309,7 +1315,7 @@ local function new_file(op, ctx, kind)
   })
   if not r then
     if info and info.code == "invalid_argument" then
-      return refuse("invalid_argument", tostring(err))
+      return refuse("invalid_argument", tostring(err), info.details)
     end
     return mutate_failure(ctx, err, info)
   end
@@ -1370,7 +1376,7 @@ local function set_file(op, ctx, kind)
       return refuse(
         "invalid_argument",
         tostring(err),
-        info.problems and { problems = info.problems } or nil
+        info.problems and { problems = info.problems } or info.details
       )
     end
     if info and info.code == "not_found" then

@@ -106,42 +106,6 @@ end
 
 -- ── Slugs ────────────────────────────────────────────────────────────────────
 
----Lower-case letters with a diacritic -> ASCII. Anything else non-ASCII is dropped.
----@type table<string, string>
-local FOLD = {
-  ["ä"] = "ae",
-  ["ö"] = "oe",
-  ["ü"] = "ue",
-  ["ß"] = "ss",
-  ["à"] = "a",
-  ["á"] = "a",
-  ["â"] = "a",
-  ["ã"] = "a",
-  ["å"] = "a",
-  ["æ"] = "ae",
-  ["ç"] = "c",
-  ["è"] = "e",
-  ["é"] = "e",
-  ["ê"] = "e",
-  ["ë"] = "e",
-  ["ì"] = "i",
-  ["í"] = "i",
-  ["î"] = "i",
-  ["ï"] = "i",
-  ["ñ"] = "n",
-  ["ò"] = "o",
-  ["ó"] = "o",
-  ["ô"] = "o",
-  ["õ"] = "o",
-  ["ø"] = "o",
-  ["œ"] = "oe",
-  ["ù"] = "u",
-  ["ú"] = "u",
-  ["û"] = "u",
-  ["ý"] = "y",
-  ["ÿ"] = "y",
-}
-
 ---A kebab-case ASCII slug from free text: umlauts folded (`ü` -> `ue`), other
 ---characters turned into hyphens, runs of hyphens collapsed, at most
 ---`MAX_SLUG` characters. Text with no usable character gives `"task"`; a
@@ -150,21 +114,8 @@ local FOLD = {
 ---@param title string
 ---@return string
 function M.slugify(title)
-  -- Not a string (nil, a number): the empty slug, not "v-null" from `vim.fn.tolower(nil)`.
-  -- A NUL byte would make `vim.fn.tolower` raise ("Using a Blob as a String"); it becomes a hyphen like any other
-  -- unusable character, so it is swapped for a space first.
-  local lowered = vim.fn.tolower(((type(title) == "string" and title or ""):gsub("%z", " ")))
-  local out = {}
-  for ch in lowered:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
-    if ch:match("^[a-z0-9]$") then
-      out[#out + 1] = ch
-    elseif FOLD[ch] then
-      out[#out + 1] = FOLD[ch]
-    else
-      out[#out + 1] = "-"
-    end
-  end
-  local slug = table.concat(out):gsub("%-+", "-"):gsub("^%-", ""):gsub("%-$", "")
+  -- Not a string (nil, a number): the empty slug (`vault.kebab`), so `"task"`.
+  local slug = vault.kebab(title)
   if #slug > M.MAX_SLUG then
     slug = slug:sub(1, M.MAX_SLUG):gsub("%-$", "")
   end
@@ -923,10 +874,12 @@ local FIELD_NORMALIZERS = {
     return id
   end,
   phase = function(value)
-    if not vault.valid_slug(vim.trim(tostring(value))) then
-      return nil, "phase must be a kebab-case word, got '" .. tostring(value) .. "'"
+    local text = vim.trim(tostring(value))
+    local serr, details = vault.slug_error("phase", text)
+    if serr then
+      return nil, serr, details
     end
-    return vim.trim(tostring(value))
+    return text
   end,
   order = function(value)
     local n = tonumber(value)
@@ -947,6 +900,7 @@ local FIELD_NORMALIZERS = {
 ---@param opts? { allow_unknown?: boolean, root?: string, link_resolver?: Tasks.LinkResolver, kept_links?: table<string, table<string, boolean>> }
 ---@return table[]|nil pairs
 ---@return string|nil err
+---@return table|nil details  # a refused phase: `vault.slug_error`
 local function normalize_patch(patch, opts)
   local result = { typed = {} }
   local resolver_memo
@@ -995,14 +949,14 @@ local function normalize_patch(patch, opts)
       result[#result + 1] = { key, M.REMOVE }
     else
       local normalize = FIELD_NORMALIZERS[key]
-      local stored, err
+      local stored, err, details
       if normalize then
-        stored, err = normalize(value, key, ctx)
+        stored, err, details = normalize(value, key, ctx)
       else
         stored, err = one_line(value, key)
       end
       if stored == nil then
-        return nil, err
+        return nil, err, details
       end
       result[#result + 1] = { key, stored }
     end
@@ -1136,6 +1090,7 @@ end
 ---@param opts? { allow_unknown?: boolean, root?: string, link_resolver?: Tasks.LinkResolver }
 ---@return table[]|nil pairs  # ordered `{ key, value }`, `REMOVE` for a key to delete
 ---@return string|nil err
+---@return table|nil details  # a refused phase: `vault.slug_error` (`field`, `value`, `char`, `suggestion`)
 function M.check_patch(patch, opts)
   if type(patch) ~= "table" then
     return nil, "patch must be a table of key = value"
@@ -1156,6 +1111,7 @@ end
 ---@param opts Tasks.NewOpts
 ---@return { id: string, area: string, slug: string, path: string, folder: boolean, index?: Tasks.IndexResult, index_err?: string, ambiguous?: Tasks.NewAmbiguity }|nil result
 ---@return string|nil err
+---@return table|nil info  # `{ code, details? }` for some refusals (a refused phase: `details` from `vault.slug_error`)
 function M.new(area, opts)
   opts = opts or {}
   local root, rerr = vault.root(opts)
@@ -1264,8 +1220,11 @@ function M.new(area, opts)
     end
     project = wikilinks.forms(nil, mode, resolver, typed --[[@as table<string, string>]])(id)
   end
-  if opts.phase ~= nil and not vault.valid_slug(tostring(opts.phase)) then
-    return nil, "phase must be a kebab-case word, got '" .. tostring(opts.phase) .. "'"
+  if opts.phase ~= nil then
+    local serr, details = vault.slug_error("phase", tostring(opts.phase))
+    if serr then
+      return nil, serr, { code = "invalid_argument", details = details }
+    end
   end
   local tags
   if opts.tags ~= nil then

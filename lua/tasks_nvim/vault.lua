@@ -311,6 +311,145 @@ function M.valid_slug(slug)
     and slug:sub(-1) ~= "-"
 end
 
+---Lower-case letters with a diacritic -> ASCII. Anything else non-ASCII is dropped.
+---@type table<string, string>
+local FOLD = {
+  ["ä"] = "ae",
+  ["ö"] = "oe",
+  ["ü"] = "ue",
+  ["ß"] = "ss",
+  ["à"] = "a",
+  ["á"] = "a",
+  ["â"] = "a",
+  ["ã"] = "a",
+  ["å"] = "a",
+  ["æ"] = "ae",
+  ["ç"] = "c",
+  ["è"] = "e",
+  ["é"] = "e",
+  ["ê"] = "e",
+  ["ë"] = "e",
+  ["ì"] = "i",
+  ["í"] = "i",
+  ["î"] = "i",
+  ["ï"] = "i",
+  ["ñ"] = "n",
+  ["ò"] = "o",
+  ["ó"] = "o",
+  ["ô"] = "o",
+  ["õ"] = "o",
+  ["ø"] = "o",
+  ["œ"] = "oe",
+  ["ù"] = "u",
+  ["ú"] = "u",
+  ["û"] = "u",
+  ["ý"] = "y",
+  ["ÿ"] = "y",
+}
+
+---`text` as kebab-case ASCII, with nothing put in for what is left: lower-cased, umlauts folded (`ü` -> `ue`), every
+---other character a hyphen, runs of hyphens collapsed, no hyphen at either end. May be `""`. Not a string: `""`.
+---@param text any
+---@return string
+function M.kebab(text)
+  -- A NUL byte would make `vim.fn.tolower` raise ("Using a Blob as a String"); it becomes a hyphen like any other
+  -- unusable character, so it is swapped for a space first.
+  local lowered = vim.fn.tolower(((type(text) == "string" and text or ""):gsub("%z", " ")))
+  local out = {}
+  for ch in lowered:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
+    if ch:match("^[a-z0-9]$") then
+      out[#out + 1] = ch
+    elseif FOLD[ch] then
+      out[#out + 1] = FOLD[ch]
+    else
+      out[#out + 1] = "-"
+    end
+  end
+  return (table.concat(out):gsub("%-+", "-"):gsub("^%-", ""):gsub("%-$", ""))
+end
+
+---The rule of `valid_slug`, in the words a message shows.
+M.SLUG_RULE = "only a-z, 0-9 and single hyphens"
+
+---Why `word` is no slug (`valid_slug`): the first fault, the character it is about (when one is) and a word that would
+---do (`kebab`, absent when nothing usable is left). Nil when `word` is a slug.
+---@param word any
+---@return { reason: string, char?: string, suggestion?: string }|nil
+function M.slug_problem(word)
+  if M.valid_slug(word) then
+    return nil
+  end
+  local text = type(word) == "string" and word or ""
+  local problem
+  if text == "" then
+    problem = { reason = "an empty word is not allowed" }
+  else
+    -- one character at a time: a UTF-8 sequence whole, any other byte (a stray continuation byte) on its own
+    local i = 1
+    while i <= #text do
+      local len = 1
+      if text:byte(i) >= 194 and text:byte(i) <= 244 then
+        local tail = text:match("^[\128-\191]+", i + 1)
+        len = 1 + (tail and math.min(#tail, 3) or 0)
+      end
+      local ch = text:sub(i, i + len - 1)
+      if not ch:match("^[a-z0-9-]$") then
+        local shown = ch == " " and "a space" or ("'" .. M.printable(ch) .. "'")
+        problem = { reason = shown .. " is not allowed", char = ch }
+        break
+      end
+      i = i + len
+    end
+    if not problem then
+      -- only a-z, 0-9 and hyphens left: the hyphens are wrong
+      if text:sub(1, 1) == "-" then
+        problem = { reason = "a hyphen at the start is not allowed", char = "-" }
+      elseif text:find("--", 1, true) then
+        problem = { reason = "a double hyphen is not allowed", char = "-" }
+      else
+        problem = { reason = "a hyphen at the end is not allowed", char = "-" }
+      end
+    end
+  end
+  local suggestion = M.kebab(text)
+  problem.suggestion = M.valid_slug(suggestion) and suggestion or nil
+  return problem
+end
+
+---A character as a message may show it: a control character (or a byte that is no UTF-8) as `\xNN`.
+---@param ch string
+---@return string
+function M.printable(ch)
+  if ch:match("^[%c\128-\255]$") or ch:match("^\194[\128-\159]$") then
+    return (ch:gsub(".", function(b)
+      return ("\\x%02X"):format(b:byte())
+    end))
+  end
+  return ch
+end
+
+---The refusal of a word that must be a slug (a phase, an entry of `phase_order`), the same everywhere it is checked:
+---`<label> '<word>': <reason> (<rule>); try '<suggestion>'`, and the details a front end shows (`field`, `value`,
+---`char`, `suggestion`, the last two only when known). Nil when `word` is a slug.
+---@param label string   # the field, e.g. `phase` or `phase_order`
+---@param word any
+---@return string|nil message
+---@return { field: string, value: string, char?: string, suggestion?: string }|nil details
+function M.slug_error(label, word)
+  local problem = M.slug_problem(word)
+  if not problem then
+    return nil, nil
+  end
+  local text = type(word) == "string" and word or tostring(word == nil and "" or word)
+  local shown = fsio.clean(text)
+  local message = ("%s '%s': %s (%s)"):format(label, shown, problem.reason, M.SLUG_RULE)
+  if problem.suggestion then
+    message = message .. "; try '" .. problem.suggestion .. "'"
+  end
+  return message,
+    { field = label, value = text, char = problem.char, suggestion = problem.suggestion }
+end
+
 ---Split `<area>/<slug>`. A bare `<area>` gives `slug = nil`.
 ---@param id any
 ---@return string|nil area

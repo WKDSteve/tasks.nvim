@@ -2936,7 +2936,7 @@
       ]
     },
     "OperationError": {
-      "description": "Why an operation did not happen. `details` names ids, keys and values (`expected` and `actual` of a conflict, the `problems` of a refused relation), never a path.",
+      "description": "Why an operation did not happen. `details` names ids, keys and values (`expected` and `actual` of a conflict, the `problems` of a refused relation, `field`/`value`/`char`/`suggestion` of a word that is no kebab-case word), never a path.",
       "type": "object",
       "required": ["code", "message", "retryable"],
       "properties": {
@@ -2950,7 +2950,26 @@
           "type": "boolean"
         },
         "details": {
-          "type": "object"
+          "type": "object",
+          "properties": {
+            "field": {
+              "description": "A word that must be kebab-case (a phase, an entry of the phases) was not: the field it was given for (`phase`).",
+              "type": "string"
+            },
+            "value": {
+              "description": "The word as it was given.",
+              "type": "string"
+            },
+            "char": {
+              "description": "The first character that is not allowed (`-` when the hyphens are wrong); absent for an empty word.",
+              "type": "string"
+            },
+            "suggestion": {
+              "description": "A word that would do: umlauts and ß written out (`ü` -> `ue`), lower case, other characters as single hyphens. Absent when nothing usable is left.",
+              "type": "string",
+              "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+            }
+          }
         }
       },
       "additionalProperties": false

@@ -1,6 +1,6 @@
 {
   "client_op_id": "golden-new-relations",
-  "digest": "sha256:512ab513118f9915",
+  "digest": "sha256:bfdf8f6e5ae501b8",
   "dry_run": false,
   "engine": {
     "git": "0000000",
@@ -89,6 +89,24 @@
         "retryable": false
       },
       "n": 4,
+      "ok": false,
+      "op": "new",
+      "outcome": "failed"
+    },
+    {
+      "changed_ids": [],
+      "error": {
+        "code": "invalid_argument",
+        "details": {
+          "char": "ü",
+          "field": "phase",
+          "suggestion": "einfuehrung",
+          "value": "einführung"
+        },
+        "message": "phase 'einführung': 'ü' is not allowed (only a-z, 0-9 and single hyphens); try 'einfuehrung'",
+        "retryable": false
+      },
+      "n": 5,
       "ok": false,
       "op": "new",
       "outcome": "failed"

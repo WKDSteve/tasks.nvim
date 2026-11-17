@@ -1331,10 +1331,11 @@ function M.parse_text(text, ctx)
     task.wikilinks = #pending > 0 and pending or nil
     local phase = as_text(meta.phase, "phase", bad)
     if phase then
-      if vault.valid_slug(phase) then
-        task.phase = phase
+      local phase_err = vault.slug_error("phase", phase)
+      if phase_err then
+        bad("bad-phase", phase_err)
       else
-        bad("bad-phase", "phase must be a kebab-case word, got '" .. phase .. "'")
+        task.phase = phase
       end
     end
 

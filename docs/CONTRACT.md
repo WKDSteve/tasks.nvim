@@ -241,6 +241,14 @@ neighbour of another group, neighbours that are no longer next to each other, an
 list moved on, ask again. A `reorder` is not all-or-nothing: what was written stays, and `details.written` says how far
 it got.
 
+**A phase that is no kebab-case word** (`phase` of `new`, `set`, `plan_new`, `plan_set`; an entry of `phases` of
+`plan_new` and `project_new`, of `phase_order` of `plan_set` and `project_set`) is `invalid_argument` with the same
+message everywhere, `phase '<word>': <what is wrong> (only a-z, 0-9 and single hyphens); try '<suggestion>'`, and
+`details`: `field` (`phase`), `value` (the word as given), `char` (the first character that is not allowed; `-` when
+the hyphens are wrong; absent for an empty word) and `suggestion` (umlauts and `ß` written out, `ü` -> `ue`, lower
+case, every other character a single hyphen; absent when nothing usable is left). Only the first wrong word is named. A
+front end may offer `suggestion` in place of the word.
+
 ### The questions of a task
 
 A task that waits for a decision may carry a section `## Offene Fragen` (`## Open questions` in a task written in English):
