@@ -1536,7 +1536,7 @@ end
 ---@return table
 local function view_failure(ctx, err, info)
   if info and info.code == "invalid_argument" then
-    return refuse("invalid_argument", tostring(err))
+    return refuse("invalid_argument", tostring(err), info.details)
   end
   if info and info.code == "not_found" then
     return refuse("not_found", tostring(err))

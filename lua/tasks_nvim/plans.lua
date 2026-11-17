@@ -599,8 +599,12 @@ function M.new(area, opts)
     return nil, "today is not a date (YYYY-MM-DD): " .. tostring(today)
   end
   local base = opts.slug or require("tasks_nvim.mutate").slugify(title)
-  if not vault.valid_slug(base) or vault.is_reserved_name(base) then
-    return nil, "invalid slug: " .. tostring(base)
+  local slug_err, slug_details = vault.slug_error("slug", base)
+  if slug_err then
+    return nil, slug_err, { code = "invalid_argument", details = slug_details }
+  end
+  if vault.is_reserved_name(base) then
+    return nil, ("slug '%s' is a reserved Windows device name"):format(base)
   end
   if #base > M.MAX_SLUG then
     return nil, ("slug is longer than %d characters"):format(M.MAX_SLUG)

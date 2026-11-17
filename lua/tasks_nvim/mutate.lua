@@ -1373,8 +1373,11 @@ function M.new(area, opts)
     end
     created = opts.created
   end
-  if opts.slug ~= nil and not vault.valid_slug(opts.slug) then
-    return nil, "invalid slug: " .. tostring(opts.slug)
+  if opts.slug ~= nil then
+    local serr, details = vault.slug_error("slug", opts.slug)
+    if serr then
+      return nil, serr, { code = "invalid_argument", details = details }
+    end
   end
   if opts.slug ~= nil and vault.is_reserved_name(opts.slug) then
     return nil, ("slug '%s' is a reserved Windows device name"):format(opts.slug)

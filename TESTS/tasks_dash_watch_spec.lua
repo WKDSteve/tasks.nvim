@@ -77,7 +77,13 @@ return function(H)
     vim.tbl_contains(rel(watch.dirs(root, "lib.nvim")), "lib.nvim/ROADMAP/plans"),
     "plans/ is watched"
   )
-  vim.fn.delete(root .. "/lib.nvim/ROADMAP/plans", "d")
+  -- a plan in its folder form: its file lies one level down, so that folder is watched too
+  vim.fn.mkdir(root .. "/lib.nvim/ROADMAP/plans/big", "p")
+  ok(
+    vim.tbl_contains(rel(watch.dirs(root, "lib.nvim")), "lib.nvim/ROADMAP/plans/big"),
+    "a plan folder is watched"
+  )
+  vim.fn.delete(root .. "/lib.nvim/ROADMAP/plans", "rf")
   -- lib.nvim 4, cascade.nvim 3 (tasks/ + 2 buckets), ALL 2, nvim-config 2; migrate.nvim has neither
   eq(#watch.dirs(root, nil), 11, "all areas")
   local all = rel(watch.dirs(root, nil))

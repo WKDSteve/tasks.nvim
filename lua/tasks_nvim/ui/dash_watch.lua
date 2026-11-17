@@ -161,6 +161,10 @@ function M.dirs(root, area, opts)
     local plans_dir = vault.plans_dir(root, name)
     if fsio.is_dir(plans_dir) then
       out[#out + 1] = { path = plans_dir }
+      -- a plan in its folder form (`plans/<slug>/<slug>.md`, it has assets): its file lies one level down
+      for _, sub in ipairs(subdirs(plans_dir)) do
+        out[#out + 1] = { path = plans_dir .. "/" .. sub }
+      end
     end
     if fsio.is_dir(tasks) then
       out[#out + 1] = { path = tasks }

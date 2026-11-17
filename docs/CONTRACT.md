@@ -247,7 +247,8 @@ message everywhere, `phase '<word>': <what is wrong> (only a-z, 0-9 and single h
 `details`: `field` (`phase`), `value` (the word as given), `char` (the first character that is not allowed; `-` when
 the hyphens are wrong; absent for an empty word) and `suggestion` (umlauts and `ß` written out, `ü` -> `ue`, lower
 case, every other character a single hyphen; absent when nothing usable is left). Only the first wrong word is named. A
-front end may offer `suggestion` in place of the word.
+front end may offer `suggestion` in place of the word. A `slug` that is no kebab-case word (`new`, `plan_new`,
+`project_new`, `view_save`) is refused the same way, with `slug` as the label and `field`.
 
 ### The questions of a task
 

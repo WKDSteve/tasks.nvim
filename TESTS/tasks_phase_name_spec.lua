@@ -150,6 +150,33 @@ return function(H)
   eq(p2.ok, true, vim.inspect(p2))
   refused(one({ op = "plan_set", id = p2.id, patch = { phase = "einführung" } }), "plan_set phase")
 
+  -- ── a slug that is no kebab-case word: the same message, the field `slug` ──
+  local SLUG = "slug 'Große Pläne': 'G' is not allowed " .. RULE .. "; try 'grosse-plaene'"
+  local function slug_refused(entry, what)
+    eq(entry.ok, false, what)
+    eq(entry.error.code, "invalid_argument", what)
+    eq(entry.error.message, SLUG, what)
+    eq(entry.error.details.field, "slug", what)
+    eq(entry.error.details.suggestion, "grosse-plaene", what)
+  end
+  slug_refused(
+    one({ op = "plan_new", area = "lib.nvim", title = "S", slug = "Große Pläne" }),
+    "plan_new slug"
+  )
+  slug_refused(
+    one({ op = "new", area = "lib.nvim", title = "S", fields = { slug = "Große Pläne" } }),
+    "new slug"
+  )
+  slug_refused(
+    one({
+      op = "view_save",
+      area = "lib.nvim",
+      slug = "Große Pläne",
+      view = { title = "V", display = "list", group_by = "status" },
+    }),
+    "view_save slug"
+  )
+
   -- ── the CLI prints the same message ──
   local err = {}
   local code = cli.run(

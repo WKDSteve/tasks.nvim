@@ -445,10 +445,16 @@ function M.save(root, area, def, opts)
     return nil, escape, { code = "forbidden" }
   end
   local today = opts.today or model.today()
-  if
-    opts.slug ~= nil and (not vault.valid_slug(opts.slug) or vault.is_reserved_name(opts.slug))
-  then
-    return nil, "invalid slug: " .. tostring(opts.slug), { code = "invalid_argument" }
+  if opts.slug ~= nil then
+    local serr, details = vault.slug_error("slug", opts.slug)
+    if serr then
+      return nil, serr, { code = "invalid_argument", details = details }
+    end
+    if vault.is_reserved_name(opts.slug) then
+      return nil,
+        ("slug '%s' is a reserved Windows device name"):format(opts.slug),
+        { code = "invalid_argument" }
+    end
   end
   -- the name: the one given, or one that is free
   local slug = opts.slug

@@ -275,7 +275,11 @@ return function(H)
     { { title = "T", tags = { "a,b" } }, "lib.nvim", "must not contain" },
     { { title = "T", tags = { "[x]" } }, "lib.nvim", "must not contain" },
     { { title = "T", summary = "a\nb" }, "lib.nvim", "single line" },
-    { { title = "T", slug = "Bad Slug" }, "lib.nvim", "invalid slug" },
+    {
+      { title = "T", slug = "Bad Slug" },
+      "lib.nvim",
+      "slug 'Bad Slug': 'B' is not allowed (only a-z, 0-9 and single hyphens); try 'bad-slug'",
+    },
     { { title = "T", today = "soon" }, "lib.nvim", "not a date" },
   }
   local tasks_dir = root .. "/lib.nvim/ROADMAP/tasks"
