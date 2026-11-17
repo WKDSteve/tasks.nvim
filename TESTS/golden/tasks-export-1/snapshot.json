@@ -46,7 +46,7 @@
     "listed": 14,
     "unlisted": 2
   },
-  "digest": "sha256:94bee8eea6cb2da3",
+  "digest": "sha256:222faea3079e42a3",
   "engine": {
     "git": "0000000",
     "nvim": "0.0.0",
@@ -139,8 +139,11 @@
         "lib.nvim",
         "cascade.nvim"
       ],
-      "etag": "sha256:52c589566eb14f77",
+      "etag": "sha256:e4f6305a93a8a754",
       "id": "lib.nvim/the-plan",
+      "links": [
+        "https://example.org/issues/1"
+      ],
       "phase": "first",
       "phase_order": [
         "build",
@@ -158,8 +161,15 @@
       "areas": [
         "lib.nvim"
       ],
-      "etag": "sha256:22ff5592ef22f003",
+      "assets": [
+        "assets/brief.pdf"
+      ],
+      "etag": "sha256:530fedc07c7833d2",
+      "folder": true,
       "id": "lib.nvim/the-project",
+      "links": [
+        "https://example.org/brief"
+      ],
       "phase_order": [
         "first",
         "second"
@@ -191,7 +201,7 @@
       "title": "Old and done"
     }
   ],
-  "rev": "rev:e56dd1",
+  "rev": "rev:f69832",
   "schema": 1,
   "tasks": [
     {

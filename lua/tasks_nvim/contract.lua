@@ -82,9 +82,11 @@ M.CAPABILITIES = {
   "next",
   "ops",
   "order",
+  "plan_assets",
   "plan_close",
   "plan_compare",
   "plan_for",
+  "plan_links",
   "plan_new",
   "plan_set",
   "project_close",
@@ -614,6 +616,24 @@ local function area_groups_of(view)
   return #out > 0 and out or nil
 end
 
+---What a plan or project entry adds when the file has it, so a document without it reads as before: `links` (the
+---web addresses; a hand-written entry that is none is the file's `bad-link` problem and is not handed on), `folder`
+---and `assets` (the files in its folder, relative to it, at most 100; `assets_truncated` beyond).
+---@param entry table
+---@param f Tasks.PlanFile
+---@return table entry
+local function with_links_and_assets(entry, f)
+  local ok = vim.tbl_filter(model.is_web_link, f.links or {})
+  entry.links = #ok > 0 and ok or nil
+  if f.folder then
+    entry.folder = true
+    local assets, truncated = require("tasks_nvim.plans").assets(f, M.LIMITS.list_items)
+    entry.assets = assets
+    entry.assets_truncated = truncated or nil
+  end
+  return entry
+end
+
 ---`snapshot.projects`: the project files with what each adds up to (`projects.rollup`) and its plans. The finished
 ---items of the Backlogs are read once, and only when there is a project at all.
 ---@param view Tasks.ContractView
@@ -627,7 +647,7 @@ local function project_entries(view)
       f,
       { plans = view.files, open = view.open, finished = finished }
     )
-    out[#out + 1] = {
+    out[#out + 1] = with_links_and_assets({
       id = f.id,
       title = f.title,
       status = f.status,
@@ -647,7 +667,7 @@ local function project_entries(view)
         own_open = r.own_open,
         days_open = r.days_open,
       }),
-    }
+    }, f)
   end
   return out
 end
@@ -797,7 +817,7 @@ function M.build_snapshot(opts)
   doc.reminders = reminders
   doc.plan = json.object(plan_head(view))
   doc.plans = vim.tbl_map(function(f)
-    return {
+    return with_links_and_assets({
       id = f.id,
       title = f.title,
       status = f.status,
@@ -809,7 +829,7 @@ function M.build_snapshot(opts)
       phase = f.phase,
       etag = file_etag(view, f.path),
       valid = f.valid,
-    }
+    }, f)
   end, view.files)
   doc.projects = project_entries(view)
   doc.tasks = json.memo(entries)

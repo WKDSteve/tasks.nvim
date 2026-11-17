@@ -89,7 +89,7 @@ commands:
         --sheet: the state of the test-sheet block testing.nvim wrote into the task, its worst sheet (inbox:
         green and waiting for your judgement), any: a task with the block, none: a task without it; nothing is run;
         --claimed: own: a valid claim of this name (`claim`), foreign: of somebody else, none: free or expired)
-  plan-new <area> <title> [--areas=a,b] [--target=<id>] [--phases=a,b,c] [--gate=hard] [--summary=text]
+  plan-new <area> <title> [--areas=a,b] [--target=<id>] [--phases=a,b,c] [--gate=hard] [--summary=text] [--links=url,url]
                                           create ROADMAP/plans/<slug>.md; tasks join it with plan=<id> phase=<word>
   plan-close <area>/<slug>                finish a plan by hand (refused while a member task is open); the project it
                                           belongs to is finished after it when nothing else holds it open
@@ -156,13 +156,13 @@ commands:
                                           --kind: into assets/videos/, assets/images/ or assets/screenshots/
                                           (--clipboard and --latest are screenshots without it)
   attach <area>/<slug> <file> [--name=n]  copy a file to <slug>/assets/ (a plain task becomes a
-                                          folder task) and print the Markdown link
+                                          folder task; a plan or project id too) and print the Markdown link
   attach <area>/<slug> --clipboard [--name=n]
                                           the image on the clipboard, saved as a PNG named <slug>-<date>-<HHMM>.png
   attach <area>/<slug> --latest[=<folder>] [--name=n]
                                           the newest image of the screenshot folder(s) (config attach.screenshot_dirs),
                                           only when modified within attach.max_age_s (300 s); older: nothing is guessed
-  folderize <area>/<slug>                 turn a plain task file into a folder task
+  folderize <area>/<slug>                 turn a plain task (or plan, project) file into a folder
   sheet-run <area>/<slug> [--testing-cli=<path>] [--dry-run]
                                           run the test sheets of a live-check task now: testing.nvim's
                                           `testing sheets run` runs them headless and writes their state into the
@@ -343,7 +343,7 @@ local SPECS = {
   },
   next = { value = { "n", "actor", "format", "by" }, flag = {} },
   ["plan-new"] = {
-    value = { "areas", "target", "phases", "gate", "status", "summary", "slug", "title" },
+    value = { "areas", "target", "phases", "gate", "status", "summary", "slug", "title", "links" },
     flag = {},
   },
   ["plan-close"] = { value = {}, flag = {} },
@@ -1194,6 +1194,7 @@ commands["plan-new"] = function(ctx)
     status = args.opt.status --[[@as string|nil]],
     summary = args.opt.summary --[[@as string|nil]],
     slug = args.opt.slug --[[@as string|nil]],
+    web_links = args.opt.links --[[@as string|nil]],
   })
   if not res then
     ctx.warn("error: " .. tostring(err))

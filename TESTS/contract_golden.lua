@@ -193,6 +193,7 @@ G.cases = {
             area = "lib.nvim",
             title = "Golden project",
             phases = { "first", "second" },
+            links = { "https://example.org/golden" },
           },
           {
             op = "plan_set",

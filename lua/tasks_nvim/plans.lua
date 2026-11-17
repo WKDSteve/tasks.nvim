@@ -1,4 +1,5 @@
 ---@module 'tasks_nvim.plans'
+-- @scans-data: the folders it lists and the paths it names are task vaults, never the files of this plugin
 ---@brief Plan files: one Markdown file per undertaking under `<area>/ROADMAP/plans/`, that tasks point at with `plan:`.
 ---@description
 --- A plan file holds what a human has to justify -- the goal, the boundaries, the definition of done, the names of the
@@ -50,6 +51,8 @@ M.STATUSES = { "planning", "doing", "parked", "done" }
 ---@field project_raw? string         # `project` as the file writes it (an id or a wikilink).
 ---@field phase? string               # A plan only: its stage in the project's `phase_order`.
 ---@field phase_order string[]
+---@field links string[]              # Web addresses (`links:`, http/https); an entry that is none is `bad-link`.
+---@field folder boolean              # The folder form `<slug>/<slug>.md`: the other files in that folder are its assets.
 ---@field gate? string                # `hard` or nil.
 ---@field created? string
 ---@field updated? string
@@ -67,7 +70,7 @@ end
 ---Read one plan file's text. Always returns a plan; a broken file carries `errors` (`valid = false`). A bare
 ---`[[slug]]` target is settled by `ctx.link_resolver` (without one it names nothing: `wikilink-dangling`).
 ---@param text string
----@param ctx { path: string, area: string, slug?: string, location?: "roadmap"|"backlog", kind?: "plan"|"project", link_resolver?: Tasks.LinkResolver }
+---@param ctx { path: string, area: string, slug?: string, location?: "roadmap"|"backlog", kind?: "plan"|"project", folder?: boolean, link_resolver?: Tasks.LinkResolver }
 ---@return Tasks.PlanFile
 function M.parse(text, ctx)
   local slug = ctx.slug or model.slug_of(ctx.path, ctx.location or "roadmap")
@@ -94,6 +97,8 @@ function M.parse(text, ctx)
     title = slug,
     areas = {},
     phase_order = {},
+    links = {},
+    folder = ctx.folder == true,
     summary = "",
     errors = errors,
     error_codes = codes,
@@ -129,6 +134,15 @@ function M.parse(text, ctx)
     for _, a in ipairs(plan.areas) do
       if not vault.valid_area(a) then
         bad("plan-bad-area", "areas: invalid area name " .. fsio.clean(a))
+      end
+    end
+    plan.links = model.field_list(meta.links, "links", bad)
+    for _, link in ipairs(plan.links) do
+      if not model.is_web_link(link) then
+        bad(
+          "bad-link",
+          ("links entry '%s' is not an http:// or https:// address"):format(fsio.clean(link))
+        )
       end
     end
     local target = model.field_text(meta.target, "target", bad)
@@ -241,7 +255,7 @@ end
 
 ---Read a plan file from disk.
 ---@param path string
----@param ctx { area: string, slug?: string, location?: "roadmap"|"backlog", link_resolver?: Tasks.LinkResolver }
+---@param ctx { area: string, slug?: string, location?: "roadmap"|"backlog", kind?: "plan"|"project", folder?: boolean, link_resolver?: Tasks.LinkResolver }
 ---@return Tasks.PlanFile
 function M.from_file(path, ctx)
   local text, err = fsio.read(path)
@@ -255,7 +269,7 @@ function M.from_file(path, ctx)
   return M.parse(text, vim.tbl_extend("force", { path = path }, ctx))
 end
 
----The open plans of an area (`ROADMAP/plans/*.md`), by slug. A bare `[[slug]]` target is settled over the vault
+---The open plans of an area (`ROADMAP/plans/<slug>.md` and `ROADMAP/plans/<slug>/<slug>.md`), by slug. A bare `[[slug]]` target is settled over the vault
 ---(`opts.link_resolver`, else one made here; its index is built only when a target needs it).
 ---@param area string
 ---@param opts? { root?: string, link_resolver?: Tasks.LinkResolver }
@@ -279,17 +293,14 @@ function M.area(area, opts)
   if escape then
     return out, { escape }
   end
-  local errors = {}
   local resolver = opts.link_resolver or wikilinks.resolver(root)
-  for name, kind in vim.fs.dir(dir) do
-    if kind == "file" and name:match("%.md$") then
-      out[#out + 1] = M.from_file(dir .. "/" .. name, { area = area, link_resolver = resolver })
-    end
+  for _, e in ipairs(vault.plan_files(dir)) do
+    out[#out + 1] = M.from_file(
+      e.path,
+      { area = area, slug = e.slug, folder = e.folder, link_resolver = resolver }
+    )
   end
-  table.sort(out, function(a, b)
-    return a.slug < b.slug
-  end)
-  return out, errors
+  return out, {}
 end
 
 ---Every open plan of the vault.
@@ -333,16 +344,44 @@ function M.find(id, opts)
   if not vault.has_area(root, area) then
     return nil, "no such open plan: " .. id
   end
-  local path = vault.plan_path(root, area, slug)
-  if not fsio.is_file(path) then
-    return nil, "no such open plan: " .. id
+  local path, folder = vault.resolve_plan(root, "plan", area, slug)
+  if not path then
+    return nil, folder --[[@as string]]
   end
   return M.from_file(path, {
     area = area,
     slug = slug,
+    folder = folder == true,
     link_resolver = opts.link_resolver or wikilinks.resolver(root),
   }),
     nil
+end
+
+---The assets of a plan or project file in its folder form (`<slug>/<slug>.md`): every other file below that folder, as a
+---path relative to it (`assets/shot.png`), sorted; at most `limit` (default 100), `truncated` beyond. A plain file has
+---none.
+---@param file Tasks.PlanFile
+---@param limit? integer
+---@return string[] assets
+---@return boolean truncated
+function M.assets(file, limit)
+  limit = limit or 100
+  if not file.folder then
+    return {}, false
+  end
+  local dir = fsio.dirname(file.path)
+  local own = vim.fs.basename(file.path)
+  local out = {}
+  for name, kind in vim.fs.dir(dir, { depth = 4 }) do
+    if kind == "file" and name ~= own then
+      out[#out + 1] = (name:gsub("\\", "/"))
+    end
+  end
+  table.sort(out)
+  if #out > limit then
+    return vim.list_slice(out, 1, limit), true
+  end
+  return out, false
 end
 
 ---The open tasks that belong to a plan (`plan: <id>`).
@@ -419,6 +458,7 @@ M.MAX_SLUG = 200
 ---@field status? string
 ---@field summary? string
 ---@field slug? string
+---@field web_links? string[]|string  # Web addresses for `links:` (http/https; a text is split at commas).
 ---@field today? string
 ---@field dry_run? boolean  # Name the plan the call would make and write nothing.
 
@@ -565,6 +605,14 @@ function M.new(area, opts)
   if #base > M.MAX_SLUG then
     return nil, ("slug is longer than %d characters"):format(M.MAX_SLUG)
   end
+  local web_links = {}
+  if opts.web_links ~= nil then
+    local given, lerr = require("tasks_nvim.mutate").link_list(opts.web_links)
+    if not given then
+      return nil, lerr, { code = "invalid_argument" }
+    end
+    web_links = given
+  end
 
   local pairs_ = { { "title", title }, { "status", status } }
   if #areas > 0 then
@@ -584,6 +632,9 @@ function M.new(area, opts)
   end
   if phase_text then
     pairs_[#pairs_ + 1] = { "phase", phase_text }
+  end
+  if #web_links > 0 then
+    pairs_[#pairs_ + 1] = { "links", web_links }
   end
   pairs_[#pairs_ + 1] = { "created", today }
   pairs_[#pairs_ + 1] = { "updated", today }
@@ -629,8 +680,9 @@ function M.new(area, opts)
     local held = backlog_taken[slug] ~= nil
       or fsio.is_file(vault.task_path(root, area, slug))
       or fsio.is_dir(vault.task_dir(root, area, slug))
-      or fsio.is_file(vault.project_path(root, area, slug))
-      or fsio.is_file(vault.plan_path(root, area, slug))
+      or vault.has_plan_or_project(root, area, slug)
+      -- a folder of that name (the folder form of a plan or project, or a leftover) would hold a second file
+      or fsio.is_dir(dir_of(root, area) .. "/" .. slug)
       or (opts.dry_run and (fsio.is_file(path) or fsio.is_dir(path)))
     if not held and opts.dry_run then
       return { id = area .. "/" .. slug, path = path, slug = slug, renamed = n > 1 }, nil
@@ -662,8 +714,18 @@ end
 ---The keys `set` may change in a plan file or a project file.
 ---@type table<string, string[]>
 M.SET_KEYS = {
-  plan = { "title", "status", "areas", "target", "phase_order", "gate", "project", "phase" },
-  project = { "title", "status", "areas", "target", "phase_order", "gate" },
+  plan = {
+    "title",
+    "status",
+    "areas",
+    "target",
+    "phase_order",
+    "gate",
+    "project",
+    "phase",
+    "links",
+  },
+  project = { "title", "status", "areas", "target", "phase_order", "gate", "links" },
 }
 
 ---Change the frontmatter of an open plan file or project file (`opts.kind = "project"`). `patch` maps a key of
@@ -741,6 +803,12 @@ function M.set(id, patch, opts)
           end
           list[#list + 1] = text
         end
+      end
+      pairs_[#pairs_ + 1] = { key, list }
+    elseif key == "links" then
+      local list, lerr = mutate.link_list(value)
+      if not list then
+        return nil, lerr, { code = "invalid_argument" }
       end
       pairs_[#pairs_ + 1] = { key, list }
     else
@@ -863,6 +931,7 @@ function M.set(id, patch, opts)
         area = file.area,
         slug = file.slug,
         kind = file_kind,
+        folder = file.folder,
         link_resolver = resolver,
       })
       local known = {}
@@ -890,6 +959,88 @@ function M.set(id, patch, opts)
     return nil, werr, winfo
   end
   return result, nil
+end
+
+---Finish a plan or project in its folder form: the folder moves to `Backlog/FEATURES/<date>_<slug>/` with its assets,
+---the file in it becomes `<date>_<slug>.md` with the finished text, then the README gets its row. A failing step puts
+---the folder back as it was (old file name, old text).
+---@param plan Tasks.PlanFile
+---@param c { id: string, old_text: string, new_text: string, target: string, rel: string, readme_path: string, readme_old?: string, readme_new?: string, readme_row: string, readme_state: string }
+---@return { id: string, from: string, to: string, readme: string }|nil result
+---@return string|nil err
+local function close_folder(plan, c)
+  local mutate = require("tasks_nvim.mutate")
+  local src_dir, target_dir = fsio.dirname(plan.path), fsio.dirname(c.target)
+  local old_name = target_dir .. "/" .. plan.slug .. ".md"
+  local changed_msg = plan.path
+    .. " changed while it was being finished; nothing was changed, run it again"
+  if fsio.read(plan.path) ~= c.old_text then
+    return nil, changed_msg
+  end
+  local made, merr = fsio.mkdirp(fsio.dirname(target_dir))
+  if not made then
+    return nil, "cannot create " .. fsio.dirname(target_dir) .. ": " .. tostring(merr)
+  end
+  local moved, mverr = fsio.rename(src_dir, target_dir)
+  if not moved then
+    return nil, "cannot move " .. src_dir .. ": " .. tostring(mverr)
+  end
+  local created = false
+  ---@param msg string
+  local function back(msg)
+    local stuck = {}
+    if created then
+      local gone, gerr = fsio.remove(c.target)
+      if not gone then
+        stuck[#stuck + 1] = c.target .. " (" .. tostring(gerr) .. ")"
+      end
+    end
+    if not fsio.is_file(old_name) then
+      local put, perr = fsio.create_exclusive(old_name, c.old_text)
+      if not put then
+        stuck[#stuck + 1] = old_name .. " (" .. tostring(perr) .. ")"
+      end
+    end
+    local returned, rerr = fsio.rename(target_dir, src_dir)
+    if not returned then
+      stuck[#stuck + 1] = target_dir .. " (" .. tostring(rerr) .. ")"
+    end
+    if #stuck > 0 then
+      msg = msg .. " (rollback incomplete: " .. table.concat(stuck, ", ") .. ")"
+    end
+    return nil, msg
+  end
+  if fsio.is_file(c.target) then
+    return back("target exists: " .. c.target)
+  end
+  local wrote, werr = fsio.create_exclusive(c.target, c.new_text)
+  if not wrote then
+    return back("cannot create " .. c.target .. ": " .. tostring(werr))
+  end
+  created = true
+  -- looked at once more right before the original goes: an edit made meanwhile would be dropped with it
+  if fsio.read(old_name) ~= c.old_text then
+    return back(changed_msg)
+  end
+  local removed, rm_err = fsio.remove(old_name)
+  if not removed then
+    return back("cannot remove " .. old_name .. ": " .. tostring(rm_err))
+  end
+  local readme_state = c.readme_state
+  if c.readme_old and c.readme_new ~= c.readme_old then
+    local ok, rwerr = mutate.readme_update(c.readme_path, "FEATURES", c.rel, c.readme_row)
+    if not ok then
+      return back("cannot write " .. c.readme_path .. ": " .. tostring(rwerr))
+    end
+  elseif not c.readme_old then
+    local ok, rwerr =
+      mutate.readme_create(c.readme_path, plan.area, "FEATURES", c.rel, c.readme_row)
+    if not ok then
+      return back("cannot write " .. c.readme_path .. ": " .. tostring(rwerr))
+    end
+    readme_state = "updated"
+  end
+  return { id = c.id, from = plan.path, to = c.target, readme = readme_state }, nil
 end
 
 ---Finish a plan: `status: done`, moved to `Backlog/FEATURES/YYYY-MM-DD_<slug>.md`, a row in the Backlog README. The
@@ -937,11 +1088,18 @@ function M.close(id, opts)
     return nil, "cannot update " .. plan.path .. ": " .. tostring(uerr)
   end
   local mutate = require("tasks_nvim.mutate")
-  local rel = date .. "_" .. plan.slug .. ".md"
+  local stem = date .. "_" .. plan.slug
+  -- the folder form goes as a folder, with its assets: `Backlog/FEATURES/<date>_<slug>/<date>_<slug>.md`
+  local rel = plan.folder and (stem .. "/" .. stem .. ".md") or (stem .. ".md")
   local target = vault.backlog_dir(root, plan.area, "FEATURES") .. "/" .. rel
   -- The finished copy of an earlier, killed close (same text) is picked up; anything else at the target is not ours.
   local resume = false
-  if fsio.is_file(target) and fsio.read(target) == new_text then
+  if plan.folder then
+    local target_dir = fsio.dirname(target)
+    if fsio.is_dir(target_dir) or fsio.is_file(target_dir) then
+      return nil, "target folder exists: " .. target_dir
+    end
+  elseif fsio.is_file(target) and fsio.read(target) == new_text then
     resume = true
   elseif fsio.is_file(target) or fsio.is_dir(target) then
     return nil, "target exists: " .. target
@@ -978,6 +1136,20 @@ function M.close(id, opts)
     local changed
     readme_new, changed = mutate.readme_add_row(readme_old, "FEATURES", rel, readme_row)
     readme_state = changed and "updated" or "unchanged"
+  end
+  if plan.folder then
+    return close_folder(plan, {
+      id = id,
+      old_text = old_text,
+      new_text = new_text,
+      target = target,
+      rel = rel,
+      readme_path = readme_path,
+      readme_old = readme_old,
+      readme_new = readme_new,
+      readme_row = readme_row,
+      readme_state = readme_state,
+    })
   end
 
   -- Only the finished copy is snapshotted: the README is written LAST and atomically, so a failing step never has a

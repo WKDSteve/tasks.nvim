@@ -467,7 +467,9 @@ tasks edited on two machines never collide on a list). `--areas` names the areas
 about another), `--phases` the stages in order (a later stage follows the earlier one in the plan), `--gate=hard` makes
 that a real rule (a task of a stage waits until the earlier stage is finished, and `list --ready`, `next` and the plan
 all see it), `--target` the task that means "done". When the last member task is finished the plan is finished too (see
-`:Tasks done`). Headless: `plan-new`.
+`:Tasks done`). Headless: `plan-new` (also `--links=url,url`: web addresses written to `links:`, http/https only). A plan
+or project takes assets like a task: `attach <plan id> <file>` (or `folderize`) turns it into its folder form
+`plans/<slug>/<slug>.md` with `assets/` beside the file, and finishing it moves the folder to the Backlog.
 
 Headless `plan-close <area>/<slug>` finishes a plan by hand (refused while a member task is open: the message names them)
 and `project-close <area>/<slug>` a project (refused while a task of its own or a plan that is not parked is open). A

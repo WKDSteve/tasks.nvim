@@ -148,6 +148,12 @@ mutate(
   (d) => (d.code = "oops"),
 );
 mutate("a list page without its total", "list-page", (d) => delete d.total);
+mutate("a project link that is no web address", "snapshot", (d) => (d.projects[0].links = ["ftp://example.org/x"]));
+mutate("a plan folder that is false", "snapshot", (d) => (d.projects[0].folder = false));
+mutate("a phase suggestion that is no kebab-case word", "result-projects", (d) => {
+  const failed = d.results.find((r) => r.error && r.error.details && r.error.details.suggestion);
+  failed.error.details.suggestion = "Einführung";
+});
 mutate("a check without its findings", "check", (d) => delete d.findings);
 mutate("a finished list without its stats", "finished", (d) => delete d.stats);
 mutate("a link of a kind nobody defined", "links", (d) => (d.pairs[0].edges[0].kind = "magic"));

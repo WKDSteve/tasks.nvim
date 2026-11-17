@@ -80,6 +80,41 @@ function M.find_open(id, root, drafts)
   return scan.find(id, { root = root })
 end
 
+---What `attach` and `folderize` put an asset into: an open task, else an open plan or project file (`file_kind`), in
+---either form. A plan or project is `{ id, area, slug, path, folder, file_kind }`.
+---@param id string
+---@param root string
+---@param drafts? table<string, Tasks.DraftTask>
+---@return Tasks.Task|{ id: string, area: string, slug: string, path: string, folder: boolean, file_kind: "plan"|"project" }|nil target
+---@return string|nil err
+function M.attach_target(id, root, drafts)
+  local task, ferr = M.find_open(id, root, drafts)
+  if task then
+    return task, nil
+  end
+  local area, slug = vault.parse_id(id)
+  if area and slug and vault.has_area(root, area) then
+    for _, kind in ipairs({ "plan", "project" }) do
+      local path, folder = vault.resolve_plan(root, kind, area, slug)
+      if path then
+        return {
+          id = area .. "/" .. slug,
+          area = area,
+          slug = slug,
+          path = fsio.norm(path),
+          folder = folder == true,
+          file_kind = kind,
+        },
+          nil
+      end
+      if tostring(folder):find("as file and as folder", 1, true) then
+        return nil, folder --[[@as string]]
+      end
+    end
+  end
+  return nil, ferr
+end
+
 ---A dry run carries on with the text an operation would write: later operations of the request find the task as the
 ---real run leaves it (`drafts` is the request's table, the one `find_open` reads first).
 ---@param drafts? table<string, Tasks.DraftTask>
@@ -537,6 +572,9 @@ local function link_list(value)
   end
   return out, nil
 end
+
+---The web addresses of a `links` value, checked as for a task (plan and project files take the same).
+M.link_list = link_list
 
 ---The resolver of bare `[[slug]]` wikilinks for a patch: the caller's (`opts.link_resolver`), else one over the vault
 ---`opts` names (nil without a vault: such a link is then refused with a reason).
@@ -1411,8 +1449,7 @@ function M.new(area, opts)
     -- projects and tasks share one id namespace (a finished plan lands in the Backlog and would read as a finished task of that id).
     local in_use = fsio.is_dir(vault.task_dir(root, area, slug))
       or fsio.is_file(vault.task_path(root, area, slug))
-      or fsio.is_file(vault.plan_path(root, area, slug))
-      or fsio.is_file(vault.project_path(root, area, slug))
+      or vault.has_plan_or_project(root, area, slug)
     -- `reserved`: ids a dry run counts as made already (earlier `new` ops of the request)
     in_use = in_use or (opts.reserved ~= nil and opts.reserved[area .. "/" .. slug] ~= nil)
     if not taken[slug] and not in_use then
@@ -2298,8 +2335,7 @@ function M.reopen(id, opts)
   if
     fsio.is_file(target)
     or fsio.is_dir(vault.task_dir(root, area, slug))
-    or fsio.is_file(vault.plan_path(root, area, slug))
-    or fsio.is_file(vault.project_path(root, area, slug))
+    or vault.has_plan_or_project(root, area, slug)
   then
     return nil,
       ("there is an open task or plan of this name already: %s"):format(id),
@@ -3012,13 +3048,15 @@ function M.asset_dir(kind)
 end
 
 ---Move a plain task file into its own folder: `tasks/<slug>.md` becomes
----`tasks/<slug>/<slug>.md`.
+---`tasks/<slug>/<slug>.md`. A plan or project file (`file_kind`) the same way below `plans/` or `projects/`.
 ---@param root string
----@param task Tasks.Task
+---@param task Tasks.Task|{ area: string, slug: string, path: string, file_kind?: "plan"|"project" }
 ---@return string|nil path  the new task file
 ---@return string|nil err
 local function to_folder(root, task)
-  local dir = vault.task_dir(root, task.area, task.slug)
+  local dest = task.file_kind and vault.plan_folder_path(root, task.file_kind, task.area, task.slug)
+    or vault.folder_task_path(root, task.area, task.slug)
+  local dir = fsio.dirname(dest)
   if fsio.is_dir(dir) then
     return nil, "folder already exists: " .. dir
   end
@@ -3026,7 +3064,6 @@ local function to_folder(root, task)
   if not made then
     return nil, "cannot create " .. dir .. ": " .. tostring(merr)
   end
-  local dest = vault.folder_task_path(root, task.area, task.slug)
   local moved, rerr = fsio.rename(task.path, dest)
   if not moved then
     pcall((vim.uv or vim.loop).fs_rmdir, dir)
@@ -3064,7 +3101,8 @@ local function undo_folder(plain, folder_file, asset, asset_dir)
 end
 
 ---Turn an open task into a folder task so assets can be attached. A task that
----already is one is left alone (`changed = false`).
+---already is one is left alone (`changed = false`). An open plan or project file is turned into its folder form the
+---same way (`plans/<slug>/<slug>.md`).
 ---@param id string
 ---@param opts? { root?: string, index?: boolean }
 ---@return { id: string, path: string, changed: boolean, index?: Tasks.IndexResult, index_err?: string }|nil result
@@ -3075,16 +3113,19 @@ function M.folderize(id, opts)
   if not root then
     return nil, rerr
   end
-  local task, ferr = scan.find(id, { root = root })
+  local task, ferr = M.attach_target(id, root)
   if not task then
     return nil, ferr
   end
   if task.folder then
     return { id = task.id, path = task.path, changed = false }, nil
   end
-  local free, gerr, ginfo = claims.guard(root, task.id, opts)
-  if not free then
-    return nil, gerr, ginfo
+  -- a claim holds a task; plans and projects are not claimed
+  if not task.file_kind then
+    local free, gerr, ginfo = claims.guard(root, task.id, opts)
+    if not free then
+      return nil, gerr, ginfo
+    end
   end
   local dest, err = to_folder(root, task)
   if not dest then
@@ -3134,7 +3175,8 @@ end
 M.asset_name = asset_name
 
 ---Copy a file into a task's `assets/` folder and give back the Markdown to link
----it. A plain task file becomes a folder task first. `opts.name` renames the
+---it. A plain task file becomes a folder task first. `id` may name an open plan or project file, too: it becomes its
+---folder form (`plans/<slug>/<slug>.md`) and the asset lies in `assets/` there. `opts.name` renames the
 ---copy; an asset of that name that already exists is an error, never replaced.
 ---`opts.kind` (`video`, `image`, `screenshot`) puts the copy into the folder of its kind below `assets/`
 ---(`assets/videos/`, `assets/images/`, `assets/screenshots/`); without it the copy lies in `assets/` itself.
@@ -3168,13 +3210,16 @@ function M.attach(id, src, opts)
   if not model.is_date(today) then
     return nil, "today is not a date (YYYY-MM-DD): " .. tostring(today)
   end
-  local task, ferr = scan.find(id, { root = root })
+  local task, ferr = M.attach_target(id, root)
   if not task then
     return nil, ferr
   end
-  local free, gerr, ginfo = claims.guard(root, task.id, opts)
-  if not free then
-    return nil, gerr, ginfo
+  -- a claim holds a task; plans and projects are not claimed
+  if not task.file_kind then
+    local free, gerr, ginfo = claims.guard(root, task.id, opts)
+    if not free then
+      return nil, gerr, ginfo
+    end
   end
 
   local path, folderized = task.path, false

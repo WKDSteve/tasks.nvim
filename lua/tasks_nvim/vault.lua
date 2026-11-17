@@ -1,4 +1,5 @@
 ---@module 'tasks_nvim.vault'
+-- @scans-data: the folders it lists and the paths it names are task vaults, never the files of this plugin
 ---@brief Where the task vault is, which areas it has, and every path the task system uses.
 ---@description
 --- The vault is a folder you name (`setup({ vault = ... })`, `$TASKS_VAULT` or `--vault`): one
@@ -516,6 +517,83 @@ end
 ---@return string
 function M.project_path(root, area, slug)
   return M.projects_dir(root, area) .. "/" .. slug .. ".md"
+end
+
+---The folder of a plan file (`kind` `plan`) or a project file (`project`), whichever form it has: `plans/<slug>.md`, or
+---`plans/<slug>/<slug>.md` once something was attached to it (its assets lie in that folder).
+---@param kind "plan"|"project"
+---@return fun(root: string, area: string): string
+local function dir_of(kind)
+  return kind == "project" and M.projects_dir or M.plans_dir
+end
+
+---`<area>/ROADMAP/plans/<slug>/<slug>.md` (or `projects/`): a plan or project file that has a folder for its assets.
+---@param root string
+---@param kind "plan"|"project"
+---@param area string
+---@param slug string
+---@return string
+function M.plan_folder_path(root, kind, area, slug)
+  return dir_of(kind)(root, area) .. "/" .. slug .. "/" .. slug .. ".md"
+end
+
+---Find an open plan file (`kind` `plan`) or project file (`project`) on disk, whichever form it has.
+---@param root string
+---@param kind "plan"|"project"
+---@param area string
+---@param slug string
+---@return string|nil path
+---@return boolean|string folder  # true for the folder form, false for a plain file; the error when there is none
+function M.resolve_plan(root, kind, area, slug)
+  local file = (kind == "project" and M.project_path or M.plan_path)(root, area, slug)
+  local folder = M.plan_folder_path(root, kind, area, slug)
+  local has_file, has_folder = fsio.is_file(file), fsio.is_file(folder)
+  if has_file and has_folder then
+    return nil, ("%s exists as file and as folder: %s/%s"):format(kind, area, slug)
+  elseif has_file then
+    return file, false
+  elseif has_folder then
+    return folder, true
+  end
+  return nil, ("no such open %s: %s/%s"):format(kind, area, slug)
+end
+
+---Whether an open plan file or project file of this slug is in the area, in either form (one id namespace).
+---@param root string
+---@param area string
+---@param slug string
+---@return boolean
+function M.has_plan_or_project(root, area, slug)
+  for _, kind in ipairs({ "plan", "project" }) do
+    local file = (kind == "project" and M.project_path or M.plan_path)(root, area, slug)
+    if fsio.is_file(file) or fsio.is_file(M.plan_folder_path(root, kind, area, slug)) then
+      return true
+    end
+  end
+  return false
+end
+
+---The plan or project files of one `ROADMAP/plans` (or `projects`) folder: `<slug>.md` and `<slug>/<slug>.md`.
+---@param dir string
+---@return { path: string, slug: string, folder: boolean }[]
+function M.plan_files(dir)
+  local out = {}
+  if not fsio.is_dir(dir) then
+    return out
+  end
+  for name, kind in vim.fs.dir(dir) do
+    local slug = name:match("^(.+)%.md$")
+    if kind == "file" and slug then
+      out[#out + 1] = { path = dir .. "/" .. name, slug = slug, folder = false }
+    elseif kind == "directory" and fsio.is_file(dir .. "/" .. name .. "/" .. name .. ".md") then
+      out[#out + 1] =
+        { path = dir .. "/" .. name .. "/" .. name .. ".md", slug = name, folder = true }
+    end
+  end
+  table.sort(out, function(a, b)
+    return a.slug < b.slug
+  end)
+  return out
 end
 
 ---`<area>/ROADMAP/TASKS.md`, the generated index.

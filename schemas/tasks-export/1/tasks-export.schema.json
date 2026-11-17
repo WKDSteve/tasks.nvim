@@ -1152,7 +1152,11 @@
               },
               "valid": {
                 "type": "boolean"
-              }
+              },
+              "links": { "$ref": "#/$defs/PlanLinks" },
+              "folder": { "$ref": "#/$defs/PlanFolder" },
+              "assets": { "$ref": "#/$defs/PlanAssets" },
+              "assets_truncated": { "$ref": "#/$defs/PlanAssetsTruncated" }
             },
             "additionalProperties": false
           }
@@ -1176,6 +1180,10 @@
                 "description": "The version of the project file, for `if_match` of `project_set`; absent for a file that cannot be read."
               },
               "valid": { "type": "boolean" },
+              "links": { "$ref": "#/$defs/PlanLinks" },
+              "folder": { "$ref": "#/$defs/PlanFolder" },
+              "assets": { "$ref": "#/$defs/PlanAssets" },
+              "assets_truncated": { "$ref": "#/$defs/PlanAssetsTruncated" },
               "plans": {
                 "type": "array",
                 "items": { "type": "string" },
@@ -2934,6 +2942,24 @@
         "io",
         "internal"
       ]
+    },
+    "PlanLinks": {
+      "description": "The web addresses of a plan or project file (`links:`, http/https only; capability `plan_links`). Absent when it has none.",
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[Hh][Tt][Tt][Pp][Ss]?://" }
+    },
+    "PlanFolder": {
+      "description": "The plan or project file is in its folder form (`<slug>/<slug>.md`, made by `attach` or `folderize`): the other files of that folder are its assets. Absent for a plain file.",
+      "const": true
+    },
+    "PlanAssets": {
+      "description": "The files in the folder of a plan or project (folder form only), relative to that folder (`assets/screenshots/shot.png`), sorted; at most 100.",
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "PlanAssetsTruncated": {
+      "description": "The folder holds more than the 100 `assets` listed.",
+      "const": true
     },
     "OperationError": {
       "description": "Why an operation did not happen. `details` names ids, keys and values (`expected` and `actual` of a conflict, the `problems` of a refused relation, `field`/`value`/`char`/`suggestion` of a word that is no kebab-case word), never a path.",

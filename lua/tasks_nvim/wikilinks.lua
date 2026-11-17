@@ -93,6 +93,17 @@ function M.read(raw)
   if not area then
     area, a = target:match("^([^/]+)/ROADMAP/plans/([^/]+)$")
   end
+  if not area then
+    area, a = target:match("^([^/]+)/ROADMAP/projects/([^/]+)$")
+  end
+  if not area then
+    -- a plan or project in its folder form: `<area>/ROADMAP/plans/<slug>/<slug>`
+    local kind
+    area, kind, a, b = target:match("^([^/]+)/ROADMAP/(p[a-z]+)/([^/]+)/([^/]+)$")
+    if not (area and a == b and (kind == "plans" or kind == "projects")) then
+      area, a = nil, nil
+    end
+  end
   if area then
     return as_id(area, a)
   end
@@ -231,16 +242,18 @@ function M.build_index(root)
         add(area, e.name, area .. "/ROADMAP/tasks/" .. e.name .. "/" .. e.name)
       end
     end
-    for _, e in ipairs(entries(vault.plans_dir(root, area))) do
-      local slug = e.name:match("^(.+)%.md$")
-      if e.kind == "file" and slug then
-        add(area, slug, area .. "/ROADMAP/plans/" .. slug)
-      end
-    end
-    for _, e in ipairs(entries(vault.projects_dir(root, area))) do
-      local slug = e.name:match("^(.+)%.md$")
-      if e.kind == "file" and slug then
-        add(area, slug, area .. "/ROADMAP/projects/" .. slug)
+    for _, kind in ipairs({ "plans", "projects" }) do
+      local dir = kind == "plans" and vault.plans_dir(root, area) or vault.projects_dir(root, area)
+      for _, e in ipairs(entries(dir)) do
+        local slug = e.name:match("^(.+)%.md$")
+        if e.kind == "file" and slug then
+          add(area, slug, area .. "/ROADMAP/" .. kind .. "/" .. slug)
+        elseif
+          e.kind == "directory" and fsio.is_file(dir .. "/" .. e.name .. "/" .. e.name .. ".md")
+        then
+          -- the folder form of a plan or project (it has assets)
+          add(area, e.name, area .. "/ROADMAP/" .. kind .. "/" .. e.name .. "/" .. e.name)
+        end
       end
     end
     for _, bucket in ipairs({ "FEATURES", "TASKS" }) do

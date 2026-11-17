@@ -26,13 +26,13 @@ M.STATUSES = plans.STATUSES
 
 ---Read one project file from disk (always returns a file; a broken one carries `errors`).
 ---@param path string
----@param ctx { area: string, slug?: string, location?: "roadmap"|"backlog", link_resolver?: Tasks.LinkResolver }
+---@param ctx { area: string, slug?: string, location?: "roadmap"|"backlog", folder?: boolean, link_resolver?: Tasks.LinkResolver }
 ---@return Tasks.PlanFile
 function M.from_file(path, ctx)
   return plans.from_file(path, vim.tbl_extend("force", { kind = "project" }, ctx))
 end
 
----The open projects of an area (`ROADMAP/projects/*.md`), by slug.
+---The open projects of an area (`ROADMAP/projects/<slug>.md` and `ROADMAP/projects/<slug>/<slug>.md`), by slug.
 ---@param area string
 ---@param opts? { root?: string, link_resolver?: Tasks.LinkResolver }
 ---@return Tasks.PlanFile[]|nil projects
@@ -56,14 +56,12 @@ function M.area(area, opts)
     return out, { escape }
   end
   local resolver = opts.link_resolver or wikilinks.resolver(root)
-  for name, kind in vim.fs.dir(dir) do
-    if kind == "file" and name:match("%.md$") then
-      out[#out + 1] = M.from_file(dir .. "/" .. name, { area = area, link_resolver = resolver })
-    end
+  for _, e in ipairs(vault.plan_files(dir)) do
+    out[#out + 1] = M.from_file(
+      e.path,
+      { area = area, slug = e.slug, folder = e.folder, link_resolver = resolver }
+    )
   end
-  table.sort(out, function(a, b)
-    return a.slug < b.slug
-  end)
   return out, {}
 end
 
@@ -106,13 +104,14 @@ function M.find(id, opts)
   if not vault.has_area(root, area) then
     return nil, "no such open project: " .. id
   end
-  local path = vault.project_path(root, area, slug)
-  if not fsio.is_file(path) then
-    return nil, "no such open project: " .. id
+  local path, folder = vault.resolve_plan(root, "project", area, slug)
+  if not path then
+    return nil, folder --[[@as string]]
   end
   return M.from_file(path, {
     area = area,
     slug = slug,
+    folder = folder == true,
     link_resolver = opts.link_resolver or wikilinks.resolver(root),
   }),
     nil

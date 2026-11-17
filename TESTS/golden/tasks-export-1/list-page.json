@@ -1,5 +1,5 @@
 {
-  "digest": "sha256:f9d686a7c917171b",
+  "digest": "sha256:a29f7d684f87c8be",
   "engine": {
     "git": "0000000",
     "nvim": "0.0.0",
@@ -226,7 +226,7 @@
   "next_offset": 5,
   "offset": 0,
   "plugin": "tasks.nvim",
-  "rev": "rev:a528ce",
+  "rev": "rev:ff1ae4",
   "schema": 1,
   "total": 14,
   "vault": {

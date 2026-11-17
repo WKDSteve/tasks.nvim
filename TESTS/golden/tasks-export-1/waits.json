@@ -1,5 +1,5 @@
 {
-  "digest": "sha256:08782607819af262",
+  "digest": "sha256:fcc9e1b21eddfb08",
   "engine": {
     "git": "0000000",
     "nvim": "0.0.0",
@@ -20,7 +20,7 @@
   "kind": "tasks.waits",
   "parked": 1,
   "plugin": "tasks.nvim",
-  "rev": "rev:e56dd1",
+  "rev": "rev:f69832",
   "schema": 1,
   "vault": {
     "id": "vault"

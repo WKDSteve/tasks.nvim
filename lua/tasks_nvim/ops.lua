@@ -233,6 +233,7 @@ local FIELDS = {
     slug = "string",
     project = "string",
     phase = "string",
+    links = "strings",
   },
   project_new = {
     area = "string",
@@ -244,6 +245,7 @@ local FIELDS = {
     status = "string",
     summary = "string",
     slug = "string",
+    links = "strings",
   },
   plan_set = { id = "string", patch = "object", if_match = "string" },
   project_set = { id = "string", patch = "object", if_match = "string" },
@@ -1311,6 +1313,7 @@ local function new_file(op, ctx, kind)
     slug = op.slug,
     project = op.project,
     phase = op.phase,
+    web_links = op.links,
     dry_run = ctx.dry,
   })
   if not r then
@@ -1780,7 +1783,8 @@ local function do_attach(op, ctx)
     )
   end
   local drafts = drafts_of(ctx)
-  local task, ferr = mutate.find_open(op.id, ctx.root, drafts)
+  -- an open task, else an open plan or project file
+  local task, ferr = mutate.attach_target(op.id, ctx.root, drafts)
   if not task then
     return mutate_failure(ctx, ferr)
   end

@@ -138,17 +138,19 @@ function M.build(H)
   -- a plan with phases; two tasks of it, a task that waits on `alpha` from another area, a finished blocker
   H.write(
     root .. "/lib.nvim/ROADMAP/plans/the-plan.md",
-    "---\ntitle: The plan\nstatus: doing\nareas: [lib.nvim, cascade.nvim]\nphase_order: [build, test]\nproject: lib.nvim/the-project\nphase: first\ncreated: "
+    "---\ntitle: The plan\nstatus: doing\nareas: [lib.nvim, cascade.nvim]\nphase_order: [build, test]\nproject: lib.nvim/the-project\nphase: first\nlinks: [https://example.org/issues/1]\ncreated: "
       .. DATE
       .. "\nupdated: "
       .. DATE
       .. "\n---\n\nA plan of the fixture vault.\n"
   )
-  -- a project that holds the plan (and nothing else): the level above plans
-  vim.fn.mkdir(root .. "/lib.nvim/ROADMAP/projects", "p")
+  -- a project that holds the plan (and nothing else): the level above plans; in its folder form, with a link and an
+  -- asset
+  vim.fn.mkdir(root .. "/lib.nvim/ROADMAP/projects/the-project/assets", "p")
+  H.write(root .. "/lib.nvim/ROADMAP/projects/the-project/assets/brief.pdf", "%PDF-1.4 brief")
   H.write(
-    root .. "/lib.nvim/ROADMAP/projects/the-project.md",
-    "---\ntitle: The project\nstatus: doing\nareas: [lib.nvim]\nphase_order: [first, second]\ncreated: "
+    root .. "/lib.nvim/ROADMAP/projects/the-project/the-project.md",
+    "---\ntitle: The project\nstatus: doing\nareas: [lib.nvim]\nphase_order: [first, second]\nlinks: [https://example.org/brief]\ncreated: "
       .. DATE
       .. "\nupdated: "
       .. DATE
