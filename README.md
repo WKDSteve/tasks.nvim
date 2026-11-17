@@ -219,6 +219,7 @@ nvim --headless -u NONE -l scripts/tasks.lua list --status=doing
 nvim --headless -u NONE -l scripts/tasks.lua new my-project "Fix the thing" --kind=bug --prio=2
 nvim --headless -u NONE -l scripts/tasks.lua done my-project/fix-the-thing
 nvim --headless -u NONE -l scripts/tasks.lua call snapshot    # the vault as one JSON document (docs/CONTRACT.md)
+nvim --headless -u NONE -l scripts/tasks.lua agent-brief   # the brief for an AI agent (claim, done, values, commands)
 nvim --headless -u NONE -l scripts/tasks-ci.lua    # check + index --check + md_lint, exit 0/1
 nvim --headless -u NONE -l scripts/tasks-html.lua --out=tasks.html   # one-file HTML overview, open it in a browser
 ```

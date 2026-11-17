@@ -14,6 +14,8 @@ return function(H)
   local specs = require("tasks_nvim.cli").specs()
 
   local ONLY_CLI = {
+    -- `agent-brief` is read by another program (ai-desktop starting an agent), not by a person in the editor
+    "agent-brief",
     "areas",
     "bootstrap",
     "call",

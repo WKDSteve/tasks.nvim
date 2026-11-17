@@ -641,6 +641,23 @@ claim is taken over. `--force --note=<why>` passes a claim of somebody else. `se
 `unclaim` is the verb for giving back (`release <key>` belongs to the parked tasks). `list --claimed=own|foreign|none` lists the tasks by
 their claim, and the dashboard marks a claimed line (`[claim: mine]`, `[claim: <who>]`). Details: [ENGINE.md](ENGINE.md#claims).
 
+### Headless: `agent-brief` (the brief for an AI agent)
+
+```
+nvim --headless -u NONE -l scripts/tasks.lua agent-brief                          # Markdown
+nvim --headless -u NONE -l scripts/tasks.lua agent-brief --by=ai-desktop:job-42   # the claim name of the examples
+nvim --headless -u NONE -l scripts/tasks.lua agent-brief --format=json            # tasks-agent-brief/1
+```
+
+The text an agent (ai-desktop, ai.nvim) gets as a tool description when a job comes from the tasks family: the workflow
+(`claim` before the work, `set`/`new` with `--by`, `done --commits --done-in`, `unclaim` to give it back, a foreign claim
+is a stop), the allowed values of every field and the command reference. Nothing in it is written twice: the values come
+from the engine's model and the reference is the `--help` text of this CLI, so a new command or category reaches the
+brief without an edit. It names `brief_version`, the contract version (`contract_schema`, as in `call hello`) and the
+engine version; `--format=json` carries the same Markdown in `markdown` next to those numbers, in canonical key order, so
+a caller compares the versions of the brief it holds and asks for a new one. `--by` (default `ai-desktop:<job>`, one
+word up to 80 characters) only fills the examples. It reads no vault.
+
 ### `:Tasks claim <id>` and `:Tasks unclaim <id>`
 
 The two verbs of the section above in the editor, on the same engine: `:Tasks claim lib.nvim/the-task for=2h by=me@host [note=<why>] [--renew] [--force]`

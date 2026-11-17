@@ -31,6 +31,7 @@ local contract_helpers = {}
 local lists = require("tasks_nvim.lists")
 local quick_wins = require("tasks_nvim.quick_wins")
 local fsio = require("tasks_nvim.fsio")
+local agent_brief = require("tasks_nvim.agent_brief")
 local mutate = require("tasks_nvim.mutate")
 local questions = require("tasks_nvim.questions")
 local next_pick = require("tasks_nvim.next_pick")
@@ -177,6 +178,9 @@ commands:
                                           the AI's answer; shown only, written with --yes
   check [<area>]                          rule check; exit 1 on any error
   template [--title=t] [--kind=k] [--prio=n] [--effort=e] [--tags=a,b] [--lang=de|en] [--with-plan]
+  agent-brief [--format=md|json] [--by=<claim name>]   the brief for an AI agent: workflow (claim, set, new, done),
+                                          allowed values and this command reference, with the contract version;
+                                          --by is the claim name in its examples (default ai-desktop:<job>); no vault
   ci [--strict] [--no-lint] [--md-lint=<file>] [--trust-vault-lint]   CI gate: check + index --check + md_lint of the
                                           generated indexes; exit 0/1 (--strict: warnings fail too).
                                           md_lint is a script RUN from the vault (TOOLS/scripts/md_lint.lua): it runs only with
@@ -407,6 +411,7 @@ local SPECS = {
     value = { "title", "kind", "prio", "effort", "tags", "lang" },
     flag = { "with-plan" },
   },
+  ["agent-brief"] = { value = { "format", "by" }, flag = {} },
   areas = { value = { "format" }, flag = {} },
   export = { value = { "top", "link-prefix" }, flag = { "no-links" } },
   import = { value = { "from-rules", "lang" }, flag = { "apply", "dry-run" } },
@@ -2166,6 +2171,29 @@ function commands.ci(ctx)
     md_lint = opt["md-lint"] --[[@as string|nil]],
   }, ctx.say)
   return res.code
+end
+
+---`agent-brief [--format=md|json] [--by=<name>]`: the tasks-family brief for an AI agent (`tasks_nvim.agent_brief`),
+---built from this file's USAGE so the command reference is never written twice. Reads no vault.
+commands["agent-brief"] = function(ctx)
+  local opt = ctx.args.opt
+  if #ctx.args.pos > 0 then
+    ctx.warn("error: agent-brief takes no positional argument")
+    return 2
+  end
+  local format = opt.format or "md"
+  if format ~= "md" and format ~= "json" then
+    ctx.warn("error: --format must be md or json")
+    return 2
+  end
+  local by, berr = agent_brief.check_by(opt.by --[[@as string|nil]])
+  if not by then
+    ctx.warn("error: " .. berr)
+    return 2
+  end
+  local brief_opts = { usage = USAGE, by = by }
+  ctx.out(format == "json" and agent_brief.json(brief_opts) or agent_brief.markdown(brief_opts))
+  return 0
 end
 
 function commands.template(ctx)
