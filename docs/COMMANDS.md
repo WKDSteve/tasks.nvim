@@ -413,6 +413,18 @@ tasks-desktop does. The command is there while the AI functions are on (`setup({
 of `agent-brief` unless ai-desktop is set otherwise). `kind` names what the job asks for (default `handoff`). A refusal
 of ai-desktop is said with its message (`ai-desktop refused the task (403): jobs from other apps are turned off ...`).
 
+**A review** (`kind=review-done`) checks a finished task against its acceptance: the id may name a task in
+`Backlog/` (and only a review takes one), `mode` is `run` unless said. ai-desktop reads the diffs of the task's
+`commits` itself and lets its agent only read (ai-desktop `docs/JOBS.md`, "Reviews"). The editor watches the job
+(`GET /jobs/<id>`, every 3 s, at most an hour) and, when it is done, shows the review block of the answer in
+`tasks://review/<id>`: `## Prüfung`, one line per criterion (met, open, not checkable, with evidence). Only after a yes
+is it written into the task file as that section (a review of the same heading replaces the last one; `updated`
+changes; under the engine's file lock, also for a finished file in `Backlog/`). When the review proposes a follow-up
+task (`### Folgetask (Vorschlag)` with `- title:` and `- summary:`), a second question creates it in the same area.
+Without a block, or when the job failed, a message says so and nothing is written. A review needs ai-desktop: ai.nvim
+does not stand in, since it cannot read the commits. While the AI functions are on, `:Tasks done` ends with the line
+`check it against its acceptance: :Tasks agent <id> kind=review-done` (a hint; nothing runs).
+
 **To ai.nvim**, when ai-desktop does not run and ai.nvim can be loaded (`pcall(require, "ai")`, no hard dependency):
 the task as one prompt in the scratch buffer `tasks://agent/<id>`; `mode=run` sends it after a question and puts the
 answer below it (one answer, no tools). A message says that ai.nvim stands in. Without either: a message that names

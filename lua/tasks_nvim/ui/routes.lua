@@ -930,7 +930,8 @@ local function nested_routes()
           name = "id",
           type = "TASK_ID",
           optional = true,
-          desc = "Id of the task to hand over (default: the buffer's)",
+          allow_done = true,
+          desc = "Task to hand over (default: the buffer's; a finished one for a review)",
         },
       },
       kv = {
@@ -938,13 +939,13 @@ local function nested_routes()
           key = "mode",
           type = "STRING",
           values = { "prefill", "run" },
-          desc = "prefill (a new job that waits, the default) or run (it runs at once)",
+          desc = "prefill: a job that waits (default); run: at once (default of a review)",
         },
         {
           key = "kind",
           type = "STRING",
           values = { "handoff", "review-done", "draft-task", "prepare-decision", "split-plan" },
-          desc = "What the job asks for (default handoff)",
+          desc = "What the job asks for (default handoff; review-done: check the acceptance)",
         },
       },
       -- Out of <Tab> while the AI functions are off (setup({ ai = ... })); never a health error.

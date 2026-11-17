@@ -166,6 +166,13 @@ A wrong key or value is ignored with a message and listed in
                                          Without a running ai-desktop,
                                          ai.nvim answers once in the buffer
                                          `tasks://agent/{id}` (run asks first).
+                                         `kind=review-done` checks a finished
+                                         task (an id in `Backlog/`) against
+                                         its acceptance; the review comes back
+                                         to `tasks://review/{id}` and goes into
+                                         the task as section `## Prüfung` only
+                                         after a yes (a proposed follow-up
+                                         task after a second yes).
                                          Hidden while the option `ai` is off.
   :Tasks plan [{area}|all] [--for={id}|--plan={id}] [filters] [--ready] [--with-steps]
               [--format=] [--to=] [--write={file} [--scope=] [--check]]

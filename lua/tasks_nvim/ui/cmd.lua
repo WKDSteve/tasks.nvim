@@ -2175,6 +2175,13 @@ local function finish_task(id, opts)
   end
   local root = vault.root()
   notify.info(("done %s -> %s"):format(id, root and rel(res.to, root) or res.to))
+  -- While the AI functions are on: one line that names the review (nothing runs by itself).
+  local ai_ok, ai_on = pcall(function()
+    return require("tasks_nvim.ai").enabled()
+  end)
+  if ai_ok and ai_on then
+    notify.info(("check it against its acceptance: :Tasks agent %s kind=review-done"):format(id))
+  end
   if flow.steps_ticked > 0 then
     notify.info(
       ("%d plan step%s ticked off"):format(flow.steps_ticked, flow.steps_ticked == 1 and "" or "s")
@@ -2824,12 +2831,13 @@ function M.open_area(ctx)
   end)
 end
 
----The scratch buffer `tasks://agent/<id>` with `lines` (a second call for the same task takes the same buffer).
+---The scratch buffer `tasks://<what>/<id>` with `lines` (a second call for the same task takes the same buffer).
 ---@param id string
 ---@param lines string[]
+---@param what? string `agent` (default) or `review`
 ---@return integer buf
-local function agent_buffer(id, lines)
-  local name = "tasks://agent/" .. id
+local function agent_buffer(id, lines, what)
+  local name = ("tasks://%s/%s"):format(what or "agent", id)
   local buf = -1
   for _, b in ipairs(vim.api.nvim_list_bufs()) do
     if vim.api.nvim_buf_get_name(b) == name then
@@ -2905,6 +2913,82 @@ local function agent_ai_nvim(ai_nvim, payload, confirm_fn)
   )
 end
 
+---The review of a finished task came back (`kind=review-done`): show its block, add it to the task as a section after
+---a yes, and create the follow-up task it proposes after a second yes. Nothing is written without them.
+---@param task table The task as `scan.find` / `scan.find_done` gave it.
+---@param job table The job of ai-desktop (`GET /jobs/<id>`).
+---@param confirm_fn fun(msg: string, label: string, cb: fun(yes: boolean))
+---@param create? fun(area: string, opts: table): table|nil, string|nil A stand-in for `mutate.new` (specs).
+local function review_came_back(task, job, confirm_fn, create)
+  local review = require("tasks_nvim.review")
+  if job.status ~= "done" then
+    notify.error(
+      ("agent: the review of %s ended %s%s"):format(
+        task.id,
+        tostring(job.status),
+        type(job.error) == "string" and (": " .. job.error) or ""
+      )
+    )
+    return
+  end
+  local block = review.block(type(job.output) == "string" and job.output or "")
+  local good, why = false, "the answer has no review block"
+  if block then
+    good, why = review.check(block)
+  end
+  if not good then
+    notify.warn(
+      ("agent: %s; the answer is in the dashboard of ai-desktop (job %s)"):format(why, job.id)
+    )
+    return
+  end
+  agent_buffer(task.id, vim.split(block, "\n", { plain = true }), "review")
+  local heading = block:match("^[^\n]*")
+  confirm_fn(
+    ("Add this review to %s as its section %s?"):format(task.id, heading),
+    "add",
+    function(yes)
+      if not yes then
+        notify.info("agent: the review was not added; it stays in this buffer")
+        return
+      end
+      local ok, err = review.adopt(task.path, block, model.today())
+      if not ok then
+        notify.error("agent: " .. tostring(err))
+        return
+      end
+      pcall(vim.cmd, "checktime")
+      notify.info(("agent: the review is in %s (%s)"):format(task.id, heading))
+      local follow = review.follow_up(block)
+      if not follow then
+        return
+      end
+      confirm_fn(
+        ("The review proposes a follow-up task in %s:\n\n%s\n\nCreate it?"):format(
+          task.area,
+          follow.title
+        ),
+        "create",
+        function(again)
+          if not again then
+            return
+          end
+          local made, merr = (create or require("tasks_nvim.mutate").new)(task.area, {
+            title = follow.title,
+            summary = follow.summary,
+            kind = "task",
+          })
+          if not made then
+            notify.error("agent: the follow-up task was not created: " .. tostring(merr))
+            return
+          end
+          notify.info("agent: created " .. tostring(made.id))
+        end
+      )
+    end
+  )
+end
+
 local AGENT_SAID = {
   prefilled = "it waits in the dashboard of ai-desktop, nothing runs",
   running = "ai-desktop runs it",
@@ -2915,7 +2999,9 @@ local AGENT_SAID = {
 ---ai-desktop's job intake (`tasks_nvim.agent`), or, without a running ai-desktop, to ai.nvim for one answer. Hidden
 ---while the AI functions are off (`setup({ ai = ... })`, `tasks_nvim.ai`).
 ---@param ctx table
----@param deps? table Stand-ins for the specs: `state`, `ai_desktop`, `hand_over`, `confirm`.
+---With `kind=review-done` the task may be finished (it is read from `Backlog/`), `mode` is `run` unless said, and the
+---review's answer comes back here: shown, and added to the task as a section only after a yes.
+---@param deps? table Stand-ins for the specs: `state`, `ai_desktop`, `hand_over`, `confirm`, `record`, `watch`, `create`.
 function M.task_agent(ctx, deps)
   deps = deps or {}
   if not no_stray_words(ctx) then
@@ -2932,8 +3018,10 @@ function M.task_agent(ctx, deps)
     return
   end
   local kv = ctx.kv or {}
-  local mode = kv.mode or "prefill"
   local kind = kv.kind or "handoff"
+  local is_review = kind == "review-done"
+  -- A review is asked for to read its answer: it runs unless said otherwise.
+  local mode = kv.mode or (is_review and "run" or "prefill")
   if not vim.tbl_contains(agent.MODES, mode) then
     notify.error("agent: mode is prefill or run, not " .. tostring(mode))
     return
@@ -2950,6 +3038,16 @@ function M.task_agent(ctx, deps)
     return
   end
   local task, ferr = scan.find(id)
+  if not task then
+    local done = scan.find_done(id)
+    if done and not is_review then
+      notify.error(
+        ("agent: %s is finished; a finished task is only reviewed (kind=review-done)"):format(id)
+      )
+      return
+    end
+    task = done
+  end
   if not task then
     notify.error("agent: " .. tostring(ferr))
     return
@@ -2985,7 +3083,35 @@ function M.task_agent(ctx, deps)
           res.note and (" (" .. res.note .. ")") or ""
         )
       )
+      if not is_review then
+        return
+      end
+      -- The review's answer comes back to this editor (watched until the job ends).
+      local record = deps.record or ai.hub_record()
+      if not record then
+        notify.warn("agent: ai-desktop is gone; the review's answer is in its dashboard")
+        return
+      end
+      local watch = deps.watch or agent.watch
+      watch(record.port, res.job_id, function(werr, job)
+        if werr or not job then
+          notify.error("agent: " .. tostring(werr))
+          return
+        end
+        review_came_back(task, job, deps.confirm or function(msg, label, cb)
+          require("tasks_nvim.ui.confirm").yesno(msg, label, cb)
+        end, deps.create)
+      end)
     end)
+    return
+  end
+  if is_review then
+    -- The review reads the commits of the task: that is ai-desktop's, not one answer of ai.nvim.
+    notify.error(
+      desktop.installed
+          and "agent: ai-desktop is installed but not running; a review needs it (it reads the commits): start it"
+        or "agent: a review needs ai-desktop (it reads the task's commits); it is not on this machine"
+    )
     return
   end
   local has_ai, ai_nvim = pcall(require, "ai")

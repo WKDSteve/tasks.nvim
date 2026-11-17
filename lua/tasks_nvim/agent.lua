@@ -285,8 +285,8 @@ function M.hand_over(payload, cb, deps)
   end
   local request = deps.request or M.request
   request(record.port, "GET", "/health", {}, "", function(herr, health)
-    if herr then
-      cb("ai-desktop does not answer: " .. herr, nil)
+    if herr or not health then
+      cb("ai-desktop does not answer: " .. tostring(herr), nil)
       return
     end
     local doc = health.status == 200 and decode(health.body) or nil
@@ -320,8 +320,8 @@ function M.hand_over(payload, cb, deps)
       },
       vim.json.encode(payload),
       function(perr, res)
-        if perr then
-          cb("the hand-over failed: " .. perr, nil)
+        if perr or not res then
+          cb("the hand-over failed: " .. tostring(perr), nil)
           return
         end
         if res.status ~= 201 then
@@ -342,6 +342,76 @@ function M.hand_over(payload, cb, deps)
       end
     )
   end)
+end
+
+-- A job that has not ended yet: it runs, waits for the person in the dashboard (a private area), or waits to be run.
+local WAITING = { running = true, needs_confirmation = true, prefilled = true }
+
+---Watches a job of ai-desktop (`GET /jobs/<id>`, no secret: the dashboard's route) until it has ended (`done`,
+---`failed`, `cancelled`) or is gone, then `on_end(err, job)` once, in the main loop. `opts`: `interval_ms` (3000),
+---`max_ms` (60 minutes; then an error), `request` (a stand-in for `M.request`). Returns a function that stops watching.
+---@param port integer
+---@param job_id string
+---@param on_end fun(err: string|nil, job: table|nil)
+---@param opts? { interval_ms?: integer, max_ms?: integer, request?: function }
+---@return fun()
+function M.watch(port, job_id, on_end, opts)
+  opts = opts or {}
+  local request = opts.request or M.request
+  local interval = opts.interval_ms or 3000
+  local deadline = vim.uv.now() + (opts.max_ms or 60 * 60 * 1000)
+  local timer = assert(vim.uv.new_timer())
+  local stopped, busy = false, false
+  local function stop()
+    if not stopped then
+      stopped = true
+      timer:stop()
+      timer:close()
+    end
+  end
+  local function finish(err, job)
+    if stopped then
+      return
+    end
+    stop()
+    on_end(err, job)
+  end
+  local function tick()
+    if stopped or busy then
+      return
+    end
+    if vim.uv.now() > deadline then
+      finish(
+        "the job did not end within the time it was watched; its answer is in the dashboard of ai-desktop"
+      )
+      return
+    end
+    busy = true
+    request(port, "GET", "/jobs/" .. job_id, {}, "", function(err, res)
+      busy = false
+      if stopped then
+        return
+      end
+      if err or not res then
+        finish("ai-desktop does not answer any more: " .. tostring(err))
+        return
+      end
+      if res.status == 404 then
+        finish("the job is gone from ai-desktop (put away, or ai-desktop restarted)")
+        return
+      end
+      local job = res.status == 200 and decode(res.body) or nil
+      if not job or type(job.status) ~= "string" then
+        finish("ai-desktop answered, but not with the job")
+        return
+      end
+      if not WAITING[job.status] then
+        finish(nil, job)
+      end
+    end)
+  end
+  timer:start(0, interval, vim.schedule_wrap(tick))
+  return stop
 end
 
 ---The prompt for ai.nvim when there is no ai-desktop: one answer, no tools.
