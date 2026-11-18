@@ -7,15 +7,16 @@
 ---
 --- * ai.nvim: `require("ai")` succeeds and has `setup` (a plugin of another name is not taken for it).
 --- * ai-desktop: installed (the manifest `<family>/installed/ai-desktop.json` its installer writes, whose program is
----   there) or running (its `hub.json`, whose process is alive). The same two files as `appkit_core::family`;
----   `<family>` is `$APPKIT_FAMILY_DIR`, else `%LOCALAPPDATA%\appkit-family` (Windows),
----   `~/Library/Application Support/appkit-family` (macOS), `$XDG_DATA_HOME/appkit-family` or
+---   there) or running (its `hub.json`, whose process is alive and, on Windows, not younger than the file). The same
+---   two files as `appkit_core::family`; `<family>` is `$APPKIT_FAMILY_DIR`, else `%LOCALAPPDATA%\appkit-family`
+---   (Windows), `~/Library/Application Support/appkit-family` (macOS), `$XDG_DATA_HOME/appkit-family` or
 ---   `~/.local/share/appkit-family`; the config folder of ai-desktop is `$AI_DESKTOP_CONFIG_DIR`, else
 ---   `%APPDATA%\ai-desktop`, `~/Library/Application Support/ai-desktop`, `$XDG_CONFIG_HOME/ai-desktop` or
 ---   `~/.config/ai-desktop`.
 ---
---- Only files are read (at most 4 KiB each): no network, no secret, nothing is started. The hand-over itself
---- (`:Tasks agent`, `tasks_nvim.agent`) asks `enabled()` first and `hub_record()` for the running ai-desktop.
+--- Only files are read (at most 4 KiB each) and, on Windows, when the process of `hub.json` started: no network, no
+--- secret, nothing is started. The hand-over itself (`:Tasks agent`, `tasks_nvim.agent`) asks `enabled()` first and
+--- `hub_record()` for the running ai-desktop.
 
 local M = {}
 
@@ -97,12 +98,66 @@ local function read_json(path)
   return doc
 end
 
----Whether the process `pid` is alive (signal 0 only asks, it sends nothing).
+-- A process that started this much after its `hub.json` was written is another one with the same id (appkit's SLACK).
+local SLACK_S = 2
+-- Seconds from 1601-01-01 (the start of a FILETIME) to 1970-01-01, and its 100 ns intervals per second.
+local EPOCH_S = 11644473600
+local TICKS = 10000000
+local PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+local kernel_declared = false
+
+---When the process `pid` started, in seconds since 1970: Windows only (`GetProcessTimes` through LuaJIT's ffi, asking
+---with the least right), nil wherever it cannot be told.
 ---@param pid integer
+---@return number|nil
+function M._started(pid)
+  if vim.fn.has("win32") ~= 1 then
+    return nil
+  end
+  local has_ffi, ffi = pcall(require, "ffi")
+  if not has_ffi then
+    return nil
+  end
+  if not kernel_declared then
+    -- One declaration each: one that another plugin made already stays, and the call below checks it fits.
+    pcall(ffi.cdef, "void* OpenProcess(unsigned long access, int inherit, unsigned long pid);")
+    pcall(
+      ffi.cdef,
+      "int GetProcessTimes(void* h, uint64_t* c, uint64_t* e, uint64_t* k, uint64_t* u);"
+    )
+    pcall(ffi.cdef, "int CloseHandle(void* h);")
+    kernel_declared = true
+  end
+  local good, started = pcall(function()
+    local handle = ffi.C.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid)
+    if handle == nil then
+      return nil
+    end
+    local times = ffi.new("uint64_t[4]")
+    local got = ffi.C.GetProcessTimes(handle, times, times + 1, times + 2, times + 3)
+    ffi.C.CloseHandle(handle)
+    -- 64-bit arithmetic of cdata (no ULL literal: a Neovim on PUC Lua must still load this file).
+    local seconds = tonumber(times[0] / ffi.cast("uint64_t", TICKS))
+    if got == 0 or seconds <= EPOCH_S then
+      return nil
+    end
+    return seconds - EPOCH_S
+  end)
+  return good and started or nil
+end
+
+---Whether the process `pid` is alive (signal 0 only asks, it sends nothing) and, where the system says when it started,
+---not younger than `written` (when its `hub.json` was written): a younger one is another process that got the id of an
+---ended ai-desktop (the rule of `appkit_core::family::process_alive`).
+---@param pid integer
+---@param written number|nil seconds since 1970
 ---@return boolean
-local function alive(pid)
-  local result = vim.uv.kill(pid, 0)
-  return result == 0
+local function alive(pid, written)
+  if vim.uv.kill(pid, 0) ~= 0 then
+    return false
+  end
+  local started = written and M._started(pid)
+  return not started or started <= written + SLACK_S
 end
 
 ---ai-desktop on this machine: installed (a manifest whose program is there), running (a `hub.json` of ai-desktop whose
@@ -129,14 +184,18 @@ function M.ai_desktop()
 end
 
 ---The `hub.json` of a running ai-desktop: `app`, `port`, `pid`, `instance` (a string, possibly empty), or nil when there
----is none, it is not ai-desktop's, its numbers are not whole numbers in range or its process is not alive.
+---is none, it is not ai-desktop's, its numbers are not whole numbers in range or its process is not alive (or, on
+---Windows, started after the file was written: another process with the id of an ended ai-desktop).
 ---@return { app: string, port: integer, pid: integer, instance: string }|nil
 function M.hub_record()
   local config = M.config_dir()
   if not config then
     return nil
   end
-  local record = read_json(vim.fs.joinpath(config, "hub.json"))
+  local path = vim.fs.joinpath(config, "hub.json")
+  local record = read_json(path)
+  local stat = record and vim.uv.fs_stat(path)
+  local written = stat and stat.mtime and (stat.mtime.sec + stat.mtime.nsec / 1e9) or nil
   local pid = record and record.pid
   local port = record and record.port
   if
@@ -149,7 +208,7 @@ function M.hub_record()
     and port > 0
     and port <= 65535
     and port == math.floor(port)
-    and alive(pid)
+    and alive(pid, written)
   then
     return {
       app = APP,

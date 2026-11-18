@@ -108,6 +108,30 @@ return function(H)
       "a hub.json of a live process: running"
     )
     eq(ai.state("auto").on, true, "auto with ai-desktop running: offered")
+    -- A hub.json older than its process: the id went to another process after ai-desktop ended (Windows tells when a
+    -- process started; elsewhere only that it is alive, as appkit).
+    local long_ago = os.time() - 3600 * 24 * 365 * 30
+    ok(vim.uv.fs_utime(record, long_ago, long_ago))
+    local win = vim.fn.has("win32") == 1
+    eq(ai.ai_desktop().running, not win, "a process younger than its hub.json is another one")
+    if win then
+      local started = ai._started(me)
+      ok(
+        started and started <= os.time() + 1 and started > os.time() - 24 * 3600,
+        tostring(started)
+      )
+      eq(ai._started(2147483646), nil, "no such process: no start")
+    else
+      eq(ai._started(me), nil, "only Windows tells")
+    end
+    local real_started = ai._started
+    ai._started = function()
+      return nil
+    end
+    eq(ai.ai_desktop().running, true, "a start that cannot be told: alive is enough")
+    ai._started = real_started
+    ok(vim.uv.fs_utime(record, os.time(), os.time()))
+    eq(ai.ai_desktop().running, true, "written after the process started: running")
     write(
       record,
       vim.json.encode({

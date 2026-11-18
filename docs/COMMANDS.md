@@ -421,7 +421,9 @@ tasks-desktop does. The command is there while the AI functions are on (`setup({
 
 1. Its `hub.json` (in `$AI_DESKTOP_CONFIG_DIR`, else `%APPDATA%\ai-desktop`, `~/Library/Application Support/ai-desktop`,
    `$XDG_CONFIG_HOME/ai-desktop` or `~/.config/ai-desktop`) names port, pid and instance; it counts only while that
-   process lives. Only files are read for the question whether ai-desktop is there.
+   process lives and, on Windows, did not start more than 2 s after the file was written (a younger one got the id of
+   an ended ai-desktop; the rule of `appkit_core::family`). Only files are read for the question whether ai-desktop is
+   there, and on Windows the start of that one process.
 2. `GET /health` on `127.0.0.1:<port>` must answer as ai-desktop with the instance of `hub.json`: another program that
    took the port gets no secret.
 3. `control.secret` beside `hub.json` (64 hex digits, new with every start of ai-desktop) is read for this call and

@@ -80,6 +80,7 @@ the version is not tagged yet (the repository is not published).
 
 ### Fixed
 
+- `tasks_nvim.ai` no longer takes a `hub.json` left behind by an ended ai-desktop for a running one when Windows gave its process id to another process: on Windows the process must not have started more than 2 s after the file was written (`GetProcessTimes` through LuaJIT's ffi, the rule of `appkit_core::family`); where the start cannot be told, alive is enough as before.
 - `$TASKS_MARKER_DOCS` is left alone while `$TASKS_VAULT` names a vault and the work is in another one (`--vault`, a second vault switched to, a throwaway vault of a test): a `done` there refreshed the plan blocks of the real documents from the other vault's tasks, or reported "no such open project" for them. Without `$TASKS_VAULT` the variable applies as before, and the documents of `setup({ chain = { marker_docs } })` apply in any vault. `done_flow.marker_docs` takes `{ root }`.
 - The tree badges watch an area that gets its first task while a tree is open (`integrations.tree_counts`): its `ROADMAP/` is watched from the first index written there, not only after the tree was opened again.
 - `check`: the finding `asset-unused` named the area instead of the image (`assets/lib.nvim is not linked`); it names the asset now.
