@@ -514,6 +514,10 @@ return function(H)
     select(2, sec_crlf_after:gsub("\n", "")),
     "no bare LF was added"
   )
+  -- the first line of the body keeps its indent (an indented code block)
+  local sec_indent = task("indented-section", "\n    indented code\n")
+  one({ op = "set_section", id = "lib.nvim/indented-section", heading = "## Prüfung", text = "x" })
+  has(H.read(sec_indent), "---\n\n    indented code\n\n## Prüfung\n\nx\n", "the indent stays")
   -- a finished task in Backlog/: the review of `:Tasks agent kind=review-done`
   local finished = root .. "/lib.nvim/Backlog/TASKS/2026-10-01_old-one.md"
   H.write(

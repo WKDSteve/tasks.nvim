@@ -898,7 +898,9 @@ local function do_set_section(op, ctx)
     end
     local body = fsio.lf(parsed.body)
     local old = sections.get(body, heading)
-    local new_body = "\n" .. vim.trim(sections.set(body, heading .. "\n\n" .. text)) .. "\n"
+    -- One blank line below the frontmatter; only blank lines go, the first line of the text keeps its indent.
+    -- (`sections.set` ends with one line break.)
+    local new_body = "\n" .. sections.set(body, heading .. "\n\n" .. text):gsub("^%s*\n", "")
     if parsed.eol == "\r\n" then
       new_body = new_body:gsub("\n", "\r\n")
     end
