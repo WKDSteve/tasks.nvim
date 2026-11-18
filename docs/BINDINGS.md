@@ -61,7 +61,8 @@ require("tasks_nvim").setup({
 ```
 
 An action that is not named keeps its default. Dashboard actions: `status prio done filter sort export rescan
-backlog roadmap preview view assign move_down move_up help`. Form actions: `tick_space tick_enter submit cancel cancel_ctrl help`. An unknown
+backlog roadmap preview view assign move_down move_up help`, and while the AI functions are on `agent agent_run` (`gh` / `gH`:
+the task under the cursor to `:Tasks agent`, prefill / run). Form actions: `tick_space tick_enter submit cancel cancel_ctrl help`. An unknown
 action name is reported (and listed in `:checkhealth`), never bound. The help (`g?`) lists the default keys.
 
 ## Form (`:Tasks new` without arguments)

@@ -757,6 +757,58 @@ return function(H)
     )
     vim.cmd("silent! %bwipeout!")
 
+    -- ── gh / gH: the task under the cursor to an agent, only with the AI functions ──
+    local config = require("tasks_nvim.config")
+    local saved_ai = config.get().ai
+    local real_hand = dash.hand_to_agent
+    local handed = {}
+    dash.hand_to_agent = function(id, mode)
+      handed[#handed + 1] = { id = id, mode = mode }
+    end
+    local agent_ok, agent_err = pcall(function()
+      config.merge({ ai = true })
+      cmd.list({ flags = {}, args = {} })
+      p = opened(2)
+      local agent_target = p:items()[1].task.id
+      p:focus("list")
+      flush()
+      keys("gh")
+      ok(
+        wait_for(function()
+          return #handed == 1
+        end),
+        "gh hands the task over"
+      )
+      eq(handed[1], { id = agent_target, mode = "prefill" })
+      eq(current_picker(), nil, "the picker closed for the hand-over")
+      cmd.list({ flags = {}, args = {} })
+      p = opened(2)
+      p:focus("list")
+      flush()
+      keys("gH")
+      ok(
+        wait_for(function()
+          return #handed == 2
+        end),
+        "gH hands it over to run"
+      )
+      eq(handed[2], { id = agent_target, mode = "run" })
+
+      -- Off: no key, nothing is handed over.
+      config.merge({ ai = false })
+      cmd.list({ flags = {}, args = {} })
+      p = opened(2)
+      p:focus("list")
+      flush()
+      keys("gh")
+      flush()
+      eq(#handed, 2, "no hand-over while the AI functions are off")
+      close_all()
+    end)
+    dash.hand_to_agent = real_hand
+    config.merge({ ai = saved_ai })
+    ok(agent_ok, tostring(agent_err))
+
     -- ── r rescans: a task added behind the dashboard's back shows up ──────
     cmd.list({ flags = {}, args = {} })
     p = opened(2)

@@ -146,7 +146,7 @@ return function(H)
   ok(custom_help:find("<C-s>", 1, true) == nil, "and the old one is gone")
   has(custom_help, "- / ", "an unbound action is listed as -")
   local dash_ui = require("tasks_nvim.ui.dash")
-  local dash_help = table.concat(dash_ui.help_lines(), "\n")
+  local dash_help = table.concat(dash_ui.help_lines(nil, true), "\n")
   for _, section in ipairs({ "dashboard", "dashboard_input" }) do
     for name, lhs in pairs(defaults[section]) do
       ok(
@@ -159,6 +159,10 @@ return function(H)
   dkeys.dashboard.status, dkeys.dashboard_input.status = "X", false
   local dcustom = table.concat(dash_ui.help_lines(dkeys), "\n")
   has(dcustom, "X / -", "a rebound list key and an unbound input key show as such")
+  -- The actions of an agent are listed only while the AI functions are on.
+  local without_ai = table.concat(dash_ui.help_lines(nil, false), "\n")
+  ok(not without_ai:find("to an agent", 1, true), "no agent line while the AI functions are off")
+  has(dash_help, "hand the current task to an agent", "and one while they are on")
 
   -- the health check reads only; it must not throw with or without a vault
   local vault = require("tasks_nvim.vault")

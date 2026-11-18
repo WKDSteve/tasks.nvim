@@ -136,7 +136,10 @@ return function(H)
     eq(#asked, 3, "list, menu, list again")
     has(asked[1].opts.prompt, "4 open", "the prompt carries the header")
 
-    -- the menu offers the single-task actions
+    -- the menu offers the single-task actions (no agent while the AI functions are off)
+    local config = require("tasks_nvim.config")
+    local saved_ai = config.get().ai
+    config.merge({ ai = false })
     reset()
     select_queue = {
       function(items)
@@ -165,6 +168,35 @@ return function(H)
     }
     dash.open({ tasks = {}, root = root, filter = {} }, { persist = false, backend = "select" })
     flush()
+
+    -- with the AI functions on, the menu hands the chosen task to an agent (after "attach a screenshot")
+    config.merge({ ai = true })
+    local real_hand = dash.hand_to_agent
+    local handed = {}
+    dash.hand_to_agent = function(id, mode)
+      handed[#handed + 1] = { id = id, mode = mode }
+    end
+    for _, case in ipairs({
+      { "hand to an agent (prefill)", "prefill" },
+      { "hand to an agent and run it", "run" },
+    }) do
+      reset()
+      select_queue = {
+        function(items)
+          return items[1]
+        end,
+        function(items)
+          eq(items[4].label, "hand to an agent (prefill)")
+          eq(items[5].label, "hand to an agent and run it")
+          return pick(case[1])(items)
+        end,
+      }
+      dash.open({ tasks = {}, root = root, filter = {} }, { persist = false, backend = "select" })
+      flush()
+      eq(handed[#handed], { id = "lib.nvim/alpha", mode = case[2] })
+    end
+    dash.hand_to_agent = real_hand
+    config.merge({ ai = saved_ai })
 
     -- an empty result says so instead of opening an empty list
     reset()

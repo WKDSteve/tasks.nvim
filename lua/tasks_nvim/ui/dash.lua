@@ -15,8 +15,10 @@
 ---  - `gb` / `gr` Backlog / ROADMAP.md of the area under the cursor   `g?` help
 ---  - `gp` preview the task file in the browser (mdview.nvim; Alt chord `<M-v>`);
 ---    `e` offers "Preview in browser" for the list as well
+---  - `gh` / `gH` hand the task under the cursor to an agent (`:Tasks agent`, prefill / run; Alt chords `<M-h>` /
+---    `<M-H>`): only while the AI functions are on (`tasks_nvim.ai`), else neither key nor help line
 ---
---- Prompting keys (`D`, `f`, `e`, `gb`, `gr`, `gp`) close the picker first -- snacks
+--- Prompting keys (`D`, `f`, `e`, `gb`, `gr`, `gp`, `gh`, `gH`) close the picker first -- snacks
 --- closes a picker whose window loses focus -- and `D` and `f` reopen it when
 --- the prompt is over. `s` / `p` refresh in place.
 ---
@@ -941,11 +943,22 @@ local function open_area_doc(state, task, which)
   end
 end
 
+-- ── agent ────────────────────────────────────────────────────────────────────
+
+---Hands the task `id` to an agent the way `:Tasks agent <id> mode=<mode>` does (`cmd.task_agent`: ai-desktop's job
+---intake, else ai.nvim; it says what happened and asks where it must). A seam: the specs put a stand-in here.
+---@param id string
+---@param mode "prefill"|"run"
+function M.hand_to_agent(id, mode)
+  cmd().task_agent({ args = { id = id }, kv = { mode = mode }, flags = {}, rest = {} })
+end
+
 -- ── help ─────────────────────────────────────────────────────────────────────
 
 ---The dashboard actions, in the order the help lists them: the name in `setup({ keys.dashboard })`, the picker
----action behind it and what it does. `help_lines` and the key binding below both read this one table.
----@type { name: string, action: string, text: string }[]
+---action behind it and what it does. `help_lines` and the key binding below both read this one table. An action with
+---`ai` is there only while the AI functions are on (`tasks_nvim.ai.enabled()`): no key, no help line otherwise.
+---@type { name: string, action: string, text: string, ai?: boolean }[]
 local ACTIONS = {
   {
     name = "status",
@@ -988,6 +1001,18 @@ local ACTIONS = {
     text = "attach a screenshot to the current task (the clipboard image, else the newest screenshot)",
   },
   {
+    name = "agent",
+    action = "tasks_agent",
+    text = "hand the current task to an agent (:Tasks agent): it waits in ai-desktop, nothing runs",
+    ai = true,
+  },
+  {
+    name = "agent_run",
+    action = "tasks_agent_run",
+    text = "hand the current task to an agent and run it (a private area asks first)",
+    ai = true,
+  },
+  {
     name = "rescan",
     action = "tasks_rescan",
     text = "rescan the vault now (the list also refreshes by itself when a task file changes)",
@@ -1021,12 +1046,25 @@ local ACTIONS = {
   { name = "help", action = "tasks_help", text = "this help" },
 }
 
+---Whether the AI functions are on (`tasks_nvim.ai`); a failure to tell counts as off.
+---@return boolean
+local function ai_on()
+  local ok, on = pcall(function()
+    return require("tasks_nvim.ai").enabled()
+  end)
+  return ok and on == true
+end
+
 ---The help text, from the keys in force: what `setup({ keys })` bound is what is shown, a key set to `false` is
----listed as unbound.
+---listed as unbound. The actions of an agent are listed only while the AI functions are on.
 ---@param keys? Tasks.KeysConfig  # Default: the configured keys.
+---@param with_ai? boolean  # Default: whether the AI functions are on.
 ---@return string[]
-function M.help_lines(keys)
+function M.help_lines(keys, with_ai)
   keys = keys or require("tasks_nvim.config").get().keys
+  if with_ai == nil then
+    with_ai = ai_on()
+  end
   local lines = {
     " Task dashboard ",
     "",
@@ -1035,9 +1073,11 @@ function M.help_lines(keys)
     " <Tab>                   mark / unmark (marked tasks are the target of status, prio, done, export)",
   }
   for _, a in ipairs(ACTIONS) do
-    local list_key = keys.dashboard[a.name] or "-"
-    local input_key = keys.dashboard_input[a.name] or "-"
-    lines[#lines + 1] = (" %-23s %s"):format(list_key .. " / " .. input_key, a.text)
+    if with_ai or not a.ai then
+      local list_key = keys.dashboard[a.name] or "-"
+      local input_key = keys.dashboard_input[a.name] or "-"
+      lines[#lines + 1] = (" %-23s %s"):format(list_key .. " / " .. input_key, a.text)
+    end
   end
   vim.list_extend(lines, {
     "",
@@ -1289,6 +1329,20 @@ local function open_picker(engine, Snacks, state)
     return item and item.task or nil
   end
 
+  ---`gh` / `gH`: the task under the cursor to an agent. The hand-over may ask (a private area, a run) and opens a
+  ---buffer for an answer, so the picker closes first and stays closed (like `gb` / `gr`).
+  ---@param picker table
+  ---@param mode "prefill"|"run"
+  local function to_agent(picker, mode)
+    local task = current_task(picker)
+    if not task then
+      return
+    end
+    detour(picker, function()
+      M.hand_to_agent(task.id, mode)
+    end)
+  end
+
   local actions = {
     tasks_status = function(picker)
       local tasks = targets(picker, true)
@@ -1452,6 +1506,12 @@ local function open_picker(engine, Snacks, state)
         refresh_keep(picker, false)
       end
     end,
+    tasks_agent = function(picker)
+      to_agent(picker, "prefill")
+    end,
+    tasks_agent_run = function(picker)
+      to_agent(picker, "run")
+    end,
     tasks_help = function()
       show_help()
     end,
@@ -1463,12 +1523,14 @@ local function open_picker(engine, Snacks, state)
   -- switches an action's key off.
   local configured = require("tasks_nvim.config").get().keys
   local list_keys, input_keys = {}, {}
+  -- The actions of an agent get no key while the AI functions are off (asked once per opening).
+  local with_ai = ai_on()
   for _, a in ipairs(ACTIONS) do
-    local list_key = configured.dashboard[a.name]
+    local list_key = (with_ai or not a.ai) and configured.dashboard[a.name]
     if list_key then
       list_keys[list_key] = a.action
     end
-    local input_key = configured.dashboard_input[a.name]
+    local input_key = (with_ai or not a.ai) and configured.dashboard_input[a.name]
     if input_key then
       input_keys[input_key] = { a.action, mode = { "n", "i" } }
     end
@@ -1759,6 +1821,21 @@ local function open_select(state)
         end,
       },
     }
+    -- After "attach a screenshot", while the AI functions are on.
+    if ai_on() then
+      table.insert(menu, 4, {
+        label = "hand to an agent (prefill)",
+        run = function()
+          M.hand_to_agent(task.id, "prefill")
+        end,
+      })
+      table.insert(menu, 5, {
+        label = "hand to an agent and run it",
+        run = function()
+          M.hand_to_agent(task.id, "run")
+        end,
+      })
+    end
     vim.ui.select(menu, {
       prompt = task.id,
       format_item = function(m)

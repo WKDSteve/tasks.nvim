@@ -105,16 +105,17 @@ opened with them) or "clear all", then a value (`(any)` clears one chip) |
 | `gp` | preview the task file under the cursor in the browser through mdview.nvim ([Browser preview](#browser-preview-mdview)); the single-task menu of the plain fallback has "preview the file (mdview)" |
 | `ga` | attach a screenshot to the task under the cursor: the clipboard image, else the newest screenshot (`attach.screenshot_dirs`, `attach.max_age_s`), the same as `:Tasks attach <id> from=clipboard\|latest`; the task becomes a folder task and the link is copied to the `+` register (nothing available: one message, nothing attached). The single-task menu of the plain fallback has "attach a screenshot" |
 | `gb` / `gr` | the Backlog picker (`:Tasks folder <area> backlog`) / `ROADMAP/ROADMAP.md` of the area under the cursor |
+| `gh` / `gH` | hand the task under the cursor to an agent, the same as `:Tasks agent <id> mode=prefill` / `mode=run` (see `:Tasks agent` below): ai-desktop's job intake, else ai.nvim; it says what happened and asks where `:Tasks agent` asks. Only while the AI functions are on (`setup({ ai = ... })`): otherwise neither key nor help line nor menu entry. The single-task menu of the plain fallback has "hand to an agent (prefill)" and "hand to an agent and run it" |
 | `g?` | key help float (any key closes it) |
 
 The letters work in the list window. In the input window they would shadow the editing
 commands (`s`, `p`, `D`, `e` in normal mode) and the typing in insert mode, so there the same
 actions are Alt chords (normal and insert mode): `<M-s>` `<M-p>` `<M-d>` `<M-f>` `<M-o>` `<M-e>`
-`<M-r>`, `<M-i>` (attach a screenshot), `<M-b>` (backlog), `<M-m>` (roadmap), `<M-v>` (preview), `<M-?>` (help). `s` and `p` are applied
+`<M-r>`, `<M-i>` (attach a screenshot), `<M-b>` (backlog), `<M-m>` (roadmap), `<M-v>` (preview), `<M-h>` / `<M-H>` (agent), `<M-?>` (help). `s` and `p` are applied
 at once, as **one batch**: every task advances from its own value, one `tasks.mutate.set`
 per task without its own index write, then each touched area's `ROADMAP/TASKS.md` is
 regenerated **once**, and one notification reports `changed / unchanged / failed`. The
-picker stays open and rescans. `D`, `f`, `e`, `gb`, `gr` and `gp` ask something or open a window, and snacks
+picker stays open and rescans. `D`, `f`, `e`, `gb`, `gr`, `gp`, `gh` and `gH` ask something or open a window, and snacks
 closes a picker whose window loses focus, so they close it first; `D` and `f` reopen it
 afterwards (the marks are gone then), `e` does not when it delivered something.
 
