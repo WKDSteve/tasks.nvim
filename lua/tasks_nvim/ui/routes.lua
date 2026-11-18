@@ -838,7 +838,7 @@ local function nested_routes()
         {
           name = "draft",
           bool = true,
-          desc = "Propose the fields from a free text (the words after it, or the selected lines) by ai-desktop or ai.nvim; they fill the form, <C-s> creates the task (only while the AI functions are on)",
+          desc = "Fill the form from a free text or the selection (ai-desktop or ai.nvim)",
         },
       },
       range = true,

@@ -113,7 +113,8 @@ return function(H)
       },
     },
     ["new"] = {
-      composer = {},
+      -- `--draft` asks ai-desktop or ai.nvim for the fields of the form: the editor's form only, the CLI has none
+      composer = { "draft" },
       cli = {
         "actor",
         "after",
