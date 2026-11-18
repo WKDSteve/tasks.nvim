@@ -241,6 +241,48 @@ return function(H)
   has(hand_over(0, task_body), "cannot connect to 127.0.0.1:0")
   ok((vim.uv.hrtime() - t0) / 1e9 < 2, "said at once")
 
+  -- A watched job comes back with its task file (up to 256 KiB) and its output (up to 512 KiB): an answer far larger
+  -- than one of the small routes is still read whole.
+  local big_markdown = ("x"):rep(200 * 1024)
+  local big_output = ("y"):rep(300 * 1024)
+  local job_port, _, stop_job = fake_desktop(function(req)
+    if req.line:match("^GET /jobs/0123456789abcdef ") then
+      return 200,
+        vim.json.encode({
+          id = "0123456789abcdef",
+          status = "done",
+          markdown = big_markdown,
+          output = big_output,
+        })
+    end
+    return 404, '{"error":{"message":"no such route"}}'
+  end)
+  local watched, watch_err, watch_done = nil, nil, false
+  agent.watch(job_port, "0123456789abcdef", function(e, job)
+    watch_err, watched, watch_done = e, job, true
+  end, { interval_ms = 50 })
+  vim.wait(5000, function()
+    return watch_done
+  end)
+  stop_job()
+  ok(watch_done, "the watch ended")
+  eq(watch_err, nil, "a large job is no broken answer")
+  eq(watched and #watched.output, #big_output, "the whole output")
+  eq(watched and #watched.markdown, #big_markdown, "the whole task file")
+  -- Something larger than any job of ai-desktop is still refused.
+  local huge_port, _, stop_huge = fake_desktop(function()
+    return 200, ("z"):rep(9 * 1024 * 1024)
+  end)
+  local huge_err, huge_done = nil, false
+  agent.request(huge_port, "GET", "/jobs/x", {}, "", function(e)
+    huge_err, huge_done = e, true
+  end, agent.MAX_JOB_RESPONSE)
+  vim.wait(5000, function()
+    return huge_done
+  end)
+  stop_huge()
+  has(huge_err or "", "larger than an answer of ai-desktop")
+
   -- ── :Tasks agent ───────────────────────────────────────────────────────────
   local cmd = require("tasks_nvim.ui.cmd")
   local root = F.vault(H)

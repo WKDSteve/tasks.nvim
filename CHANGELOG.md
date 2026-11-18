@@ -83,6 +83,7 @@ the version is not tagged yet (the repository is not published).
 
 ### Fixed
 
+- `:Tasks agent` (`review-done`, `prepare-decision`, `split-plan`) and `:Tasks new --draft` read a watched job of ai-desktop whole: `GET /jobs/<id>` carries the task file (up to 256 KiB) and the output (up to 512 KiB), and the 64 KiB bound of the small routes made such a job end as "ai-desktop does not answer any more". A job may now be up to 8 MiB (`agent.MAX_JOB_RESPONSE`).
 - `tasks-export/1`: the `inverse` of `set_section` (`op`, `heading`, `text`) is in the schema's `Inverse`; it was written but not allowed there, so a typed reader (tasks-desktop) could not take it back. Golden `result-set-section`.
 - `tasks_nvim.ai` no longer takes a `hub.json` left behind by an ended ai-desktop for a running one when Windows gave its process id to another process: on Windows the process must not have started more than 2 s after the file was written (`GetProcessTimes` through LuaJIT's ffi, the rule of `appkit_core::family`); where the start cannot be told, alive is enough as before.
 - `$TASKS_MARKER_DOCS` is left alone while `$TASKS_VAULT` names a vault and the work is in another one (`--vault`, a second vault switched to, a throwaway vault of a test): a `done` there refreshed the plan blocks of the real documents from the other vault's tasks, or reported "no such open project" for them. Without `$TASKS_VAULT` the variable applies as before, and the documents of `setup({ chain = { marker_docs } })` apply in any vault. `done_flow.marker_docs` takes `{ root }`.

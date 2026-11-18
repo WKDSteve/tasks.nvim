@@ -25,8 +25,11 @@ M.KINDS = { "handoff", "review-done", "draft-task", "prepare-decision", "split-p
 
 -- ai-desktop takes a task file of up to 256 KiB; a larger one is refused here, before a request.
 M.MAX_MARKDOWN = 256 * 1024
--- The answers are small JSON documents; more than this is not ai-desktop.
+-- The answers of health, intake and run are small JSON documents; more than this is not ai-desktop.
 local MAX_RESPONSE = 64 * 1024
+-- A job (`GET /jobs/<id>`) carries its task file (up to 256 KiB) and its output (up to 512 KiB), JSON-escaped: room for
+-- that with a margin, still a bound.
+M.MAX_JOB_RESPONSE = 8 * 1024 * 1024
 local TIMEOUT_MS = 5000
 local SECRET_BYTES = 4096
 
@@ -126,15 +129,17 @@ function M.parse_response(text)
   return { status = status, body = body }
 end
 
----One HTTP request to 127.0.0.1:`port` over `vim.uv` TCP (`Connection: close`, 5 s, 64 KiB at most). `cb(err, res)`
----runs in the main loop; `res` is `{ status, body }`. `headers` is a list of `{ name, value }`.
+---One HTTP request to 127.0.0.1:`port` over `vim.uv` TCP (`Connection: close`, 5 s, 64 KiB at most unless `max_bytes`
+---says more). `cb(err, res)` runs in the main loop; `res` is `{ status, body }`. `headers` is a list of `{ name, value }`.
 ---@param port integer
 ---@param method string
 ---@param path string
 ---@param headers string[][]
 ---@param body string
 ---@param cb fun(err: string|nil, res: { status: integer, body: string }|nil)
-function M.request(port, method, path, headers, body, cb)
+---@param max_bytes? integer The largest answer taken (default 64 KiB).
+function M.request(port, method, path, headers, body, cb, max_bytes)
+  local max = max_bytes or MAX_RESPONSE
   local tcp = vim.uv.new_tcp()
   local timer = vim.uv.new_timer()
   if not tcp or not timer then
@@ -181,7 +186,7 @@ function M.request(port, method, path, headers, body, cb)
         finish("the connection broke (" .. tostring(rerr) .. ")")
       elseif data then
         size = size + #data
-        if size > MAX_RESPONSE then
+        if size > max then
           finish("the answer is larger than an answer of ai-desktop")
           return
         end
@@ -441,7 +446,7 @@ function M.watch(port, job_id, on_end, opts)
       if not WAITING[job.status] then
         finish(nil, job)
       end
-    end)
+    end, M.MAX_JOB_RESPONSE)
   end
   timer:start(0, interval, vim.schedule_wrap(tick))
   return stop
