@@ -344,6 +344,39 @@ function M.hand_over(payload, cb, deps)
   end)
 end
 
+---Runs a job that waits for a yes (a private area or a draft, `needs_confirmation`) after the person said yes here:
+---`POST /jobs/<id>/run` with `confirm_private` and the control secret. `cb(err)` in the main loop. `deps`: `request`,
+---`config_dir` for the specs.
+---@param port integer
+---@param job_id string
+---@param cb fun(err: string|nil)
+---@param deps? table
+function M.confirm_run(port, job_id, cb, deps)
+  deps = deps or {}
+  local secret, serr = M.read_secret(deps.config_dir or require("tasks_nvim.ai").config_dir() or "")
+  if not secret then
+    cb(serr)
+    return
+  end
+  local request = deps.request or M.request
+  request(
+    port,
+    "POST",
+    "/jobs/" .. job_id .. "/run",
+    { { "Authorization", "Bearer " .. secret }, { "Content-Type", "application/json" } },
+    vim.json.encode({ confirm_private = true }),
+    function(err, res)
+      if err or not res then
+        cb("ai-desktop does not answer: " .. tostring(err))
+      elseif res.status ~= 200 then
+        cb(("ai-desktop did not run the job (%d): %s"):format(res.status, answer_error(res)))
+      else
+        cb(nil)
+      end
+    end
+  )
+end
+
 -- A job that has not ended yet: it runs, waits for the person in the dashboard (a private area), or waits to be run.
 local WAITING = { running = true, needs_confirmation = true, prefilled = true }
 

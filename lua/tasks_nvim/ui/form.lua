@@ -345,6 +345,7 @@ function M.open(opts)
       due = opts.due,
       start = opts.start,
       ticks = opts.ticks,
+      sections = opts.sections,
       hint = M.key_hint(form_keys),
     })
   )

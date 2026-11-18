@@ -835,6 +835,11 @@ local function nested_routes()
           bool = true,
           desc = "Create a folder task (<slug>/<slug>.md) that can hold assets",
         },
+        {
+          name = "draft",
+          bool = true,
+          desc = "Propose the fields from a free text (the words after it, or the selected lines) by ai-desktop or ai.nvim; they fill the form, <C-s> creates the task (only while the AI functions are on)",
+        },
       },
       range = true,
       desc = "Without arguments: a Markdown form (summary, tick kind, prio, effort, category, severity, status; context, acceptance and notes as text; several areas a,b create one task each; <C-s> submits; mode= picks float, split, vsplit or current) and the question whether to attach assets. With an area: create ROADMAP/tasks/<slug>.md in it and open it; the words after the area are the title (asked for when missing); --folder makes a folder task that can hold assets",

@@ -1359,6 +1359,8 @@ function M.task_new_form(given)
   open({
     areas = areas,
     root = root,
+    area = given.area,
+    sections = given.acceptance and { acceptance = given.acceptance } or nil,
     title = given.title,
     summary = given.summary,
     mode = given.mode,
@@ -1522,10 +1524,226 @@ function M.range_source(ctx, buf)
   return source
 end
 
+---The text of `:Tasks new --draft`: the words after it, then the selected lines (a range), joined by a blank line.
+---@param ctx table
+---@param buf? integer
+---@return string
+function M.draft_text(ctx, buf)
+  local parts = {}
+  local words = {}
+  if ctx.args and ctx.args.area and ctx.args.area ~= "" then
+    words[1] = ctx.args.area
+  end
+  vim.list_extend(words, ctx.rest or {})
+  local typed = vim.trim(unquote(table.concat(words, " ")))
+  if typed ~= "" then
+    parts[#parts + 1] = typed
+  end
+  local r = ctx.range
+  if r and (r.range or 0) > 0 then
+    buf = buf or vim.api.nvim_get_current_buf()
+    if vim.api.nvim_buf_is_valid(buf) then
+      local last = vim.api.nvim_buf_line_count(buf)
+      local first_line = math.max(1, math.min(r.line1 or 1, last))
+      local last_line = math.max(first_line, math.min(r.line2 or first_line, last))
+      local selected = vim.trim(
+        table.concat(vim.api.nvim_buf_get_lines(buf, first_line - 1, last_line, false), "\n")
+      )
+      if selected ~= "" then
+        parts[#parts + 1] = selected
+      end
+    end
+  end
+  return table.concat(parts, "\n\n")
+end
+
+---`:Tasks new --draft <text>` (or over a selection): the fields of a new task proposed from a free text
+---(`tasks_nvim.draft`), by ai-desktop's job `draft-task` or, without a running ai-desktop, one answer of ai.nvim. The
+---draft fills the form of `:Tasks new`; nothing is created before `<C-s>`. The area is not known yet, so the
+---strictest class holds: ai-desktop's jobs model, when it is not local, is used only after a yes here, and ai.nvim is
+---asked only after a yes.
+---@param ctx table
+---@param deps? table Stand-ins for the specs: `state`, `ai_desktop`, `ai_nvim`, `choices`, `hand_over`, `record`,
+---  `watch`, `confirm_run`, `confirm`, `form`, `root`.
+function M.task_new_draft(ctx, deps)
+  deps = deps or {}
+  local ai = require("tasks_nvim.ai")
+  local agent = require("tasks_nvim.agent")
+  local draft = require("tasks_nvim.draft")
+  local state = deps.state or ai.state()
+  if not state.on then
+    notify.error(
+      state.setting == false and "new --draft: the AI functions are off (setup({ ai = false }))"
+        or "new --draft: neither ai-desktop nor ai.nvim is found on this machine"
+    )
+    return
+  end
+  local text = M.draft_text(ctx)
+  if text == "" then
+    notify.error(
+      "new --draft: give a text (the words after --draft) or select the lines to draft from"
+    )
+    return
+  end
+  if #text > draft.MAX_TEXT then
+    notify.error(("new --draft: the text is larger than %d KiB"):format(draft.MAX_TEXT / 1024))
+    return
+  end
+  local root = deps.root or vault_root()
+  if not root then
+    return
+  end
+  local choices = deps.choices or draft.choices(root)
+  if #choices.areas == 0 then
+    notify.error(require("tasks_nvim.form").no_areas_message(root))
+    return
+  end
+  local confirm_fn = deps.confirm
+    or function(msg, label, cb)
+      require("tasks_nvim.ui.confirm").yesno(msg, label, cb)
+    end
+  local source = M.range_source(ctx)
+
+  ---@param d Tasks.Draft
+  local function fill(d)
+    local given = draft.given(d)
+    if source and source.ref then
+      given.refs, given.ref_list = source.ref, { source.ref }
+    end
+    if #d.dropped > 0 then
+      notify.info(
+        "new --draft: left out, not values of this vault: " .. table.concat(d.dropped, ", ")
+      )
+    end
+    notify.info("new --draft: the form is filled in; <C-s> creates the task, q drops it")
+    local form = deps.form or M.task_new_form
+    form(given)
+  end
+
+  local desktop = deps.ai_desktop or ai.ai_desktop()
+  if desktop.running then
+    local hand_over = deps.hand_over or agent.hand_over
+    notify.info("new --draft: asking ai-desktop ...")
+    hand_over(draft.payload(text, root, choices), function(herr, res)
+      if herr or not res then
+        notify.error("new --draft: " .. (herr or "no answer"))
+        return
+      end
+      local record = deps.record or ai.hub_record()
+      if not record then
+        notify.error("new --draft: ai-desktop is gone")
+        return
+      end
+      local function watch_job()
+        local watch = deps.watch or agent.watch
+        watch(record.port, res.job_id, function(werr, job)
+          if werr or not job then
+            notify.error("new --draft: " .. tostring(werr))
+            return
+          end
+          if job.status ~= "done" then
+            notify.error(
+              ("new --draft: the job is %s: %s"):format(
+                job.status,
+                tostring(job.error or "no answer")
+              )
+            )
+            return
+          end
+          local d, derr
+          if type(job.draft) == "table" then
+            d, derr = draft.check(job.draft, choices)
+          else
+            derr = type(job.draft_error) == "string" and job.draft_error
+              or "ai-desktop gave no draft"
+          end
+          if not d then
+            notify.error("new --draft: " .. tostring(derr) .. "; nothing filled in")
+            return
+          end
+          fill(d)
+        end, { interval_ms = 1000, max_ms = 10 * 60 * 1000 })
+      end
+      if res.status ~= "needs_confirmation" then
+        watch_job()
+        return
+      end
+      confirm_fn(
+        "The area of the new task is not chosen yet, so the text counts as private, and the model of ai-desktop's jobs does not run on this machine. Send the text there anyway?",
+        "send",
+        function(yes)
+          if not yes then
+            notify.info("new --draft: nothing sent; the job waits in the dashboard of ai-desktop")
+            return
+          end
+          local confirm_run = deps.confirm_run or agent.confirm_run
+          confirm_run(record.port, res.job_id, function(cerr)
+            if cerr then
+              notify.error("new --draft: " .. cerr)
+              return
+            end
+            watch_job()
+          end)
+        end
+      )
+    end, { allow_foreground = function() end })
+    return
+  end
+  local ai_nvim = deps.ai_nvim
+  if ai_nvim == nil then
+    local has_ai, mod = pcall(require, "ai")
+    ai_nvim = has_ai and type(mod) == "table" and type(mod.ask) == "function" and mod or false
+  end
+  if not ai_nvim then
+    notify.error(
+      desktop.installed
+          and "new --draft: ai-desktop is installed but not running: start it, then :Tasks new --draft again"
+        or "new --draft: there is no ai-desktop and no ai.nvim to ask"
+    )
+    return
+  end
+  local prompt = draft.prompt(text, choices)
+  -- UI-03: a fallback says so; and ai.nvim may use a model outside this machine, so it asks first.
+  confirm_fn(
+    ("%s; ai.nvim answers once instead. The area is not chosen yet, so the text counts as private, and ai.nvim may send it to a model outside this machine. Send the text (%d characters)?"):format(
+      desktop.installed and "ai-desktop is installed but not running"
+        or "No ai-desktop on this machine",
+      #text
+    ),
+    "send",
+    function(yes)
+      if not yes then
+        notify.info("new --draft: nothing sent")
+        return
+      end
+      notify.info("new --draft: waiting for the answer of ai.nvim ...")
+      ai_nvim.ask({ prompt = prompt, context = {} }, function(ok, res)
+        vim.schedule(function()
+          if not ok then
+            local why = type(res) == "table" and res.message or tostring(res)
+            notify.error("new --draft: ai.nvim: " .. tostring(why))
+            return
+          end
+          local d, derr = draft.extract(tostring(type(res) == "table" and res.text or ""), choices)
+          if not d then
+            notify.error("new --draft: " .. tostring(derr) .. "; nothing filled in")
+            return
+          end
+          fill(d)
+        end)
+      end)
+    end
+  )
+end
+
 ---`:Tasks new [<area> [title...]] [kind= prio= effort= tags= status=]`. With a range, the task is about those lines:
 ---it gets a `refs:` entry for them, and the first selected line as its title when none was typed.
 ---@param ctx table
 function M.task_new(ctx)
+  if ctx.flags and ctx.flags.draft then
+    M.task_new_draft(ctx)
+    return
+  end
   local area = ctx.args.area
   local source = M.range_source(ctx)
   if area == nil or area == "" then

@@ -181,9 +181,9 @@ local function selection(ticks)
 end
 
 ---Fresh form text.
----@param opts? { area?: string, title?: string, summary?: string, areas?: string[], tags?: string, other?: string, refs?: string, links?: string, after?: string, plan?: string, project?: string, phase?: string, due?: string, start?: string, ticks?: table<string, string|string[]>, hint?: string, lang?: "de"|"en" }
+---@param opts? { area?: string, title?: string, summary?: string, areas?: string[], tags?: string, other?: string, refs?: string, links?: string, after?: string, plan?: string, project?: string, phase?: string, due?: string, start?: string, ticks?: table<string, string|string[]>, hint?: string, lang?: "de"|"en", sections?: table<string, string> }
 ---  `ticks` overrides the ticked values per field name; `hint` is the second line (the keys of the user's setup);
----  `lang` picks the headings of the body sections (default `de`).
+---  `lang` picks the headings of the body sections (default `de`); `sections` fills them (`acceptance` = its lines).
 ---@return string[] lines
 function M.template(opts)
   opts = opts or {}
@@ -245,10 +245,16 @@ function M.template(opts)
   lines[#lines + 1] = "Due: " .. (opts.due or "")
   lines[#lines + 1] = "Start: " .. (opts.start or "")
   local headings = SECTION_HEADINGS[opts.lang or "de"] or SECTION_HEADINGS.de
-  for _, h in ipairs(headings) do
+  for i, h in ipairs(headings) do
     lines[#lines + 1] = ""
     lines[#lines + 1] = "## " .. h
     lines[#lines + 1] = ""
+    -- `opts.sections` fills a section (a draft's acceptance): its text, then the blank line as before.
+    local text = opts.sections and M.SECTIONS[i] and opts.sections[M.SECTIONS[i].key]
+    if type(text) == "string" and text ~= "" then
+      vim.list_extend(lines, vim.split(text, "\n", { plain = true }))
+      lines[#lines + 1] = ""
+    end
   end
   return lines
 end

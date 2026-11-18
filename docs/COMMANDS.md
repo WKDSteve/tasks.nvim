@@ -258,6 +258,31 @@ With an area (`task new <area> ...`) nothing changes: that is the old behaviour 
 Seams for tests and other front ends: `ui.cmd.form_open` (replaces the form buffer,
 signature of `ui.form.open`) and `ui.cmd.explorer_open(dir)`.
 
+### `:Tasks new --draft <text...>` -- the form, filled in from a free text
+
+`:Tasks new --draft Der Knopf im Formular soll blau sein` (or `:'<,'>Tasks new --draft`
+over a note, a piece of a mail; typed words and the selection together are the text)
+asks for the fields of the new task and opens the form above with them filled in:
+title, area, kind, prio, effort, value, tags, category, plan, summary and the
+acceptance lines. Nothing is created: `<C-s>` creates the task as always, every field
+stays as editable as a typed one, and `q` drops it. Only while the AI functions are on
+(`setup({ ai = ... })`).
+
+- With a running ai-desktop, the text goes to its job of the kind `draft-task`
+  (`POST /jobs`, docs/JOBS.md "Drafts" of ai-desktop) with the values this vault allows
+  (`choices`: its areas, the kinds and categories, the tags of its open tasks, the ids of
+  its plans). The dashboard does not come to the front; the editor watches the job.
+- The area is not chosen yet, so the text counts as private (the strictest class): a
+  local model of ai-desktop answers at once; when its jobs model does not run on this
+  machine, ai-desktop holds the job and the editor asks first ("Send the text there
+  anyway?"); only a yes runs it (`POST /jobs/<id>/run` with `confirm_private` and the
+  control secret). No leaves it waiting in the dashboard.
+- Without ai-desktop, ai.nvim answers once with the same prompt, after a question
+  (ai.nvim may send it to a model outside this machine).
+- The answer is checked again here (`tasks_nvim.draft.check`, the rules of ai-desktop's
+  `draft::check`): a value this vault does not know is left out and named in a message;
+  a wrong shape or a control character fills in nothing and says why.
+
 ### `:Tasks new <area> [title...] [kind= prio= effort= tags= status=]`
 
 Besides these keys `value=`, `actor=`, `after=`, `order=`, `plan=`, `phase=` and `waits_for=` are accepted

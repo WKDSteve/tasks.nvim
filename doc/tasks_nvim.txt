@@ -136,6 +136,11 @@ A wrong key or value is ignored with a message and listed in
   :Tasks new [{area} [{title}...]] [kind= prio= effort= value= actor=
               tags= category= severity= status=] [--folder]
       Without arguments a Markdown form (`<C-s>` submits).
+  :Tasks new --draft {text}...           The form, filled in from a free text
+                                         (or the selected lines) by ai-desktop's
+                                         job `draft-task` or one answer of
+                                         ai.nvim; asks before the text leaves
+                                         the machine; `<C-s>` creates the task.
 
   :Tasks set {id} {key}={value} ...      Change frontmatter; an empty value
                                          removes the key. A finished task takes
