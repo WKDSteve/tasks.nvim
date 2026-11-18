@@ -103,6 +103,20 @@ G.cases = {
       return '{"params":{"id":"lib.nvim/shipped","finished":true}}'
     end,
   },
+  {
+    -- the answer of a review job taken apart (capability `agent_answer`): its section and the follow-up it proposes
+    name = "agent-answer-review",
+    method = "agent_answer",
+    request = vim.json.encode({
+      params = {
+        kind = "review-done",
+        id = "lib.nvim/alpha",
+        output = "Checked.\n\n<!-- review:begin -->\n## Prüfung\n\n- [x] it is done — erfüllt: a.lua:1\n"
+          .. "- [ ] documented — offen\n\n### Folgetask (Vorschlag)\n\n- title: Document it\n"
+          .. "- summary: The README names it.\n<!-- review:end -->\n",
+      },
+    }),
+  },
   { name = "bodies-page", method = "bodies", request = '{"params":{"limit":3,"offset":1}}' },
   {
     name = "estimate",

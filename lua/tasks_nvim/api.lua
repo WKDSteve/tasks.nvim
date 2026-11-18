@@ -103,6 +103,13 @@ local methods = {
       )
     end,
   },
+  agent_answer = {
+    params = { kind = "string", output = "string", id = "string" },
+    required = { "kind", "output", "id" },
+    run = function(params, opts)
+      return contract.agent_answer(params, opts)
+    end,
+  },
   bodies = {
     params = { ids = "string_list", limit = "integer", offset = "integer" },
     run = function(params, opts)

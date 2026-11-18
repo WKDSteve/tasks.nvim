@@ -57,6 +57,7 @@ M.ENGINE_VERSION = "0.1.0-dev"
 ---@type string[]
 M.CAPABILITIES = {
   "add_steps",
+  "agent_answer",
   "answer",
   "append_note",
   "areas",
@@ -1089,6 +1090,80 @@ function M.lists(opts)
   local doc = M.head("tasks.lists", root)
   doc.lists = json.memo(items)
   doc.notes = notes
+  return seal(doc, nil), nil
+end
+
+---The kinds of a job whose answer `agent_answer` takes apart, and the marker of its block.
+local ANSWER_KINDS = { ["review-done"] = "review", ["prepare-decision"] = "decision" }
+
+---The answer of an agent's job (ai-desktop, `GET /jobs/<id>` `output`) taken apart for the task `id` (capability
+---`agent_answer`): the last block of its kind, checked by the rules `:Tasks agent` uses (`tasks_nvim.review`), as the
+---sections a caller writes with `set_section` after a yes. A review gives its section (`## Prüfung`) and the follow-up
+---task it proposes; a prepared decision its proposal and, only when the task has no questions of its own, its open
+---questions (`questions_added`). Nothing is written. An answer without a block of its kind, or one that breaks a rule,
+---is `invalid_argument` with the reason. The output is untrusted text.
+---@param params { kind: string, output: string, id: string }
+---@param opts? { root?: string }
+---@return table|nil doc
+---@return Tasks.ContractError|string|nil err
+function M.agent_answer(params, opts)
+  local root, rerr = vault.root(opts)
+  if not root then
+    return nil, rerr
+  end
+  local function refused(message)
+    return nil, { code = "invalid_argument", message = message, retryable = false }
+  end
+  local which = ANSWER_KINDS[params.kind]
+  if not which then
+    return refused("kind is review-done or prepare-decision")
+  end
+  local area, slug, perr = vault.parse_id(tostring(params.id))
+  if not area or not slug then
+    return refused(perr or "expected <area>/<slug>")
+  end
+  local review = require("tasks_nvim.review")
+  local block = review.block(params.output, which)
+  if not block then
+    return refused(("the answer has no %s block"):format(which))
+  end
+  local doc = M.head("tasks.agent_answer", root)
+  doc.answer_kind = params.kind
+  local function section(text)
+    local heading = text:match("^[^\n]*")
+    return json.object({ heading = heading, text = vim.trim(text:sub(#heading + 1)) })
+  end
+  if which == "review" then
+    local good, why = review.check(block)
+    if not good then
+      return refused(why or "the review breaks a rule")
+    end
+    doc.sections = { section(vim.trim(block)) }
+    local follow = review.follow_up(block)
+    if follow then
+      doc.follow_up = json.object({
+        title = clip(follow.title, M.LIMITS.title),
+        summary = follow.summary and clip(follow.summary, M.LIMITS.summary) or nil,
+      })
+    end
+  else
+    local parts, why = review.check_decision(block)
+    if not parts then
+      return refused(why or "the proposal breaks a rule")
+    end
+    local task = scan.find(params.id, { root = root })
+    if not task or task.status ~= "decision" then
+      return nil,
+        {
+          code = "not_found",
+          message = "no open task that waits for a decision: " .. tostring(params.id),
+          retryable = false,
+        }
+    end
+    local blocks, added = review.decision_blocks(fsio.read(task.path) or "", parts)
+    doc.sections = vim.tbl_map(section, blocks)
+    doc.questions_added = added
+  end
   return seal(doc, nil), nil
 end
 

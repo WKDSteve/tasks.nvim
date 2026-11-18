@@ -1,0 +1,26 @@
+{
+  "answer_kind": "review-done",
+  "digest": "sha256:b9f5f49d95e9a726",
+  "engine": {
+    "git": "0000000",
+    "nvim": "0.0.0",
+    "version": "0.1.0-test"
+  },
+  "follow_up": {
+    "summary": "The README names it.",
+    "title": "Document it"
+  },
+  "generated_at": "2026-01-01T00:00:00Z",
+  "kind": "tasks.agent_answer",
+  "plugin": "tasks.nvim",
+  "schema": 1,
+  "sections": [
+    {
+      "heading": "## Prüfung",
+      "text": "- [x] it is done — erfüllt: a.lua:1\n- [ ] documented — offen\n\n### Folgetask (Vorschlag)\n\n- title: Document it\n- summary: The README names it."
+    }
+  ],
+  "vault": {
+    "id": "vault"
+  }
+}

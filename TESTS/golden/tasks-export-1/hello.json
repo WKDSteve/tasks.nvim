@@ -1,6 +1,7 @@
 {
   "capabilities": [
     "add_steps",
+    "agent_answer",
     "answer",
     "append_note",
     "areas",

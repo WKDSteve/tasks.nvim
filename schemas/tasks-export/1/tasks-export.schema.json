@@ -38,6 +38,9 @@
       "$ref": "#/$defs/TaskDocument"
     },
     {
+      "$ref": "#/$defs/AgentAnswer"
+    },
+    {
       "$ref": "#/$defs/Next"
     },
     {
@@ -2013,6 +2016,65 @@
           "items": {
             "type": "string"
           }
+        }
+      },
+      "unevaluatedProperties": false
+    },
+    "AgentAnswer": {
+      "description": "tasks.agent_answer (capability agent_answer): the answer of an agent's job (kind review-done or prepare-decision) taken apart for one task by the rules of :Tasks agent, as the sections a caller writes with set_section after a yes. Nothing is written. The texts are untrusted.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/Head"
+        }
+      ],
+      "type": "object",
+      "required": ["kind", "digest", "answer_kind", "sections"],
+      "properties": {
+        "kind": {
+          "const": "tasks.agent_answer"
+        },
+        "digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "answer_kind": {
+          "enum": ["review-done", "prepare-decision"]
+        },
+        "sections": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 2,
+          "description": "In the order to write them: the heading (one line, '## ' and a word) and the text below it, trimmed.",
+          "items": {
+            "type": "object",
+            "required": ["heading", "text"],
+            "properties": {
+              "heading": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "follow_up": {
+          "type": "object",
+          "description": "review-done: the follow-up task the review proposes (create it only after a yes of its own).",
+          "required": ["title"],
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "summary": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        "questions_added": {
+          "type": "boolean",
+          "description": "prepare-decision: whether the open questions are among the sections (only when the task has none of its own)."
         }
       },
       "unevaluatedProperties": false
