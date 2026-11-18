@@ -201,6 +201,14 @@ return function(H)
     has(err2, "not the ai-desktop of hub.json")
     eq(#seen, before + 1, "only the health question")
 
+    -- A hub.json without an instance cannot prove which program is on the port: the secret is not sent either.
+    before = #seen
+    local err_noinst = hand_over(port, task_body, {
+      record = { app = "ai-desktop", port = port, pid = 4242, instance = "" },
+    })
+    has(err_noinst, "not the ai-desktop of hub.json")
+    eq(#seen, before + 1, "only the health question, no job with the secret")
+
     -- No secret file: nothing is sent.
     local saved = H.read(dir .. "/control.secret")
     os.remove(dir .. "/control.secret")

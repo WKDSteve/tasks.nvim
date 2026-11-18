@@ -298,7 +298,9 @@ function M.hand_over(payload, cb, deps)
     if
       not doc
       or doc.app ~= "ai-desktop"
-      or (record.instance ~= "" and doc.instance ~= record.instance)
+      -- no instance in hub.json: nothing proves which program is on the port, so the secret stays here
+      or record.instance == ""
+      or doc.instance ~= record.instance
     then
       cb(
         ("the program on port %d is not the ai-desktop of hub.json; nothing was sent"):format(
