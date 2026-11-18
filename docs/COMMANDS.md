@@ -439,6 +439,13 @@ tasks-desktop does. The command is there while the AI functions are on (`setup({
    job (`prefilled`: it waits in the dashboard, `running`, `needs_confirmation`: a private area that ai-desktop asks
    about first). The vault has no class of its areas, so none is sent: ai-desktop's own `private_areas` decide.
 
+Every later request with the secret about that job (`POST /jobs/<id>/run` after a yes here, `DELETE /jobs/<id>` after a
+no) goes to the port of the hand-over and asks `GET /health` again first: only the same instance gets the secret. A
+question here may stay open for long; when ai-desktop restarted meanwhile (another port, another secret) and another
+program took the old port, that program gets nothing and the message says so. Before a `DELETE` the editor asks where
+the job is (`GET /jobs/<id>`): a job that was confirmed in ai-desktop's dashboard meanwhile runs or has run, it is left
+as it is (a `DELETE` would cancel it) and the message says that the text went to the model from there.
+
 `mode=prefill` (the default) leaves a new job that waits; `mode=run` starts it at once (Claude Code with the brief
 of `agent-brief` unless ai-desktop is set otherwise). `kind` names what the job asks for (default `handoff`). A refusal
 of ai-desktop is said with its message (`ai-desktop refused the task (403): jobs from other apps are turned off ...`).

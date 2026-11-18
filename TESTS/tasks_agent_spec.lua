@@ -28,60 +28,6 @@ return function(H)
   H.write(dir .. "/control.secret", SECRET:upper() .. "\r\n")
   eq(agent.read_secret(dir), SECRET, "64 hex digits, trimmed, lower case")
 
-  -- ── putting a job away (a no to its question) ─────────────────────────────
-  do
-    local sent, said = {}, {}
-    local function drop(id, status, err)
-      agent.drop_job(4711, id, function(derr)
-        said[#said + 1] = derr or "ok"
-      end, {
-        config_dir = dir,
-        request = function(port, method, path, headers, body, cb)
-          sent[#sent + 1] =
-            { port = port, method = method, path = path, headers = headers, body = body }
-          cb(
-            err,
-            err == nil and { status = status, body = '{"error":{"message":"jobs are off"}}' } or nil
-          )
-        end,
-      })
-    end
-    drop("0123456789abcdef", 204)
-    eq(said[#said], "ok")
-    eq(sent[1].method, "DELETE")
-    eq(sent[1].path, "/jobs/0123456789abcdef")
-    eq(sent[1].port, 4711)
-    eq(
-      sent[1].headers,
-      { { "Authorization", "Bearer " .. SECRET } },
-      "the secret in the header, nothing else"
-    )
-    eq(sent[1].body, "")
-    drop("0123456789abcdef", 404)
-    eq(said[#said], "ok", "a job that is gone already is put away")
-    drop("0123456789abcdef", 403)
-    has(said[#said], "did not put the job away (403)")
-    drop("0123456789abcdef", nil, "closed")
-    has(said[#said], "does not answer")
-    local before = #sent
-    for _, bad in ipairs({ "../health", "a b", "", "a?x=1" }) do
-      drop(bad, 204)
-      has(said[#said], "not plain", bad)
-    end
-    eq(#sent, before, "an id that is not plain is never put into a request line")
-    -- Without the secret nothing is asked.
-    agent.drop_job(4711, "0123456789abcdef", function(derr)
-      said[#said + 1] = derr
-    end, {
-      config_dir = dir .. "/nowhere",
-      request = function()
-        sent[#sent + 1] = "asked"
-      end,
-    })
-    has(said[#said], "no control.secret")
-    eq(#sent, before)
-  end
-
   -- ── answers ────────────────────────────────────────────────────────────────
   eq(
     agent.parse_response("HTTP/1.1 201 Created\r\nContent-Length: 2\r\n\r\n{}"),
@@ -233,7 +179,13 @@ return function(H)
   local served, serr = pcall(function()
     local err, result, foreground = hand_over(port, task_body)
     eq(err, nil)
-    eq(result, { job_id = "0123456789abcdef", status = "prefilled", private = false, note = nil })
+    eq(result, {
+      job_id = "0123456789abcdef",
+      status = "prefilled",
+      private = false,
+      note = nil,
+      peer = { port = port, pid = 4242, instance = "inst-1" },
+    })
     eq(#seen, 2, "health, then the job")
     has(seen[1].line, "GET /health HTTP/1.1")
     has(seen[2].line, "POST /jobs HTTP/1.1")
@@ -279,6 +231,145 @@ return function(H)
   end)
   stop()
   ok(served, tostring(serr))
+
+  -- ── after the hand-over: confirm_run and drop_job prove the ai-desktop again ─
+  -- The question to the person may stay open for long; ai-desktop may restart meanwhile on another port and another
+  -- program may listen on the old one. Every request with the secret proves the instance of the hand-over first.
+  local JOB = "0123456789abcdef"
+  local JOB_WAITS = '{"id":"0123456789abcdef","status":"needs_confirmation"}'
+  local JOB_RUNS = '{"id":"0123456789abcdef","status":"running"}'
+  local function job_desktop(job_body, delete_status)
+    return fake_desktop(function(req)
+      if req.line:match("^GET /health ") then
+        return 200, HEALTH
+      end
+      if req.line:match("^GET /jobs/") then
+        if not job_body then
+          return 404, '{"error":{"message":"no such job"}}'
+        end
+        return 200, job_body
+      end
+      if req.line:match("^DELETE /jobs/") then
+        return delete_status or 204, ""
+      end
+      if req.line:match("^POST /jobs/[%w]+/run ") then
+        return 200, JOB_RUNS
+      end
+      return 500, "{}"
+    end)
+  end
+  local function call(fn, peer, id, extra)
+    local err, outcome, done = nil, nil, false
+    fn(peer, id, function(e, o)
+      err, outcome, done = e, o, true
+    end, vim.tbl_extend("force", { config_dir = dir }, extra or {}))
+    vim.wait(5000, function()
+      return done
+    end)
+    ok(done, "answered")
+    return err, outcome
+  end
+  local function lines(reqs)
+    return vim.tbl_map(function(r)
+      return r.line
+    end, reqs)
+  end
+
+  -- The hand-over says which ai-desktop took the job.
+  local hp, _, hstop = fake_desktop(standard)
+  local _, handed_res = hand_over(hp, task_body)
+  hstop()
+  eq(handed_res.peer, { port = hp, pid = 4242, instance = "inst-1" }, "the proved ai-desktop")
+
+  -- A job that still waits: health, where the job is (no secret), then DELETE with the secret.
+  local p1, seen1, stop1 = job_desktop(JOB_WAITS)
+  local drop_err, outcome = call(agent.drop_job, { port = p1, instance = "inst-1" }, JOB)
+  stop1()
+  eq(drop_err, nil)
+  eq(outcome, "dropped")
+  eq(lines(seen1), {
+    "GET /health HTTP/1.1",
+    "GET /jobs/" .. JOB .. " HTTP/1.1",
+    "DELETE /jobs/" .. JOB .. " HTTP/1.1",
+  })
+  lacks(seen1[1].head, SECRET, "the health question carries no secret")
+  lacks(seen1[2].head, SECRET, "the job question carries no secret")
+  has(seen1[3].head, "Authorization: Bearer " .. SECRET, "the secret goes with the DELETE")
+
+  -- Confirmed in the dashboard meanwhile: DELETE would cancel the running job; it is left, and the status is said.
+  local p2, seen2, stop2 = job_desktop(JOB_RUNS)
+  drop_err, outcome = call(agent.drop_job, { port = p2, instance = "inst-1" }, JOB)
+  stop2()
+  eq(drop_err, nil)
+  eq(outcome, "running", "the status of the job confirmed in the dashboard")
+  eq(#seen2, 2, "no DELETE of a running job")
+
+  -- ai-desktop does not know the job any more (restarted: its jobs live in memory).
+  local p3, seen3, stop3 = job_desktop(nil)
+  drop_err, outcome = call(agent.drop_job, { port = p3, instance = "inst-1" }, JOB)
+  stop3()
+  eq({ drop_err, outcome }, { nil, "gone" })
+  eq(#seen3, 2, "no DELETE of a job that is gone")
+
+  -- ai-desktop refuses the DELETE: said.
+  local p4, _, stop4 = job_desktop(JOB_WAITS, 403)
+  drop_err = call(agent.drop_job, { port = p4, instance = "inst-1" }, JOB)
+  stop4()
+  has(drop_err, "did not put the job away (403)")
+
+  -- Another program on the old port (ai-desktop restarted elsewhere): it answers everything with 404, as the old
+  -- drop_job took for "put away". It is not asked about the job, and the secret never reaches it.
+  local stranger = function()
+    return 404, '{"error":{"message":"not found"}}'
+  end
+  local p5, seen5, stop5 = fake_desktop(stranger)
+  drop_err, outcome = call(agent.drop_job, { port = p5, instance = "inst-1" }, JOB)
+  local cerr = call(agent.confirm_run, { port = p5, instance = "inst-1" }, JOB)
+  stop5()
+  has(drop_err, "not the ai-desktop that took the job; nothing was sent")
+  eq(outcome, nil)
+  has(cerr, "not the ai-desktop that took the job; nothing was sent")
+  eq(lines(seen5), { "GET /health HTTP/1.1", "GET /health HTTP/1.1" }, "only the health questions")
+  for _, req in ipairs(seen5) do
+    lacks(req.head, SECRET, "the stranger never gets the secret")
+  end
+
+  -- Another ai-desktop (a new instance) on the old port does not get the secret either.
+  local p6, seen6, stop6 = job_desktop(JOB_WAITS)
+  drop_err = call(agent.drop_job, { port = p6, instance = "inst-0" }, JOB)
+  cerr = call(agent.confirm_run, { port = p6, instance = "inst-0" }, JOB)
+  stop6()
+  has(drop_err, "not the ai-desktop that took the job")
+  has(cerr, "not the ai-desktop that took the job")
+  eq(#seen6, 2, "only the health questions")
+
+  -- confirm_run: health, then the run with the secret.
+  local p7, seen7, stop7 = job_desktop(JOB_WAITS)
+  cerr = call(agent.confirm_run, { port = p7, instance = "inst-1" }, JOB)
+  stop7()
+  eq(cerr, nil)
+  eq(lines(seen7), { "GET /health HTTP/1.1", "POST /jobs/" .. JOB .. "/run HTTP/1.1" })
+  has(seen7[2].head, "Authorization: Bearer " .. SECRET)
+  eq(vim.json.decode(seen7[2].body), { confirm_private = true })
+
+  -- Nobody on the port, an id that is not plain, no secret file: nothing with the secret leaves.
+  local gone = vim.uv.new_tcp()
+  gone:bind("127.0.0.1", 0)
+  local gone_port = gone:getsockname().port
+  gone:close()
+  has(call(agent.drop_job, { port = gone_port, instance = "inst-1" }, JOB), "does not answer")
+  local p8, seen8, stop8 = job_desktop(JOB_WAITS)
+  for _, bad in ipairs({ "../health", "a b", "", "a?x=1" }) do
+    has(call(agent.drop_job, { port = p8, instance = "inst-1" }, bad), "not plain", bad)
+    has(call(agent.confirm_run, { port = p8, instance = "inst-1" }, bad), "not plain", bad)
+  end
+  eq(#seen8, 0, "an id that is not plain is never put into a request line")
+  local saved_secret = H.read(dir .. "/control.secret")
+  os.remove(dir .. "/control.secret")
+  has(call(agent.drop_job, { port = p8, instance = "inst-1" }, JOB), "no control.secret")
+  H.write(dir .. "/control.secret", saved_secret)
+  stop8()
+  eq(lines(seen8), { "GET /health HTTP/1.1" }, "without the secret only the health question")
 
   -- ai-desktop refuses: its message is said, the secret is not.
   local refusing_port, _, stop_refusing = fake_desktop(function(req)

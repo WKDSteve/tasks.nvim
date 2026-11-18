@@ -221,7 +221,12 @@ return function(H)
       { args = {}, rest = { "x" }, kv = {}, flags = { draft = true } },
       deps({
         hand_over = function(_, cb)
-          cb(nil, { job_id = "0123456789abcdef", status = "needs_confirmation", private = true })
+          cb(nil, {
+            job_id = "0123456789abcdef",
+            status = "needs_confirmation",
+            private = true,
+            peer = { port = 7, pid = 8, instance = "proved" },
+          })
         end,
         confirm = function(msg, _, cb)
           asked_msg = msg
@@ -230,15 +235,20 @@ return function(H)
         confirm_run = function()
           confirmed_run = true
         end,
-        drop_job = function(port, job_id, cb)
-          dropped = { port, job_id }
-          cb(nil)
+        drop_job = function(peer, job_id, cb)
+          dropped = { peer, job_id }
+          cb(nil, "dropped")
         end,
       })
     )
     has(asked_msg, "counts as private")
     eq(confirmed_run, nil, "no: nothing runs")
     eq(dropped[2], "0123456789abcdef", "no: the waiting job is put away in ai-desktop")
+    eq(
+      dropped[1],
+      { port = 7, pid = 8, instance = "proved" },
+      "to the ai-desktop the hand-over proved, not to a hub.json read again"
+    )
     has(last(), "new --draft: nothing sent")
     ok(not last():find("still waits", 1, true), "put away: nothing waits in the dashboard")
     -- ai-desktop ended meanwhile: the no stands, and the message says where the job is.
@@ -256,7 +266,40 @@ return function(H)
         end,
       })
     )
-    has(last(), "nothing sent; the job still waits in the dashboard")
+    has(last(), "nothing sent from here; the job still waits in the dashboard")
+    -- Confirmed in the dashboard of ai-desktop before the no here: the job runs, so "nothing sent" would not be true.
+    cmd.task_new_draft(
+      { args = {}, rest = { "x" }, kv = {}, flags = { draft = true } },
+      deps({
+        hand_over = function(_, cb)
+          cb(nil, { job_id = "0123456789abcdef", status = "needs_confirmation", private = true })
+        end,
+        confirm = function(_, _, cb)
+          cb(false)
+        end,
+        drop_job = function(_, _, cb)
+          cb(nil, "running")
+        end,
+      })
+    )
+    has(last(), "confirmed in the dashboard of ai-desktop meanwhile (running)")
+    ok(not last():find("nothing sent", 1, true), "the text went to the model from the dashboard")
+    -- A job ai-desktop does not know any more: nothing went from here.
+    cmd.task_new_draft(
+      { args = {}, rest = { "x" }, kv = {}, flags = { draft = true } },
+      deps({
+        hand_over = function(_, cb)
+          cb(nil, { job_id = "0123456789abcdef", status = "needs_confirmation", private = true })
+        end,
+        confirm = function(_, _, cb)
+          cb(false)
+        end,
+        drop_job = function(_, _, cb)
+          cb(nil, "gone")
+        end,
+      })
+    )
+    has(last(), "new --draft: nothing sent")
     filled = nil
     cmd.task_new_draft(
       { args = {}, rest = { "x" }, kv = {}, flags = { draft = true } },

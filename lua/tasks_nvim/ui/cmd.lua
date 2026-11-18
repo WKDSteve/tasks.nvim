@@ -1629,7 +1629,8 @@ function M.task_new_draft(ctx, deps)
         notify.error("new --draft: " .. (herr or "no answer"))
         return
       end
-      local record = deps.record or ai.hub_record()
+      -- The ai-desktop the hand-over proved (`res.peer`): its job is there, and every later request proves it again.
+      local record = res.peer or deps.record or ai.hub_record()
       if not record then
         notify.error("new --draft: ai-desktop is gone")
         return
@@ -1678,21 +1679,28 @@ function M.task_new_draft(ctx, deps)
           if not yes then
             -- Nothing goes to a model; the waiting job (with the text, in the memory of ai-desktop) is put away.
             local drop_job = deps.drop_job or agent.drop_job
-            drop_job(record.port, res.job_id, function(derr)
+            drop_job(record, res.job_id, function(derr, outcome)
               if derr then
                 notify.info(
-                  "new --draft: nothing sent; the job still waits in the dashboard of ai-desktop ("
+                  "new --draft: nothing sent from here; the job still waits in the dashboard of ai-desktop ("
                     .. derr
                     .. ")"
                 )
-              else
+              elseif outcome == "dropped" or outcome == "gone" then
                 notify.info("new --draft: nothing sent")
+              else
+                -- Confirmed in the dashboard of ai-desktop meanwhile: the text went to its model from there.
+                notify.warn(
+                  ("new --draft: the job was confirmed in the dashboard of ai-desktop meanwhile (%s); the text went to its model from there, the job was left as it is"):format(
+                    tostring(outcome)
+                  )
+                )
               end
             end)
             return
           end
           local confirm_run = deps.confirm_run or agent.confirm_run
-          confirm_run(record.port, res.job_id, function(cerr)
+          confirm_run(record, res.job_id, function(cerr)
             if cerr then
               notify.error("new --draft: " .. cerr)
               return
@@ -3808,7 +3816,7 @@ function M.task_agent(ctx, deps)
         return
       end
       -- The answer comes back to this editor (watched until the job ends).
-      local record = deps.record or ai.hub_record()
+      local record = res.peer or deps.record or ai.hub_record()
       if not record then
         notify.warn("agent: ai-desktop is gone; the review's answer is in its dashboard")
         return

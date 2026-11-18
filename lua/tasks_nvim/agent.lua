@@ -256,11 +256,63 @@ local function answer_error(res)
   return (message:gsub("[\r\n].*$", ""):sub(1, 300))
 end
 
+---@class Tasks.AgentPeer
+---@field port integer
+---@field pid integer
+---@field instance string The instance `GET /health` answered with; never empty.
+
 ---@class Tasks.AgentResult
 ---@field job_id string
 ---@field status string   prefilled | running | needs_confirmation
 ---@field private boolean
 ---@field note string|nil
+---@field peer Tasks.AgentPeer The ai-desktop that took the job (proved by `GET /health`): later requests about the job
+---  go to it and prove it again.
+
+---The one way to the control secret: `GET /health` on `peer.port` must answer as ai-desktop with `peer.instance` (not
+---empty), only then is `control.secret` read (now: it changes with every start of ai-desktop) and `send(secret)`
+---called. Otherwise `fail(err)` and nothing with the secret leaves. Between a hand-over and a later request (a question
+---to the person may stay open for long) ai-desktop may have restarted on another port and another program may listen
+---on the old one: proving the instance before each request keeps the secret here then. `deps`: `request`,
+---`config_dir`.
+---@param peer { port: integer, instance: string }
+---@param deps table
+---@param whose string Names the expected ai-desktop in the error ("of hub.json", "that took the job").
+---@param fail fun(err: string)
+---@param send fun(secret: string)
+local function with_secret(peer, deps, whose, fail, send)
+  local request = deps.request or M.request
+  request(peer.port, "GET", "/health", {}, "", function(herr, health)
+    if herr or not health then
+      fail("ai-desktop does not answer: " .. tostring(herr))
+      return
+    end
+    local doc = health.status == 200 and decode(health.body) or nil
+    if
+      not doc
+      or doc.app ~= "ai-desktop"
+      -- no instance: nothing proves which program is on the port, so the secret stays here
+      or type(peer.instance) ~= "string"
+      or peer.instance == ""
+      or doc.instance ~= peer.instance
+    then
+      fail(
+        ("the program on port %d is not the ai-desktop %s; nothing was sent"):format(
+          peer.port,
+          whose
+        )
+      )
+      return
+    end
+    local secret, serr =
+      M.read_secret(deps.config_dir or require("tasks_nvim.ai").config_dir() or "")
+    if not secret then
+      fail(serr)
+      return
+    end
+    send(secret)
+  end)
+end
 
 ---Hands a task to the running ai-desktop. `cb(err, result)` in the main loop. `deps` replaces parts for the specs:
 ---`record` (the `hub.json` record), `config_dir`, `request`, `allow_foreground`.
@@ -289,32 +341,9 @@ function M.hand_over(payload, cb, deps)
     return
   end
   local request = deps.request or M.request
-  request(record.port, "GET", "/health", {}, "", function(herr, health)
-    if herr or not health then
-      cb("ai-desktop does not answer: " .. tostring(herr), nil)
-      return
-    end
-    local doc = health.status == 200 and decode(health.body) or nil
-    if
-      not doc
-      or doc.app ~= "ai-desktop"
-      -- no instance in hub.json: nothing proves which program is on the port, so the secret stays here
-      or record.instance == ""
-      or doc.instance ~= record.instance
-    then
-      cb(
-        ("the program on port %d is not the ai-desktop of hub.json; nothing was sent"):format(
-          record.port
-        ),
-        nil
-      )
-      return
-    end
-    local secret, serr = M.read_secret(deps.config_dir or ai.config_dir() or "")
-    if not secret then
-      cb(serr, nil)
-      return
-    end
+  with_secret(record, deps, "of hub.json", function(err)
+    cb(err, nil)
+  end, function(secret)
     local allow = deps.allow_foreground or M.allow_foreground
     allow(record.pid)
     request(
@@ -345,81 +374,117 @@ function M.hand_over(payload, cb, deps)
           status = answer.status,
           private = answer.private == true,
           note = type(answer.note) == "string" and answer.note or nil,
+          peer = { port = record.port, pid = record.pid, instance = record.instance },
         })
       end
     )
   end)
 end
 
----Runs a job that waits for a yes (a private area or a draft, `needs_confirmation`) after the person said yes here:
----`POST /jobs/<id>/run` with `confirm_private` and the control secret. `cb(err)` in the main loop. `deps`: `request`,
----`config_dir` for the specs.
----@param port integer
----@param job_id string
----@param cb fun(err: string|nil)
----@param deps? table
-function M.confirm_run(port, job_id, cb, deps)
-  deps = deps or {}
-  local secret, serr = M.read_secret(deps.config_dir or require("tasks_nvim.ai").config_dir() or "")
-  if not secret then
-    cb(serr)
-    return
-  end
-  local request = deps.request or M.request
-  request(
-    port,
-    "POST",
-    "/jobs/" .. job_id .. "/run",
-    { { "Authorization", "Bearer " .. secret }, { "Content-Type", "application/json" } },
-    vim.json.encode({ confirm_private = true }),
-    function(err, res)
-      if err or not res then
-        cb("ai-desktop does not answer: " .. tostring(err))
-      elseif res.status ~= 200 then
-        cb(("ai-desktop did not run the job (%d): %s"):format(res.status, answer_error(res)))
-      else
-        cb(nil)
-      end
-    end
-  )
+---Whether `job_id` may go into a request line: only the letters and digits ai-desktop gives.
+---@param job_id any
+---@return boolean
+local function plain_id(job_id)
+  return type(job_id) == "string" and job_id:match("^%w+$") ~= nil
 end
 
----Puts a job away that nobody waits for any more (the person said no to its question): `DELETE /jobs/<id>` with the
----control secret, so that it does not stay in the dashboard of ai-desktop. A job ai-desktop does not know any more
----(`404`) counts as put away. `cb(err)` in the main loop. `deps`: `request`, `config_dir` for the specs.
----@param port integer
+---Runs a job that waits for a yes (a private area or a draft, `needs_confirmation`) after the person said yes here:
+---`POST /jobs/<id>/run` with `confirm_private` and the control secret, after `GET /health` proved that `peer` (the one
+---of the hand-over, `Tasks.AgentResult.peer`) is still on its port. `cb(err)` in the main loop. `deps`: `request`,
+---`config_dir` for the specs.
+---@param peer { port: integer, instance: string }
 ---@param job_id string
 ---@param cb fun(err: string|nil)
 ---@param deps? table
-function M.drop_job(port, job_id, cb, deps)
+function M.confirm_run(peer, job_id, cb, deps)
   deps = deps or {}
-  -- The id goes into the request line: only the letters and digits ai-desktop gives pass.
-  if type(job_id) ~= "string" or not job_id:match("^%w+$") then
+  if not plain_id(job_id) then
     cb("the job id is not plain")
     return
   end
-  local secret, serr = M.read_secret(deps.config_dir or require("tasks_nvim.ai").config_dir() or "")
-  if not secret then
-    cb(serr)
+  local request = deps.request or M.request
+  with_secret(peer, deps, "that took the job", cb, function(secret)
+    request(
+      peer.port,
+      "POST",
+      "/jobs/" .. job_id .. "/run",
+      { { "Authorization", "Bearer " .. secret }, { "Content-Type", "application/json" } },
+      vim.json.encode({ confirm_private = true }),
+      function(err, res)
+        if err or not res then
+          cb("ai-desktop does not answer: " .. tostring(err))
+        elseif res.status ~= 200 then
+          cb(("ai-desktop did not run the job (%d): %s"):format(res.status, answer_error(res)))
+        else
+          cb(nil)
+        end
+      end
+    )
+  end)
+end
+
+---Puts a job away that nobody waits for any more (the person said no to its question here), so that it does not stay
+---in the dashboard of ai-desktop. After `GET /health` proved `peer` (the one of the hand-over), `GET /jobs/<id>` (no
+---secret) says where the job is: only a job that still waits for its yes is put away (`DELETE /jobs/<id>` with the
+---control secret); ai-desktop cancels a running job on `DELETE`, and a job that runs or has run was confirmed in its
+---dashboard meanwhile: that is left as it is. `cb(err, outcome)` in the main loop; `outcome` is `"dropped"`, `"gone"`
+---(ai-desktop does not know the job any more) or the status of a job that was confirmed in the dashboard (`running`,
+---`done`, ...). `deps`: `request`, `config_dir` for the specs.
+---@param peer { port: integer, instance: string }
+---@param job_id string
+---@param cb fun(err: string|nil, outcome: string|nil)
+---@param deps? table
+function M.drop_job(peer, job_id, cb, deps)
+  deps = deps or {}
+  if not plain_id(job_id) then
+    cb("the job id is not plain", nil)
     return
   end
   local request = deps.request or M.request
-  request(
-    port,
-    "DELETE",
-    "/jobs/" .. job_id,
-    { { "Authorization", "Bearer " .. secret } },
-    "",
-    function(err, res)
-      if err or not res then
-        cb("ai-desktop does not answer: " .. tostring(err))
-      elseif res.status ~= 200 and res.status ~= 204 and res.status ~= 404 then
-        cb(("ai-desktop did not put the job away (%d): %s"):format(res.status, answer_error(res)))
-      else
-        cb(nil)
+  local function fail(err)
+    cb(err, nil)
+  end
+  with_secret(peer, deps, "that took the job", fail, function(secret)
+    request(peer.port, "GET", "/jobs/" .. job_id, {}, "", function(gerr, got)
+      if gerr or not got then
+        fail("ai-desktop does not answer: " .. tostring(gerr))
+        return
       end
-    end
-  )
+      if got.status == 404 then
+        cb(nil, "gone")
+        return
+      end
+      local job = got.status == 200 and decode(got.body) or nil
+      if not job or type(job.status) ~= "string" then
+        fail(("ai-desktop did not say where the job is (%d)"):format(got.status))
+        return
+      end
+      if job.status ~= "needs_confirmation" then
+        cb(nil, job.status)
+        return
+      end
+      request(
+        peer.port,
+        "DELETE",
+        "/jobs/" .. job_id,
+        { { "Authorization", "Bearer " .. secret } },
+        "",
+        function(err, res)
+          if err or not res then
+            fail("ai-desktop does not answer: " .. tostring(err))
+          elseif res.status == 404 then
+            cb(nil, "gone")
+          elseif res.status ~= 200 and res.status ~= 204 then
+            fail(
+              ("ai-desktop did not put the job away (%d): %s"):format(res.status, answer_error(res))
+            )
+          else
+            cb(nil, "dropped")
+          end
+        end
+      )
+    end, M.MAX_JOB_RESPONSE)
+  end)
 end
 
 -- A job that has not ended yet: it runs, waits for the person in the dashboard (a private area), or waits to be run.
