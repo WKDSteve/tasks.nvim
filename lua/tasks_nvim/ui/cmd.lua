@@ -1564,7 +1564,7 @@ end
 ---asked only after a yes.
 ---@param ctx table
 ---@param deps? table Stand-ins for the specs: `state`, `ai_desktop`, `ai_nvim`, `choices`, `hand_over`, `record`,
----  `watch`, `confirm_run`, `confirm`, `form`, `root`.
+---  `watch`, `confirm_run`, `drop_job`, `confirm`, `form`, `root`.
 function M.task_new_draft(ctx, deps)
   deps = deps or {}
   local ai = require("tasks_nvim.ai")
@@ -1676,7 +1676,19 @@ function M.task_new_draft(ctx, deps)
         "send",
         function(yes)
           if not yes then
-            notify.info("new --draft: nothing sent; the job waits in the dashboard of ai-desktop")
+            -- Nothing goes to a model; the waiting job (with the text, in the memory of ai-desktop) is put away.
+            local drop_job = deps.drop_job or agent.drop_job
+            drop_job(record.port, res.job_id, function(derr)
+              if derr then
+                notify.info(
+                  "new --draft: nothing sent; the job still waits in the dashboard of ai-desktop ("
+                    .. derr
+                    .. ")"
+                )
+              else
+                notify.info("new --draft: nothing sent")
+              end
+            end)
             return
           end
           local confirm_run = deps.confirm_run or agent.confirm_run

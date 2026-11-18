@@ -277,7 +277,9 @@ stays as editable as a typed one, and `q` drops it. Only while the AI functions 
   local model of ai-desktop answers at once; when its jobs model does not run on this
   machine, ai-desktop holds the job and the editor asks first ("Send the text there
   anyway?"); only a yes runs it (`POST /jobs/<id>/run` with `confirm_private` and the
-  control secret). No leaves it waiting in the dashboard.
+  control secret). No sends nothing and puts the waiting job away (`DELETE /jobs/<id>`
+  with the control secret), so that it does not stay in the dashboard; when that fails
+  (ai-desktop ended meanwhile) the message says that the job still waits there.
 - Without ai-desktop, ai.nvim answers once with the same prompt, after a question
   (ai.nvim may send it to a model outside this machine).
 - The answer is checked again here (`tasks_nvim.draft.check`, the rules of ai-desktop's

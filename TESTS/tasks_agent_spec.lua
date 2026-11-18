@@ -28,6 +28,60 @@ return function(H)
   H.write(dir .. "/control.secret", SECRET:upper() .. "\r\n")
   eq(agent.read_secret(dir), SECRET, "64 hex digits, trimmed, lower case")
 
+  -- ── putting a job away (a no to its question) ─────────────────────────────
+  do
+    local sent, said = {}, {}
+    local function drop(id, status, err)
+      agent.drop_job(4711, id, function(derr)
+        said[#said + 1] = derr or "ok"
+      end, {
+        config_dir = dir,
+        request = function(port, method, path, headers, body, cb)
+          sent[#sent + 1] =
+            { port = port, method = method, path = path, headers = headers, body = body }
+          cb(
+            err,
+            err == nil and { status = status, body = '{"error":{"message":"jobs are off"}}' } or nil
+          )
+        end,
+      })
+    end
+    drop("0123456789abcdef", 204)
+    eq(said[#said], "ok")
+    eq(sent[1].method, "DELETE")
+    eq(sent[1].path, "/jobs/0123456789abcdef")
+    eq(sent[1].port, 4711)
+    eq(
+      sent[1].headers,
+      { { "Authorization", "Bearer " .. SECRET } },
+      "the secret in the header, nothing else"
+    )
+    eq(sent[1].body, "")
+    drop("0123456789abcdef", 404)
+    eq(said[#said], "ok", "a job that is gone already is put away")
+    drop("0123456789abcdef", 403)
+    has(said[#said], "did not put the job away (403)")
+    drop("0123456789abcdef", nil, "closed")
+    has(said[#said], "does not answer")
+    local before = #sent
+    for _, bad in ipairs({ "../health", "a b", "", "a?x=1" }) do
+      drop(bad, 204)
+      has(said[#said], "not plain", bad)
+    end
+    eq(#sent, before, "an id that is not plain is never put into a request line")
+    -- Without the secret nothing is asked.
+    agent.drop_job(4711, "0123456789abcdef", function(derr)
+      said[#said + 1] = derr
+    end, {
+      config_dir = dir .. "/nowhere",
+      request = function()
+        sent[#sent + 1] = "asked"
+      end,
+    })
+    has(said[#said], "no control.secret")
+    eq(#sent, before)
+  end
+
   -- ── answers ────────────────────────────────────────────────────────────────
   eq(
     agent.parse_response("HTTP/1.1 201 Created\r\nContent-Length: 2\r\n\r\n{}"),

@@ -146,7 +146,7 @@ return function(H)
         dropped = {},
       },
     }
-    local handed, filled, confirmed_run
+    local handed, filled, confirmed_run, dropped
     local function deps(extra)
       return vim.tbl_extend("force", {
         state = on,
@@ -230,10 +230,33 @@ return function(H)
         confirm_run = function()
           confirmed_run = true
         end,
+        drop_job = function(port, job_id, cb)
+          dropped = { port, job_id }
+          cb(nil)
+        end,
       })
     )
     has(asked_msg, "counts as private")
     eq(confirmed_run, nil, "no: nothing runs")
+    eq(dropped[2], "0123456789abcdef", "no: the waiting job is put away in ai-desktop")
+    has(last(), "new --draft: nothing sent")
+    ok(not last():find("still waits", 1, true), "put away: nothing waits in the dashboard")
+    -- ai-desktop ended meanwhile: the no stands, and the message says where the job is.
+    cmd.task_new_draft(
+      { args = {}, rest = { "x" }, kv = {}, flags = { draft = true } },
+      deps({
+        hand_over = function(_, cb)
+          cb(nil, { job_id = "0123456789abcdef", status = "needs_confirmation", private = true })
+        end,
+        confirm = function(_, _, cb)
+          cb(false)
+        end,
+        drop_job = function(_, _, cb)
+          cb("ai-desktop does not answer: closed")
+        end,
+      })
+    )
+    has(last(), "nothing sent; the job still waits in the dashboard")
     filled = nil
     cmd.task_new_draft(
       { args = {}, rest = { "x" }, kv = {}, flags = { draft = true } },

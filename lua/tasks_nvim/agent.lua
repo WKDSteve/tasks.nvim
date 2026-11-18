@@ -384,6 +384,44 @@ function M.confirm_run(port, job_id, cb, deps)
   )
 end
 
+---Puts a job away that nobody waits for any more (the person said no to its question): `DELETE /jobs/<id>` with the
+---control secret, so that it does not stay in the dashboard of ai-desktop. A job ai-desktop does not know any more
+---(`404`) counts as put away. `cb(err)` in the main loop. `deps`: `request`, `config_dir` for the specs.
+---@param port integer
+---@param job_id string
+---@param cb fun(err: string|nil)
+---@param deps? table
+function M.drop_job(port, job_id, cb, deps)
+  deps = deps or {}
+  -- The id goes into the request line: only the letters and digits ai-desktop gives pass.
+  if type(job_id) ~= "string" or not job_id:match("^%w+$") then
+    cb("the job id is not plain")
+    return
+  end
+  local secret, serr = M.read_secret(deps.config_dir or require("tasks_nvim.ai").config_dir() or "")
+  if not secret then
+    cb(serr)
+    return
+  end
+  local request = deps.request or M.request
+  request(
+    port,
+    "DELETE",
+    "/jobs/" .. job_id,
+    { { "Authorization", "Bearer " .. secret } },
+    "",
+    function(err, res)
+      if err or not res then
+        cb("ai-desktop does not answer: " .. tostring(err))
+      elseif res.status ~= 200 and res.status ~= 204 and res.status ~= 404 then
+        cb(("ai-desktop did not put the job away (%d): %s"):format(res.status, answer_error(res)))
+      else
+        cb(nil)
+      end
+    end
+  )
+end
+
 -- A job that has not ended yet: it runs, waits for the person in the dashboard (a private area), or waits to be run.
 local WAITING = { running = true, needs_confirmation = true, prefilled = true }
 
