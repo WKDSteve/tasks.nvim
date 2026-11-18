@@ -46,6 +46,7 @@
     "set_section",
     "snapshot",
     "task",
+    "task_finished",
     "tick_step",
     "vault_marker",
     "view_delete",

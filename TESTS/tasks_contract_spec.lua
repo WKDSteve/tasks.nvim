@@ -106,6 +106,7 @@ return function(H)
     "rounds",
     "set_body",
     "set_section",
+    "task_finished",
     "tick_step",
     "vault_marker",
     "view_delete",
@@ -651,6 +652,11 @@ return function(H)
   eq(one.rounds, nil, "a task that is no routine has no rounds")
   -- a routine: its finished rounds from the Backlog, newest first
   golden("task-routine")
+  -- a finished task (capability `task_finished`): only when asked, from the Backlog
+  golden("task-finished")
+  local _, _, done_code = call("task", { id = "lib.nvim/alpha", finished = true })
+  eq(done_code, "not_found", "an open task is no finished one")
+  eq(call("task", { id = "lib.nvim/alpha", finished = false }).task.id, "lib.nvim/alpha")
 
   -- ── bodies ──
   local bodies = call("bodies", { limit = 3, offset = 1 })

@@ -560,6 +560,10 @@ export type TaskDocument = Head & {
    */
   body: string;
   body_truncated: boolean;
+  /**
+   * Capability task_finished: the call named finished, and this is the finished task of the id, read from its area's Backlog/ (no readiness, no rounds).
+   */
+  finished?: true;
   steps: {
     n: number;
     text: string;

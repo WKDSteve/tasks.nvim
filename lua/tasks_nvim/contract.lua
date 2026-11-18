@@ -102,6 +102,7 @@ M.CAPABILITIES = {
   "set_section",
   "snapshot",
   "task",
+  "task_finished",
   "tick_step",
   "vault_marker",
   "view_delete",
@@ -1091,9 +1092,11 @@ function M.lists(opts)
   return seal(doc, nil), nil
 end
 
----One task with its body and steps.
+---One task with its body and steps. With `opts.finished` (capability `task_finished`) the finished task of that id in
+---its area's `Backlog/` (the first of `scan.find_done`, with `commits` and `done_in`), marked `finished = true`; it has
+---no readiness and no rounds.
 ---@param id string
----@param opts? { root?: string, view?: Tasks.ContractView }
+---@param opts? { root?: string, view?: Tasks.ContractView, finished?: boolean }
 ---@return table|nil doc
 ---@return Tasks.ContractError|string|nil err
 function M.task(id, opts)
@@ -1113,16 +1116,25 @@ function M.task(id, opts)
   if not view then
     return nil, verr
   end
+  local finished = opts ~= nil and opts.finished == true
   local found
-  for _, t in ipairs(view.all) do
-    if t.id == id and t.location == "roadmap" then
-      found = t
-      break
+  if finished then
+    found = scan.find_done(id, { root = view.root })
+  else
+    for _, t in ipairs(view.all) do
+      if t.id == id and t.location == "roadmap" then
+        found = t
+        break
+      end
     end
   end
   if not found then
     return nil,
-      { code = "not_found", message = "no such task: " .. tostring(id), retryable = false }
+      {
+        code = "not_found",
+        message = (finished and "no such finished task: " or "no such task: ") .. tostring(id),
+        retryable = false,
+      }
   end
   local text = not fsio.is_link(found.path) and fsio.read(found.path) or nil
   local body = ""
@@ -1135,7 +1147,12 @@ function M.task(id, opts)
     body = body:sub(1, M.LIMITS.body_bytes)
   end
   local doc = M.head("tasks.task", view.root)
-  doc.task = task_entry(view.root, found, view.plan.nodes[found.id], view.rank[found.id])
+  if finished then
+    doc.task = task_entry(view.root, found, nil, nil)
+    doc.finished = true
+  else
+    doc.task = task_entry(view.root, found, view.plan.nodes[found.id], view.rank[found.id])
+  end
   doc.body = body
   doc.body_truncated = truncated
   doc.steps = vim.tbl_map(function(s)
@@ -1159,7 +1176,10 @@ function M.task(id, opts)
     })
   end, found.questions and found.questions.items or {})
   -- a routine: its finished rounds (capability `rounds`); they lie in the Backlog, outside the revision
-  local rounds, rounds_truncated = done_flow.rounds(found, { root = view.root })
+  local rounds, rounds_truncated = nil, nil
+  if not finished then
+    rounds, rounds_truncated = done_flow.rounds(found, { root = view.root })
+  end
   if rounds then
     doc.rounds = vim.tbl_map(function(r)
       local t = r.task

@@ -84,6 +84,25 @@ G.cases = {
       return '{"params":{"id":"lib.nvim/backup-check-2026-03-01"}}'
     end,
   },
+  {
+    -- a finished task read from its area's Backlog (capability `task_finished`): its commits and done_in, its body,
+    -- `finished`, no readiness and no rounds
+    name = "task-finished",
+    method = "task",
+    fresh = true,
+    request = function(root)
+      local path = root .. "/lib.nvim/Backlog/FEATURES/2026-01-09_shipped.md"
+      vim.fn.mkdir(vim.fs.dirname(path), "p")
+      local fh = assert(io.open(path, "wb"))
+      fh:write(
+        "---\ntitle: Shipped\nstatus: done\nkind: feature\ndone_in: lib.nvim@bbb2222\n"
+          .. "commits: [lib.nvim@bbb2222]\ncreated: 2026-01-01\nupdated: 2026-01-09\n---\n\n"
+          .. "## Akzeptanz\n\n- [x] it ships\n"
+      )
+      fh:close()
+      return '{"params":{"id":"lib.nvim/shipped","finished":true}}'
+    end,
+  },
   { name = "bodies-page", method = "bodies", request = '{"params":{"limit":3,"offset":1}}' },
   {
     name = "estimate",

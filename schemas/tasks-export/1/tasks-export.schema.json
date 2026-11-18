@@ -2054,6 +2054,10 @@
         "body_truncated": {
           "type": "boolean"
         },
+        "finished": {
+          "const": true,
+          "description": "Capability task_finished: the call named finished, and this is the finished task of the id, read from its area's Backlog/ (no readiness, no rounds)."
+        },
         "steps": {
           "type": "array",
           "items": {

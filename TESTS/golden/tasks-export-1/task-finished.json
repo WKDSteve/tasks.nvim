@@ -1,0 +1,46 @@
+{
+  "body": "\n## Akzeptanz\n\n- [x] it ships\n",
+  "body_truncated": false,
+  "digest": "sha256:fdfa5c0fb0ec2c7d",
+  "engine": {
+    "git": "0000000",
+    "nvim": "0.0.0",
+    "version": "0.1.0-test"
+  },
+  "finished": true,
+  "generated_at": "2026-01-01T00:00:00Z",
+  "kind": "tasks.task",
+  "plugin": "tasks.nvim",
+  "questions": [],
+  "rev": "rev:2cfff6",
+  "schema": 1,
+  "steps": [],
+  "task": {
+    "after": [],
+    "area": "lib.nvim",
+    "blocked_by": [],
+    "category": [],
+    "commits": [
+      "lib.nvim@bbb2222"
+    ],
+    "created": "2026-01-01",
+    "done_in": "lib.nvim@bbb2222",
+    "etag": "sha256:c9d7010031260a00",
+    "file": "lib.nvim/Backlog/FEATURES/2026-01-09_shipped.md",
+    "folder": false,
+    "id": "lib.nvim/shipped",
+    "kind": "feature",
+    "problems": [],
+    "refs": [],
+    "slug": "shipped",
+    "status": "done",
+    "summary": "- [x] it ships",
+    "tags": [],
+    "title": "Shipped",
+    "updated": "2026-01-09",
+    "valid": true
+  },
+  "vault": {
+    "id": "vault"
+  }
+}

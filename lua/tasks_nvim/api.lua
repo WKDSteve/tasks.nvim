@@ -94,10 +94,13 @@ local methods = {
     end,
   },
   task = {
-    params = { id = "string" },
+    params = { id = "string", finished = "boolean" },
     required = { "id" },
     run = function(params, opts)
-      return contract.task(params.id, opts)
+      return contract.task(
+        params.id,
+        vim.tbl_extend("force", opts or {}, { finished = params.finished })
+      )
     end,
   },
   bodies = {
