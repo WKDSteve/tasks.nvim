@@ -65,12 +65,25 @@ return function(H)
   has(r.out, "tasks claim <id> --by=ai-desktop:job-42")
   lacks(r.out, "--by=ai-desktop:<job>", "the default is replaced in every example")
 
-  for _, bad in ipairs({ "--by=", "--by=two words", "--by=a\tb", "--by=" .. string.rep("x", 81) }) do
+  -- only a name `claim` takes: an agent copies the examples into a shell, so `$(...)` or a backtick must never get in
+  for _, bad in ipairs({
+    "--by=",
+    "--by=two words",
+    "--by=a\tb",
+    "--by=$(whoami)",
+    "--by=a`id`",
+    "--by=a;b",
+    "--by=a/b",
+    "--by=" .. string.rep("x", 65),
+  }) do
     r = run({ "agent-brief", bad })
     eq(r.code, 2, "refused: " .. bad)
-    has(r.err, "--by must be")
+    has(r.err, "--by must be a claim name")
+    eq(r.out, "", "nothing printed for a refused name")
   end
-  ok(brief.check_by(string.rep("x", 80)), "80 characters are fine")
+  ok(brief.check_by(string.rep("x", 64)), "64 characters are fine")
+  ok(brief.check_by("cdx:ab12cd34"), "the editor's own claim name is fine")
+  ok(brief.check_by("me@host.local"), "user@host is fine")
 
   -- ── usage errors ───────────────────────────────────────────────────────
   r = run({ "agent-brief", "--format=yaml" })

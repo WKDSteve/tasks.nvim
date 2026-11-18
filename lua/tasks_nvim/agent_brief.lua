@@ -26,9 +26,6 @@ M.SCHEMA_NAME = "tasks-agent-brief/1"
 ---"agent works on it" and link the job.
 M.DEFAULT_BY = "ai-desktop:<job>"
 
----Longest `--by` name the brief accepts as its example (a claim name is one line, no control characters).
-local MAX_BY = 80
-
 ---@param list (string|integer)[]
 ---@return string
 local function words(list)
@@ -39,14 +36,17 @@ local function words(list)
   return table.concat(out, ", ")
 end
 
+---The name `--by` fills into the examples. It must be a name `claim` takes (`claims.valid_name`): an agent copies the
+---examples into a shell, so a name the engine refuses would fail there, and a name with `$(...)` or a backtick would
+---run as a command. Only the default placeholder `ai-desktop:<job>` is not such a name (the caller puts the job id in).
 ---@param by string|nil
 ---@return string|nil by, string|nil err
 function M.check_by(by)
   if by == nil then
     return M.DEFAULT_BY
   end
-  if by == "" or #by > MAX_BY or by:find("[%c%s]") then
-    return nil, ("--by must be 1-%d characters without spaces or control characters"):format(MAX_BY)
+  if not claims.valid_name(by) then
+    return nil, "--by must be a claim name: 1-64 characters of letters, digits and . _ : @ -"
   end
   return by
 end
