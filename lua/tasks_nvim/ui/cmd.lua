@@ -2139,6 +2139,13 @@ local function ask_model(step, confirm_fn)
     notify.error("sheet-ai ask: no hand-over in this buffer; run :Tasks sheet-ai draft first")
     return
   end
+  -- `setup({ ai = false })` turns every AI function of the ai family off: ask sends to ai.nvim, so it refuses.
+  if require("tasks_nvim.config").get().ai == false then
+    notify.error(
+      "sheet-ai ask: the AI functions are off (setup({ ai = false })); paste the document into an AI by hand"
+    )
+    return
+  end
   local has_ai, ai = pcall(require, "ai")
   if not has_ai then
     notify.error("sheet-ai ask: ai.nvim is not available; paste the document into an AI by hand")

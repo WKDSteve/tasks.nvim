@@ -481,6 +481,16 @@ return function(H)
       end
     end
     local before = below_marker()
+    -- `setup({ ai = false })` turns every AI function off: ask neither asks nor sends.
+    local config = require("tasks_nvim.config")
+    local ai_before = config.get().ai
+    config.merge({ ai = false })
+    local asked_before = #asked
+    ask_step(true)
+    config.merge({ ai = ai_before })
+    eq(#reqs, 0, "ai = false: nothing is sent")
+    eq(#asked, asked_before, "ai = false: not even asked")
+    eq(below_marker(), before, "ai = false: the buffer stays")
     ask_step(false)
     eq(#reqs, 0, "ask, no: nothing is sent")
     eq(below_marker(), before, "and the buffer stays")
