@@ -490,17 +490,21 @@ end
 -- A job that has not ended yet: it runs, waits for the person in the dashboard (a private area), or waits to be run.
 local WAITING = { running = true, needs_confirmation = true, prefilled = true }
 
----Watches a job of ai-desktop (`GET /jobs/<id>`, no secret: the dashboard's route) until it has ended (`done`,
----`failed`, `cancelled`) or is gone, then `on_end(err, job)` once, in the main loop. `opts`: `interval_ms` (3000),
----`max_ms` (60 minutes; then an error), `request` (a stand-in for `M.request`). Returns a function that stops watching.
+---Watches a job of ai-desktop (`GET /jobs/<id>` with the control secret, which ai-desktop asks for a job since its
+---management API has a login) until it has ended (`done`, `failed`, `cancelled`) or is gone, then `on_end(err, job)`
+---once, in the main loop. Without a readable secret it asks without one (an ai-desktop older than the login answers).
+---`opts`: `interval_ms` (3000), `max_ms` (60 minutes; then an error), `request` (a stand-in for `M.request`),
+---`config_dir` (the specs). Returns a function that stops watching.
 ---@param port integer
 ---@param job_id string
 ---@param on_end fun(err: string|nil, job: table|nil)
----@param opts? { interval_ms?: integer, max_ms?: integer, request?: function }
+---@param opts? { interval_ms?: integer, max_ms?: integer, request?: function, config_dir?: string }
 ---@return fun()
 function M.watch(port, job_id, on_end, opts)
   opts = opts or {}
   local request = opts.request or M.request
+  local secret = M.read_secret(opts.config_dir or require("tasks_nvim.ai").config_dir() or "")
+  local headers = secret and { { "Authorization", "Bearer " .. secret } } or {}
   local interval = opts.interval_ms or 3000
   local deadline = vim.uv.now() + (opts.max_ms or 60 * 60 * 1000)
   local timer = assert(vim.uv.new_timer())
@@ -530,7 +534,7 @@ function M.watch(port, job_id, on_end, opts)
       return
     end
     busy = true
-    request(port, "GET", "/jobs/" .. job_id, {}, "", function(err, res)
+    request(port, "GET", "/jobs/" .. job_id, headers, "", function(err, res)
       busy = false
       if stopped then
         return

@@ -398,7 +398,7 @@ return function(H)
   -- than one of the small routes is still read whole.
   local big_markdown = ("x"):rep(200 * 1024)
   local big_output = ("y"):rep(300 * 1024)
-  local job_port, _, stop_job = fake_desktop(function(req)
+  local job_port, job_seen, stop_job = fake_desktop(function(req)
     if req.line:match("^GET /jobs/0123456789abcdef ") then
       return 200,
         vim.json.encode({
@@ -413,12 +413,18 @@ return function(H)
   local watched, watch_err, watch_done = nil, nil, false
   agent.watch(job_port, "0123456789abcdef", function(e, job)
     watch_err, watched, watch_done = e, job, true
-  end, { interval_ms = 50 })
+  end, { interval_ms = 50, config_dir = dir })
   vim.wait(5000, function()
     return watch_done
   end)
   stop_job()
   ok(watch_done, "the watch ended")
+  -- ai-desktop reads a job only with the control secret (the login of its management API).
+  has(
+    job_seen[1] and job_seen[1].head or "",
+    "Authorization: Bearer " .. SECRET,
+    "the watch sends the secret"
+  )
   eq(watch_err, nil, "a large job is no broken answer")
   eq(watched and #watched.output, #big_output, "the whole output")
   eq(watched and #watched.markdown, #big_markdown, "the whole task file")
