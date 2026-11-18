@@ -21,6 +21,8 @@
 --- rule, it belongs in the engine module it calls.
 
 local check = require("tasks_nvim.check")
+local contract = require("tasks_nvim.contract")
+local history = require("tasks_nvim.history")
 local index = require("tasks_nvim.index")
 local model = require("tasks_nvim.model")
 local done_flow = require("tasks_nvim.done_flow")
@@ -123,6 +125,16 @@ commands:
   index [<area>] [--check]                (re)write ROADMAP/TASKS.md; --check only reports
   index <area> --staged                   build it from the staging area and stage it; the working tree stays as it
                                           is, so another session's uncommitted tasks stay out of the commit
+                                          index without an area also writes down the figures of today when the vault
+                                          keeps a series (_Telemetry/history exists); --no-history leaves that out
+  history [<area>] [--since=YYYY-MM-DD] [--until=YYYY-MM-DD] [--resolution=day|week] [--format=tsv|json]
+                                          the overview figures over time (open, ready, with value, ...; default: the
+                                          last 90 days); '-' is a day before the first row, '*' a day with a row
+  history record [--dry-run]              write down the figures of today: one row per area whose figures changed
+                                          (<vault>/_Telemetry/history/YYYY-MM.jsonl, made on the first run)
+  history backfill [--since=..] [--until=..] [--dry-run]
+                                          fill the days before today that have a commit and no row from the history
+                                          of the vault's repository (rows marked src: git; the repository is not touched)
   migrate-actor [<area>] [--write]        propose actor=me for tasks that wait for you (status decision, tag
                                           needs-user) and leave every other task EMPTY; dry run unless --write
   new <area>[,<area>...] <title> [--kind=k] [--prio=1..3] [--effort=XS..XL|0.5d] [--value=1..5] [--actor=cdx|me|pair] [--after=id,id] [--order=2.5] [--plan=id|--project=id] [--phase=word] [--created=YYYY-MM-DD] [--tags=a,b]
@@ -352,7 +364,7 @@ local SPECS = {
   },
   ["plan-close"] = { value = {}, flag = {} },
   ["project-close"] = { value = {}, flag = {} },
-  index = { value = {}, flag = { "check", "all", "staged" } },
+  index = { value = {}, flag = { "check", "all", "staged", "no-history" } },
   new = {
     value = {
       "created",
@@ -1358,6 +1370,7 @@ function commands.index(ctx)
   end
   local opts = { root = eo.root, check = args.opt.check == true }
   local results, errors
+  local whole_vault = not (args.pos[1] and not args.opt.all)
   if args.pos[1] and not args.opt.all then
     local res, err = index.write_area(args.pos[1], opts)
     results, errors = res and { res } or {}, err and { args.pos[1] .. ": " .. err } or {}
@@ -1395,6 +1408,21 @@ function commands.index(ctx)
       #errors
     )
   )
+  -- A run over the whole vault read every task anyway: it is the moment the series of the figures grows by today.
+  -- Only a vault that keeps a series (the folder is there), and never the reason for the index to fail.
+  local root = vault.root(eo)
+  if whole_vault and not args.opt["no-history"] and root and history.exists(root) then
+    local recorded, rerr
+    local view, verr = contract.view({ root = root })
+    if view then
+      recorded, rerr = history.record(view, { today = eo.today })
+    end
+    if recorded and recorded.rows > 0 then
+      ctx.say(("history\t%d row(s)\t%s"):format(recorded.rows, recorded.file))
+    elseif not recorded then
+      ctx.warn("warn: history not recorded: " .. contract.redact(root, tostring(verr or rerr)))
+    end
+  end
   return #errors > 0 and 1 or 0
 end
 

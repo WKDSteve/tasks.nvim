@@ -1129,6 +1129,9 @@ return function(H)
   end
   golden("finished")
   golden("finished-window")
+  -- the series of the figures (its own spec is tasks_history_spec.lua): the documents are those of the contract
+  golden("history")
+  golden("history-weeks")
   ---@param name string
   ---@param request? string
   ---@param expected string

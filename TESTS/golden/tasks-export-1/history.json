@@ -1,0 +1,135 @@
+{
+  "digest": "sha256:39c97d9fa721c3d3",
+  "engine": {
+    "git": "0000000",
+    "nvim": "0.0.0",
+    "version": "0.1.0-test"
+  },
+  "first": "2025-12-30",
+  "generated_at": "2026-01-01T00:00:00Z",
+  "incomplete": [
+    "_Telemetry/history/2026-01.jsonl:2: no JSON object"
+  ],
+  "kind": "tasks.history",
+  "last": "2026-01-01",
+  "plugin": "tasks.nvim",
+  "points": [
+    {
+      "created": 0,
+      "day": "2025-12-29",
+      "done": 0,
+      "recorded": false
+    },
+    {
+      "by_state": {
+        "decision": 0,
+        "freed": 0,
+        "parked": 0,
+        "ready": 2,
+        "stuck": 0,
+        "waiting": 2
+      },
+      "by_status": {
+        "blocked": 1,
+        "decision": 0,
+        "doing": 0,
+        "open": 3,
+        "parked": 0
+      },
+      "created": 0,
+      "day": "2025-12-30",
+      "done": 1,
+      "effort_days": 3.5,
+      "open": 4,
+      "recorded": true,
+      "value": 7,
+      "with_effort": 2,
+      "with_value": 2
+    },
+    {
+      "by_state": {
+        "decision": 0,
+        "freed": 0,
+        "parked": 1,
+        "ready": 2,
+        "stuck": 0,
+        "waiting": 2
+      },
+      "by_status": {
+        "blocked": 1,
+        "decision": 0,
+        "doing": 0,
+        "open": 3,
+        "parked": 1
+      },
+      "created": 0,
+      "day": "2025-12-31",
+      "done": 1,
+      "effort_days": 3.5,
+      "open": 5,
+      "recorded": true,
+      "value": 7,
+      "with_effort": 2,
+      "with_value": 2
+    },
+    {
+      "by_state": {
+        "decision": 1,
+        "freed": 0,
+        "parked": 1,
+        "ready": 3,
+        "stuck": 1,
+        "waiting": 1
+      },
+      "by_status": {
+        "blocked": 1,
+        "decision": 1,
+        "doing": 1,
+        "open": 3,
+        "parked": 1
+      },
+      "created": 21,
+      "day": "2026-01-01",
+      "done": 0,
+      "effort_days": 5,
+      "open": 7,
+      "recorded": true,
+      "value": 12,
+      "with_effort": 3,
+      "with_value": 4
+    },
+    {
+      "by_state": {
+        "decision": 1,
+        "freed": 0,
+        "parked": 1,
+        "ready": 3,
+        "stuck": 1,
+        "waiting": 1
+      },
+      "by_status": {
+        "blocked": 1,
+        "decision": 1,
+        "doing": 1,
+        "open": 3,
+        "parked": 1
+      },
+      "created": 0,
+      "day": "2026-01-02",
+      "done": 2,
+      "effort_days": 5,
+      "open": 7,
+      "recorded": false,
+      "value": 12,
+      "with_effort": 3,
+      "with_value": 4
+    }
+  ],
+  "resolution": "day",
+  "schema": 1,
+  "since": "2025-12-29",
+  "until": "2026-01-02",
+  "vault": {
+    "id": "vault"
+  }
+}

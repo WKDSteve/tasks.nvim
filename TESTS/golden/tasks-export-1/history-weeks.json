@@ -1,0 +1,58 @@
+{
+  "area": "lib.nvim",
+  "digest": "sha256:2993eb838f163076",
+  "engine": {
+    "git": "0000000",
+    "nvim": "0.0.0",
+    "version": "0.1.0-test"
+  },
+  "first": "2025-12-30",
+  "generated_at": "2026-01-01T00:00:00Z",
+  "incomplete": [
+    "_Telemetry/history/2026-01.jsonl:2: no JSON object"
+  ],
+  "kind": "tasks.history",
+  "last": "2026-01-01",
+  "plugin": "tasks.nvim",
+  "points": [
+    {
+      "created": 0,
+      "day": "2025-12-22",
+      "done": 0,
+      "recorded": false
+    },
+    {
+      "by_state": {
+        "decision": 1,
+        "freed": 0,
+        "parked": 0,
+        "ready": 3,
+        "stuck": 1,
+        "waiting": 1
+      },
+      "by_status": {
+        "blocked": 1,
+        "decision": 1,
+        "doing": 1,
+        "open": 3,
+        "parked": 0
+      },
+      "created": 15,
+      "day": "2025-12-29",
+      "done": 2,
+      "effort_days": 5,
+      "open": 6,
+      "recorded": true,
+      "value": 12,
+      "with_effort": 3,
+      "with_value": 4
+    }
+  ],
+  "resolution": "week",
+  "schema": 1,
+  "since": "2025-12-22",
+  "until": "2026-01-04",
+  "vault": {
+    "id": "vault"
+  }
+}

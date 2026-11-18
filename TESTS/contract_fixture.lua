@@ -229,6 +229,25 @@ function M.build(H)
       .. "\n---\n\nMoved by hand.\n"
   )
 
+  -- the series of the overview figures (`tasks_nvim.history`): two months, a day both areas have a row for, a line
+  -- that is no row (the document names it and goes on)
+  H.write(
+    root .. "/_Telemetry/history/2025-12.jsonl",
+    table.concat({
+      '{"area":"lib.nvim","at":"2025-12-30T18:00:00Z","day":"2025-12-30","days":3.5,"open":4,"state":{"ready":2,"waiting":2},"status":{"blocked":1,"open":3},"v":1,"value":7,"with_effort":2,"with_value":2}',
+      '{"area":"cascade.nvim","at":"2025-12-31T09:00:00Z","day":"2025-12-31","days":0,"open":1,"src":"git","state":{"parked":1},"status":{"parked":1},"v":1,"value":0,"with_effort":0,"with_value":0}',
+      "",
+    }, "\n")
+  )
+  H.write(
+    root .. "/_Telemetry/history/2026-01.jsonl",
+    table.concat({
+      '{"area":"lib.nvim","at":"2026-01-01T08:00:00Z","day":"2026-01-01","days":5,"open":6,"state":{"decision":1,"ready":3,"stuck":1,"waiting":1},"status":{"blocked":1,"decision":1,"doing":1,"open":3},"v":1,"value":12,"with_effort":3,"with_value":4}',
+      "not a row",
+      "",
+    }, "\n")
+  )
+
   -- saved views: one per way to draw, and one that is no view (a display nobody knows), which the document names as a problem
   vim.fn.mkdir(root .. "/lib.nvim/ROADMAP/views", "p")
   local function view(slug, head)

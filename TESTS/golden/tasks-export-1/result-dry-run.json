@@ -1,6 +1,6 @@
 {
   "client_op_id": "golden-dry",
-  "digest": "sha256:2dbe9a21d50f6a9f",
+  "digest": "sha256:56f42dd984dae193",
   "dry_run": true,
   "engine": {
     "git": "0000000",
@@ -98,6 +98,15 @@
       "outcome": "would_create",
       "renamed": false,
       "slug": "golden-plan"
+    },
+    {
+      "changed_ids": [],
+      "file": "_Telemetry/history/2026-01.jsonl",
+      "n": 8,
+      "ok": true,
+      "op": "history_record",
+      "outcome": "would_change",
+      "rows": 2
     }
   ],
   "schema": 1,

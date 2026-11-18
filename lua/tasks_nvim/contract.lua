@@ -6,8 +6,8 @@
 --- (`lib.nvim.json.canonical`). The contract is versioned (`schema: 1`), only ever grows inside a version, and is described by
 --- the JSON Schemas in `schemas/tasks-export/1/`. The Markdown files stay the single source of truth.
 ---
---- Documents (`kind`): `tasks.hello`, `tasks.snapshot`, `tasks.list`, `tasks.task`, `tasks.next`, `tasks.areas`, `tasks.finished`, `tasks.links`, `tasks.groupings`, `tasks.views`,
---- `tasks.waits`, `tasks.error`. Every one starts with the same head (`schema`, `plugin`, `kind`, `generated_at`, `vault.id`,
+--- Documents (`kind`): `tasks.hello`, `tasks.snapshot`, `tasks.list`, `tasks.task`, `tasks.next`, `tasks.areas`, `tasks.finished`, `tasks.history`, `tasks.links`, `tasks.groupings`,
+--- `tasks.views`, `tasks.waits`, `tasks.error`. Every one starts with the same head (`schema`, `plugin`, `kind`, `generated_at`, `vault.id`,
 --- `engine`); a document that comes from a scan also carries `rev` (what the vault looked like) and `digest` (the hash
 --- of the content: without `generated_at` and `engine`, so two runs on an unchanged vault have the same digest).
 ---
@@ -28,6 +28,7 @@ local done_flow = require("tasks_nvim.done_flow")
 local error_codes = require("lib.nvim.contract.errors")
 local estimate = require("tasks_nvim.estimate")
 local fsio = require("tasks_nvim.fsio")
+local history = require("tasks_nvim.history")
 local json = require("lib.nvim.json.canonical")
 local links = require("tasks_nvim.links")
 local model = require("tasks_nvim.model")
@@ -73,6 +74,7 @@ M.CAPABILITIES = {
   "finished",
   "groupings",
   "hello",
+  "history",
   "if_match",
   "intent",
   "links",
@@ -2384,6 +2386,160 @@ function M.finished(params, opts)
   })
   doc.incomplete = incomplete
   return seal(doc, nil), nil
+end
+
+---The most points one `history` request answers.
+M.HISTORY_MAX_POINTS = 800
+
+---The days `history` covers when no `since` is asked for (up to `until`, both included).
+M.HISTORY_DEFAULT_DAYS = 90
+
+---The figures of the overview over time (`tasks_nvim.history`): one point per day or week of the window, oldest
+---first. A point carries the level of the day (`open`, `by_status`, `by_state`, `with_effort`, `with_value`,
+---`effort_days`, `value`: the sum over the areas of the last row each of them has up to that day; absent before the
+---first row, unknown is never 0), `recorded` (a row was written on that day, of any area: a level without it is the
+---one carried over) and the two figures the files themselves give for every day: `done` (tasks finished on it, the
+---day in the name of the Backlog file) and `created` (tasks whose `created` is that day, open or finished). A week
+---is named by its Monday: its level is the one of its last day in the window, `done` and `created` are its sums.
+---`area` (an area or an area group) narrows all of it. The series lies outside the revision, as in `tasks.finished`.
+---@param params? { area?: string, since?: string, until?: string, resolution?: string }
+---@param opts? { root?: string, today?: string }
+---@return table|nil doc
+---@return Tasks.ContractError|string|nil err
+function M.history(params, opts)
+  params = params or {}
+  opts = opts or {}
+  local function bad(message)
+    return nil, { code = "invalid_argument", message = message, retryable = false }
+  end
+  local today = opts.today or model.today()
+  if not model.is_date(today) then
+    return bad("today is not a date (YYYY-MM-DD)")
+  end
+  for _, name in ipairs({ "since", "until" }) do
+    if params[name] ~= nil and not model.is_date(params[name]) then
+      return bad(name .. " must be a day, YYYY-MM-DD")
+    end
+  end
+  local until_ = params["until"] or today
+  local since = params.since or model.add_days(until_, -(M.HISTORY_DEFAULT_DAYS - 1))
+  if not since then
+    return bad("until is too early for a window")
+  end
+  if since > until_ then
+    return bad("since is after until")
+  end
+  local resolution = params.resolution or "day"
+  if resolution ~= "day" and resolution ~= "week" then
+    return bad("resolution must be day or week")
+  end
+  local n_points = model.days_between(since, until_) + 1
+  if resolution == "week" then
+    n_points = model.days_between(week_start(since), week_start(until_)) / 7 + 1
+  end
+  if n_points > M.HISTORY_MAX_POINTS then
+    return bad(
+      ("the window holds %d points, at most %d: ask for weeks or for fewer days"):format(
+        n_points,
+        M.HISTORY_MAX_POINTS
+      )
+    )
+  end
+  local root, rerr = vault.root(opts)
+  if not root then
+    return nil, rerr
+  end
+  return fsio.read_scope(function()
+    local area_set = nil
+    if params.area ~= nil then
+      local scope = vault.area_scope(root, params.area)
+      if not scope then
+        return nil,
+          {
+            code = "not_found",
+            message = "unknown area: " .. tostring(params.area),
+            retryable = false,
+          }
+      end
+      area_set = scope.set
+    end
+    local incomplete = {}
+    local function note(errors)
+      if type(errors) == "table" then
+        for _, e in ipairs(errors) do
+          incomplete[#incomplete + 1] = redact(root, tostring(e))
+        end
+      end
+    end
+    -- what the files say about every day: finished (the date in the name), created (the `created:` line)
+    local done, created = {}, {}
+    local function count(into, day)
+      if model.is_date(day) and day >= since and day <= until_ then
+        into[day] = (into[day] or 0) + 1
+      end
+    end
+    for _, a in ipairs(vault.areas(root)) do
+      if area_set == nil or area_set[a.name] then
+        local open, oerr = scan.area(a.name, { root = root })
+        note(oerr)
+        for _, t in ipairs(open or {}) do
+          count(created, t.created)
+        end
+        local finished, ferr = scan.backlog(a.name, { root = root })
+        note(ferr)
+        for _, t in ipairs(finished or {}) do
+          count(created, t.created)
+          count(done, model.done_date(t.path))
+        end
+      end
+    end
+    local read = history.read(root)
+    local levels = history.levels(read.rows, since, until_, area_set)
+    for _, p in ipairs(read.problems) do
+      incomplete[#incomplete + 1] = p
+    end
+
+    local points, by_key = {}, {}
+    ---@type string|nil
+    local day = since
+    while day and day <= until_ do
+      local key = resolution == "week" and week_start(day) or day
+      local point = by_key[key]
+      if not point then
+        point = { day = key, recorded = false, done = 0, created = 0 }
+        by_key[key] = point
+        points[#points + 1] = point
+      end
+      point.recorded = point.recorded or read.days[day] == true
+      point.done = point.done + (done[day] or 0)
+      point.created = point.created + (created[day] or 0)
+      local level = levels.by_day[day]
+      if level then
+        point.open = level.open
+        point.by_status = json.object(vim.deepcopy(level.status))
+        point.by_state = json.object(vim.deepcopy(level.state))
+        point.with_effort = level.with_effort
+        point.with_value = level.with_value
+        point.effort_days = days_sum(level.days)
+        point.value = level.value
+      end
+      day = model.add_days(day, 1)
+    end
+    for i, point in ipairs(points) do
+      points[i] = json.object(point)
+    end
+
+    local doc = M.head("tasks.history", root)
+    doc.since = since
+    doc["until"] = until_
+    doc.resolution = resolution
+    doc.area = params.area
+    doc.first = levels.first
+    doc.last = levels.last
+    doc.points = json.memo(points)
+    doc.incomplete = incomplete
+    return seal(doc, nil), nil
+  end)
 end
 
 ---Where the areas hang together: the links between the open tasks of different areas (`blocked_by`, `after`, a ref that

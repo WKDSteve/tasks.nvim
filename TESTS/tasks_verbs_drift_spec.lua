@@ -22,6 +22,9 @@ return function(H)
     "check",
     "ci",
     "export",
+    -- `history` reads and writes the series of the figures for a hub, a script or a chart of tasks-desktop; the
+    -- editor has no view of it
+    "history",
     "import",
     "init-vault",
     -- `intent` takes a document of another app; the editor fills `:Tasks new` from it later
@@ -68,7 +71,8 @@ return function(H)
     ["estimate"] = { composer = { "list", "walk" }, cli = { "stale-refs" } },
     ["folderize"] = { composer = {}, cli = { "by", "force", "no-index", "note" } },
     -- `--staged` is for the shell around a commit; the editor has no staging step of its own.
-    ["index"] = { composer = {}, cli = { "staged" } },
+    -- `--no-history`: only the CLI's index writes down the figures of the day (`tasks history`), so only it can skip it.
+    ["index"] = { composer = {}, cli = { "no-history", "staged" } },
     ["list"] = {
       composer = { "force", "list", "to" },
       cli = {

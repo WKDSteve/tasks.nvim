@@ -79,6 +79,8 @@ TESTS/              specs (run with scripts/test.sh, i.e. testing.nvim)
 | `tasks_nvim.done_flow` | The one entry for finishing a task: `run(id, opts)` calls `mutate.done` and returns `{ done, steps_ticked, freed, plans_closed, docs_refreshed, notes, next }`. The `:Tasks done` command, the dashboard (through `batch.done_many`) and the CLI call only this. `preview(id, opts)` is the same finish worked out and not written (`mutate.done_preview`: target path, README row, the steps it would tick, the plan it would close, the tasks it would free), with the `etag` of the file it read and a `confirm` token for that version (`mutate.confirm_token` / `confirm_etag`: `done-`, 16 hex digits of the etag, six digits binding the id; stateless, a host adds its own authorisation). `run` takes `if_match`: a task file that is not that version is a `conflict` and nothing moves. The chain names the tasks it freed and picks the next task (`next_pick`); plan steps, plan files and generated blocks land behind the same seam. A failure after the finish never undoes it and goes to `notes`; an already finished task runs no chain; `batch.done_many` picks once for a whole stack and checks each plan once (`close_plans`). `marker_docs` is the list of documents a finish refreshes (config plus `$TASKS_MARKER_DOCS`). | `run`, `preview`, `close_plans`, `marker_docs`, `refresh_marker_docs` |
 | `tasks_nvim.batch` | `set_many` applies steps `{ id, patch, expect = { key, value } }` (a step whose task changed since it was read is refused) and `done_many` finishes several tasks; both write each area index once. `plan_cycle` plans advancing `status` / `prio` of a selection (each task from its own value; the steps carry `expect`), `model.cycle_status` / `cycle_prio` are the cycles: the dashboard only presses the keys. `reorder(id, { after, before, group, if_match }, opts)` moves a task inside its group (same stage, same `status|effective prio`, `plan.group_key`): it gets an `order` between its neighbours', tasks without an `order` are numbered only where the spot needs it (those before it), two values closer than `MIN_ORDER_GAP` renumber the numbered tasks 1, 2, 3, ...; a neighbour of another group, a group the caller did not see or neighbours that are no longer adjacent is a `conflict`, a move that would write more than `MAX_REORDER_WRITES` files is refused, every write is a `set` with `expect` on `order` (not all-or-nothing: what was written stays and the answer says how far it got), the answer carries the `inverse` that puts it back in its place and `restore` (a `set` of `order` for every file written) that gives every file its old value back. `plan_reorder` is the pure placement. | `set_many`, `done_many`, `plan_cycle`, `reorder`, `plan_reorder` |
 | `tasks_nvim.scan` | `lib.nvim.fs.collect_recursive` (or the TTL cache `scan_cached` with `ttl_seconds`) over `ROADMAP/tasks/` and `Backlog/`. A folder task's `<slug>/<slug>.md` is a task (`task.folder`), the other files in its folder are assets and ignored; any other nested file is returned, flagged. Backlog files count as tasks only with frontmatter and a `status`. A folder whose real path is outside the vault (a `ROADMAP` or `tasks` that is a link or a junction) is not read and is reported as a walk error (`vault.leaves`). Every function settles the bare `[[slug]]` wikilinks of what it returns (`wikilinks.resolve`; `opts.link_resolver` shares one index over several calls, `all` and `check` do). | `area`, `all`, `backlog`, `find`, `find_done`, `backlog_slugs` |
+| `tasks_nvim.history` | The series of the overview figures (see [The series of the figures](#the-series-of-the-figures-_telemetryhistory)): `figures` counts a view by area (open, by status, by readiness, with effort and value, their sums), `record` writes the rows of today for the areas that changed (`changes` decides, `write_rows` replaces a row of the same day and area and keeps every other line), `read` returns one row per day and area (the later `at` wins) and names the lines it skipped, `levels` sums the last row of every area per day of a window. `parse_row` is the one judge of a line. | `figures`, `record`, `read`, `levels`, `changes`, `write_rows`, `parse_row`, `exists` |
+| `tasks_nvim.history_backfill` | Fills the series for past days from the repository of the vault: `days` lists the days of `HEAD` that have a commit with their last commit, `run` lays the tree of each day without a row into a temporary folder (own index file, the repository untouched), counts it and writes rows marked `src: git`. Needs git; the web variant never calls it. | `days`, `run` |
 | `tasks_nvim.index` | `render` is pure and deterministic: the same tasks give the same bytes, whatever order they are found in. `write_area` writes only when the content differs (a CRLF checkout counts as equal and keeps its line endings), removes the file when no task is open, and with `check = true` only reports `stale` (`missing` / `outdated` / `orphan`). `render_global` returns the all-areas overview as text; nothing writes `ALL/TASKS.md` (decision E2: it is never committed). | `render`, `write_area`, `write_all`, `render_global` |
 | `tasks_nvim.mutate` | `new` creates the file with `O_CREAT\|O_EXCL` (a taken slug gets `-2`, `-3`, ...; a slug used in `Backlog/` or as a folder counts as taken; `folder = true` makes a folder task). `set` validates the patch, changes only the named keys through `lib.nvim.markdown.frontmatter` and bumps `updated` only when something changed. `blocked_by`, `after` and `plan` take ids and wikilinks (resolved to ids, a bare slug against the vault); they are written through `wikilinks.forms`: what the file holds keeps its form, a typed wikilink stays as typed, a new id follows `links` (`opts.links`, `setup`, `$TASKS_LINKS`). `new` writes `after` and `plan` the same way. `done` is rule R6 (below). `folderize` and `attach` turn a task into a folder task and copy assets into it. All regenerate the area index. | `template`, `new`, `set`, `done`, `folderize`, `attach`, `slugify`, `readme_add_row`, `SETTABLE` |
 | `tasks_nvim.form` | The form behind `task new` without arguments, with no UI: `template` builds the Markdown text (`Area:` / `Title:` / `Summary:` / `Tags:` / `Refs:` lines, the free-text sections Kontext / Akzeptanz / Notizen and one `- [ ]` / `- [x]` bullet list per choice field, the value sets read from `tasks.model`), `parse` reads what the user left in it, `validate` checks it (area known, title present, one tick on a single-choice list) and returns `tasks.mutate.new` options, `toggle` flips one bullet and keeps a single-choice list at one tick (`category` takes several). It creates nothing: the editor layer passes the values to `mutate.new`, the same write path as the CLI. | `fields`, `template`, `parse`, `validate`, `toggle`, `normalize`, `error_lines`, `strip_errors` |
@@ -339,6 +341,66 @@ The next round of a folder task is a plain task file: its assets stay with the f
 no deadline) and `repeat-from-without-repeat` (warning). Not built: deleting with a warning, a history of the rounds beyond
 the Backlog files. `start` counts for every task, not only for rounds: a task whose earliest day to begin is ahead is not offered by `next`
 and not listed by `list --ready` (a clock-dependent answer, `--today` fixes the day).
+
+### The series of the figures (`_Telemetry/history`)
+
+The engine knows the vault as it is now. How many tasks were ready three weeks ago cannot be worked out afterwards:
+readiness hangs on the blockers of that day. So the figures of the overview are written down when they change
+(`tasks_nvim.history`) and read back as a series (`tasks.history` of the contract, `tasks history` on the command line).
+
+**Where, and why there** (decided 2026-11-18): in the vault, `<vault>/_Telemetry/history/YYYY-MM.jsonl`, one JSON
+object per line. In the vault because every reader has it then: a second machine after `git pull`, and the web variant,
+which runs the engine in the browser and has neither a hub nor git. A file beside the hub or per machine would give
+every machine its own series with its own gaps; reading the history of the repository on demand needs git and minutes.
+`_Telemetry` is no area (it has neither `ROADMAP` nor `Backlog`, and a name with a leading `_` never is one).
+
+**A row** holds the figures of one area on one day, absolute, never a difference:
+
+```json
+{"area":"lib.nvim","at":"2026-11-18T10:35:25Z","day":"2026-11-18","days":12.5,"open":20,"state":{"ready":9,"waiting":7,"stuck":1,"decision":1,"parked":2},"status":{"open":12,"doing":2,"blocked":3,"decision":1,"parked":2},"v":1,"value":40,"with_effort":15,"with_value":14}
+```
+
+`status` counts by `status:`, `state` by readiness (the figures of the plan head), zero counts are left out; `days`
+and `value` are the sums of the written efforts and values, `with_effort` and `with_value` how many tasks carry one.
+`at` is when the row was written (UTC), `src: "git"` marks a row filled in from the repository. No path of this
+machine is in a row.
+
+**When a row is written**: only for an area whose figures differ from its last row (an area that had figures and is
+gone gets a row of zeros), and the writer keeps at most one row per day and area: a second run on the same day
+replaces the row of that day. Nothing runs by itself; three things write:
+
+| What | When |
+|---|---|
+| `tasks history record` | by hand or from a script; makes the folder on the first run |
+| `tasks index` (no area, or `--all`) | it read every task anyway; only in a vault that keeps a series (the folder is there), `--no-history` leaves it out, and a failure is a warning, never the reason for the index to fail |
+| the operation `history_record` of `tasks-ops/1` | what a hub sends (its engine is warm, so the count costs little) |
+
+A full count reads the whole vault (seconds on a big one), which is why `new`, `set` and `done` do not write a row.
+
+**Two machines**: both may write the same day before they see each other's commit. The vault's `.gitattributes`
+merges the files by union (`_Telemetry/history/*.jsonl merge=union`): both lines stay, no conflict, and the reader
+takes the row with the later `at` (the same second: the same line on every machine). The next row written for that
+day leaves one line. Commit the files with the rest of the vault; a row that is committed late or never costs a step
+in the curve and nothing else, because rows are absolute.
+
+**Reading** (`history.read`) is the one place that judges a line: a line that is no row (not JSON, an unknown
+version, a count below zero or beyond 1e9, an unknown status or state word, a day of another month than its file, a
+line longer than 2048 bytes, the markers of a merge without union) is named as `<file>:<line>: <why>` and skipped,
+at most 20 by name and the rest counted. The writer leaves such a line where it is: it may be a row of a newer engine.
+A `_Telemetry` or `history` that is a link is not read and not written.
+
+**Levels** (`history.levels`): the level of a day is the sum over the areas of the last row each has up to that day.
+A day before the first row has no level; a day without a row carries the level over and says so (`recorded: false`
+in the document). What the files themselves say about a day (finished on it, created on it) needs no row and is
+counted live for every day.
+
+**The past** (`tasks history backfill`, `tasks_nvim.history_backfill`): for every day before today that has a commit
+and no row, the tree of the last commit of that day is laid out in a temporary folder (through an index file of its
+own: no worktree, no branch, the repository and its working tree stay untouched), counted with the engine of today
+and written as rows with `src: "git"` and the commit time as `at`. A day that has a row is never counted again (a row
+written on its day is what the vault was), a day without a commit gets none, a tree the engine cannot read is skipped
+and named. The day of a commit is the day of its committer time on this machine. Needs `git`; a few seconds for the
+first tree, then about a second per day.
 
 ### Folder tasks
 

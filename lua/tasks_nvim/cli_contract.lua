@@ -15,13 +15,17 @@
 ---    order is the plan's, `--sort` has no meaning there and is refused
 ---  - `next --format=json`, `areas --format=json|tsv`, `waits --format=json`, `show <id> [--format=json|text]`, `plans [area]`
 ---  - `list --done`: the finished tasks of the Backlogs (tab-separated, like the open ones)
+---  - `history [<area>]`: the series of the overview figures (`tasks.history`) as lines or as the document;
+---    `history record` writes down the figures of today, `history backfill` fills past days from git
 ---
 --- Reads, except `call ops` (the write door; exit 1 when an operation failed). Not its job: the documents (`contract`),
 --- the request check (`api`).
 
 local api = require("tasks_nvim.api")
 local contract = require("tasks_nvim.contract")
+local backfill = require("tasks_nvim.history_backfill")
 local fsio = require("tasks_nvim.fsio")
+local history = require("tasks_nvim.history")
 local model = require("tasks_nvim.model")
 local plans = require("tasks_nvim.plans")
 local projects = require("tasks_nvim.projects")
@@ -585,12 +589,148 @@ end
 -- ── registration ─────────────────────────────────────────────────────────────
 
 ---Add the commands of this module to the tables of `cli.lua`.
+---The columns of `history` in its tab-separated form, after the day and the mark of a recorded day.
+local HISTORY_COLUMNS = {
+  "open",
+  "ready",
+  "waiting",
+  "stuck",
+  "decision",
+  "parked",
+  "with_value",
+  "with_effort",
+  "effort_days",
+  "value",
+  "done",
+  "created",
+}
+
+---`history record`: write down the figures of today.
+---@param ctx Tasks.CliCtx
+---@return integer
+local function history_record(ctx)
+  if #ctx.args.pos > 1 then
+    ctx.warn("error: history record takes no argument")
+    return 2
+  end
+  local dry = ctx.args.opt["dry-run"] == true
+  local view, verr = contract.view({ root = ctx.eo.root })
+  if not view then
+    ctx.warn("error: " .. tostring(verr))
+    return 1
+  end
+  local res, err = history.record(view, { today = ctx.eo.today, dry_run = dry })
+  if not res then
+    ctx.warn("error: " .. contract.redact(view.root, tostring(err)))
+    return 1
+  end
+  for _, p in ipairs(res.problems) do
+    ctx.warn("warn: skipped " .. p)
+  end
+  ctx.say(("history\t%d row(s)%s\t%s"):format(res.rows, dry and " (dry run)" or "", res.file))
+  return 0
+end
+
+---`history backfill`: fill the past days from the repository of the vault.
+---@param ctx Tasks.CliCtx
+---@return integer
+local function history_backfill(ctx)
+  if #ctx.args.pos > 1 then
+    ctx.warn("error: history backfill takes no argument")
+    return 2
+  end
+  local opt = ctx.args.opt
+  local dry = opt["dry-run"] == true
+  local res, err = backfill.run({
+    root = ctx.eo.root,
+    today = ctx.eo.today,
+    since = opt.since --[[@as string|nil]],
+    ["until"] = opt["until"] --[[@as string|nil]],
+    dry_run = dry,
+    progress = function(day, n, of)
+      ctx.warn(("backfill\t%d/%d\t%s"):format(n, of, day))
+    end,
+  })
+  if not res then
+    local root = vault.root({ root = ctx.eo.root })
+    ctx.warn("error: " .. (root and contract.redact(root, tostring(err)) or tostring(err)))
+    return 1
+  end
+  for _, s in ipairs(res.skipped) do
+    ctx.say(("skipped\t%s\t%s"):format(s.day, fsio.clean(s.why)))
+  end
+  ctx.say(
+    ("backfill\t%d day(s)\t%d row(s)%s\t%s\t%d day(s) with rows left alone"):format(
+      res.days,
+      res.rows,
+      dry and " (dry run)" or "",
+      res.first and (res.first .. ".." .. res.last) or "-",
+      res.kept
+    )
+  )
+  return 0
+end
+
+---`history [<area>]`: the series as lines, or the `tasks.history` document.
+---@param ctx Tasks.CliCtx
+---@return integer
+local function run_history(ctx)
+  local sub = ctx.args.pos[1]
+  if sub == "record" then
+    return history_record(ctx)
+  elseif sub == "backfill" then
+    return history_backfill(ctx)
+  end
+  local opt = ctx.args.opt
+  local format = opt.format or "tsv"
+  if format ~= "tsv" and format ~= "json" then
+    ctx.warn("error: --format must be tsv or json")
+    return 2
+  end
+  if #ctx.args.pos > 1 or opt["dry-run"] then
+    ctx.warn("error: history takes at most one area (--dry-run belongs to record and backfill)")
+    return 2
+  end
+  local doc, err = contract.history({
+    area = sub,
+    since = opt.since,
+    ["until"] = opt["until"],
+    resolution = opt.resolution,
+  }, { root = ctx.eo.root, today = ctx.eo.today })
+  if format == "json" then
+    return emit(ctx, doc, err)
+  end
+  if not doc then
+    local e = type(err) == "table" and err or { message = tostring(err) }
+    ctx.warn("error: " .. tostring(e.message))
+    return exit_code(e.code)
+  end
+  ctx.say("# day\trecorded\t" .. table.concat(HISTORY_COLUMNS, "\t"))
+  for _, p in ipairs(doc.points) do
+    local cells = { p.day, p.recorded and "*" or "-" }
+    for _, name in ipairs(HISTORY_COLUMNS) do
+      local v = p[name]
+      if v == nil and p.by_state then
+        v = p.by_state[name]
+      end
+      cells[#cells + 1] = v == nil and "-" or tostring(v)
+    end
+    ctx.say(table.concat(cells, "\t"))
+  end
+  for _, e in ipairs(doc.incomplete) do
+    ctx.warn("warn: skipped " .. fsio.clean(e))
+  end
+  return 0
+end
+
 ---@param commands table<string, fun(ctx: Tasks.CliCtx): integer>
 ---@param specs table<string, Tasks.CliSpec>
 ---@param helpers Tasks.CliContractHelpers
 function M.register(commands, specs, helpers)
   specs.call = { value = { "params" }, flag = { "pretty" } }
   commands.call = run_call
+  specs.history = { value = { "since", "until", "resolution", "format" }, flag = { "dry-run" } }
+  commands.history = run_history
   specs.show = { value = { "format" }, flag = {} }
   commands.show = run_show
   specs.plans = { value = {}, flag = { "tree" } }

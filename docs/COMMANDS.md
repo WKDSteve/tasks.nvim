@@ -725,6 +725,25 @@ Takes an intent `wkd-intent/1` (`tasks.new` from a testing finding, `tasks.show`
 `would_create`, `exists` (a task holds the ref `testing-finding:<fp>` already), `shown`, `not_found` or, with `--yes`, `created`.
 Details and limits: [ENGINE.md](ENGINE.md#taking-an-intent-wkd-intent1).
 
+### Headless: `history` (the overview figures over time)
+
+```
+tasks history [<area>] [--since=YYYY-MM-DD] [--until=YYYY-MM-DD] [--resolution=day|week] [--format=tsv|json]
+tasks history record [--dry-run]
+tasks history backfill [--since=YYYY-MM-DD] [--until=YYYY-MM-DD] [--dry-run]
+```
+
+`history` prints one line per day (or week) of the window, by default the last 90 days: the day, `*` for a day a row
+was written on (else `-`), then open, ready, waiting, stuck, decision, parked, with value, with effort, the sums of
+effort days and value, and what the files say about the day (finished, created). A `-` in a figure is a day before the
+first row. `--format=json` is the `tasks.history` document.
+
+`history record` writes down the figures of today: one row per area whose figures changed since its last row, in
+`<vault>/_Telemetry/history/YYYY-MM.jsonl` (the folder is made on the first run). After that, `tasks index` without an
+area does the same on every run (`--no-history` leaves it out). `history backfill` fills the days before today that
+have a commit and no row from the history of the vault's repository; the progress goes to stderr, the repository is
+not touched. Details and the reasons: [ENGINE.md](ENGINE.md#the-series-of-the-figures-_telemetryhistory).
+
 ### Headless: `claim` and `unclaim` (reserve a task while you work on it)
 
 ```

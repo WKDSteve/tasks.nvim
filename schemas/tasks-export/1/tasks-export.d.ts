@@ -19,6 +19,7 @@ export type TasksExport =
   | Next
   | Areas
   | Finished
+  | History
   | Links
   | Groupings
   | Views
@@ -731,6 +732,30 @@ export type Finished = Head & {
   incomplete: string[];
 };
 /**
+ * tasks.history (capability `history`): the figures of the overview over time, one point per day or week of the window `since`..`until` (both included), oldest first. The levels come from the series the engine writes down below `_Telemetry/history/` of the vault (a row per day and area whose figures changed; `first` and `last` are the first and last day that has a row of the areas asked for, absent without a series). The series lies outside the revision, as the finished tasks do.
+ */
+export type History = Head & {
+  kind: "tasks.history";
+  digest: Digest;
+  since: Date;
+  until: Date;
+  resolution: "day" | "week";
+  /**
+   * The area or area group asked for; absent for the whole vault.
+   */
+  area?: string;
+  first?: Date;
+  last?: Date;
+  /**
+   * @maxItems 800
+   */
+  points: HistoryPoint[];
+  /**
+   * What was skipped: a line of the series that is no row (`<file>:<line>: <why>`, relative to the vault), a folder that could not be read.
+   */
+  incomplete: string[];
+};
+/**
  * tasks.links: where the areas hang together. A link is a `blocked_by` or `after` to an open task of another area, a ref that names another area (`lib.nvim@803de65`, `lib.nvim:anchor`; a path says nothing about the repo), or a plan whose open tasks lie in several areas. `pairs` groups the edges by the two areas (`a` sorts before `b`, the busiest pair first); `tasks` lists, for every open task that touches two or more areas, the areas it touches (its own and those of every link it is part of, in both directions). The edges of the pairs are cut at 2000 (`truncated`); `edge_count`, the counts and `tasks` cover all of them.
  */
 export type Links = Head & {
@@ -1331,6 +1356,55 @@ export interface FinishedStats {
   }[];
 }
 /**
+ * One day (or one week, named by its Monday) of `tasks.history`. `done` and `created` are what the files say about the day and are always there. The level (`open` and the fields beside it) is the sum over the areas of the last row each of them has up to that day: absent before the first row (unknown, never 0), all of it or none. `recorded` is false for a level that was carried over (no row of any area was written on that day).
+ */
+export interface HistoryPoint {
+  day: Date;
+  recorded: boolean;
+  /**
+   * Tasks finished on the day (the date in the name of the Backlog file); for a week their sum.
+   */
+  done: number;
+  /**
+   * Tasks, open or finished, whose `created` is the day; for a week their sum.
+   */
+  created: number;
+  /**
+   * Open tasks.
+   */
+  open?: number;
+  by_status?: {
+    [k: string]: number;
+  };
+  /**
+   * By readiness, the figures of the plan head of the snapshot (`plan.summary`).
+   */
+  by_state?: {
+    ready: number;
+    decision: number;
+    waiting: number;
+    stuck: number;
+    freed: number;
+    parked: number;
+  };
+  /**
+   * Open tasks that carry an effort.
+   */
+  with_effort?: number;
+  /**
+   * Open tasks that carry a value.
+   */
+  with_value?: number;
+  /**
+   * The sum of the written efforts of the open tasks.
+   */
+  effort_days?: number;
+  /**
+   * The sum of the written values of the open tasks.
+   */
+  value?: number;
+}
+/**
  * One link between the open tasks of two areas, seen from the task it starts at. `to` is the other task (`blocked_by`, `after`) or the plan (`plan`); `ref` is the ref as written (`refs`).
  */
 export interface LinkEdge {
@@ -1430,7 +1504,8 @@ export interface ResultEntry {
     | "view_delete"
     | "attach"
     | "claim"
-    | "release";
+    | "release"
+    | "history_record";
   id?: string;
   ok: boolean;
   /**
@@ -1491,6 +1566,10 @@ export interface ResultEntry {
    */
   link?: string;
   writes?: number;
+  /**
+   * `history_record`: the rows written into the series (a dry run: that would be written).
+   */
+  rows?: number;
   to?: string;
   steps_ticked?: number;
   plans_closed?: string[];

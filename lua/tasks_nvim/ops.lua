@@ -89,6 +89,7 @@ local errors = require("lib.nvim.contract.errors")
 local contract_ops = require("lib.nvim.contract.ops")
 local fm = require("lib.nvim.markdown.frontmatter")
 local fsio = require("tasks_nvim.fsio")
+local history = require("tasks_nvim.history")
 local index = require("tasks_nvim.index")
 local json = require("lib.nvim.json.canonical")
 local model = require("tasks_nvim.model")
@@ -151,6 +152,7 @@ M.OPS = {
   "attach",
   "claim",
   "release",
+  "history_record",
 }
 
 ---Longest `client_op_id`.
@@ -259,6 +261,7 @@ local FIELDS = {
   project_set = { id = "string", patch = "object", if_match = "string" },
   plan_close = { id = "string" },
   project_close = { id = "string" },
+  history_record = {},
 }
 
 for _, name in ipairs({
@@ -1951,6 +1954,28 @@ local function do_attach(op, ctx)
   return entry
 end
 
+---`history_record` {}: write down the figures of today in the series of the vault (`tasks_nvim.history`): a row for
+---every area whose figures changed since its last row; the folder is made on the first run. `rows` says how many
+---(a dry run: how many it would be), `file` the month file. No task changes, so no `id` and no `inverse`.
+---@param _ table
+---@param ctx Tasks.OpsCtx
+---@return table entry
+local function do_history_record(_, ctx)
+  local view, verr = contract.view({ root = ctx.root })
+  if not view then
+    return fail(ctx, verr)
+  end
+  local r, err = history.record(view, { today = ctx.today, dry_run = ctx.dry })
+  if not r then
+    return fail(ctx, err)
+  end
+  local outcome = "unchanged"
+  if r.rows > 0 then
+    outcome = ctx.dry and "would_change" or "changed"
+  end
+  return { ok = true, outcome = outcome, changed_ids = {}, rows = r.rows, file = r.file }
+end
+
 ---@type table<string, fun(op: table, ctx: Tasks.OpsCtx): table>
 local HANDLERS = {
   set = do_set,
@@ -1976,6 +2001,7 @@ local HANDLERS = {
   attach = do_attach,
   claim = do_claim,
   release = do_release,
+  history_record = do_history_record,
 }
 
 -- ── the request ──────────────────────────────────────────────────────────────

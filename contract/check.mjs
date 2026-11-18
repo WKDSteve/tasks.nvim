@@ -161,6 +161,13 @@ mutate("a pair of areas without its count", "links", (d) => delete d.pairs[0].co
 mutate("a touched task with one area", "links", (d) => (d.tasks[0].areas = ["a"]));
 mutate("a finished task with a made-up day", "finished", (d) => (d.items[0].done = "yesterday"));
 mutate("a count row with a key nobody defined", "finished", (d) => (d.stats.by_area[0].colour = "red"));
+mutate("a history without its points", "history", (d) => delete d.points);
+mutate("a history point with a level but no states", "history", (d) => delete d.points[2].by_state);
+mutate("a history point with a state nobody defined", "history", (d) => (d.points[2].by_state.frozen = 1));
+mutate("a history point that counts below zero", "history", (d) => (d.points[2].open = -1));
+mutate("a history by a resolution nobody defined", "history-weeks", (d) => (d.resolution = "month"));
+mutate("a history point with a made-up day", "history-weeks", (d) => (d.points[0].day = "last week"));
+mutate("rows of the series as text", "result-dry-run", (d) => (d.results.at(-1).rows = "one"));
 mutate("a finding with a severity nobody defined", "check", (d) => (d.findings[0].severity = "fatal"));
 mutate("a plan graph without its edges", "planfor", (d) => delete d.edges);
 mutate("a plan graph whose edge kind nobody defined", "planfor", (d) => (d.edges[0].kind = "soft"));

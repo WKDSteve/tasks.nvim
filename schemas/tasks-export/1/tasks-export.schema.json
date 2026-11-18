@@ -50,6 +50,9 @@
       "$ref": "#/$defs/Finished"
     },
     {
+      "$ref": "#/$defs/History"
+    },
+    {
       "$ref": "#/$defs/Links"
     },
     {
@@ -2692,6 +2695,188 @@
       },
       "unevaluatedProperties": false
     },
+    "HistoryPoint": {
+      "description": "One day (or one week, named by its Monday) of `tasks.history`. `done` and `created` are what the files say about the day and are always there. The level (`open` and the fields beside it) is the sum over the areas of the last row each of them has up to that day: absent before the first row (unknown, never 0), all of it or none. `recorded` is false for a level that was carried over (no row of any area was written on that day).",
+      "type": "object",
+      "required": [
+        "day",
+        "recorded",
+        "done",
+        "created"
+      ],
+      "properties": {
+        "day": {
+          "$ref": "#/$defs/Date"
+        },
+        "recorded": {
+          "type": "boolean"
+        },
+        "done": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Tasks finished on the day (the date in the name of the Backlog file); for a week their sum."
+        },
+        "created": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Tasks, open or finished, whose `created` is the day; for a week their sum."
+        },
+        "open": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Open tasks."
+        },
+        "by_status": {
+          "type": "object",
+          "propertyNames": {
+            "$ref": "#/$defs/OpenStatus"
+          },
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "by_state": {
+          "description": "By readiness, the figures of the plan head of the snapshot (`plan.summary`).",
+          "type": "object",
+          "required": [
+            "ready",
+            "decision",
+            "waiting",
+            "stuck",
+            "freed",
+            "parked"
+          ],
+          "properties": {
+            "ready": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "decision": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "waiting": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "stuck": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "freed": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "parked": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false
+        },
+        "with_effort": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Open tasks that carry an effort."
+        },
+        "with_value": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Open tasks that carry a value."
+        },
+        "effort_days": {
+          "type": "number",
+          "minimum": 0,
+          "description": "The sum of the written efforts of the open tasks."
+        },
+        "value": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "The sum of the written values of the open tasks."
+        }
+      },
+      "dependentRequired": {
+        "open": [
+          "by_status",
+          "by_state",
+          "with_effort",
+          "with_value",
+          "effort_days",
+          "value"
+        ],
+        "by_status": [
+          "open"
+        ],
+        "by_state": [
+          "open"
+        ]
+      },
+      "additionalProperties": false
+    },
+    "History": {
+      "description": "tasks.history (capability `history`): the figures of the overview over time, one point per day or week of the window `since`..`until` (both included), oldest first. The levels come from the series the engine writes down below `_Telemetry/history/` of the vault (a row per day and area whose figures changed; `first` and `last` are the first and last day that has a row of the areas asked for, absent without a series). The series lies outside the revision, as the finished tasks do.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/Head"
+        }
+      ],
+      "type": "object",
+      "required": [
+        "kind",
+        "digest",
+        "since",
+        "until",
+        "resolution",
+        "points",
+        "incomplete"
+      ],
+      "properties": {
+        "kind": {
+          "const": "tasks.history"
+        },
+        "digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "since": {
+          "$ref": "#/$defs/Date"
+        },
+        "until": {
+          "$ref": "#/$defs/Date"
+        },
+        "resolution": {
+          "enum": [
+            "day",
+            "week"
+          ]
+        },
+        "area": {
+          "type": "string",
+          "description": "The area or area group asked for; absent for the whole vault."
+        },
+        "first": {
+          "$ref": "#/$defs/Date"
+        },
+        "last": {
+          "$ref": "#/$defs/Date"
+        },
+        "points": {
+          "type": "array",
+          "maxItems": 800,
+          "items": {
+            "$ref": "#/$defs/HistoryPoint"
+          }
+        },
+        "incomplete": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "What was skipped: a line of the series that is no row (`<file>:<line>: <why>`, relative to the vault), a folder that could not be read."
+        }
+      },
+      "unevaluatedProperties": false
+    },
     "LinkEdge": {
       "description": "One link between the open tasks of two areas, seen from the task it starts at. `to` is the other task (`blocked_by`, `after`) or the plan (`plan`); `ref` is the ref as written (`refs`).",
       "type": "object",
@@ -3231,7 +3416,7 @@
           "minimum": 1
         },
         "op": {
-          "enum": ["set", "new", "reorder", "done", "move_area", "plan_new", "plan_set", "plan_close", "project_new", "project_set", "project_close", "tick_step", "add_steps", "answer", "append_note", "reopen", "set_body", "set_section", "view_save", "view_delete", "attach", "claim", "release"]
+          "enum": ["set", "new", "reorder", "done", "move_area", "plan_new", "plan_set", "plan_close", "project_new", "project_set", "project_close", "tick_step", "add_steps", "answer", "append_note", "reopen", "set_body", "set_section", "view_save", "view_delete", "attach", "claim", "release", "history_record"]
         },
         "id": {
           "type": "string"
@@ -3327,6 +3512,11 @@
         "writes": {
           "type": "integer",
           "minimum": 0
+        },
+        "rows": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "`history_record`: the rows written into the series (a dry run: that would be written)."
         },
         "to": {
           "type": "string"

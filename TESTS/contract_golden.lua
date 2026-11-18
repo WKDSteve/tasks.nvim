@@ -153,6 +153,18 @@ G.cases = {
     method = "finished",
     request = '{"params":{"since":"2025-12-31","until":"2026-01-01"}}',
   },
+  -- the series of the figures: a window around the rows of the fixture (a day before the first row, a carried day,
+  -- a line that is no row), and the same by week for one area
+  {
+    name = "history",
+    method = "history",
+    request = '{"params":{"since":"2025-12-29","until":"2026-01-02"}}',
+  },
+  {
+    name = "history-weeks",
+    method = "history",
+    request = '{"params":{"area":"lib.nvim","since":"2025-12-22","until":"2026-01-04","resolution":"week"}}',
+  },
   { name = "error-unsupported-schema", method = "list", request = '{"schema":2}' },
   { name = "error-unknown-parameter", method = "list", request = '{"params":{"colour":"red"}}' },
   { name = "donepreview", method = "done_preview", request = '{"params":{"id":"lib.nvim/delta"}}' },
@@ -182,6 +194,7 @@ G.cases = {
             title = "Golden plan",
             phases = { "design", "build" },
           },
+          { op = "history_record" },
         },
       })
     end,
