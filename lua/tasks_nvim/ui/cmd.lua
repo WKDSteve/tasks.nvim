@@ -1784,6 +1784,18 @@ function M.task_new(ctx)
     M.task_new_form(given)
     return
   end
+  -- The route takes any first word (it may be the text of `--draft`): the area is checked here.
+  local root = vault.root()
+  if root then
+    local names = {}
+    for _, a in ipairs(vault.areas(root)) do
+      names[#names + 1] = a.name
+    end
+    if not vim.tbl_contains(names, area) then
+      notify.error(vault.not_an_area_message(area, names))
+      return
+    end
+  end
   local title = unquote(table.concat(ctx.rest, " "))
   if title == "" and source and source.text then
     title = source.text

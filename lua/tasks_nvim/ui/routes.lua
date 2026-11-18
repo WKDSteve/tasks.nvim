@@ -269,6 +269,18 @@ function M.register_types()
     end,
   })
 
+  -- The first word of `:Tasks new`: an area, or with `--draft` the start of the text. The composer checks a word before
+  -- it knows the flags, so this type takes any word and `task_new` checks the area itself (the same message).
+  composer.register_type("TASK_NEW_AREA", {
+    desc = "Area of the vault; with --draft the first word of the text",
+    validate = function(raw)
+      return true, raw, nil
+    end,
+    complete = function(arg_lead)
+      return prefix_ci(area_names(), arg_lead)
+    end,
+  })
+
   composer.register_type("TASK_ID", {
     desc = "Id of an open task, as area/slug",
     validate = function(raw, spec)
@@ -764,7 +776,7 @@ local function nested_routes()
       args = {
         {
           name = "area",
-          type = "TASK_AREA",
+          type = "TASK_NEW_AREA",
           optional = true,
           desc = "Area to create the task in (none: open the form)",
         },

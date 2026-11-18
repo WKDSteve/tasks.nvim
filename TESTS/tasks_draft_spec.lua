@@ -357,4 +357,18 @@ return function(H)
     names[#names + 1] = f.name
   end
   ok(vim.tbl_contains(names, "draft"), "--draft is a flag of :Tasks new")
+  -- The composer checks the first word before it knows the flags: any word passes (`:Tasks new --draft Der Knopf`),
+  -- and task_new checks the area itself when it is no draft.
+  local argtypes = require("lib.nvim.bindings.usercmd.composer.argtypes")
+  ok(argtypes.validate("Der", route.args[1]), "a word of the text is no refused area")
+  local told2 = {}
+  local orig = vim.notify
+  vim.notify = function(msg)
+    told2[#told2 + 1] = msg
+  end
+  local fine, why =
+    pcall(cmd.task_new, { args = { area = "nope" }, rest = { "x" }, kv = {}, flags = {} })
+  vim.notify = orig
+  ok(fine, tostring(why))
+  has(told2[#told2] or "", "nope")
 end
