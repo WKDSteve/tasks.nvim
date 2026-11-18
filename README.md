@@ -228,6 +228,19 @@ The CI gate can *run* `<vault>/TOOLS/scripts/md_lint.lua`, code that lives in th
 you pass `--trust-vault-lint` (or `--md-lint=<your own copy>`, or `--no-lint`; [docs/ENGINE.md](docs/ENGINE.md)). A finished task needs `<area>/Backlog/README.md` to get its row; without
 the file `done` says so and moves the task anyway.
 
+### MCP server (Claude Code and other agents)
+
+`scripts/mcp.lua` serves the read methods of `tasks-export/1` as MCP tools over stdio (`lib.nvim.mcp.server`):
+`tasks_hello`, `tasks_list`, `tasks_task`, `tasks_next`, `tasks_areas`, `tasks_check`, `tasks_find`, `tasks_waits`,
+`tasks_finished`. Each answers the contract's JSON document; an error document is an error result. There is no write
+tool: claiming, changing and finishing a task stay with the command line and the editor.
+
+```sh
+claude mcp add tasks -- nvim --headless -u NONE -l /path/to/tasks.nvim/scripts/mcp.lua --vault=/path/to/vault
+```
+
+Without `--vault` the server reads `$TASKS_VAULT`; lib.nvim is found as for `scripts/tasks.lua`.
+
 ## In a tree view
 
 A tree that reads `lib.nvim.tree.registry` shows the vault without another line of configuration. Today that is
