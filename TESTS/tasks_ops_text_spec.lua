@@ -448,6 +448,123 @@ return function(H)
   eq({ dry_steps.ok, dry_steps.outcome, dry_steps.inverse }, { true, "would_change", nil })
   eq(H.read(s1), bytes)
 
+  -- ── set_section ────────────────────────────────────────────────────────────
+  local sec = task("sectioned")
+  local sec_before = H.read(sec)
+  local REVIEW =
+    "2026-11-18: all met\n\n- [x] it is done — erfüllt: feature.txt:1\n\n### Folgetask (Vorschlag)\n\n- title: x"
+  local sec_added =
+    one({ op = "set_section", id = "lib.nvim/sectioned", heading = "## Prüfung", text = REVIEW })
+  eq({ sec_added.ok, sec_added.outcome }, { true, "changed" }, vim.inspect(sec_added))
+  eq(sec_added.inverse, nil, "a section that was not there has no inverse")
+  local after_add = H.read(sec)
+  has(
+    after_add,
+    "text that stays\n\n## Prüfung\n\n" .. REVIEW .. "\n",
+    "added at the end after one blank line"
+  )
+  has(after_add, "updated: " .. F.TODAY)
+  eq(
+    (without_updated(after_add):gsub("\n\n## Prüfung\n.*$", "\n")),
+    without_updated(sec_before),
+    "the rest of the text stays as it was"
+  )
+  local again =
+    one({ op = "set_section", id = "lib.nvim/sectioned", heading = "## Prüfung", text = REVIEW })
+  eq(again.outcome, "unchanged", "the same section again changes nothing")
+  local replaced = one({
+    op = "set_section",
+    id = "lib.nvim/sectioned",
+    heading = "## Prüfung",
+    text = "2026-11-19: one open",
+    if_match = etag(sec),
+  })
+  eq(replaced.outcome, "changed")
+  lacks(H.read(sec), "all met", "the old section is replaced")
+  has(H.read(sec), "## Prüfung\n\n2026-11-19: one open\n")
+  eq(replaced.inverse, {
+    op = "set_section",
+    id = "lib.nvim/sectioned",
+    heading = "## Prüfung",
+    text = REVIEW,
+    if_match = replaced.etag_after,
+  }, "the inverse sets the old text again")
+  eq(one(replaced.inverse).outcome, "changed")
+  has(H.read(sec), REVIEW)
+  -- a section in the middle: the sections after it stay where they are
+  one({
+    op = "set_section",
+    id = "lib.nvim/sectioned",
+    heading = "## Notizen",
+    text = "- new notes",
+  })
+  has(H.read(sec), "## Notizen\n\n- new notes\n\n## Weiteres\n\ntext that stays\n")
+  lacks(H.read(sec), "an older note")
+  -- a file with CRLF keeps it
+  local sec_crlf = task("crlf-section")
+  local crlf_text = H.read(sec_crlf):gsub("\r?\n", "\r\n")
+  local crlf_fh = assert(io.open(sec_crlf, "wb"))
+  crlf_fh:write(crlf_text)
+  crlf_fh:close()
+  one({ op = "set_section", id = "lib.nvim/crlf-section", heading = "## Prüfung", text = "a\nb" })
+  local sec_crlf_after = H.read(sec_crlf)
+  has(sec_crlf_after, "## Prüfung\r\n\r\na\r\nb\r\n")
+  eq(
+    select(2, sec_crlf_after:gsub("\r\n", "")),
+    select(2, sec_crlf_after:gsub("\n", "")),
+    "no bare LF was added"
+  )
+  -- a finished task in Backlog/: the review of `:Tasks agent kind=review-done`
+  local finished = root .. "/lib.nvim/Backlog/TASKS/2026-10-01_old-one.md"
+  H.write(
+    finished,
+    F.text(F.meta("Old one", "done", { { "kind", "task" } }), "\n## Akzeptanz\n\n- [x] it\n")
+  )
+  local done_entry =
+    one({ op = "set_section", id = "lib.nvim/old-one", heading = "## Prüfung", text = "met" })
+  eq({ done_entry.ok, done_entry.outcome }, { true, "changed" }, vim.inspect(done_entry))
+  eq(done_entry.index, nil, "a finished task is in no index")
+  has(H.read(finished), "- [x] it\n\n## Prüfung\n\nmet\n")
+  has(H.read(finished), "status: done", "it stays finished")
+  local dry_done = one(
+    { op = "set_section", id = "lib.nvim/old-one", heading = "## Prüfung", text = "other" },
+    { dry_run = true }
+  )
+  eq(dry_done.outcome, "would_change")
+  has(H.read(finished), "## Prüfung\n\nmet\n", "a dry run writes nothing")
+  -- what it refuses, writing nothing
+  local before_refused = H.read(sec)
+  local function refused_section(op, word)
+    local e = one(vim.tbl_extend("force", { op = "set_section", id = "lib.nvim/sectioned" }, op))
+    eq(e.ok, false, vim.inspect(e))
+    has(e.error.message, word)
+  end
+  refused_section(
+    { heading = "## Prüfung", text = "x\n## Akzeptanz\n- [ ] forged" },
+    "'## ' heading"
+  )
+  refused_section({ heading = "### deeper", text = "x" }, "starts with '## '")
+  refused_section({ heading = "## Prüfung", text = "   " }, "text is empty")
+  refused_section({ heading = "## Prüfung", text = "bell\7" }, "control character")
+  refused_section({ heading = "## Prüfung", text = string.rep("x", 40000) }, "longer than")
+  eq(H.read(sec), before_refused)
+  local two_lines = ops({
+    { op = "set_section", id = "lib.nvim/sectioned", heading = "## two\nlines", text = "x" },
+  })
+  ok(two_lines.kind == "tasks.error" or two_lines.results[1].ok == false, "a heading of two lines")
+  eq(
+    one({ op = "set_section", id = "lib.nvim/missing", heading = "## Prüfung", text = "x" }).error.code,
+    "not_found"
+  )
+  local stale_section = one({
+    op = "set_section",
+    id = "lib.nvim/sectioned",
+    heading = "## Prüfung",
+    text = "x",
+    if_match = "sha256:0000000000000000",
+  })
+  eq(stale_section.error.code, "conflict")
+
   -- the overview of the area is current
   local idx = require("tasks_nvim.index").write_area("lib.nvim", { root = root, check = true })
   eq(idx.action, "unchanged", "the overview of the area matches the files")

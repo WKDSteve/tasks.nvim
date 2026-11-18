@@ -27,6 +27,9 @@
 ---    Existing steps stay as they were; the answer has an `inverse` (a `set_body` with the old text)
 ---  - `append_note` { id, text, if_match? }: add one dated line to the notes of an open task (`## Notizen` / `## Notes`,
 ---    made when missing); no `inverse`
+---  - `set_section` { id, heading, text, if_match? }: set the section `heading` (`## ...`) of the body of an open task, or
+---    of a finished one in `Backlog/`, to `text` (replacing a section of that heading, else added at the end; at most
+---    32768 characters, no '## ' heading inside); the answer has an `inverse` when a section was replaced
 ---  - `set_body` { id, body, if_match? }: replace the text below the frontmatter of an open task (at most 100000 characters, no
 ---    control character but the line break and the tab; an empty text is allowed and leaves one blank line); the answer has an
 ---    `inverse` (the old text) when the old text is within the same limit
@@ -92,6 +95,7 @@ local model = require("tasks_nvim.model")
 local moves = require("tasks_nvim.moves")
 local mutate = require("tasks_nvim.mutate")
 local scan = require("tasks_nvim.scan")
+local sections = require("tasks_nvim.sections")
 local questions = require("tasks_nvim.questions")
 local steps = require("tasks_nvim.steps")
 local vault = require("tasks_nvim.vault")
@@ -141,6 +145,7 @@ M.OPS = {
   "append_note",
   "reopen",
   "set_body",
+  "set_section",
   "view_save",
   "view_delete",
   "attach",
@@ -156,6 +161,8 @@ M.MAX_BODY = 20000
 
 ---Longest `body` of `set_body`, in characters (the text a task file may grow to is not bounded by `new`).
 M.MAX_SET_BODY = 100000
+-- A section of `set_section` (a review, a proposal): at most this many characters, its heading at most 200.
+M.MAX_SECTION = 32768
 
 ---Longest entry of a list value (a tag, a ref, an id).
 M.MAX_ENTRY = 300
@@ -196,6 +203,7 @@ local FIELDS = {
   append_note = { id = "string", text = "string", if_match = "string" },
   reopen = { id = "string", status = "string", if_match = "string" },
   set_body = { id = "string", body = "string", if_match = "string" },
+  set_section = { id = "string", heading = "string", text = "string", if_match = "string" },
   view_save = {
     id = "string",
     area = "string",
@@ -264,6 +272,7 @@ for _, name in ipairs({
   "append_note",
   "reopen",
   "set_body",
+  "set_section",
   "attach",
 }) do
   FIELDS[name] = vim.tbl_extend("error", FIELDS[name], CLAIM_FIELDS)
@@ -839,6 +848,97 @@ local function do_set_body(op, ctx)
     return mutate_failure(ctx, err, info)
   end
   return body_entry(ctx, r)
+end
+
+---`set_section`: set the section `heading` (`## ...`) of a task's body to `text`, replacing a section of that heading
+---(up to the next `## ` heading) or adding it at the end; on an open task or a finished one in `Backlog/` (a review of
+---a finished task, `:Tasks agent kind=review-done`). The frontmatter stays but for `updated`; the file keeps its line
+---ending. The inverse sets the old text again when there was a section of that heading.
+---@param op table
+---@param ctx Tasks.OpsCtx
+---@return table entry
+local function do_set_section(op, ctx)
+  if op.id == nil or op.heading == nil or op.text == nil then
+    return refuse("invalid_argument", "set_section needs id, heading and text")
+  end
+  local heading = op.heading
+  -- has_control lets the line break and the tab through (a body has them); a heading is one line.
+  if
+    not heading:match("^## %S")
+    or #heading > 200
+    or heading:find("[\r\n\t]")
+    or has_control(heading)
+  then
+    return refuse(
+      "invalid_argument",
+      "heading is one line of at most 200 characters that starts with '## ' and a word"
+    )
+  end
+  if has_control(op.text) then
+    return refuse("invalid_argument", "text contains a control character")
+  end
+  if too_long(op.text, M.MAX_SECTION) then
+    return refuse("payload_too_large", ("text is longer than %d characters"):format(M.MAX_SECTION))
+  end
+  local text = vim.trim(fsio.lf(op.text))
+  if text == "" then
+    return refuse("invalid_argument", "text is empty")
+  end
+  -- A second section of the task's level would take the place of the task's own (and stay behind the next time).
+  if ("\n" .. text):find("\n## ") then
+    return refuse(
+      "invalid_argument",
+      "text holds a '## ' heading; only deeper headings (###) belong to a section"
+    )
+  end
+  local r, err, info = mutate.edit_text(op.id, function(file_text)
+    local parsed = fm.parse(file_text)
+    if not parsed or not parsed.has_block or parsed.unterminated then
+      return nil, "the file has no frontmatter block to write below"
+    end
+    local body = fsio.lf(parsed.body)
+    local old = sections.get(body, heading)
+    local new_body = "\n" .. vim.trim(sections.set(body, heading .. "\n\n" .. text)) .. "\n"
+    if parsed.eol == "\r\n" then
+      new_body = new_body:gsub("\n", "\r\n")
+    end
+    parsed.body = new_body
+    return fm.serialize(parsed), nil, { old = old }
+  end, {
+    root = ctx.root,
+    today = ctx.today,
+    index = false,
+    if_match = op.if_match,
+    dry_run = ctx.dry,
+    drafts = drafts_of(ctx),
+    allow_done = true,
+  })
+  if not r then
+    return mutate_failure(ctx, err, info)
+  end
+  local entry = text_entry(ctx, r)
+  if r.location == "backlog" then
+    -- a finished task is in no index: nothing for the door to write
+    ctx.touched[r.area] = nil
+  end
+  local old = r.extra and r.extra.old
+  if
+    r.changed
+    and not ctx.dry
+    and old
+    and old ~= ""
+    and not too_long(old, M.MAX_SECTION)
+    and not has_control(old)
+  then
+    entry.inverse = json.object({
+      op = "set_section",
+      id = r.id,
+      heading = heading,
+      text = old,
+      if_match = r.etag_after,
+    })
+  end
+  return entry
 end
 
 ---@param op table
@@ -1868,6 +1968,7 @@ local HANDLERS = {
   append_note = do_append_note,
   reopen = do_reopen,
   set_body = do_set_body,
+  set_section = do_set_section,
   view_save = do_view_save,
   view_delete = do_view_delete,
   attach = do_attach,

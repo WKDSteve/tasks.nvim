@@ -83,21 +83,9 @@ return function(H)
   has(replaced, newer .. "\n\n## Notizen\n\n- n\n", "the next section stays, after one blank line")
   eq(review.with_section(base:gsub("\n", "\r\n"), BLOCK), added, "a file with CRLF")
 
-  local path = H.tmpdir() .. "/finished.md"
-  H.write(
-    path,
-    "---\ntitle: X\nstatus: done\nupdated: 2026-11-01\n---\n\n## Akzeptanz\n\n- [x] it\n"
-  )
-  local wrote, werr = review.adopt(path, BLOCK, "2026-11-18")
-  ok(wrote, tostring(werr))
-  local text = H.read(path)
-  has(text, "\n## Prüfung\n")
-  has(text, "updated: 2026-11-18", "updated is stamped")
-  eq(
-    select(1, review.adopt(path, "# not a review", "2026-11-18")),
-    false,
-    "a foreign block is refused"
-  )
+  -- A foreign block is refused before anything is sent to the engine (the writing itself: the command below, and
+  -- `set_section` in tasks_ops_text_spec).
+  eq(select(1, review.adopt("lib.nvim/x", "# not a review")), false, "a foreign block is refused")
 
   -- ── watching the job ───────────────────────────────────────────────────────
   local function watch_with(answers)

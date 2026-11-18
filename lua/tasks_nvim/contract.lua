@@ -50,7 +50,7 @@ M.PLUGIN = "tasks.nvim"
 M.ENGINE_VERSION = "0.1.0-dev"
 
 ---What this engine can answer; an app shows only what is listed here. Sorted.
----`ops` is the write door (`set`, `new`, `reorder`, `done`, `move_area`, `plan_new`, `plan_set`, `plan_close`, `project_new`, `project_set`, `project_close`, `tick_step`, `add_steps`, `answer`, `append_note`, `reopen`, `set_body`, `view_save`, `view_delete`, `attach`), `if_match` the compare-and-set on a task's
+---`ops` is the write door (`set`, `new`, `reorder`, `done`, `move_area`, `plan_new`, `plan_set`, `plan_close`, `project_new`, `project_set`, `project_close`, `tick_step`, `add_steps`, `answer`, `append_note`, `reopen`, `set_body`, `set_section`, `view_save`, `view_delete`, `attach`), `if_match` the compare-and-set on a task's
 ---`etag`, `done_preview` what `done` needs first, `reorder` a move inside a group, `move_area_preview` the report of a
 ---move to another area (the move itself is not there yet). `waits_for` says that a task carries what it waits for
 ---(`set` and `new` take the key, `list` and `order` filter by it), `waits` is the overview of those keys.
@@ -99,6 +99,7 @@ M.CAPABILITIES = {
   "repeat",
   "rounds",
   "set_body",
+  "set_section",
   "snapshot",
   "task",
   "tick_step",

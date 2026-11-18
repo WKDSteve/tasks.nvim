@@ -105,6 +105,7 @@ return function(H)
     "repeat",
     "rounds",
     "set_body",
+    "set_section",
     "tick_step",
     "vault_marker",
     "view_delete",

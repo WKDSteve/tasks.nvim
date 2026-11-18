@@ -43,6 +43,7 @@
     "repeat",
     "rounds",
     "set_body",
+    "set_section",
     "snapshot",
     "task",
     "tick_step",

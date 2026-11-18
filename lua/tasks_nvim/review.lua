@@ -5,16 +5,16 @@
 --- ai-desktop's review agent only reads; its answer ends with one block between `<!-- review:begin -->` and
 --- `<!-- review:end -->`: a section `## Prüfung` (or `## Review`), one line per acceptance criterion, and, when something
 --- is open, `### Folgetask (Vorschlag)` / `### Follow-up task (proposal)` with `- title:` and `- summary:`. This module
---- finds the block (`block`), the proposed follow-up (`follow_up`) and writes the section into the task file
---- (`adopt`): the open file or the finished one in `Backlog/`, replacing a section of the same name, under the file
---- lock of the engine. It never decides on its own: `:Tasks agent` asks the person first (`tasks_nvim.ui.cmd`).
+--- finds the block (`block`), the proposed follow-up (`follow_up`) and writes the section into the task
+--- (`adopt`, `write`): the open file or the finished one in `Backlog/`, replacing a section of the same name, through
+--- the engine's operation `set_section`, the one tasks-desktop uses too. It never decides on its own: `:Tasks agent` asks the person first (`tasks_nvim.ui.cmd`).
 ---
 --- A prepared decision (`kind=prepare-decision`) is the same kind of answer with the markers `<!-- decision:begin -->`
 --- / `<!-- decision:end -->` and two sections: `## Vorschlag` (`## Proposal`: options, consequences, the
 --- recommendation, open assumptions) and `## Offene Fragen` (`## Open questions`, the format of `tasks_nvim.questions`,
---- which `answer` answers). `check_decision` takes it apart and checks it, `with_decision` puts it into the text of a
---- task: the proposal replaces an earlier one, the questions go in only when the task has none of its own (those are
---- the person's and stay).
+--- which `answer` answers). `check_decision` takes it apart and checks it, `decision_blocks` says what goes into the
+--- task (the proposal, replacing an earlier one; the questions only when the task has none of its own: those are the
+--- person's and stay), `with_decision` the same as text.
 --- Low-level: no notification here.
 
 local M = {}
@@ -159,6 +159,21 @@ function M.check_decision(block)
     parts.questions = secs[2].text
   end
   return parts, nil
+end
+
+---The blocks of a prepared decision that go into a task whose text is `text`: the proposal, and the questions when the
+---task has none of its own. `added` says whether the questions are among them.
+---@param text string
+---@param parts { proposal: string, questions: string|nil }
+---@return string[] blocks
+---@return boolean added
+function M.decision_blocks(text, parts)
+  local blocks = { parts.proposal }
+  if parts.questions and not require("tasks_nvim.questions").parse(text) then
+    blocks[#blocks + 1] = parts.questions
+    return blocks, true
+  end
+  return blocks, false
 end
 
 ---The text of a task with a prepared decision: the proposal as its section (replacing an earlier one of the same
@@ -337,82 +352,54 @@ function M.follow_up(block)
   return { title = found.title, summary = found.summary }
 end
 
----The text with `block` as its section: a section of the same heading (to the next `## ` heading or the end) is
----replaced, else the block is added at the end.
+---The text with `block` as its section (`tasks_nvim.sections.set`, a thin re-export kept for the callers of this
+---module).
 ---@param text string
 ---@param block string
 ---@return string
 function M.with_section(text, block)
-  local heading = block:match("^[^\n]*")
-  local lines = vim.split((text:gsub("\r\n", "\n")), "\n", { plain = true })
-  while #lines > 0 and lines[#lines] == "" do
-    lines[#lines] = nil
-  end
-  local first, after
-  for i, line in ipairs(lines) do
-    if not first then
-      if line == heading then
-        first = i
-      end
-    elseif line:match("^## ") then
-      after = i
-      break
-    end
-  end
-  local new = vim.split(block, "\n", { plain = true })
-  local out
-  if first then
-    out = vim.list_slice(lines, 1, first - 1)
-    vim.list_extend(out, new)
-    if after then
-      out[#out + 1] = ""
-      vim.list_extend(out, vim.list_slice(lines, after))
-    end
-  else
-    out = lines
-    out[#out + 1] = ""
-    vim.list_extend(out, new)
-  end
-  return table.concat(out, "\n") .. "\n"
+  return require("tasks_nvim.sections").set(text, block)
 end
 
----Writes the review into the task file at `path` (open or finished) under the engine's file lock, through a
----temporary file; `updated` becomes `today`. A link is not written through.
----@param path string
----@param block string
----@param today string YYYY-MM-DD
+---Writes sections into a task, open or finished, through the write door of the engine (`ops` `set_section`, the
+---operation tasks-desktop sends through `call ops` as well): one operation per block (its first line is the heading),
+---in one request. False and the first error when one is refused.
+---@param id string
+---@param blocks string[]
+---@param opts? { root?: string, today?: string }
 ---@return boolean ok
 ---@return string|nil err
-function M.adopt(path, block, today)
-  local fsio = require("tasks_nvim.fsio")
+function M.write(id, blocks, opts)
+  local list = {}
+  for _, block in ipairs(blocks) do
+    local heading = block:match("^[^\n]*")
+    list[#list + 1] =
+      { op = "set_section", id = id, heading = heading, text = vim.trim(block:sub(#heading + 1)) }
+  end
+  local doc, err = require("tasks_nvim.ops").run({ ops = list }, opts)
+  if not doc then
+    return false, type(err) == "table" and tostring(err.message) or tostring(err)
+  end
+  for _, entry in ipairs(doc.results or {}) do
+    if not entry.ok then
+      return false, entry.error and entry.error.message or "the write was refused"
+    end
+  end
+  return true, nil
+end
+
+---Adds a review block to the task `id` (open or finished) after `check`, through `write`.
+---@param id string
+---@param block string
+---@param opts? { root?: string, today?: string }
+---@return boolean ok
+---@return string|nil err
+function M.adopt(id, block, opts)
   local good, why = M.check(block)
   if not good then
     return false, why
   end
-  if fsio.is_link(path) then
-    return false, path .. " is a symbolic link or junction: it is not written through"
-  end
-  local ok, err = fsio.with_lock(path, function()
-    local text, rerr = fsio.read(path)
-    if not text then
-      return nil, "cannot read " .. path .. ": " .. tostring(rerr)
-    end
-    local new_text = M.with_section(text, block)
-    local stamped, uerr =
-      require("lib.nvim.markdown.frontmatter").update_text(new_text, { { "updated", today } })
-    if not stamped then
-      return nil, "cannot update " .. path .. ": " .. tostring(uerr)
-    end
-    local wrote, werr = fsio.write_atomic(path, stamped)
-    if not wrote then
-      return nil, werr
-    end
-    return true
-  end)
-  if not ok then
-    return false, tostring(err)
-  end
-  return true, nil
+  return M.write(id, { block }, opts)
 end
 
 return M

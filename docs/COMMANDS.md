@@ -444,7 +444,7 @@ of ai-desktop is said with its message (`ai-desktop refused the task (403): jobs
 (`GET /jobs/<id>`, every 3 s, at most an hour) and, when it is done, shows the review block of the answer in
 `tasks://review/<id>`: `## Prüfung`, one line per criterion (met, open, not checkable, with evidence). Only after a yes
 is it written into the task file as that section (a review of the same heading replaces the last one; `updated`
-changes; under the engine's file lock, also for a finished file in `Backlog/`). When the review proposes a follow-up
+changes), through the engine's operation `set_section`, which also takes a finished file in `Backlog/`. When the review proposes a follow-up
 task (`### Folgetask (Vorschlag)` with `- title:` and `- summary:`), a second question creates it in the same area.
 Without a block, or when the job failed, a message says so and nothing is written. A review needs ai-desktop: ai.nvim
 does not stand in, since it cannot read the commits. While the AI functions are on, `:Tasks done` ends with the line
@@ -455,7 +455,7 @@ other status is refused). ai-desktop's agent reads the task, the commits and fil
 repository of the area, and decides nothing. Its answer comes back as for a review, in `tasks://decision/<id>`: a
 section `## Vorschlag` (2 to 4 options with consequences, the recommendation with its reason, open assumptions) and
 `## Offene Fragen` in the format of the questions (`### ...? [q1]`, unticked options, one `(empfohlen)`). Both go into
-the task only after a yes, through the engine (`mutate.edit_text`): the proposal replaces an earlier one, the
+the task only after a yes, through the engine (`set_section`): the proposal replaces an earlier one, the
 questions go in only when the task has none of its own (those are the person's and stay). The status stays
 `decision`; the person answers with `:Tasks answer <id> q1 <n>` (or in the question view of tasks-desktop).
 

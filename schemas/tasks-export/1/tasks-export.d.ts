@@ -1378,6 +1378,7 @@ export interface ResultEntry {
     | "append_note"
     | "reopen"
     | "set_body"
+    | "set_section"
     | "view_save"
     | "view_delete"
     | "attach"

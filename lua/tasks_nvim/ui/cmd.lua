@@ -3170,7 +3170,7 @@ local function review_came_back(task, job, confirm_fn, create)
         notify.info("agent: the review was not added; it stays in this buffer")
         return
       end
-      local ok, err = review.adopt(task.path, block, model.today())
+      local ok, err = review.adopt(task.id, block)
       if not ok then
         notify.error("agent: " .. tostring(err))
         return
@@ -3248,17 +3248,15 @@ local function decision_came_back(task, job, confirm_fn)
         notify.info("agent: the proposal was not added; it stays in this buffer")
         return
       end
-      local res, err = require("tasks_nvim.mutate").edit_text(task.id, function(text)
-        local new_text, added = review.with_decision(text, parts)
-        return new_text, nil, added
-      end)
-      if not res then
+      local blocks, added = review.decision_blocks(fsio.read(task.path) or "", parts)
+      local wrote, err = review.write(task.id, blocks)
+      if not wrote then
         notify.error("agent: " .. tostring(err))
         return
       end
       refresh_task_buffers(task.id)
       notify.info(("agent: the proposal is in %s"):format(task.id))
-      if parts.questions and res.extra then
+      if parts.questions and added then
         notify.info(
           ("agent: answer its questions with :Tasks answer %s <question> <option>"):format(task.id)
         )

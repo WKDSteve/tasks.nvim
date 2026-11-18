@@ -1848,6 +1848,8 @@ function M.set(id, patch, opts)
 end
 
 ---Change the TEXT of an open task (steps, notes: what is below the frontmatter), as a compare-and-set like `set`.
+---With `opts.allow_done` a finished task in `Backlog/` is taken as well when no open one has the id (`set_section`:
+---a review written into a finished task); its index is not touched.
 ---
 ---`transform(text)` gets the whole file and answers the new whole file, or `nil, message` when the change cannot be made
 ---(a message without a code is a fault of the request), and may add a third value (`extra`) that is handed back. It runs
@@ -1857,8 +1859,8 @@ end
 ---@generic E
 ---@param id string
 ---@param transform fun(text: string): string|nil, string|nil, E|nil
----@param opts? { root?: string, today?: string, index?: boolean, if_match?: string, dry_run?: boolean, drafts?: table<string, Tasks.DraftTask> }
----@return { id: string, area: string, path: string, changed: boolean, etag_before: string, etag_after: string, extra?: any }|nil result
+---@param opts? { root?: string, today?: string, index?: boolean, if_match?: string, dry_run?: boolean, drafts?: table<string, Tasks.DraftTask>, allow_done?: boolean }
+---@return { id: string, area: string, path: string, location: string, changed: boolean, etag_before: string, etag_after: string, extra?: any }|nil result
 ---@return string|nil err
 ---@return table|nil info  # `{ code = "conflict"|"locked"|"lock_stuck"|"forbidden"|"io", ... }` when there is a reason to name
 function M.edit_text(id, transform, opts)
@@ -1868,6 +1870,9 @@ function M.edit_text(id, transform, opts)
     return nil, rerr
   end
   local task, ferr = M.find_open(id, root, opts.drafts)
+  if not task and opts.allow_done then
+    task = scan.find_done(id, { root = root })
+  end
   if not task then
     return nil, ferr
   end
@@ -1921,6 +1926,7 @@ function M.edit_text(id, transform, opts)
     id = task.id,
     area = task.area,
     path = task.path,
+    location = task.location or "roadmap",
     changed = new_text ~= text,
     etag_before = etag_before,
     etag_after = etag_before,
