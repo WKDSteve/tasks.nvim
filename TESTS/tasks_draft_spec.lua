@@ -190,11 +190,15 @@ return function(H)
     eq(filled.area, "lib.nvim")
     eq(filled.kind, "task")
 
-    -- A draft whose area left the vault since: checked again here, left out.
+    -- A draft whose area left the vault since: checked again here, left out; what ai-desktop left out is named too.
     answer.draft.area = "gone"
+    answer.draft.dropped = { "plan: nowhere", 7 }
     filled = nil
+    told = {}
     cmd.task_new_draft({ args = {}, rest = { "x" }, kv = {}, flags = { draft = true } }, deps())
     eq(filled.area, nil)
+    has(told[#told - 1].msg, "plan: nowhere, area: gone")
+    answer.draft.dropped = {}
     has(last(), "<C-s> creates the task")
     answer.draft.area = "lib.nvim"
 

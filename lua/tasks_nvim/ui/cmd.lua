@@ -1653,6 +1653,9 @@ function M.task_new_draft(ctx, deps)
           local d, derr
           if type(job.draft) == "table" then
             d, derr = draft.check(job.draft, choices)
+            if d then
+              d.dropped = vim.list_extend(draft.dropped_by(job.draft), d.dropped)
+            end
           else
             derr = type(job.draft_error) == "string" and job.draft_error
               or "ai-desktop gave no draft"

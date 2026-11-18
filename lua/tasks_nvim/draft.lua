@@ -424,6 +424,27 @@ function M.check(raw, choices)
   return out, nil
 end
 
+---What ai-desktop left out of a draft it checked (`dropped` of its job): texts of one line only, at most 50. The
+---check here sees only what it kept, so the callers name these too.
+---@param raw any
+---@return string[]
+function M.dropped_by(raw)
+  local out = {}
+  local list = type(raw) == "table" and raw.dropped or nil
+  if type(list) ~= "table" then
+    return out
+  end
+  for _, v in ipairs(list) do
+    if type(v) == "string" and vim.trim(v) ~= "" and #v <= 300 and not M.text_error(v, false) then
+      out[#out + 1] = v
+      if #out == 50 then
+        break
+      end
+    end
+  end
+  return out
+end
+
 ---The last block between the markers in an answer (a ```json fence inside is allowed), parsed and checked.
 ---@param output string
 ---@param choices Tasks.DraftChoices
