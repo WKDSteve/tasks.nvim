@@ -1522,6 +1522,7 @@ export interface Inverse {
     | "tick_step"
     | "answer"
     | "set_body"
+    | "set_section"
     | "move_area"
     | "view_save"
     | "view_delete"
@@ -1552,6 +1553,14 @@ export interface Inverse {
    * `set_body`: the text below the frontmatter that the task had.
    */
   body?: string;
+  /**
+   * `set_section`: the heading of the section that was replaced.
+   */
+  heading?: string;
+  /**
+   * `set_section`: the text the section had below its heading.
+   */
+  text?: string;
   /**
    * `move_area`: the area the task came from (`id` is the id it has now).
    */

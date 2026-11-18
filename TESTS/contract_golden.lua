@@ -275,6 +275,31 @@ G.cases = {
     end,
   },
   {
+    -- `set_section` for real: a section added at the end (no inverse), then replaced (its inverse sets the old text)
+    name = "result-set-section",
+    method = "ops",
+    fresh = true,
+    request = function()
+      return encode({
+        client_op_id = "golden-set-section",
+        ops = {
+          {
+            op = "set_section",
+            id = "lib.nvim/alpha",
+            heading = "## Prüfung",
+            text = "- [x] first",
+          },
+          {
+            op = "set_section",
+            id = "lib.nvim/alpha",
+            heading = "## Prüfung",
+            text = "- [x] second",
+          },
+        },
+      })
+    end,
+  },
+  {
     -- saved views for real: made, replaced on the version read, replaced on a stale one, deleted, a view that is not there
     name = "result-views",
     method = "ops",

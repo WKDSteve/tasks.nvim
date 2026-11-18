@@ -3072,7 +3072,7 @@
       "required": ["op", "id"],
       "properties": {
         "op": {
-          "enum": ["set", "reorder", "tick_step", "answer", "set_body", "move_area", "view_save", "view_delete", "plan_set", "project_set"]
+          "enum": ["set", "reorder", "tick_step", "answer", "set_body", "set_section", "move_area", "view_save", "view_delete", "plan_set", "project_set"]
         },
         "id": {
           "type": "string"
@@ -3101,6 +3101,14 @@
         },
         "body": {
           "description": "`set_body`: the text below the frontmatter that the task had.",
+          "type": "string"
+        },
+        "heading": {
+          "description": "`set_section`: the heading of the section that was replaced.",
+          "type": "string"
+        },
+        "text": {
+          "description": "`set_section`: the text the section had below its heading.",
           "type": "string"
         },
         "to_area": {

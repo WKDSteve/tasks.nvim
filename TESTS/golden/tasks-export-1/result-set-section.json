@@ -1,0 +1,57 @@
+{
+  "client_op_id": "golden-set-section",
+  "digest": "sha256:8187367bc5ca5872",
+  "dry_run": false,
+  "engine": {
+    "git": "0000000",
+    "nvim": "0.0.0",
+    "version": "0.1.0-test"
+  },
+  "generated_at": "2026-01-01T00:00:00Z",
+  "kind": "tasks.result",
+  "ok": true,
+  "plugin": "tasks.nvim",
+  "results": [
+    {
+      "changed_ids": [
+        "lib.nvim/alpha"
+      ],
+      "etag_after": "sha256:fe2af55f00230395",
+      "etag_before": "sha256:b3fc5b0215162275",
+      "id": "lib.nvim/alpha",
+      "index": {
+        "action": "written"
+      },
+      "n": 1,
+      "ok": true,
+      "op": "set_section",
+      "outcome": "changed"
+    },
+    {
+      "changed_ids": [
+        "lib.nvim/alpha"
+      ],
+      "etag_after": "sha256:7a4b2595a31cedf2",
+      "etag_before": "sha256:fe2af55f00230395",
+      "id": "lib.nvim/alpha",
+      "index": {
+        "action": "written"
+      },
+      "inverse": {
+        "heading": "## Prüfung",
+        "id": "lib.nvim/alpha",
+        "if_match": "sha256:7a4b2595a31cedf2",
+        "op": "set_section",
+        "text": "- [x] first"
+      },
+      "n": 2,
+      "ok": true,
+      "op": "set_section",
+      "outcome": "changed"
+    }
+  ],
+  "schema": 1,
+  "vault": {
+    "id": "vault"
+  }
+}
