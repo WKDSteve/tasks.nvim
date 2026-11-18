@@ -2989,6 +2989,70 @@ local function review_came_back(task, job, confirm_fn, create)
   )
 end
 
+---A prepared decision came back (`kind=prepare-decision`): show it, and after a yes write the proposal (and the open
+---questions, when the task has none of its own) into the task through the engine (`mutate.edit_text`); the status
+---stays `decision`, the person answers the questions (`:Tasks answer`).
+---@param task table The open task as `scan.find` gave it.
+---@param job table The job of ai-desktop.
+---@param confirm_fn fun(msg: string, label: string, cb: fun(yes: boolean))
+local function decision_came_back(task, job, confirm_fn)
+  local review = require("tasks_nvim.review")
+  if job.status ~= "done" then
+    notify.error(
+      ("agent: the preparation of %s ended %s%s"):format(
+        task.id,
+        tostring(job.status),
+        type(job.error) == "string" and (": " .. job.error) or ""
+      )
+    )
+    return
+  end
+  local block = review.block(type(job.output) == "string" and job.output or "", "decision")
+  local parts, why = nil, "the answer has no decision block"
+  if block then
+    parts, why = review.check_decision(block)
+  end
+  if not parts or not block then
+    notify.warn(
+      ("agent: %s; the answer is in the dashboard of ai-desktop (job %s)"):format(why, job.id)
+    )
+    return
+  end
+  agent_buffer(task.id, vim.split(block, "\n", { plain = true }), "decision")
+  confirm_fn(
+    ("Add this proposal to %s%s? The task stays a decision; you decide."):format(
+      task.id,
+      parts.questions and " (with its open questions)" or ""
+    ),
+    "add",
+    function(yes)
+      if not yes then
+        notify.info("agent: the proposal was not added; it stays in this buffer")
+        return
+      end
+      local res, err = require("tasks_nvim.mutate").edit_text(task.id, function(text)
+        local new_text, added = review.with_decision(text, parts)
+        return new_text, nil, added
+      end)
+      if not res then
+        notify.error("agent: " .. tostring(err))
+        return
+      end
+      refresh_task_buffers(task.id)
+      notify.info(("agent: the proposal is in %s"):format(task.id))
+      if parts.questions and res.extra then
+        notify.info(
+          ("agent: answer its questions with :Tasks answer %s <question> <option>"):format(task.id)
+        )
+      elseif parts.questions then
+        notify.info(
+          "agent: the task has open questions of its own; they stay, the proposal's are only in its text"
+        )
+      end
+    end
+  )
+end
+
 local AGENT_SAID = {
   prefilled = "it waits in the dashboard of ai-desktop, nothing runs",
   running = "ai-desktop runs it",
@@ -3020,8 +3084,9 @@ function M.task_agent(ctx, deps)
   local kv = ctx.kv or {}
   local kind = kv.kind or "handoff"
   local is_review = kind == "review-done"
-  -- A review is asked for to read its answer: it runs unless said otherwise.
-  local mode = kv.mode or (is_review and "run" or "prefill")
+  local is_decision = kind == "prepare-decision"
+  -- A review or a prepared decision is asked for to read its answer: it runs unless said otherwise.
+  local mode = kv.mode or ((is_review or is_decision) and "run" or "prefill")
   if not vim.tbl_contains(agent.MODES, mode) then
     notify.error("agent: mode is prefill or run, not " .. tostring(mode))
     return
@@ -3050,6 +3115,15 @@ function M.task_agent(ctx, deps)
   end
   if not task then
     notify.error("agent: " .. tostring(ferr))
+    return
+  end
+  if is_decision and task.status ~= "decision" then
+    notify.error(
+      ("agent: prepare-decision is for a task that waits for a decision (status decision); %s is %s"):format(
+        id,
+        tostring(task.status)
+      )
+    )
     return
   end
   local root, rerr = require("tasks_nvim.vault").root()
@@ -3083,10 +3157,10 @@ function M.task_agent(ctx, deps)
           res.note and (" (" .. res.note .. ")") or ""
         )
       )
-      if not is_review then
+      if not is_review and not is_decision then
         return
       end
-      -- The review's answer comes back to this editor (watched until the job ends).
+      -- The answer comes back to this editor (watched until the job ends).
       local record = deps.record or ai.hub_record()
       if not record then
         notify.warn("agent: ai-desktop is gone; the review's answer is in its dashboard")
@@ -3098,19 +3172,25 @@ function M.task_agent(ctx, deps)
           notify.error("agent: " .. tostring(werr))
           return
         end
-        review_came_back(task, job, deps.confirm or function(msg, label, cb)
-          require("tasks_nvim.ui.confirm").yesno(msg, label, cb)
-        end, deps.create)
+        local confirm_fn = deps.confirm
+          or function(msg, label, cb)
+            require("tasks_nvim.ui.confirm").yesno(msg, label, cb)
+          end
+        if is_decision then
+          decision_came_back(task, job, confirm_fn)
+        else
+          review_came_back(task, job, confirm_fn, deps.create)
+        end
       end)
     end)
     return
   end
-  if is_review then
-    -- The review reads the commits of the task: that is ai-desktop's, not one answer of ai.nvim.
+  if is_review or is_decision then
+    -- A review or a prepared decision reads the commits and repositories: ai-desktop's, not one answer of ai.nvim.
     notify.error(
       desktop.installed
-          and "agent: ai-desktop is installed but not running; a review needs it (it reads the commits): start it"
-        or "agent: a review needs ai-desktop (it reads the task's commits); it is not on this machine"
+          and "agent: ai-desktop is installed but not running; this kind needs it (it reads commits and repositories): start it"
+        or "agent: this kind needs ai-desktop (it reads commits and repositories); it is not on this machine"
     )
     return
   end

@@ -8,35 +8,51 @@
 --- finds the block (`block`), the proposed follow-up (`follow_up`) and writes the section into the task file
 --- (`adopt`): the open file or the finished one in `Backlog/`, replacing a section of the same name, under the file
 --- lock of the engine. It never decides on its own: `:Tasks agent` asks the person first (`tasks_nvim.ui.cmd`).
+---
+--- A prepared decision (`kind=prepare-decision`) is the same kind of answer with the markers `<!-- decision:begin -->`
+--- / `<!-- decision:end -->` and two sections: `## Vorschlag` (`## Proposal`: options, consequences, the
+--- recommendation, open assumptions) and `## Offene Fragen` (`## Open questions`, the format of `tasks_nvim.questions`,
+--- which `answer` answers). `check_decision` takes it apart and checks it, `with_decision` puts it into the text of a
+--- task: the proposal replaces an earlier one, the questions go in only when the task has none of its own (those are
+--- the person's and stay).
 --- Low-level: no notification here.
 
 local M = {}
 
 M.BEGIN = "<!-- review:begin -->"
 M.END = "<!-- review:end -->"
+M.DECISION_BEGIN = "<!-- decision:begin -->"
+M.DECISION_END = "<!-- decision:end -->"
+
+local PROPOSAL_HEADINGS = { "## Vorschlag", "## Proposal" }
+local QUESTION_HEADINGS = { "## Offene Fragen", "## Open questions" }
 
 -- A section heading the block may start with; another heading is refused (the block is foreign text).
 local HEADINGS = { "## Prüfung", "## Review" }
 -- More than this is no review of one task.
 local MAX_BLOCK = 32 * 1024
 
----The last review block of an answer (without the markers, trimmed), or nil.
+---The last block of an answer (without the markers, trimmed), or nil: a review's, or with `which = "decision"` a
+---prepared decision's.
 ---@param output string
+---@param which? "review"|"decision"
 ---@return string|nil
-function M.block(output)
+function M.block(output, which)
+  local begin_mark = which == "decision" and M.DECISION_BEGIN or M.BEGIN
+  local end_mark = which == "decision" and M.DECISION_END or M.END
   local found
   local from = 1
   while true do
-    local b = output:find(M.BEGIN, from, true)
+    local b = output:find(begin_mark, from, true)
     if not b then
       break
     end
-    local e = output:find(M.END, b + #M.BEGIN, true)
+    local e = output:find(end_mark, b + #begin_mark, true)
     if not e then
       break
     end
-    found = output:sub(b + #M.BEGIN, e - 1)
-    from = e + #M.END
+    found = output:sub(b + #begin_mark, e - 1)
+    from = e + #end_mark
   end
   if not found then
     return nil
@@ -69,6 +85,87 @@ function M.check(block)
     end
   end
   return false, "the review does not start with ## Prüfung or ## Review"
+end
+
+---The `## ` sections of a block, in order: `{ heading, text }` (the text starts with its heading line).
+---@param block string
+---@return { heading: string, text: string }[]
+local function sections(block)
+  local out = {}
+  for line in (block .. "\n"):gmatch("([^\n]*)\n") do
+    if line:match("^## ") then
+      out[#out + 1] = { heading = line, lines = { line } }
+    elseif #out > 0 then
+      table.insert(out[#out].lines, line)
+    end
+  end
+  for _, sec in ipairs(out) do
+    sec.text = vim.trim(table.concat(sec.lines, "\n"))
+    sec.lines = nil
+  end
+  return out
+end
+
+---Takes a prepared decision apart and checks it: the proposal (`## Vorschlag` / `## Proposal`, first) and, when
+---there, the questions (`## Offene Fragen` / `## Open questions`), nothing else of the task's level, no control
+---character, at most 32 KiB. The questions must read as questions of `tasks_nvim.questions`: at least one, each with
+---two options or more, none answered, no problem `check` would report.
+---@param block string
+---@return { proposal: string, questions: string|nil }|nil parts
+---@return string|nil why
+function M.check_decision(block)
+  if #block > MAX_BLOCK then
+    return nil, ("the proposal is larger than %d KiB"):format(MAX_BLOCK / 1024)
+  end
+  if block:find("[%z\1-\8\11\12\14-\31\127]") then
+    return nil, "the proposal holds a control character"
+  end
+  local secs = sections(block)
+  if #secs == 0 or not block:match("^## ") then
+    return nil, "the proposal does not start with ## Vorschlag or ## Proposal"
+  end
+  if not vim.tbl_contains(PROPOSAL_HEADINGS, secs[1].heading) then
+    return nil, "the proposal does not start with ## Vorschlag or ## Proposal"
+  end
+  local parts = { proposal = secs[1].text }
+  if secs[2] then
+    if not vim.tbl_contains(QUESTION_HEADINGS, secs[2].heading) or secs[3] then
+      return nil, "the proposal holds a section that is neither ## Vorschlag nor ## Offene Fragen"
+    end
+    local parsed = require("tasks_nvim.questions").parse(secs[2].text .. "\n")
+    if not parsed then
+      return nil, "its open questions hold no question (### ...? [qN] with options)"
+    end
+    if #parsed.problems > 0 then
+      return nil, "its open questions: " .. parsed.problems[1]
+    end
+    for _, q in ipairs(parsed.items) do
+      if #q.options < 2 then
+        return nil, ("its question %q has fewer than two options"):format(q.title)
+      end
+      if q.answered then
+        return nil, ("its question %q is answered already; the person decides"):format(q.title)
+      end
+    end
+    parts.questions = secs[2].text
+  end
+  return parts, nil
+end
+
+---The text of a task with a prepared decision: the proposal as its section (replacing an earlier one of the same
+---heading), the questions only when the task has no questions of its own. `added` says whether they went in.
+---@param text string
+---@param parts { proposal: string, questions: string|nil }
+---@return string new_text
+---@return boolean added
+function M.with_decision(text, parts)
+  local out = M.with_section(text, parts.proposal)
+  local added = false
+  if parts.questions and not require("tasks_nvim.questions").parse(text) then
+    out = M.with_section(out, parts.questions)
+    added = true
+  end
+  return out, added
 end
 
 ---The follow-up task the review proposes (`title`, `summary`), or nil when it proposes none.

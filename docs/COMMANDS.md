@@ -425,6 +425,18 @@ Without a block, or when the job failed, a message says so and nothing is writte
 does not stand in, since it cannot read the commits. While the AI functions are on, `:Tasks done` ends with the line
 `check it against its acceptance: :Tasks agent <id> kind=review-done` (a hint; nothing runs).
 
+**A prepared decision** (`kind=prepare-decision`) is for a task that waits for the person (`status: decision`; any
+other status is refused). ai-desktop's agent reads the task, the commits and files its `refs` name and the
+repository of the area, and decides nothing. Its answer comes back as for a review, in `tasks://decision/<id>`: a
+section `## Vorschlag` (2 to 4 options with consequences, the recommendation with its reason, open assumptions) and
+`## Offene Fragen` in the format of the questions (`### ...? [q1]`, unticked options, one `(empfohlen)`). Both go into
+the task only after a yes, through the engine (`mutate.edit_text`): the proposal replaces an earlier one, the
+questions go in only when the task has none of its own (those are the person's and stay). The status stays
+`decision`; the person answers with `:Tasks answer <id> q1 <n>` (or in the question view of tasks-desktop).
+
+Why both: the proposal keeps the reasons where the task is read, and the questions make the choice one answer that
+the engine already knows how to write, instead of a second format.
+
 **To ai.nvim**, when ai-desktop does not run and ai.nvim can be loaded (`pcall(require, "ai")`, no hard dependency):
 the task as one prompt in the scratch buffer `tasks://agent/<id>`; `mode=run` sends it after a question and puts the
 answer below it (one answer, no tools). A message says that ai.nvim stands in. Without either: a message that names

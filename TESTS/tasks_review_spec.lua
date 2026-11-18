@@ -244,7 +244,7 @@ return function(H)
       d
     )
     package.loaded["ai"] = nil
-    ok(said("a review needs it"))
+    ok(said("this kind needs it"))
 
     -- A job that failed or has no block: said, nothing written.
     told = {}

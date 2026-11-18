@@ -945,7 +945,7 @@ local function nested_routes()
           key = "kind",
           type = "STRING",
           values = { "handoff", "review-done", "draft-task", "prepare-decision", "split-plan" },
-          desc = "What the job asks for (default handoff; review-done: check the acceptance)",
+          desc = "What the job asks for (default handoff; also review, decision help)",
         },
       },
       -- Out of <Tab> while the AI functions are off (setup({ ai = ... })); never a health error.

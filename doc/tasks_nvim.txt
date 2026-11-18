@@ -173,6 +173,11 @@ A wrong key or value is ignored with a message and listed in
                                          the task as section `## Prüfung` only
                                          after a yes (a proposed follow-up
                                          task after a second yes).
+                                         `kind=prepare-decision` (a task in
+                                         status decision) adds `## Vorschlag`
+                                         and `## Offene Fragen` after a yes;
+                                         the status stays, |:Tasks| `answer`
+                                         decides.
                                          Hidden while the option `ai` is off.
   :Tasks plan [{area}|all] [--for={id}|--plan={id}] [filters] [--ready] [--with-steps]
               [--format=] [--to=] [--write={file} [--scope=] [--check]]
