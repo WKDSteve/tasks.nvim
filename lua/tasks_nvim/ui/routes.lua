@@ -290,13 +290,23 @@ function M.register_types()
       if spec and spec.allow_done and scan.find_done(raw, { root = root }) then
         return true, raw, nil
       end
+      if spec and spec.allow_plan and require("tasks_nvim.plans").find(raw, { root = root }) then
+        return true, raw, nil
+      end
       -- `find_err` is "no such open task" or the more useful "exists as file and as folder".
       return false, nil, find_err or ("no such open task: " .. raw)
     end,
     complete = function(arg_lead, spec)
-      if spec and spec.allow_done and spec.complete_done ~= false then
+      if spec and (spec.allow_done or spec.allow_plan) and spec.complete_done ~= false then
         local both = vim.list_extend({}, open_ids())
-        vim.list_extend(both, done_ids())
+        if spec.allow_done then
+          vim.list_extend(both, done_ids())
+        end
+        if spec.allow_plan then
+          for _, plan in ipairs(require("tasks_nvim.plans").all({ root = vault.root() }) or {}) do
+            both[#both + 1] = plan.id
+          end
+        end
         table.sort(both)
         return prefix_ci(both, arg_lead)
       end
@@ -931,7 +941,8 @@ local function nested_routes()
           type = "TASK_ID",
           optional = true,
           allow_done = true,
-          desc = "Task to hand over (default: the buffer's; a finished one for a review)",
+          allow_plan = true,
+          desc = "Task to hand over (default: the buffer's); a plan for split-plan",
         },
       },
       kv = {

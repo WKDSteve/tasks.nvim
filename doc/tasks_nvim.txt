@@ -177,7 +177,11 @@ A wrong key or value is ignored with a message and listed in
                                          status decision) adds `## Vorschlag`
                                          and `## Offene Fragen` after a yes;
                                          the status stays, |:Tasks| `answer`
-                                         decides.
+                                         decides. `kind=split-plan` takes a
+                                         plan id: its drafts come to
+                                         `tasks://split/{plan}` to tick ([x]);
+                                         `:w` creates the ticked ones after a
+                                         yes (a new phase after its own yes).
                                          Hidden while the option `ai` is off.
   :Tasks plan [{area}|all] [--for={id}|--plan={id}] [filters] [--ready] [--with-steps]
               [--format=] [--to=] [--write={file} [--scope=] [--check]]

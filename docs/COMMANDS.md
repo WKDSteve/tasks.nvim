@@ -437,6 +437,18 @@ questions go in only when the task has none of its own (those are the person's a
 Why both: the proposal keeps the reasons where the task is read, and the questions make the choice one answer that
 the engine already knows how to write, instead of a second format.
 
+**A split of a plan** (`kind=split-plan`) takes a plan id (`<area>/<slug>` of `ROADMAP/plans/`, also completed; without
+an id the plan of the current buffer); another kind refuses a plan. The plan file goes to ai-desktop with the list of
+its tasks, open and finished (id, status, phase, title), so that the drafts do not repeat them; ai-desktop's agent only
+reads and answers with drafts (title, area, kind, prio, effort, value, phase, summary, acceptance, `after`,
+`blocked_by`; `#N` names another draft). They come back as a list in `tasks://split/<plan>`: tick the ones to create
+(`[x]`), then `:w`. After a yes the engine creates them in order (`mutate.new` with `plan`, `phase`, the summary and a
+body with the acceptance; `#N` becomes the id draft N got; `blocked_by` is set afterwards). A phase the plan does not
+have is asked for on its own and then added to its `phase_order`; without that yes the drafts of that phase are
+refused. A draft whose value the engine refuses (a kind that is none, an unknown area) is refused alone, with the
+reason, and the buffer marks each ticked line `[+] ... -> <id>` or `[!]`. Nothing is created without the tick, the
+`:w` and the yes.
+
 **To ai.nvim**, when ai-desktop does not run and ai.nvim can be loaded (`pcall(require, "ai")`, no hard dependency):
 the task as one prompt in the scratch buffer `tasks://agent/<id>`; `mode=run` sends it after a question and puts the
 answer below it (one answer, no tools). A message says that ai.nvim stands in. Without either: a message that names

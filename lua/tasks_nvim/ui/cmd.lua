@@ -3053,6 +3053,369 @@ local function decision_came_back(task, job, confirm_fn)
   )
 end
 
+---The plan of the current buffer (its file is a plan file), or nil.
+---@return string|nil
+local function buffer_plan_id()
+  local name = vim.api.nvim_buf_get_name(0)
+  if name == "" or vim.bo.buftype ~= "" then
+    return nil
+  end
+  local want = vim.fn.fnamemodify(name, ":p")
+  for _, plan in ipairs(require("tasks_nvim.plans").all() or {}) do
+    if plan.path and fsio.same_path(plan.path, want) then
+      return plan.id
+    end
+  end
+  return nil
+end
+
+---The text a split of `plan` sends: the plan file and the list of its tasks, open and finished, so that the drafts do
+---not repeat them (also for a model that cannot read the vault).
+---@param plan table A plan file (`plans.find`).
+---@param text string The plan file.
+---@return string
+local function split_markdown(plan, text)
+  local lines = {}
+  local function add(t, state)
+    lines[#lines + 1] = ("- %s (%s, phase %s): %s"):format(
+      t.id,
+      state,
+      t.phase or "-",
+      t.title or ""
+    )
+  end
+  for _, t in ipairs(require("tasks_nvim.plans").members(plan.id, scan.all() or {})) do
+    add(t, t.status or "open")
+  end
+  local areas = { plan.area }
+  for _, a in ipairs(plan.areas or {}) do
+    if not vim.tbl_contains(areas, a) then
+      areas[#areas + 1] = a
+    end
+  end
+  for _, area in ipairs(areas) do
+    for _, t in ipairs(scan.backlog(area) or {}) do
+      if t.plan == plan.id then
+        add(t, "done")
+      end
+    end
+  end
+  table.sort(lines)
+  return vim.trim(text)
+    .. "\n\n## Tasks of this plan\n\n"
+    .. (#lines > 0 and table.concat(lines, "\n") or "(none yet)")
+    .. "\n"
+end
+
+---The body of a task created from a draft: where it came from and its acceptance, in the language of the plan.
+---@param draft Tasks.SplitDraft
+---@param plan_id string
+---@param job_id string
+---@param german boolean
+---@return string
+local function draft_body(draft, plan_id, job_id, german)
+  local lines = {}
+  if german then
+    lines[#lines + 1] = "## Kontext"
+    lines[#lines + 1] = ""
+    lines[#lines + 1] = ("Entwurf aus der Zerlegung des Plans `%s` (ai-desktop, Auftrag %s)."):format(
+      plan_id,
+      job_id
+    )
+    lines[#lines + 1] = ""
+    lines[#lines + 1] = "## Akzeptanz"
+  else
+    lines[#lines + 1] = "## Context"
+    lines[#lines + 1] = ""
+    lines[#lines + 1] = ("A draft of the split of the plan `%s` (ai-desktop, job %s)."):format(
+      plan_id,
+      job_id
+    )
+    lines[#lines + 1] = ""
+    lines[#lines + 1] = "## Acceptance"
+  end
+  lines[#lines + 1] = ""
+  for _, a in ipairs(draft.acceptance) do
+    lines[#lines + 1] = "- [ ] " .. a
+  end
+  if #draft.acceptance == 0 then
+    lines[#lines + 1] = "- [ ] "
+  end
+  lines[#lines + 1] = ""
+  lines[#lines + 1] = german and "## Notizen" or "## Notes"
+  return table.concat(lines, "\n") .. "\n"
+end
+
+---The lines of the split buffer: one box per draft, what it would be, why one cannot be created.
+---@param plan_id string
+---@param job_id string
+---@param parsed { phases: table[], drafts: Tasks.SplitDraft[] }
+---@return string[]
+local function split_lines(plan_id, job_id, parsed)
+  local lines = {
+    ("# Split of the plan %s (ai-desktop job %s)"):format(plan_id, job_id),
+    "",
+    "Tick the drafts to create ([x]), then :w. Nothing is created before a yes; a new phase is asked for on its own.",
+    "",
+  }
+  local names = {}
+  for _, p in ipairs(parsed.phases) do
+    names[#names + 1] = p.name .. (p.new and " (new)" or "")
+  end
+  if #names > 0 then
+    lines[#lines + 1] = "Phases: " .. table.concat(names, ", ")
+    lines[#lines + 1] = ""
+  end
+  for _, d in ipairs(parsed.drafts) do
+    if d.invalid then
+      lines[#lines + 1] = ("- [-] %d. %s  (cannot be created: %s)"):format(d.n, d.title, d.invalid)
+    else
+      lines[#lines + 1] = ("- [ ] %d. %s"):format(d.n, d.title)
+    end
+    local facts = { "area " .. d.area }
+    for _, key in ipairs({ "kind", "prio", "effort", "value", "phase" }) do
+      if d[key] ~= nil then
+        facts[#facts + 1] = key .. " " .. tostring(d[key])
+      end
+    end
+    lines[#lines + 1] = "      " .. table.concat(facts, " · ")
+    if d.summary then
+      lines[#lines + 1] = "      " .. d.summary
+    end
+    if #d.acceptance > 0 then
+      lines[#lines + 1] = "      acceptance: " .. table.concat(d.acceptance, "; ")
+    end
+    if #d.after > 0 or #d.blocked_by > 0 then
+      lines[#lines + 1] = ("      after: %s · blocked_by: %s"):format(
+        #d.after > 0 and table.concat(d.after, ", ") or "-",
+        #d.blocked_by > 0 and table.concat(d.blocked_by, ", ") or "-"
+      )
+    end
+  end
+  return lines
+end
+
+---Creates the ticked drafts of a split buffer after a yes (and a new phase only after its own yes), through the
+---engine; a draft that the engine refuses is refused alone, with the reason, in the buffer and in a message.
+---@param buf integer
+---@param confirm_fn fun(msg: string, label: string, cb: fun(yes: boolean))
+---@param deps table `create` (mutate.new), `set` (mutate.set), `plan_set` (plans.set): stand-ins for the specs.
+local function split_create(buf, confirm_fn, deps)
+  local state = vim.b[buf].tasks_split
+  if not state then
+    return
+  end
+  local plans = require("tasks_nvim.plans")
+  local ticked = {}
+  for _, line in ipairs(vim.api.nvim_buf_get_lines(buf, 0, -1, false)) do
+    local n = line:match("^%- %[[xX]%] (%d+)%.")
+    if n then
+      ticked[#ticked + 1] = tonumber(n)
+    end
+  end
+  vim.bo[buf].modified = false
+  if #ticked == 0 then
+    notify.info("agent: nothing ticked, nothing created")
+    return
+  end
+  table.sort(ticked)
+  local plan = plans.find(state.plan)
+  if not plan then
+    notify.error("agent: the plan " .. state.plan .. " is gone")
+    return
+  end
+  local drafts = state.drafts
+  local new_phases = {}
+  for _, n in ipairs(ticked) do
+    local d = drafts[n]
+    if
+      d
+      and not d.invalid
+      and d.phase
+      and not vim.tbl_contains(plan.phase_order or {}, d.phase)
+      and not vim.tbl_contains(new_phases, d.phase)
+    then
+      new_phases[#new_phases + 1] = d.phase
+    end
+  end
+  local function create_all(phases_ok)
+    local created, refused = {}, {}
+    local made_ids = {}
+    local function draft_ids(list, n, what)
+      local out = {}
+      for _, ref in ipairs(list) do
+        local k = ref:match("^#(%d+)$")
+        if k then
+          local id = made_ids[tonumber(k)]
+          if id then
+            out[#out + 1] = id
+          else
+            refused[#refused + 1] = ("draft %d: its %s #%s was not created, left out"):format(
+              n,
+              what,
+              k
+            )
+          end
+        else
+          out[#out + 1] = ref
+        end
+      end
+      return out
+    end
+    for _, n in ipairs(ticked) do
+      local d = drafts[n]
+      if not d then
+        refused[#refused + 1] = ("draft %d: there is no such draft"):format(n)
+      elseif d.invalid then
+        refused[#refused + 1] = ("draft %d (%s): %s"):format(n, d.title, d.invalid)
+      elseif d.phase and not phases_ok and vim.tbl_contains(new_phases, d.phase) then
+        refused[#refused + 1] = ("draft %d (%s): its phase %s is not in the plan"):format(
+          n,
+          d.title,
+          d.phase
+        )
+      else
+        local after = draft_ids(d.after, n, "after")
+        local res, err = (deps.create or mutate.new)(d.area, {
+          title = d.title,
+          kind = d.kind,
+          prio = d.prio,
+          effort = d.effort,
+          value = d.value,
+          plan = state.plan,
+          phase = d.phase,
+          summary = d.summary,
+          after = #after > 0 and after or nil,
+          body = draft_body(d, state.plan, state.job, state.german),
+        })
+        if not res then
+          refused[#refused + 1] = ("draft %d (%s): %s"):format(n, d.title, tostring(err))
+        else
+          made_ids[n] = res.id
+          created[#created + 1] = res.id
+          local blocked = draft_ids(d.blocked_by, n, "blocked_by")
+          if #blocked > 0 then
+            local ok, serr = (deps.set or mutate.set)(res.id, { blocked_by = blocked })
+            if not ok then
+              refused[#refused + 1] = ("draft %d: created as %s, but its blocked_by was refused: %s"):format(
+                n,
+                res.id,
+                tostring(serr)
+              )
+            end
+          end
+        end
+      end
+    end
+    -- What became of each ticked draft, in the buffer too.
+    if vim.api.nvim_buf_is_valid(buf) then
+      local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+      for i, line in ipairs(lines) do
+        local n = tonumber(line:match("^%- %[[xX]%] (%d+)%."))
+        if n and made_ids[n] then
+          lines[i] = line:gsub("^%- %[[xX]%]", "- [+]", 1) .. "  -> " .. made_ids[n]
+        elseif n then
+          lines[i] = line:gsub("^%- %[[xX]%]", "- [!]", 1) .. "  (refused, see the message)"
+        end
+      end
+      vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+      vim.bo[buf].modified = false
+    end
+    if #created > 0 then
+      notify.info("agent: created " .. table.concat(created, ", "))
+    end
+    for _, why in ipairs(refused) do
+      notify.warn("agent: " .. why)
+    end
+  end
+  confirm_fn(
+    ("Create %d task(s) in the plan %s?"):format(#ticked, state.plan),
+    "create",
+    function(yes)
+      if not yes then
+        notify.info("agent: nothing created")
+        return
+      end
+      if #new_phases == 0 then
+        create_all(true)
+        return
+      end
+      confirm_fn(
+        ("The drafts name phase(s) the plan %s does not have: %s. Add them to its phase_order?"):format(
+          state.plan,
+          table.concat(new_phases, ", ")
+        ),
+        "add",
+        function(add)
+          if add then
+            local order = vim.deepcopy(plan.phase_order or {})
+            vim.list_extend(order, new_phases)
+            local ok, perr = (deps.plan_set or plans.set)(state.plan, { phase_order = order })
+            if not ok then
+              notify.error("agent: the phases were not added: " .. tostring(perr))
+              create_all(false)
+              return
+            end
+          end
+          create_all(add)
+        end
+      )
+    end
+  )
+end
+
+---A split came back (`kind=split-plan`): the drafts go into `tasks://split/<plan>` to tick; `:w` there creates the
+---ticked ones after a yes (`split_create`).
+---@param plan table The plan file.
+---@param job table The job of ai-desktop.
+---@param confirm_fn fun(msg: string, label: string, cb: fun(yes: boolean))
+---@param deps table
+local function split_came_back(plan, job, confirm_fn, deps)
+  local review = require("tasks_nvim.review")
+  if job.status ~= "done" then
+    notify.error(
+      ("agent: the split of %s ended %s%s"):format(
+        plan.id,
+        tostring(job.status),
+        type(job.error) == "string" and (": " .. job.error) or ""
+      )
+    )
+    return
+  end
+  local block = review.block(type(job.output) == "string" and job.output or "", "split")
+  local parsed, why = nil, "the answer has no split block"
+  if block then
+    parsed, why = review.parse_split(block)
+  end
+  if not parsed then
+    notify.warn(
+      ("agent: %s; the answer is in the dashboard of ai-desktop (job %s)"):format(why, job.id)
+    )
+    return
+  end
+  local buf = agent_buffer(plan.id, split_lines(plan.id, job.id, parsed), "split")
+  vim.bo[buf].buftype = "acwrite"
+  vim.bo[buf].modified = false
+  local text = fsio.read(plan.path) or ""
+  vim.b[buf].tasks_split = {
+    plan = plan.id,
+    job = job.id,
+    drafts = parsed.drafts,
+    german = text:find("## Ziel", 1, true) ~= nil or text:find("## Leitlinien", 1, true) ~= nil,
+  }
+  local group = vim.api.nvim_create_augroup("tasks_split_" .. buf, { clear = true })
+  vim.api.nvim_create_autocmd("BufWriteCmd", {
+    group = group,
+    buffer = buf,
+    callback = function()
+      split_create(buf, confirm_fn, deps)
+    end,
+  })
+  notify.info(
+    ("agent: %d draft(s) for %s; tick the ones to create, then :w"):format(#parsed.drafts, plan.id)
+  )
+end
+
 local AGENT_SAID = {
   prefilled = "it waits in the dashboard of ai-desktop, nothing runs",
   running = "ai-desktop runs it",
@@ -3085,8 +3448,9 @@ function M.task_agent(ctx, deps)
   local kind = kv.kind or "handoff"
   local is_review = kind == "review-done"
   local is_decision = kind == "prepare-decision"
-  -- A review or a prepared decision is asked for to read its answer: it runs unless said otherwise.
-  local mode = kv.mode or ((is_review or is_decision) and "run" or "prefill")
+  local is_split = kind == "split-plan"
+  -- A review, a prepared decision or a split is asked for to read its answer: it runs unless said otherwise.
+  local mode = kv.mode or ((is_review or is_decision or is_split) and "run" or "prefill")
   if not vim.tbl_contains(agent.MODES, mode) then
     notify.error("agent: mode is prefill or run, not " .. tostring(mode))
     return
@@ -3097,12 +3461,44 @@ function M.task_agent(ctx, deps)
     )
     return
   end
-  local id = (ctx.args or {}).id or buffer_task_id()
+  local id = (ctx.args or {}).id or (is_split and buffer_plan_id() or buffer_task_id())
   if not id or not id:match("^[%w_][^/]*/[^/]+$") then
-    notify.error("agent: name a task (area/slug), or run it from a task's buffer")
+    notify.error(
+      is_split and "agent: name a plan (area/slug), or run it from a plan's buffer"
+        or "agent: name a task (area/slug), or run it from a task's buffer"
+    )
     return
   end
-  local task, ferr = scan.find(id)
+  local root, rerr = require("tasks_nvim.vault").root()
+  if not root then
+    notify.error("agent: " .. tostring(rerr))
+    return
+  end
+  local task, payload
+  if is_split then
+    local plan, perr = require("tasks_nvim.plans").find(id)
+    if not plan then
+      notify.error("agent: split-plan names a plan: " .. tostring(perr))
+      return
+    end
+    local text = fsio.read(plan.path)
+    if not text then
+      notify.error("agent: cannot read " .. tostring(plan.path))
+      return
+    end
+    task = plan
+    payload = agent.payload(
+      { id = plan.id, title = plan.title, area = plan.area },
+      root,
+      split_markdown(plan, text),
+      mode,
+      kind
+    )
+  end
+  local ferr
+  if not task then
+    task, ferr = scan.find(id)
+  end
   if not task then
     local done = scan.find_done(id)
     if done and not is_review then
@@ -3114,6 +3510,10 @@ function M.task_agent(ctx, deps)
     task = done
   end
   if not task then
+    if require("tasks_nvim.plans").find(id) then
+      notify.error(("agent: %s is a plan; a plan is only split (kind=split-plan)"):format(id))
+      return
+    end
     notify.error("agent: " .. tostring(ferr))
     return
   end
@@ -3126,19 +3526,16 @@ function M.task_agent(ctx, deps)
     )
     return
   end
-  local root, rerr = require("tasks_nvim.vault").root()
-  if not root then
-    notify.error("agent: " .. tostring(rerr))
-    return
+  if not payload then
+    local file = task.path and io.open(task.path, "rb")
+    if not file then
+      notify.error("agent: cannot read " .. tostring(task.path))
+      return
+    end
+    local markdown = file:read("*a") or ""
+    file:close()
+    payload = agent.payload(task, root, markdown, mode, kind)
   end
-  local file = task.path and io.open(task.path, "rb")
-  if not file then
-    notify.error("agent: cannot read " .. tostring(task.path))
-    return
-  end
-  local markdown = file:read("*a") or ""
-  file:close()
-  local payload = agent.payload(task, root, markdown, mode, kind)
 
   local desktop = deps.ai_desktop or ai.ai_desktop()
   if desktop.running then
@@ -3157,7 +3554,7 @@ function M.task_agent(ctx, deps)
           res.note and (" (" .. res.note .. ")") or ""
         )
       )
-      if not is_review and not is_decision then
+      if not is_review and not is_decision and not is_split then
         return
       end
       -- The answer comes back to this editor (watched until the job ends).
@@ -3176,7 +3573,9 @@ function M.task_agent(ctx, deps)
           or function(msg, label, cb)
             require("tasks_nvim.ui.confirm").yesno(msg, label, cb)
           end
-        if is_decision then
+        if is_split then
+          split_came_back(task, job, confirm_fn, deps)
+        elseif is_decision then
           decision_came_back(task, job, confirm_fn)
         else
           review_came_back(task, job, confirm_fn, deps.create)
@@ -3185,8 +3584,8 @@ function M.task_agent(ctx, deps)
     end)
     return
   end
-  if is_review or is_decision then
-    -- A review or a prepared decision reads the commits and repositories: ai-desktop's, not one answer of ai.nvim.
+  if is_review or is_decision or is_split then
+    -- These kinds read commits, repositories and the plan's tasks: ai-desktop's, not one answer of ai.nvim.
     notify.error(
       desktop.installed
           and "agent: ai-desktop is installed but not running; this kind needs it (it reads commits and repositories): start it"

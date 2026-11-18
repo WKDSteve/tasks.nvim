@@ -23,6 +23,11 @@ M.BEGIN = "<!-- review:begin -->"
 M.END = "<!-- review:end -->"
 M.DECISION_BEGIN = "<!-- decision:begin -->"
 M.DECISION_END = "<!-- decision:end -->"
+M.SPLIT_BEGIN = "<!-- split:begin -->"
+M.SPLIT_END = "<!-- split:end -->"
+
+-- More drafts than this are no split of one plan.
+M.MAX_DRAFTS = 30
 
 local PROPOSAL_HEADINGS = { "## Vorschlag", "## Proposal" }
 local QUESTION_HEADINGS = { "## Offene Fragen", "## Open questions" }
@@ -35,11 +40,15 @@ local MAX_BLOCK = 32 * 1024
 ---The last block of an answer (without the markers, trimmed), or nil: a review's, or with `which = "decision"` a
 ---prepared decision's.
 ---@param output string
----@param which? "review"|"decision"
+---@param which? "review"|"decision"|"split"
 ---@return string|nil
 function M.block(output, which)
-  local begin_mark = which == "decision" and M.DECISION_BEGIN or M.BEGIN
-  local end_mark = which == "decision" and M.DECISION_END or M.END
+  local begin_mark = which == "decision" and M.DECISION_BEGIN
+    or which == "split" and M.SPLIT_BEGIN
+    or M.BEGIN
+  local end_mark = which == "decision" and M.DECISION_END
+    or which == "split" and M.SPLIT_END
+    or M.END
   local found
   local from = 1
   while true do
@@ -166,6 +175,142 @@ function M.with_decision(text, parts)
     added = true
   end
   return out, added
+end
+
+---@class Tasks.SplitDraft
+---@field n integer               # Its position in the list, from 1 (`#n` in another draft's after/blocked_by).
+---@field title string
+---@field area string
+---@field kind? string
+---@field prio? integer
+---@field effort? string
+---@field value? integer
+---@field phase? string
+---@field summary? string
+---@field acceptance string[]
+---@field after string[]
+---@field blocked_by string[]
+---@field invalid? string          # Why it cannot be created as it is (its form); the engine checks the values later.
+
+---One string of a draft: nil when missing, false and why when it is not one line of text.
+---@param value any
+---@param what string
+---@return string|nil|false
+---@return string|nil
+local function one_line(value, what)
+  if value == nil then
+    return nil
+  end
+  if type(value) ~= "string" then
+    return false, what .. " is not text"
+  end
+  if value:find("[%z\1-\31\127]") then
+    return false, what .. " is not one line of text"
+  end
+  return vim.trim(value)
+end
+
+---A list of one-line strings of a draft (missing: empty).
+---@param value any
+---@param what string
+---@return string[]|false
+---@return string|nil
+local function line_list(value, what)
+  if value == nil then
+    return {}
+  end
+  if type(value) ~= "table" or not vim.islist(value) then
+    return false, what .. " is not a list"
+  end
+  local out = {}
+  for _, item in ipairs(value) do
+    local text, why = one_line(item, what)
+    if not text then
+      return false, why or (what .. " holds an empty entry")
+    end
+    if text ~= "" then
+      out[#out + 1] = text
+    end
+  end
+  return out
+end
+
+---The phases and drafts of a split (`kind=split-plan`): the JSON object of the block. Nil and why when the block is
+---not such an object or names no draft; a draft whose form is wrong is kept with `invalid` (shown, never created).
+---The values (kind, prio, area ...) are the engine's to check when a draft is created.
+---@param block string
+---@return { phases: { name: string, new: boolean }[], drafts: Tasks.SplitDraft[] }|nil
+---@return string|nil why
+function M.parse_split(block)
+  if #block > MAX_BLOCK * 2 then
+    return nil, ("the drafts are larger than %d KiB"):format(MAX_BLOCK * 2 / 1024)
+  end
+  local json = vim.trim((block:gsub("^```%w*", ""):gsub("```%s*$", "")))
+  local good, doc = pcall(vim.json.decode, json, { luanil = { object = true, array = true } })
+  if not good or type(doc) ~= "table" or vim.islist(doc) then
+    return nil, "the drafts are not one JSON object"
+  end
+  if type(doc.tasks) ~= "table" or not vim.islist(doc.tasks) or #doc.tasks == 0 then
+    return nil, "the split proposes no task"
+  end
+  if #doc.tasks > M.MAX_DRAFTS then
+    return nil, ("the split proposes %d tasks, more than %d"):format(#doc.tasks, M.MAX_DRAFTS)
+  end
+  local phases = {}
+  for _, p in ipairs(type(doc.phases) == "table" and vim.islist(doc.phases) and doc.phases or {}) do
+    local name = type(p) == "table" and one_line(p.name, "phase") or nil
+    if name and name ~= "" then
+      phases[#phases + 1] = { name = name, new = p.new == true }
+    end
+  end
+  local drafts = {}
+  for n, t in ipairs(doc.tasks) do
+    local d = { n = n, acceptance = {}, after = {}, blocked_by = {} }
+    local function bad(why)
+      d.invalid = d.invalid or why
+    end
+    if type(t) ~= "table" or vim.islist(t) then
+      d.title = "(not a draft)"
+      d.area = ""
+      bad("not an object")
+    else
+      for _, key in ipairs({ "title", "area", "kind", "effort", "phase", "summary" }) do
+        local text, why = one_line(t[key], key)
+        if text == false then
+          bad(why)
+        elseif text ~= nil then
+          d[key] = text
+        end
+      end
+      for _, key in ipairs({ "prio", "value" }) do
+        if t[key] ~= nil then
+          if type(t[key]) ~= "number" or t[key] ~= math.floor(t[key]) then
+            bad(key .. " is not a whole number")
+          else
+            d[key] = t[key]
+          end
+        end
+      end
+      for _, key in ipairs({ "acceptance", "after", "blocked_by" }) do
+        local list, why = line_list(t[key], key)
+        if list == false then
+          bad(why)
+        else
+          d[key] = list
+        end
+      end
+      if not d.title or d.title == "" then
+        d.title = d.title or "(no title)"
+        bad("it has no title")
+      end
+      if not d.area or d.area == "" then
+        d.area = d.area or ""
+        bad("it names no area")
+      end
+    end
+    drafts[n] = d
+  end
+  return { phases = phases, drafts = drafts }, nil
 end
 
 ---The follow-up task the review proposes (`title`, `summary`), or nil when it proposes none.
