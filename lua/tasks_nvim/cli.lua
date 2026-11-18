@@ -1408,7 +1408,8 @@ function commands.index(ctx)
       #errors
     )
   )
-  -- A run over the whole vault read every task anyway: it is the moment the series of the figures grows by today.
+  -- A run over the whole vault is the moment the series of the figures grows by today (the count reads the vault
+  -- once more, through the parse cache the index just filled).
   -- Only a vault that keeps a series (the folder is there), and never the reason for the index to fail.
   local root = vault.root(eo)
   if whole_vault and not args.opt["no-history"] and root and history.exists(root) then

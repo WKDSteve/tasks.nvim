@@ -2397,8 +2397,8 @@ M.HISTORY_DEFAULT_DAYS = 90
 ---The figures of the overview over time (`tasks_nvim.history`): one point per day or week of the window, oldest
 ---first. A point carries the level of the day (`open`, `by_status`, `by_state`, `with_effort`, `with_value`,
 ---`effort_days`, `value`: the sum over the areas of the last row each of them has up to that day; absent before the
----first row, unknown is never 0), `recorded` (a row was written on that day, of any area: a level without it is the
----one carried over) and the two figures the files themselves give for every day: `done` (tasks finished on it, the
+---first row, unknown is never 0), `recorded` (a row of the areas asked for was written on that day: a level without
+---it is the one carried over) and the two figures the files themselves give for every day: `done` (tasks finished on it, the
 ---day in the name of the Backlog file) and `created` (tasks whose `created` is that day, open or finished). A week
 ---is named by its Monday: its level is the one of its last day in the window, `done` and `created` are its sums.
 ---`area` (an area or an area group) narrows all of it. The series lies outside the revision, as in `tasks.finished`.
@@ -2423,7 +2423,8 @@ function M.history(params, opts)
   end
   local until_ = params["until"] or today
   local since = params.since or model.add_days(until_, -(M.HISTORY_DEFAULT_DAYS - 1))
-  if not since then
+  -- a day before the year 0 is no day of the calendar the engine reckons in
+  if not since or not model.is_date(since) then
     return bad("until is too early for a window")
   end
   if since > until_ then
@@ -2510,7 +2511,7 @@ function M.history(params, opts)
         by_key[key] = point
         points[#points + 1] = point
       end
-      point.recorded = point.recorded or read.days[day] == true
+      point.recorded = point.recorded or levels.days[day] == true
       point.done = point.done + (done[day] or 0)
       point.created = point.created + (created[day] or 0)
       local level = levels.by_day[day]

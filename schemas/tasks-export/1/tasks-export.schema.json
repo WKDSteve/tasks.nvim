@@ -2696,7 +2696,7 @@
       "unevaluatedProperties": false
     },
     "HistoryPoint": {
-      "description": "One day (or one week, named by its Monday) of `tasks.history`. `done` and `created` are what the files say about the day and are always there. The level (`open` and the fields beside it) is the sum over the areas of the last row each of them has up to that day: absent before the first row (unknown, never 0), all of it or none. `recorded` is false for a level that was carried over (no row of any area was written on that day).",
+      "description": "One day (or one week, named by its Monday) of `tasks.history`. `done` and `created` are what the files say about the day and are always there. The level (`open` and the fields beside it) is the sum over the areas of the last row each of them has up to that day: absent before the first row (unknown, never 0), all of it or none. `recorded` is false for a level that was carried over (no row of the areas asked for was written on that day).",
       "type": "object",
       "required": [
         "day",

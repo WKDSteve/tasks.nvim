@@ -459,6 +459,101 @@ return function(H)
   end
   eq(opens, { "-", 2, 2, 3, 3, 5 }, "the curve: unknown, two, carried, three, carried, today")
 
+  -- a count filled in from git ends at the next day that has rows: that day said "unchanged" for the areas it has
+  -- no row of, against the rows that existed then (review of 94d02b0)
+  local mv = F.vault(H)
+  local function mgit(args, date)
+    local cmd = { "git", "-C", mv, "-c", "user.name=t", "-c", "user.email=t@example.org" }
+    vim.list_extend(cmd, args)
+    local env = date and { GIT_AUTHOR_DATE = date, GIT_COMMITTER_DATE = date } or nil
+    local res = vim.system(cmd, { text = true, env = env }):wait()
+    eq(res.code, 0, "git " .. table.concat(args, " ") .. ": " .. tostring(res.stderr))
+  end
+  local function mcommit(date)
+    mgit({ "add", "-A", "--", ".", ":(exclude)_Telemetry" })
+    mgit({ "commit", "-q", "-m", "state of " .. date }, date)
+  end
+  mgit({ "init", "-q" })
+  mgit({ "config", "core.autocrlf", "false" })
+  task(mv, "lib.nvim", "a", "open", {})
+  task(mv, "cascade.nvim", "b", "open", {})
+  mcommit("2026-03-02T09:00:00")
+  history.record(view_of(mv), { today = "2026-03-02", at = "2026-03-02T10:00:00Z" })
+  -- 03-03: lib.nvim has two tasks, committed, nobody recorded
+  local extra = task(mv, "lib.nvim", "c", "open", {})
+  mcommit("2026-03-03T09:00:00")
+  -- 03-04: lib.nvim is back at one, cascade.nvim has two; recorded (only cascade.nvim changed against 03-02)
+  vim.fn.delete(extra)
+  task(mv, "cascade.nvim", "d", "open", {})
+  mcommit("2026-03-04T09:00:00")
+  history.record(view_of(mv), { today = "2026-03-04", at = "2026-03-04T10:00:00Z" })
+  local function open_of(root_)
+    local out = {}
+    for _, p in
+      ipairs(call(root_, { since = "2026-03-02", ["until"] = "2026-03-05" }, "2026-03-05").points)
+    do
+      out[#out + 1] = p.open
+    end
+    return out
+  end
+  eq(open_of(mv), { 2, 2, 3, 3 }, "before the backfill: the day nobody recorded is carried over")
+  local mid = backfill.run({ root = mv, today = "2026-03-05" })
+  eq({ mid.days, mid.kept }, { 1, 2 })
+  eq(
+    open_of(mv),
+    { 2, 3, 3, 3 },
+    "the filled day shows, and the recorded day after it is what it was"
+  )
+  local back = history.read(mv).rows
+  local reset = vim.tbl_filter(function(r)
+    return r.day == "2026-03-04" and r.area == "lib.nvim"
+  end, back)[1]
+  eq(
+    { reset.open, reset.src },
+    { 1, "git" },
+    "the recorded day got a row that ends the count from git"
+  )
+  eq(backfill.run({ root = mv, today = "2026-03-05" }).rows, 0, "a second run writes nothing more")
+
+  -- a row written on its day wins over a row from the repository, whatever their times
+  local pv = F.vault(H)
+  task(pv, "lib.nvim", "a", "open", {})
+  history.record(view_of(pv), { today = "2026-03-02", at = "2026-03-02T09:00:00Z" })
+  local written = lines(pv, "2026-03.jsonl")[1]
+  local from_git = written
+    :gsub('"at":"[^"]+"', '"at":"2026-03-02T23:00:00Z"')
+    :gsub(',"open":1,"state"', ',"open":9,"src":"git","state"')
+  for _, both in ipairs({ { written, from_git }, { from_git, written } }) do
+    H.write(pv .. "/_Telemetry/history/2026-03.jsonl", table.concat(both, "\n") .. "\n")
+    local one_row = history.read(pv)
+    eq(one_row.problems, {})
+    eq({ #one_row.rows, one_row.rows[1].open, one_row.rows[1].src }, { 1, 1, nil })
+  end
+
+  -- a month file that is a link is not written through (the reader skips it already)
+  local lv = F.vault(H)
+  task(lv, "lib.nvim", "a", "open", {})
+  local outside = H.tmpdir() .. "/outside.jsonl"
+  H.write(outside, "not ours\n")
+  vim.fn.mkdir(lv .. "/_Telemetry/history", "p")
+  local linked = (vim.uv or vim.loop).fs_symlink(outside, lv .. "/_Telemetry/history/2026-03.jsonl")
+  if linked then
+    local res, lerr =
+      history.record(view_of(lv), { today = "2026-03-02", at = "2026-03-02T09:00:00Z" })
+    eq(res, nil, "the write is refused")
+    has(tostring(lerr), "is a link")
+    eq(H.read(outside), "not ours\n", "the file outside the vault is as it was")
+  end
+
+  -- `recorded` of a point is about the areas asked for
+  local scoped =
+    call(root, { area = "lib.nvim", since = "2026-03-02", ["until"] = "2026-03-05" }).points
+  eq(scoped[1].recorded, true)
+  eq(scoped[4].recorded, false, "03-05 has a row of cascade.nvim only")
+
+  -- a window before the calendar the engine reckons in is refused, not an internal error
+  eq(call(root, { ["until"] = "0000-01-05" }).code, "invalid_argument")
+
   -- a window, and what is refused
   local windowed = F.vault(H)
   eq(backfill.run({ root = windowed, today = "2026-03-06" }), nil, "a vault that is no repository")

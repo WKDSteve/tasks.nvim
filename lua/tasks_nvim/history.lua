@@ -384,6 +384,22 @@ local function lines_of(text)
   return out
 end
 
+---Whether a row takes the place of the one known for its day and area. A row written on its day is what the vault
+---was: one filled in from the repository (`src`) never replaces it, whatever its time (a commit late in the evening
+---is later than a row of the morning). Else the later one is the state of the day; the same second: the same line on
+---every machine, whatever the order in the file.
+---@param row Tasks.HistoryRow
+---@param line string
+---@param known { row: Tasks.HistoryRow, line: string }
+---@return boolean
+local function beats(row, line, known)
+  local written, known_written = row.src == nil, known.row.src == nil
+  if written ~= known_written then
+    return written
+  end
+  return row.at > known.row.at or (row.at == known.row.at and line > known.line)
+end
+
 ---@class Tasks.HistoryRead
 ---@field rows Tasks.HistoryRow[]   # One row per day and area (the latest `at`), by day, then area.
 ---@field problems string[]        # Lines and files that were skipped, relative to the vault.
@@ -428,9 +444,7 @@ function M.read(root)
             if not known then
               order[#order + 1] = key
               best[key] = { row = row, line = line }
-            elseif row.at > known.row.at or (row.at == known.row.at and line > known.line) then
-              -- two machines wrote the same day: the later one is the state of that day (the same second: the same
-              -- line on every machine, whatever the order in the file)
+            elseif beats(row, line, known) then
               best[key] = { row = row, line = line }
             end
           end
@@ -528,6 +542,10 @@ function M.write_rows(root, rows)
   end
   for _, path in ipairs(files) do
     local ok, err = fsio.with_lock(path, function()
+      -- the reader skips a month file that is a link; a write would go THROUGH it, into a file outside the vault
+      if fsio.is_link(path) then
+        return nil, vim.fs.basename(path) .. " is a link"
+      end
       local replaced = {}
       for _, row in ipairs(by_file[path]) do
         replaced[row.day .. "\0" .. row.area] = true
@@ -603,6 +621,7 @@ end
 ---@field by_day table<string, Tasks.HistoryFigures>  # The sum over the areas on every day from the first row on.
 ---@field first? string  # The first day of the series that has a row of these areas.
 ---@field last? string   # The last such day.
+---@field days table<string, true>  # The days that have a row of these areas.
 
 ---The level of every day of a window: the sum of the last row of every area up to that day. A day before the first
 ---row has no level (unknown, never 0).
@@ -612,7 +631,7 @@ end
 ---@param areas? table<string, true>  # only these areas (default: all)
 ---@return Tasks.HistoryLevels
 function M.levels(rows, since, until_, areas)
-  local out = { by_day = {} }
+  local out = { by_day = {}, days = {} }
   local cur, seen, i = {}, false, 1
   local scoped = {}
   for _, row in ipairs(rows) do
@@ -620,6 +639,7 @@ function M.levels(rows, since, until_, areas)
       scoped[#scoped + 1] = row
       out.first = out.first or row.day
       out.last = row.day
+      out.days[row.day] = true
     end
   end
   ---@type string|nil

@@ -7,8 +7,12 @@
 ---
 ---  - only days WITHOUT a row are filled: a row that was written on its day is what the vault was, a count from git
 ---    is the next best thing and never replaces it;
+---  - a day that HAS rows said "unchanged" for every area it has no row of, measured against the rows that existed
+---    then. A count filled in before it must not reach past it: where it differs, the day gets a row that puts the
+---    area back to what the existing rows say (zeros for an area without one);
 ---  - a day without a commit gets no row (nothing changed), today is left to `history.record`;
----  - a tree the engine of today cannot read is skipped and named (a gap stays a gap, nothing is guessed);
+---  - a tree the engine of today cannot read, or git cannot lay out (a path too long for this folder, a name this
+---    system refuses), is skipped and named (a gap stays a gap, nothing is guessed);
 ---  - the repository is not touched: the trees are laid out through an index file of their own
 ---    (`GIT_INDEX_FILE`), in a folder that is removed afterwards. No worktree, no branch, no stash.
 ---
@@ -152,17 +156,54 @@ function M.run(opts)
 
   local function run()
     vim.fn.mkdir(tree, "p")
-    local state, next_row = {}, 1
+    -- `state`: the last row of every area so far, existing or of this run; `before`: the same from the existing rows
+    -- alone; `filled`: the areas whose state is a row of this run
+    local state, before, filled, next_row = {}, {}, {}, 1
+    ---Take over the existing rows of every day before `limit` (nil: all that are left), day by day.
+    ---@param limit string|nil
+    local function take_existing(limit)
+      while read.rows[next_row] and (limit == nil or read.rows[next_row].day < limit) do
+        local day, at, here = read.rows[next_row].day, "", {}
+        while read.rows[next_row] and read.rows[next_row].day == day do
+          local row = read.rows[next_row]
+          state[row.area], before[row.area] = row, row
+          filled[row.area] = nil
+          here[row.area] = true
+          if row.at > at then
+            at = row.at
+          end
+          next_row = next_row + 1
+        end
+        -- the day has rows: an area without one was unchanged on it against the rows that existed, so a count of
+        -- this run ends here
+        local areas = vim.tbl_keys(filled)
+        table.sort(areas)
+        for _, area in ipairs(areas) do
+          if not here[area] then
+            local was = before[area] or history.empty()
+            if not history.same(state[area], was) then
+              local row = vim.tbl_extend("force", vim.deepcopy(was), {
+                day = day,
+                area = area,
+                at = at,
+                src = "git",
+              })
+              state[area] = row
+              new_rows[#new_rows + 1] = row
+            end
+            filled[area] = nil
+          end
+        end
+      end
+    end
+
     local prev = nil
     for n, d in ipairs(days) do
       if opts.progress then
         opts.progress(d.day, n, #days)
       end
       -- the rows that exist for earlier days are the state this day is compared with
-      while read.rows[next_row] and read.rows[next_row].day < d.day do
-        state[read.rows[next_row].area] = read.rows[next_row]
-        next_row = next_row + 1
-      end
+      take_existing(d.day)
       local _, cerr
       if prev then
         -- from one tree to the next: only the files that differ are written
@@ -171,22 +212,28 @@ function M.run(opts)
         -- `-u` also stores what the files look like on disk: without it the next step finds every file "not uptodate"
         _, cerr = git(tree, { "read-tree", "--reset", "-u", d.sha }, env)
       end
+      local view, why
       if cerr then
-        return nil, cerr
-      end
-      prev = d.sha
-      local ok, view, verr = pcall(function()
-        return fsio.read_scope(function()
-          return contract.build_view({ root = tree_root })
+        -- the tree is in no known state now: the next day is laid out whole
+        prev, why = nil, cerr
+      else
+        prev = d.sha
+        local ok, built, verr = pcall(function()
+          return fsio.read_scope(function()
+            return contract.build_view({ root = tree_root })
+          end)
         end)
-      end)
-      if not ok or not view then
-        local why = tostring(not ok and view or verr):gsub(vim.pesc(tmp), "<tree>")
-        result.skipped[#result.skipped + 1] = { day = d.day, why = why }
+        view = ok and built or nil
+        why = not view and tostring(not ok and built or verr) or nil
+      end
+      if not view then
+        local shown = tostring(why):gsub(vim.pesc(tmp), "<tree>")
+        result.skipped[#result.skipped + 1] = { day = d.day, why = shown }
       else
         local rows = history.changes(state, history.figures(view), d.day, d.at, "git")
         for _, row in ipairs(rows) do
           state[row.area] = row
+          filled[row.area] = true
           new_rows[#new_rows + 1] = row
         end
         result.days = result.days + 1
@@ -194,6 +241,7 @@ function M.run(opts)
         result.last = d.day
       end
     end
+    take_existing(nil)
     return true
   end
 

@@ -379,7 +379,8 @@ A full count reads the whole vault (seconds on a big one), which is why `new`, `
 
 **Two machines**: both may write the same day before they see each other's commit. The vault's `.gitattributes`
 merges the files by union (`_Telemetry/history/*.jsonl merge=union`): both lines stay, no conflict, and the reader
-takes the row with the later `at` (the same second: the same line on every machine). The next row written for that
+takes the row with the later `at` (the same second: the same line on every machine); a row written on its day always
+wins over one filled in from the repository. The next row written for that
 day leaves one line. Commit the files with the rest of the vault; a row that is committed late or never costs a step
 in the curve and nothing else, because rows are absolute.
 
@@ -387,7 +388,7 @@ in the curve and nothing else, because rows are absolute.
 version, a count below zero or beyond 1e9, an unknown status or state word, a day of another month than its file, a
 line longer than 2048 bytes, the markers of a merge without union) is named as `<file>:<line>: <why>` and skipped,
 at most 20 by name and the rest counted. The writer leaves such a line where it is: it may be a row of a newer engine.
-A `_Telemetry` or `history` that is a link is not read and not written.
+A `_Telemetry`, a `history` or a month file that is a link is not read and not written.
 
 **Levels** (`history.levels`): the level of a day is the sum over the areas of the last row each has up to that day.
 A day before the first row has no level; a day without a row carries the level over and says so (`recorded: false`
@@ -398,7 +399,7 @@ counted live for every day.
 and no row, the tree of the last commit of that day is laid out in a temporary folder (through an index file of its
 own: no worktree, no branch, the repository and its working tree stay untouched), counted with the engine of today
 and written as rows with `src: "git"` and the commit time as `at`. A day that has a row is never counted again (a row
-written on its day is what the vault was), a day without a commit gets none, a tree the engine cannot read is skipped
+written on its day is what the vault was; an area it has no row of gets one that ends a count filled in before it), a day without a commit gets none, a tree the engine cannot read is skipped
 and named. The day of a commit is the day of its committer time on this machine. Needs `git`; a few seconds for the
 first tree, then about a second per day.
 

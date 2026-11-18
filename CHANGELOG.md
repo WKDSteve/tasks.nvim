@@ -85,6 +85,7 @@ the version is not tagged yet (the repository is not published).
 
 ### Fixed
 
+- `tasks history backfill` no longer lets a count filled in from the repository reach past a day that has rows: such a day said "unchanged" for every area it has no row of, so it gets a row that puts the area back (review of 94d02b0). A row written on its day wins over a row from the repository whatever their times; a month file that is a link is refused by the writer (it used to be written through); a day git cannot lay out is skipped, not the end of the run; `tasks.history` answers `invalid_argument` for a window before the year 0 (it raised), and `recorded` of a point counts the rows of the areas asked for.
 - `:Tasks sheet-ai ask` refuses while `setup({ ai = false })` turns the AI functions off; it still sent the hand-over to ai.nvim (after a yes), though `false` promises none at all.
 - `:Tasks agent` (`review-done`, `prepare-decision`, `split-plan`) and `:Tasks new --draft` read a watched job of ai-desktop whole: `GET /jobs/<id>` carries the task file (up to 256 KiB) and the output (up to 512 KiB), and the 64 KiB bound of the small routes made such a job end as "ai-desktop does not answer any more". A job may now be up to 8 MiB (`agent.MAX_JOB_RESPONSE`).
 - `tasks-export/1`: the `inverse` of `set_section` (`op`, `heading`, `text`) is in the schema's `Inverse`; it was written but not allowed there, so a typed reader (tasks-desktop) could not take it back. Golden `result-set-section`.
