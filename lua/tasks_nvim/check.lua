@@ -18,6 +18,8 @@
 ---    (warning)
 ---  - `ui-tag-without-ux` (warning): an open task with a tag of `M.UI_TAGS` (`ui`, `webui`, ...) and no category
 ---    `ux` (vault rule R19: the category is the one source for "touches the surface", a tag only says which part)
+---  - `outcome-without-reason`, `outcome-on-open-task` (hints, severity `info`): an outcome `seen` / `not-applicable`
+---    without `outcome_reason` (open or finished); an outcome on an open task (allowed: a note made in advance)
 ---  - `ui-word-without-ux` (a hint, `result.hints`, severity `info`): a word of `M.UI_WORDS` in the title of an open task
 ---    that has neither the category `ux` nor a UI tag. Never an error or a warning, not in the contract document;
 ---    `opts.ui_words = false` switches it off (`setup({ check = { ui_words_off = { "<vault name>" } } })`)
@@ -287,6 +289,35 @@ function M.ui_word(title)
     end
   end
   return nil
+end
+
+---The outcome hints of one task (open or finished): never a warning, an outcome is a note, not a defect.
+---@param hints Tasks.Finding[]
+---@param t Tasks.Task
+---@param open boolean
+local function outcome_findings(hints, t, open)
+  if not t.outcome then
+    return
+  end
+  local function hint(code, message)
+    hints[#hints + 1] =
+      { code = code, severity = "info", area = t.area, path = t.path, id = t.id, message = message }
+  end
+  local reason = t.outcome_reason and vim.trim(t.outcome_reason) or ""
+  if model.OUTCOME_NEEDS_REASON[t.outcome] and reason == "" then
+    hint(
+      "outcome-without-reason",
+      ("outcome %s without outcome_reason: say why it ends without being done"):format(t.outcome)
+    )
+  end
+  if open then
+    hint(
+      "outcome-on-open-task",
+      ("outcome %s on an open task: tasks done writes it when the task is finished"):format(
+        t.outcome
+      )
+    )
+  end
 end
 
 ---Rule R19 on one open task: a UI tag without the category `ux` is a warning, a UI word in the title of a task with
@@ -1175,6 +1206,8 @@ function M.run(opts)
 
   local findings = {}
   local task_count = 0
+  ---@type Tasks.Finding[]
+  local hints = {}
 
   for _, name in ipairs(names) do
     local scanned = by_area[name] or { tasks = {} }
@@ -1198,6 +1231,10 @@ function M.run(opts)
     local finished_ids = {}
     for _, t in ipairs(finished) do
       finished_ids[t.id] = t
+      outcome_findings(hints, t, false)
+    end
+    for _, t in ipairs(open) do
+      outcome_findings(hints, t, true)
     end
     task_count = task_count + #open + #finished
 
@@ -1347,8 +1384,6 @@ function M.run(opts)
   plan_findings(findings, open_ids, names, scan_opts, is_finished)
   -- an open task past its due date: a warning, never an error (a parked task waits on purpose)
   local today = opts.today or model.today()
-  ---@type Tasks.Finding[]
-  local hints = {}
   local words = opts.ui_words
   if words == nil then
     words = M.ui_words_on(root)

@@ -558,6 +558,8 @@ local function start_next_round(routine, opts)
     { "waits_for", mutate.REMOVE },
     { "commits", mutate.REMOVE },
     { "done_in", mutate.REMOVE },
+    { "outcome", mutate.REMOVE },
+    { "outcome_reason", mutate.REMOVE },
     { "blocked_by", mutate.REMOVE },
     -- the round is not ready before its due day: `next` and `list --ready` honour `start`
     { "start", due },

@@ -337,7 +337,7 @@ local function check_lang(lang)
 end
 
 ---Frontmatter keys in the order concept section 3 shows them.
----@param meta { title: string, status: string, kind?: string, prio?: integer|string, effort?: string, value?: integer|string, actor?: string, after?: string[], order?: number|string, plan?: string, project?: string, phase?: string, tags?: string[], category?: string[], scope?: string[], severity?: string, waits_for?: string, due?: string, start?: string, refs?: string[], links?: string[], created: string, updated: string }
+---@param meta { title: string, status: string, kind?: string, prio?: integer|string, effort?: string, value?: integer|string, actor?: string, after?: string[], order?: number|string, plan?: string, project?: string, phase?: string, tags?: string[], category?: string[], scope?: string[], severity?: string, outcome?: string, outcome_reason?: string, waits_for?: string, due?: string, start?: string, refs?: string[], links?: string[], created: string, updated: string }
 ---@return table[] pairs
 local function meta_pairs(meta)
   local pairs_ = {
@@ -389,6 +389,12 @@ local function meta_pairs(meta)
   end
   if meta.severity then
     pairs_[#pairs_ + 1] = { "severity", meta.severity }
+  end
+  if meta.outcome then
+    pairs_[#pairs_ + 1] = { "outcome", meta.outcome }
+  end
+  if meta.outcome_reason then
+    pairs_[#pairs_ + 1] = { "outcome_reason", meta.outcome_reason }
   end
   if meta.due then
     pairs_[#pairs_ + 1] = { "due", meta.due }
@@ -500,6 +506,18 @@ local function one_line(value, what)
     return nil, what .. " must be a single line"
   end
   return t, nil
+end
+
+---An `outcome_reason` as given to `new` or `done`: one line, or nil when none was given or it is blank (a blank
+---reason is no reason; `done` then asks for one where the outcome needs it).
+---@param value any
+---@return string|nil reason
+---@return string|nil err
+local function outcome_reason_of(value)
+  if value == nil or (type(value) == "string" and trim(value) == "") then
+    return nil, nil
+  end
+  return one_line(value, "outcome_reason")
 end
 
 ---A list of single-line strings. A string is split at commas; one pair of
@@ -724,6 +742,8 @@ local SETTABLE = {
   "rules",
   "done_in",
   "commits",
+  "outcome",
+  "outcome_reason",
   "created",
   "remind",
   "remind_at",
@@ -887,6 +907,7 @@ local FIELD_NORMALIZERS = {
     return value
   end,
   severity = one_of("severity", model.is_severity, model.SEVERITIES),
+  outcome = one_of("outcome", model.is_outcome, model.OUTCOMES),
   waits_for = function(value)
     if not model.is_waits_for(value) then
       return nil, model.waits_for_error(value)
@@ -1311,6 +1332,17 @@ function M.new(area, opts)
         table.concat(model.SEVERITIES, ", ")
       )
   end
+  if opts.outcome ~= nil and not model.is_outcome(opts.outcome) then
+    return nil,
+      ("unknown outcome '%s' (expected %s)"):format(
+        tostring(opts.outcome),
+        table.concat(model.OUTCOMES, ", ")
+      )
+  end
+  local outcome_reason, oerr = outcome_reason_of(opts.outcome_reason)
+  if oerr then
+    return nil, oerr
+  end
   local refs
   if opts.refs ~= nil then
     local list, rerr2 = string_list(opts.refs, "refs")
@@ -1439,6 +1471,8 @@ function M.new(area, opts)
       category = category,
       scope = scope,
       severity = opts.severity,
+      outcome = opts.outcome,
+      outcome_reason = outcome_reason,
       due = opts.due,
       start = opts.start,
       repeat_every = opts.repeat_every,
@@ -2010,7 +2044,7 @@ end
 ---for a folder task); the link text is always the file name.
 ---@param bucket Tasks.Bucket
 ---@param rel string
----@param task { title: string, summary: string }  # A task, or a plan file.
+---@param task { title: string, summary: string, outcome?: string, outcome_reason?: string }  # A task, or a plan file.
 ---@param date string
 ---@return string
 local function readme_row(bucket, rel, task, date)
@@ -2028,9 +2062,21 @@ local function readme_row(bucket, rel, task, date)
     end
     content = content .. " — " .. cell(summary)
   end
+  -- How it ended, when the task says so: `(date, seen: reason)`. Without an outcome the row is what it always was.
+  local ended = date
+  if task.outcome then
+    ended = ended .. ", " .. task.outcome
+    local reason = task.outcome_reason
+    if reason and reason ~= "" then
+      if vim.fn.strchars(reason) > 120 then
+        reason = vim.fn.strcharpart(reason, 0, 119) .. "…"
+      end
+      ended = ended .. ": " .. cell(reason)
+    end
+  end
   -- The names are `YYYY-MM-DD_<slug>` with a validated slug: nothing to escape.
   local filename = rel:match("([^/]*)$")
-  return ("| [`%s`](./%s/%s) | %s (%s) |"):format(filename, bucket, rel, content, date)
+  return ("| [`%s`](./%s/%s) | %s (%s) |"):format(filename, bucket, rel, content, ended)
 end
 
 ---@see readme_row
@@ -2463,6 +2509,8 @@ end
 ---@field done_in? string|string[]   # Commit(s) that delivered the task.
 ---@field commits? string|string[]    # `repo@sha` commits made for the task; added to those the task already lists.
 ---@field remind? string             # A date or `+<n>d` / `+<n>w`: when to look at the finished task again.
+---@field outcome? string            # How it ended (`model.OUTCOMES`); nil: as the task says (none: done as meant).
+---@field outcome_reason? string     # Why; required for `seen` and `not-applicable` unless the task has one already.
 ---@field date? string               # `YYYY-MM-DD` filename prefix (default: today).
 ---@field today? string              # Sets `updated` (default: today).
 ---@field index? boolean             # Regenerate the area index (default true).
@@ -2493,6 +2541,8 @@ end
 ---@field readme_state "missing"|"updated"|"unchanged"
 ---@field steps_ticked integer        # Plan steps ticked in the finished copy.
 ---@field index boolean              # Regenerate the area index afterwards.
+---@field outcome? string            # How the finished task ended (what the finished file says).
+---@field outcome_reason? string
 
 ---What `done` did so far, for the rollback.
 ---@class Tasks.DoneProgress
@@ -2501,6 +2551,51 @@ end
 ---@field created_target boolean     # This run created `target` (as opposed to finding another process's).
 ---@field readme_written? string     # The README text this run wrote (nil: it did not write the README).
 ---@field readme_created? boolean    # This run made the README (a new area had none): a rollback removes it again.
+
+---The `outcome` / `outcome_reason` pairs a finish writes: none when `opts` names neither (the finish is what it was
+---before outcomes existed). `seen` and `not-applicable` need a reason, from `opts` or from the task (a note made in
+---advance); a reason alone completes the outcome the task has.
+---@param task Tasks.Task
+---@param opts Tasks.DoneOpts
+---@return table[]|nil pairs
+---@return string|nil err
+local function done_outcome(task, opts)
+  local pairs_ = {}
+  if opts.outcome == nil and opts.outcome_reason == nil then
+    return pairs_, nil
+  end
+  local reason, rerr = outcome_reason_of(opts.outcome_reason)
+  if rerr then
+    return nil, rerr
+  end
+  local outcome = opts.outcome
+  if outcome == nil then
+    outcome = task.outcome
+    if outcome == nil then
+      return nil,
+        ("a reason belongs to an outcome: add --outcome=%s"):format(
+          table.concat(model.OUTCOMES, "|")
+        )
+    end
+  elseif not model.is_outcome(outcome) then
+    return nil,
+      ("unknown outcome '%s' (expected %s)"):format(
+        tostring(outcome),
+        table.concat(model.OUTCOMES, ", ")
+      )
+  else
+    pairs_[#pairs_ + 1] = { "outcome", outcome }
+  end
+  local has = reason or (task.outcome_reason ~= nil and vim.trim(task.outcome_reason) ~= "")
+  if model.OUTCOME_NEEDS_REASON[outcome] and not has then
+    return nil,
+      ("outcome %s needs a reason (--reason=...): why it ends without being done"):format(outcome)
+  end
+  if reason then
+    pairs_[#pairs_ + 1] = { "outcome_reason", reason }
+  end
+  return pairs_, nil
+end
 
 ---Validate and compute: no file is written. `nil, err` when the task cannot be finished;
 ---`{ already = true }` (a finished task) as the first result when there is nothing to do.
@@ -2581,6 +2676,13 @@ local function plan_done(id, opts)
     end
     patch[#patch + 1] = { "remind", remind_date }
   end
+  local ended, oerr = done_outcome(task, opts)
+  if not ended then
+    return nil, oerr
+  end
+  for _, kv in ipairs(ended) do
+    patch[#patch + 1] = kv
+  end
   patch[#patch + 1] = { "updated", today }
 
   local old_text, rd_err = read_open(task, opts.drafts)
@@ -2645,7 +2747,15 @@ local function plan_done(id, opts)
     end
     readme_old = text
   end
-  local row = readme_row(bucket, rel, task, date)
+  -- the row names the outcome this finish writes, not the one the open file had
+  local row_task = task
+  if #ended > 0 then
+    row_task = vim.tbl_extend("force", {}, task)
+    for _, kv in ipairs(ended) do
+      row_task[kv[1]] = kv[2]
+    end
+  end
+  local row = readme_row(bucket, rel, row_task, date)
   local readme_new, readme_state = readme_old, "missing"
   if readme_old then
     local changed
@@ -2669,6 +2779,8 @@ local function plan_done(id, opts)
     old_text = old_text,
     new_text = new_text,
     steps_ticked = steps_ticked,
+    outcome = row_task.outcome,
+    outcome_reason = row_task.outcome_reason,
     readme_path = readme_path,
     readme_old = readme_old,
     readme_new = readme_new,
@@ -2952,6 +3064,8 @@ function M.done(id, opts)
     plan_id = plan.task.plan,
     project_id = plan.task.project,
     readme = plan.readme_state,
+    outcome = plan.outcome,
+    outcome_reason = plan.outcome_reason,
     index = type(res) == "table" and res or nil,
   },
     nil
@@ -2999,6 +3113,8 @@ end
 ---@field readme_row? string
 ---@field plan_id? string
 ---@field project_id? string       # The project the task belongs to directly (`project:`), not through a plan.
+---@field outcome? string            # How the task ends (`model.OUTCOMES`); nil: done as meant.
+---@field outcome_reason? string
 ---@field etag? string               # The version of the task file this preview is about.
 ---@field confirm? string            # Hand this to `done` to finish exactly that version.
 
@@ -3033,6 +3149,8 @@ function M.done_preview(id, opts)
     readme_row = plan.readme_row,
     plan_id = plan.task.plan,
     project_id = plan.task.project,
+    outcome = plan.outcome,
+    outcome_reason = plan.outcome_reason,
     etag = etag,
     confirm = M.confirm_token(id, etag),
   },

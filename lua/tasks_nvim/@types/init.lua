@@ -30,6 +30,8 @@
 ---@field scope string[]              # The `scope` list as written (`model.SCOPES`; may hold an unknown word, see `errors`).
 ---@field severity? string             # `low|medium|high|critical`, as written (meant for bug/security tasks; may be an unknown word, see `errors`).
 ---@field waits_for? string            # What a parked task waits for from outside (`mac`), as written; one key (`model.is_waits_for`).
+---@field outcome? string              # How the task ended (`model.OUTCOMES`); nil: none written, or an unknown word (see `errors`).
+---@field outcome_reason? string       # Why it ended so; `check` hints when `seen` / `not-applicable` have none.
 ---@field created? string             # `YYYY-MM-DD`
 ---@field updated? string             # `YYYY-MM-DD`
 ---@field due? string                 # `YYYY-MM-DD`, optional: when the task is due (not the reminder, see `remind`).
@@ -71,6 +73,7 @@
 ---@field effort? string|string[]      # Matches the written effort exactly (`XS`..`XL`, `0.5d`).
 ---@field effort_max? string           # Matches an effort of at most this (sizes and days on one scale; no effort never matches).
 ---@field severity? string|string[]    # Matches the written severity (a task without severity never matches).
+---@field outcome? string|string[]     # How a finished task ended (`model.OUTCOMES`); `none`: no outcome written.
 ---@field waits_for? string|string[]   # Parked tasks that wait for one of these keys; `none`: parked without a reason.
 ---@field value? integer|integer[]     # Matches the written value (a task without value never matches).
 ---@field value_min? integer           # Matches value >= value_min (a task without value never matches).
@@ -125,6 +128,8 @@
 ---@field category? string[]|string   # Concerns (`model.CATEGORIES`); a string is split at commas.
 ---@field scope? string[]|string      # Surfaces it touches (`model.SCOPES`); a string is split at commas.
 ---@field severity? string            # `model.SEVERITIES`; meant for bug/security tasks (a warning from `check` otherwise).
+---@field outcome? string             # `model.OUTCOMES`: a note in advance of how the task will end.
+---@field outcome_reason? string      # Why it will end so.
 ---@field waits_for? string           # What the task waits for from outside (`model.is_waits_for`); the task is created `parked`.
 ---@field value? integer|string       # 1..5, the expected benefit.
 ---@field after? string[]|string     # Task ids that should come first (soft).

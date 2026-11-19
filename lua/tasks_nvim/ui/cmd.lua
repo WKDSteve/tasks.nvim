@@ -2412,8 +2412,16 @@ end
 ---@param id string
 ---@param opts { done_in?: string, commits?: string, date?: string }
 local function finish_task(id, opts)
-  local flow, err =
-    done_flow.run(id, { done_in = opts.done_in, commits = opts.commits, date = opts.date })
+  -- every option of the route reaches the finish (`remind` and `outcome` were lost here once)
+  local flow, err = done_flow.run(id, {
+    done_in = opts.done_in,
+    commits = opts.commits,
+    date = opts.date,
+    remind = opts.remind and (opts.remind:match("^%d+[dw]$") and "+" .. opts.remind or opts.remind)
+      or nil,
+    outcome = opts.outcome,
+    outcome_reason = opts.outcome_reason,
+  })
   if not flow then
     notify.error(tostring(err))
     return
@@ -2623,7 +2631,7 @@ function M.attach_screenshot(id)
   return res
 end
 
----`:Tasks done <id> [done_in=...] [commits=repo@sha,...] [date=YYYY-MM-DD] [--yes]`
+---`:Tasks done <id> [done_in=...] [commits=repo@sha,...] [date=YYYY-MM-DD] [outcome=seen reason=...] [--yes]`
 ---@param ctx table
 function M.task_done(ctx)
   if #ctx.rest > 0 then
@@ -2636,6 +2644,8 @@ function M.task_done(ctx)
     commits = ctx.kv.commits,
     date = ctx.kv.date,
     remind = ctx.kv.remind,
+    outcome = ctx.kv.outcome,
+    outcome_reason = ctx.kv.reason,
   }
   local task = scan.find(id)
   if not task or ctx.flags.yes then

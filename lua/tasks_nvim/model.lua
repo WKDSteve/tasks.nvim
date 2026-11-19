@@ -295,6 +295,22 @@ end
 ---@type string[]
 M.SEVERITIES = { "low", "medium", "high", "critical" }
 
+---How a finished task ended, beside `status: done` (which stays the only "finished"): `learned` (done as meant),
+---`seen` (looked at, not done, with a reason) and `not-applicable` (does not apply, with a reason). No `outcome` reads
+---as "done as meant".
+---@type string[]
+M.OUTCOMES = { "learned", "seen", "not-applicable" }
+
+---The outcomes that need an `outcome_reason`.
+---@type table<string, boolean>
+M.OUTCOME_NEEDS_REASON = { seen = true, ["not-applicable"] = true }
+
+---@param s any
+---@return boolean
+function M.is_outcome(s)
+  return type(s) == "string" and vim.tbl_contains(M.OUTCOMES, s)
+end
+
 ---The listing orders `sort` knows. `default` is what the index uses.
 ---@type string[]
 M.SORTS = {
@@ -1152,6 +1168,20 @@ function M.parse_text(text, ctx)
       end
     end
 
+    -- how a finished task ended; `check` gives the hints (an outcome on an open task is a note made in advance)
+    local outcome = as_text(meta.outcome, "outcome", bad)
+    if outcome then
+      if M.is_outcome(outcome) then
+        task.outcome = outcome
+      else
+        bad(
+          "unknown-outcome",
+          ("unknown outcome '%s' (expected %s)"):format(outcome, table.concat(M.OUTCOMES, ", "))
+        )
+      end
+    end
+    task.outcome_reason = as_text(meta.outcome_reason, "outcome_reason", bad)
+
     -- what a parked task waits for from outside; only `parked` gives the key a meaning
     local waits_for = as_text(meta.waits_for, "waits_for", bad)
     if waits_for then
@@ -1781,6 +1811,7 @@ function M.filter(tasks, f)
   local prio, tag = to_set(f.prio), to_set(f.tag)
   local category = to_set(f.category)
   local effort, severity = to_set(f.effort), to_set(f.severity)
+  local outcome = to_set(f.outcome)
   local value, actor = to_set(f.value), to_set(f.actor)
   local waits_for = to_set(f.waits_for)
   local plan_set, phase_set = to_set(f.plan), to_set(f.phase)
@@ -1846,6 +1877,9 @@ function M.filter(tasks, f)
       keep = days ~= nil and days <= effort_max
     end
     if keep and severity and not (t.severity and severity[t.severity]) then
+      keep = false
+    end
+    if keep and outcome and not outcome[t.outcome or "none"] then
       keep = false
     end
     if keep and value and not (t.value and value[t.value]) then

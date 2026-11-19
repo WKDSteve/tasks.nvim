@@ -66,6 +66,9 @@ return function(H)
         "no-index",
         "no-next",
         "note",
+        -- `outcome=` and `reason=` are key=value words of `:Tasks done`, as `commits=` and `remind=` are
+        "outcome",
+        "reason",
         "remind",
         "unblock",
       },
@@ -84,6 +87,8 @@ return function(H)
         "due-before",
         "limit",
         "offset",
+        -- goes with `--done`, which only the CLI lists
+        "outcome",
         "stale-refs",
         "starts-after",
       },
@@ -134,11 +139,14 @@ return function(H)
         "links",
         "no-index",
         "order",
+        -- `outcome=` / `outcome_reason=` in the editor, as every field of `new` there
+        "outcome",
         "phase",
         "plan",
         "prio",
         -- a task of a project itself: a field of `new` on the command line, not of the form
         "project",
+        "reason",
         "refs",
         "repeat",
         "repeat-from",

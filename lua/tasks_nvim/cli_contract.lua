@@ -574,7 +574,8 @@ function M.list_done(ctx, filter, area, format, helpers)
     else
       ctx.say(table.concat({
         fsio.clean(t.id),
-        helpers.cellv(t.status),
+        -- how it ended rides on the status (`done:seen`): a task without an outcome reads as it always did
+        helpers.cellv(t.outcome and (tostring(t.status) .. ":" .. t.outcome) or t.status),
         helpers.cellv(t.prio),
         helpers.cellv(t.effort),
         helpers.cellv(t.kind),

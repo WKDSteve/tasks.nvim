@@ -566,6 +566,28 @@ run died after creating the Backlog file but before deleting the old one, the
 next run completes it. A target that exists with different content, or a
 finished task with the same id under another date, is refused.
 
+#### How it ended (`outcome`)
+
+`done` stays the only finished status. Beside it, `outcome` says how the task ended:
+
+| `outcome` | Meaning | `outcome_reason` |
+| --- | --- | --- |
+| (none) | done as meant: every task finished before outcomes existed | -- |
+| `learned` | done as meant, said out loud (a learning task that was learned) | optional |
+| `seen` | looked at, not done ("I looked at it, but X keeps me from it") | required |
+| `not-applicable` | does not apply | required |
+
+`tasks done <id> --outcome=seen --reason="..."` (Lua: `mutate.done(id, { outcome, outcome_reason })`) writes both
+keys into the finished copy. `seen` and `not-applicable` without a reason are refused, unless the task carries an
+`outcome_reason` already; a blank reason is no reason. `--reason` alone completes the outcome the task names. A
+finish that names neither writes neither, byte for byte as before. The outcome may be noted on an open task in
+advance (`set outcome=seen`, `new --outcome=`); `check` then gives the hint `outcome-on-open-task`.
+
+The Backlog row names it after the date (`(2026-11-19, seen: no Mac)`), `list --done` shows it on the status
+(`done:seen`) and filters with `--outcome=learned,seen,not-applicable|none` (`none`: no outcome written).
+`done_preview` and the result of `done` carry `outcome` and `outcome_reason`. The next round of a routine starts
+without them. The contract (`tasks.finished`, `donepreview`) does not carry the fields yet.
+
 ### The marker file `tasks-vault.json`
 
 An optional file in the vault root marks a folder as a tasks vault. Without it every folder works as before; with it the
@@ -628,6 +650,8 @@ file that is there (also not a refused one). Nobody else writes it: a person edi
 | `severity-without-bug-or-security` (warning) | `severity` on a task that is neither `kind: bug` nor in the bug / security category |
 | `invalid-waits-for` (error) | `waits_for` is not one key: a lower-case word of a-z, 0-9 and `-`, at most 40 characters, not `none` |
 | `waits-for-without-parked` (warning) | `waits_for` on a task that is not `parked`: only a parked task waits (the engine drops the key when the status leaves `parked`; this is a file edited by hand) |
+| `unknown-outcome` (error) | `outcome` is none of `learned`, `seen`, `not-applicable` |
+| `outcome-without-reason`, `outcome-on-open-task` (hints) | an open or finished task with `outcome: seen` / `not-applicable` and no `outcome_reason`; an outcome on an open task (allowed: a note made in advance, `done` writes it for real). Hints like `ui-word-without-ux`: in `result.hints`, never a warning |
 | `slug` | filename is not a kebab-case ASCII slug, or the file lies in a subfolder of `tasks/` other than `<slug>/<slug>.md` |
 | `slug-conflict` | the same slug exists as a file and as a folder task |
 | `asset-dangling` (warning) | a folder task links `assets/<file>` that is not there |

@@ -47,7 +47,7 @@ end
 ---words the same way. Unknown words are an error, never silently ignored.
 ---`stale` may be a number, a digit string or `refs` (same as `stale_refs`: a
 ---file named in `refs` changed since `updated`); `today` is passed through.
----@param opt { plan?: string, project?: string, phase?: string, status?: string, prio?: string|integer, effort?: string, kind?: string, tag?: string, category?: string, severity?: string, waits_for?: string, value?: string|integer, actor?: string, stale?: string|integer, stale_refs?: boolean, blocked?: boolean, reminders?: boolean, overdue?: boolean, due_before?: string, starts_after?: string, unestimated?: boolean, quick_win?: boolean, sheet?: string, claimed?: string, today?: string }
+---@param opt { plan?: string, project?: string, phase?: string, status?: string, prio?: string|integer, effort?: string, kind?: string, tag?: string, category?: string, severity?: string, outcome?: string, waits_for?: string, value?: string|integer, actor?: string, stale?: string|integer, stale_refs?: boolean, blocked?: boolean, reminders?: boolean, overdue?: boolean, due_before?: string, starts_after?: string, unestimated?: boolean, quick_win?: boolean, sheet?: string, claimed?: string, today?: string }
 ---@return Tasks.Filter|nil filter
 ---@return string|nil err
 function M.parse(opt)
@@ -168,6 +168,20 @@ function M.parse(opt)
     do
       if not model.is_severity(v) then
         return nil, "unknown severity in --severity: " .. v
+      end
+    end
+  end
+  if opt.outcome then
+    -- how a finished task ended; `none`: no outcome written (done as meant)
+    f.outcome = M.split_commas(opt.outcome)
+    if #f.outcome == 0 then
+      return nil, "--outcome needs a value (" .. table.concat(model.OUTCOMES, ", ") .. ", none)"
+    end
+    for _, v in
+      ipairs(f.outcome --[[@as string[] ]])
+    do
+      if v ~= "none" and not model.is_outcome(v) then
+        return nil, "unknown outcome in --outcome: " .. v
       end
     end
   end
