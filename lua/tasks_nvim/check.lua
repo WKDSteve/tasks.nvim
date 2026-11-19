@@ -76,6 +76,10 @@
 ---    `tasks:` names a task that exists nowhere, `image:` names a file that is not there, a meeting is done before its
 ---    day; `meeting-done-without-result`, `meeting-overlap` (hints): done without `## Ergebnis` (allowed), two planned
 ---    meetings of the area at the same time
+---  - learning paths (`<area>/ROADMAP/paths/`, `tasks_nvim.paths`): a broken path file with the codes of a plan file
+---    as `path-...` (and `path-no-stages`); `path-id-taken` (error); `path-reason-missing`, `path-duplicate-key`,
+---    `path-bad-key`, `path-bad-mark`, `path-bad-arrow`, `path-image-outside`, `path-arrow-dangling`,
+---    `path-image-missing`, `path-cycle` (warnings): the tree of `## Lernpunkte`
 ---
 --- Not its job: fixing anything (`index.write_area` regenerates an index).
 
@@ -85,6 +89,7 @@ local fsio = require("tasks_nvim.fsio")
 ---@type table<string, boolean>
 local IMAGE_EXT =
   { png = true, jpg = true, jpeg = true, gif = true, webp = true, svg = true, bmp = true }
+local lernbaum = require("tasks_nvim.lernbaum")
 local meetings = require("tasks_nvim.meetings")
 local model = require("tasks_nvim.model")
 local plan = require("tasks_nvim.plan")
@@ -701,6 +706,135 @@ local function meeting_findings(findings, hints, open_ids, names, scan_opts, is_
   end
 end
 
+---The ids the arrows of a task's `## Lernpunkte` name (its file read once, only when an arrow leads to it).
+---@param task_path string
+---@return string[]
+local function task_arrows(task_path)
+  local text = fsio.read(task_path)
+  if not text then
+    return {}
+  end
+  local parsed = require("lib.nvim.markdown.frontmatter").parse(text)
+  local body = parsed and parsed.body or text
+  return lernbaum.promoted_ids(lernbaum.parse(body))
+end
+
+---The findings of the learning paths of the areas checked (`<area>/ROADMAP/paths/`, `tasks_nvim.paths`): a broken
+---file with its codes (errors), an id another file of the area has (error), and as warnings the problems of the tree
+---(`path-reason-missing`, `path-duplicate-key`, `path-bad-key`, `path-bad-mark`, `path-bad-arrow`,
+---`path-image-outside`), an arrow to a task that exists nowhere (`path-arrow-dangling`), an image that is not there
+---(`path-image-missing`) and a cycle of promotions over paths and the `## Lernpunkte` of tasks (`path-cycle`). None of
+---them refuses a write (R3).
+---@param findings Tasks.Finding[]
+---@param open_ids table<string, Tasks.Task>
+---@param names string[]
+---@param scan_opts table
+---@param is_finished fun(id: string): boolean
+local function path_findings(findings, open_ids, names, scan_opts, is_finished)
+  local paths_mod = require("tasks_nvim.paths")
+  for _, name in ipairs(names) do
+    local list, errs = paths_mod.area(name, scan_opts)
+    for _, e in ipairs(type(errs) == "table" and errs or {}) do
+      add(
+        findings,
+        "error",
+        "unreadable",
+        { area = name, path = vault.paths_dir(scan_opts.root, name) },
+        e
+      )
+    end
+    for _, p in ipairs(list or {}) do
+      for i, msg in ipairs(p.errors) do
+        add(findings, "error", p.error_codes[i] or "frontmatter-invalid", p, msg)
+      end
+      if
+        open_ids[p.id]
+        or is_finished(p.id)
+        or (plans.find(p.id, scan_opts))
+        or (projects.find(p.id, scan_opts))
+        or (meetings.find(p.id, scan_opts))
+      then
+        add(
+          findings,
+          "error",
+          "path-id-taken",
+          p,
+          "a task (open or finished), plan, project or meeting of the area has the same id: "
+            .. p.id
+        )
+      end
+      local tree = p.tree or lernbaum.parse("")
+      for _, pr in ipairs(tree.problems) do
+        add(findings, "warn", pr.code, p, ("line %d: %s"):format(pr.line, pr.message))
+      end
+      local dir = fsio.dirname(p.path)
+      for _, node in ipairs(tree.nodes) do
+        if node.promoted and not open_ids[node.promoted] and not is_finished(node.promoted) then
+          add(
+            findings,
+            "warn",
+            "path-arrow-dangling",
+            p,
+            ("line %d: the arrow names %s, which does not exist"):format(node.line, node.promoted)
+          )
+        end
+        if
+          node.image
+          and node.image:match("^assets/")
+          and not node.image:find("..", 1, true)
+          and not (p.folder and fsio.is_file(dir .. "/" .. node.image))
+        then
+          add(
+            findings,
+            "warn",
+            "path-image-missing",
+            p,
+            ("line %d: the image %s is not there"):format(node.line, node.image)
+          )
+        end
+      end
+      -- a cycle of promotions: the path, the tasks its arrows name, the tasks theirs name, back to one seen on the way
+      local state, stack, reported = {}, {}, false
+      local function visit(id, arrows)
+        state[id] = "on"
+        stack[#stack + 1] = id
+        for _, next_id in ipairs(arrows) do
+          if reported then
+            break
+          end
+          if state[next_id] == "on" then
+            local from
+            for i, s in ipairs(stack) do
+              if s == next_id then
+                from = i
+                break
+              end
+            end
+            local ring = vim.list_slice(stack, from)
+            ring[#ring + 1] = next_id
+            add(
+              findings,
+              "warn",
+              "path-cycle",
+              p,
+              "the promotions run in a circle: " .. table.concat(ring, " -> ")
+            )
+            reported = true
+          elseif state[next_id] == nil then
+            local t = open_ids[next_id]
+            local done = not t and scan.find_done(next_id, scan_opts) or nil
+            local file = (t and t.path) or (done and done.path)
+            visit(next_id, file and task_arrows(file) or {})
+          end
+        end
+        table.remove(stack)
+        state[id] = "done"
+      end
+      visit(p.id, lernbaum.promoted_ids(tree))
+    end
+  end
+end
+
 ---Project files, the plans that name one (`project:`, `phase:`) and the tasks that name one themselves, reported for
 ---the checked areas. A project nobody wrote is an error (a typo); a project that is finished already, a stage the
 ---project does not list, an area the project does not list and a gate that is not enforced across plans are warnings.
@@ -1240,6 +1374,7 @@ function M.run(opts)
   plan_file_findings(findings, open_ids, names, scan_opts, is_finished)
   project_findings(findings, open_ids, names, scan_opts, is_finished)
   meeting_findings(findings, hints, open_ids, names, scan_opts, is_finished, today)
+  path_findings(findings, open_ids, names, scan_opts, is_finished)
   view_findings(findings, root, names)
   if not opts.area then
     area_group_findings(findings, root)

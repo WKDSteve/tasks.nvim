@@ -200,13 +200,13 @@ function M.is_finished_plan(item)
   return meta.areas ~= nil or meta.phase_order ~= nil or meta.gate ~= nil or meta.target ~= nil
 end
 
----What a finished item of a Backlog is: `"plan"`, `"project"` (told by `closed_kind`) or `"task"`.
+---What a finished item of a Backlog is: `"plan"`, `"project"`, `"path"` (told by `closed_kind`) or `"task"`.
 ---@param item Tasks.Task
----@return "plan"|"project"|"task"
+---@return "plan"|"project"|"path"|"task"
 function M.finished_kind(item)
   local meta = item.meta or {}
-  if meta.closed_kind == "project" then
-    return "project"
+  if meta.closed_kind == "project" or meta.closed_kind == "path" then
+    return meta.closed_kind
   end
   return M.is_finished_plan(item) and "plan" or "task"
 end
@@ -279,8 +279,9 @@ function M.rollup(project, ctx)
   out.tasks_open = #open
   out.tasks_done = 0
   for _, item in ipairs(finished) do
+    -- a finished project or learning path of the project is no finished task of it
     if
-      not M.is_finished_plan(item)
+      M.finished_kind(item) == "task"
       and (item.project == project.id or (item.plan and member_ids[item.plan]))
     then
       out.tasks_done = out.tasks_done + 1

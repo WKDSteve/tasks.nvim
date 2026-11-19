@@ -73,6 +73,8 @@ TESTS/              specs (run with scripts/test.sh, i.e. testing.nvim)
 | `tasks_nvim.meetings` | Meeting files, `<area>/MEETINGS/<slug>.md` (or the folder form `<slug>/<slug>.md`), see [Meetings](#meetings-meetings): a meeting is no task and names its tasks (`tasks:`); `by_task` derives the meetings of a task. `parse` / `from_file` always return a meeting (a broken one carries errors; a parse cache by mtime and size), `area` / `all` / `find` read them, `online_service` tells the service of an address, `parse_duration`, `parse_notify`, `is_tz` read the fields. | `parse`, `from_file`, `area`, `all`, `find`, `by_task`, `less`, `online_service` |
 | `tasks_nvim.meeting_write` | Writing meetings under the file lock, on the version read: `new`, `set`, `close`, `capture` (one line of the minutes), `attend`, `followups` (tasks of the follow-ups), `board_save` (a whiteboard, replaced only on the version read); `renames_for_move` and `tick_done` for `move_area` and `done`; pure body helpers (`capture_body`, `attend_body`, `tick_item`, `add_items`, `append_to_section`, `set_section`). | `new`, `set`, `close`, `capture`, `attend`, `followups`, `board_save`, `edit` |
 | `tasks_nvim.meeting_quick` | The quick capture of a meeting: one line (day, time, duration, all-day, address, `@place`, `#task`, `!notify`, the rest the title) read into a proposal of the fields of `meeting_new`, with what it assumed and the words it could not read. Pure. | `parse` |
+| `tasks_nvim.lernbaum` | The learning tree of `## Lernpunkte`, see [Learning paths](#learning-paths-roadmappaths): nodes with marks, keys, reasons, arrows, notes and images; the parent rule, progress counted apart, the problems of one file; `render` gives the text back byte for byte. Pure. | `parse`, `render`, `set_state`, `node`, `progress_text`, `promoted_ids` |
+| `tasks_nvim.paths` | Learning paths, `<area>/ROADMAP/paths/<slug>.md` (read by `plans` with `kind = "path"`): list, make, change, finish, and change one learning point on disk. | `from_file`, `area`, `all`, `find`, `new`, `set`, `close`, `point` |
 | `tasks_nvim.plan_scope` | The impure edge of the plan: one scan of the open tasks, finished ids looked up in the Backlogs when a blocker is not open, the scope cut like the commands do (area, `--for`, filters); `filter_readiness` serves `list --ready|--waiting`. `shared` is ONE pass over the vault (open tasks, finished ids, plan files, which file a ref means) that `load`, `filter_readiness` and the dashboard reuse. The marker blocks of documents: `refresh_document` (every block of a file, after a finish), `write_block` (`plan --write`), `marker_attrs`, `resolve_block`. | `shared`, `load`, `index`, `filter_readiness`, `refresh_document`, `write_block`, `marker_attrs`, `resolve_block` |
 | `tasks_nvim.plan_view` | A plan as Markdown (ready now, decisions by leverage, stages, critical path, warnings, the estimate line), `tsv` or `ids`; the `next` lines and the dialog text; the marker blocks of a document (`parse_blocks`, `replace_blocks`: fence-aware, per-line endings kept, the start marker carries attributes; `start_line`, `parse_start`). | `markdown`, `tsv`, `ids`, `next_lines`, `next_message`, `empty_text`, `parse_blocks`, `replace_blocks`, `replace_block`, `start_line`, `parse_start` |
 | `tasks_nvim.estimate` | Sums over tasks: effort days with how many tasks they are made of, a range (every size at its low and its high end), value, roi over the tasks with both numbers, quick wins, the split by actor, progress from finished tasks. A task without an estimate is missing, never 0. | `rollup`, `describe`, `fmt_days` |
@@ -484,6 +486,39 @@ preview) and are the one asset that is replaced, only on the version read. A fol
 `refs: [<meeting>]` and its id behind the line (`-> <id>`); the `done` of that task ticks the line, a `move_area`
 rewrites it and `tasks:`. `tasks_nvim.meeting_quick` reads one line ("Mo 14:00-15:00 Sync @teams https://... #a/b
 !-15m") into a proposal of the fields, for the app, the CLI (`tasks meeting new --quick=`) and `:Tasks meeting new`.
+
+### Learning paths (`ROADMAP/paths/`)
+
+A learning path organises knowledge where a plan organises work: `<area>/ROADMAP/paths/<slug>.md` (the folder form
+`paths/<slug>/<slug>.md` once something was attached) with the frontmatter of a plan file without stages (`title`,
+`status`, `areas`, `target`, `links`, `project`; `phase_order`, `gate` and `phase` are `path-no-stages`) and a tree of
+learning points in `## Lernpunkte` (or `## Learning points`). `tasks_nvim.plans` reads and writes it (`kind = "path"`),
+`tasks_nvim.paths` lists, makes, changes and finishes them; the id shares the namespace of the area.
+
+```markdown
+## Lernpunkte
+
+- [ ] Lua lernen {#lua}
+  - [x] [Reference Manual](https://www.lua.org/manual/5.4/)
+    > Note: the precedence of `..` and `^`.
+  - [~] [Programming in Lua](https://www.lua.org/pil/) – Grund: only chapter 1 was needed
+  - [ ] C-Compiler erlernen → learning/c-compiler {#cc}
+  - [-] Lua-JIT internals – Grund: not needed for the goal
+```
+
+`[ ]` open, `[x]` learned, `[~]` seen and `[-]` dropped (both with a reason, `– Grund:` or `Reason:`), `[!]` blocked.
+A node with children has no mark of its own: it is closed when all its leaves are, and shown as learned (all
+learned), open (none closed) or partial. Progress is counted apart: learned, seen, dropped, open (blocked ones among
+the open and once more as blocked). `{#key}` names a node, `→ <id>` the task it was promoted to, a `> ` line below it
+is its note, `![](assets/...)` an image (only below the path's `assets/`). `tasks_nvim.lernbaum` reads the tree and
+writes it back byte for byte (only a node changed by `set_state` is written anew); `paths.point` changes one point
+on disk under the file's lock. A path is finished by hand with `paths.close`, like a plan: moved to
+`Backlog/FEATURES/` with `closed_kind: path`.
+
+`check` reports the file's faults as errors (`path-...`, `path-id-taken`) and the tree's as warnings, never refusing a
+write: `path-reason-missing`, `path-duplicate-key`, `path-bad-key`, `path-bad-mark`, `path-bad-arrow`,
+`path-image-outside`, `path-arrow-dangling` (an arrow to no task), `path-image-missing` and `path-cycle` (promotions
+that run in a circle over the `## Lernpunkte` of the tasks they name).
 
 ### Folder tasks
 

@@ -94,7 +94,7 @@ function M.attach_target(id, root, drafts)
   end
   local area, slug = vault.parse_id(id)
   if area and slug and vault.has_area(root, area) then
-    for _, kind in ipairs({ "plan", "project" }) do
+    for _, kind in ipairs({ "plan", "project", "path" }) do
       local path, folder = vault.resolve_plan(root, kind, area, slug)
       if path then
         return {

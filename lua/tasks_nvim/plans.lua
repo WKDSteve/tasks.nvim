@@ -46,7 +46,8 @@ M.STATUSES = { "planning", "doing", "parked", "done" }
 ---@field target? string             # The task id; a wikilink in the file (`[[<slug>]]`, `[[<area>/<slug>]]`, a vault path) is read as its id.
 ---@field target_raw? string         # `target` as the file writes it (an id or a wikilink).
 ---@field link_problems? Tasks.LinkProblem[]  # A bare `[[slug]]` target that names no id or several (`check`: `wikilink-dangling`, `wikilink-ambiguous`); `target` is nil then.
----@field kind "plan"|"project"      # Which kind of file this is (a project file is read by the same parser).
+---@field kind "plan"|"project"|"path"  # Which kind of file this is (a project file and a learning path are read by the same parser).
+---@field tree? Tasks.LernTree        # A learning path only: the tree of `## Lernpunkte` (`tasks_nvim.lernbaum`).
 ---@field project? string             # A plan only: the project it belongs to (an id; a wikilink in the file is read as its id).
 ---@field project_raw? string         # `project` as the file writes it (an id or a wikilink).
 ---@field phase? string               # A plan only: its stage in the project's `phase_order`.
@@ -79,9 +80,9 @@ function M.parse(text, ctx)
   ---@param code string
   ---@param msg string
   local function bad(code, msg)
-    -- the codes of a project file say `project-...` where a plan's say `plan-...`
-    if file_kind == "project" and code:sub(1, 5) == "plan-" then
-      code = "project-" .. code:sub(6)
+    -- the codes of a project file say `project-...` (a learning path's `path-...`) where a plan's say `plan-...`
+    if file_kind ~= "plan" and code:sub(1, 5) == "plan-" then
+      code = file_kind .. "-" .. code:sub(6)
     end
     errors[#errors + 1] = msg
     codes[#codes + 1] = code
@@ -190,6 +191,15 @@ function M.parse(text, ctx)
         bad("plan-bad-gate", "gate must be `hard` or absent, got '" .. fsio.clean(gate) .. "'")
       end
     end
+    if
+      file_kind == "path" and (meta.phase_order ~= nil or meta.gate ~= nil or meta.phase ~= nil)
+    then
+      -- a path organises knowledge, not work: its order is the tree, not stages
+      bad(
+        "path-no-stages",
+        "a learning path has no phase_order, gate or phase: its order is the tree"
+      )
+    end
     local project = model.field_text(meta.project, "project", bad)
     if file_kind == "project" then
       if meta.project ~= nil or meta.phase ~= nil then
@@ -227,7 +237,7 @@ function M.parse(text, ctx)
           end
         end
       end
-      local phase = model.field_text(meta.phase, "phase", bad)
+      local phase = file_kind == "plan" and model.field_text(meta.phase, "phase", bad) or nil
       if phase then
         local phase_err = vault.slug_error("phase", phase)
         if phase_err then
@@ -248,6 +258,13 @@ function M.parse(text, ctx)
     end
     plan.summary = model.field_text(meta.summary, "summary", bad)
       or model.first_paragraph(parsed.body)
+    if file_kind == "path" then
+      -- the problems of the tree are `check`'s findings, never a fault of the file (R3: nothing refuses a write)
+      plan.tree = require("tasks_nvim.lernbaum").parse(parsed.body or "")
+    end
+  end
+  if file_kind == "path" and not plan.tree then
+    plan.tree = require("tasks_nvim.lernbaum").parse("")
   end
   plan.valid = #errors == 0
   return plan
@@ -543,8 +560,14 @@ function M.new(area, opts)
   if opts.gate ~= nil and opts.gate ~= "hard" then
     return nil, "gate must be `hard` or absent"
   end
-  -- a project file is made the same way (`opts.kind = "project"`); a plan may name its project and its stage there
-  local file_kind = opts.kind == "project" and "project" or "plan"
+  -- a project file is made the same way (`opts.kind = "project"`), a learning path too (`"path"`); a plan may name
+  -- its project and its stage there, a path its project only
+  local file_kind = (opts.kind == "project" or opts.kind == "path") and opts.kind or "plan"
+  if file_kind == "path" and (#phases > 0 or opts.gate ~= nil or opts.phase ~= nil) then
+    return nil,
+      "a learning path has no stages: no phases, gate or phase (its order is the tree)",
+      { code = "invalid_argument" }
+  end
   local project_text, phase_text
   if opts.project ~= nil or opts.phase ~= nil then
     if file_kind == "project" then
@@ -592,8 +615,10 @@ function M.new(area, opts)
     project_text = wikilinks.is_wikilink(raw) and raw
       or wikilinks.render(pid, wikilinks.mode(opts), link_resolver)
   end
-  local dir_of = file_kind == "project" and vault.projects_dir or vault.plans_dir
-  local path_of = file_kind == "project" and vault.project_path or vault.plan_path
+  local dir_of = vault.file_kind_dir(file_kind)
+  local function path_of(r, a, s)
+    return vault.file_kind_path(file_kind, r, a, s)
+  end
   local today = opts.today or model.today()
   if not model.is_date(today) then
     return nil, "today is not a date (YYYY-MM-DD): " .. tostring(today)
@@ -643,9 +668,23 @@ function M.new(area, opts)
   pairs_[#pairs_ + 1] = { "created", today }
   pairs_[#pairs_ + 1] = { "updated", today }
   local lead = opts.summary and (vim.trim(opts.summary) .. "\n\n") or ""
+  local sections = file_kind == "path"
+      and {
+        "## Warum",
+        "",
+        "<!-- Wozu dieser Lernpfad dient, und woran man merkt, dass man es kann. -->",
+        "",
+        "## Lernpunkte",
+        "",
+        '<!-- - [ ] Punkt {#schluessel}: [x] gelernt, [~] angeschaut, [-] entfaellt (mit "– Grund: ..."), [!] blockiert -->',
+        "",
+        "## Notizen",
+        "",
+      }
+    or nil
   local body = "\n"
     .. lead
-    .. table.concat({
+    .. table.concat(sections or {
       "## Ziel und Abgrenzung",
       "",
       "<!-- Was dieses Vorhaben erreichen soll, und was nicht dazugehoert. -->",
@@ -730,7 +769,21 @@ M.SET_KEYS = {
     "links",
   },
   project = { "title", "status", "areas", "target", "phase_order", "gate", "links" },
+  path = { "title", "status", "areas", "target", "project", "links" },
 }
+
+---The finder of a kind of file: plans here, projects and paths in their own modules (required where used: they
+---require this module).
+---@param file_kind "plan"|"project"|"path"
+---@return fun(id: string, opts?: table): Tasks.PlanFile|nil, string|nil
+local function finder_of(file_kind)
+  if file_kind == "project" then
+    return require("tasks_nvim.projects").find
+  elseif file_kind == "path" then
+    return require("tasks_nvim.paths").find
+  end
+  return M.find
+end
 
 ---Change the frontmatter of an open plan file or project file (`opts.kind = "project"`). `patch` maps a key of
 ---`SET_KEYS` to its new value; `nil`, `vim.NIL`, an empty text or an empty list removes the key (not `title` and
@@ -750,9 +803,8 @@ function M.set(id, patch, opts)
   if not root then
     return nil, rerr
   end
-  local file_kind = opts.kind == "project" and "project" or "plan"
-  local finder = file_kind == "project" and require("tasks_nvim.projects").find or M.find
-  local file, ferr = finder(id, { root = root, link_resolver = opts.link_resolver })
+  local file_kind = (opts.kind == "project" or opts.kind == "path") and opts.kind or "plan"
+  local file, ferr = finder_of(file_kind)(id, { root = root, link_resolver = opts.link_resolver })
   if not file then
     return nil, ferr, { code = "not_found" }
   end
@@ -846,8 +898,8 @@ function M.set(id, patch, opts)
     end
   end
 
-  -- the relation of a plan to its project, as it would be afterwards
-  if file_kind == "plan" and (patch.project ~= nil or patch.phase ~= nil) then
+  -- the relation of a plan (or a path) to its project, as it would be afterwards
+  if file_kind ~= "project" and (patch.project ~= nil or patch.phase ~= nil) then
     local project_id, phase = file.project, file.phase
     for _, kv in ipairs(pairs_) do
       if kv[1] == "project" then
@@ -1063,9 +1115,10 @@ function M.close(id, opts)
   if not root then
     return nil, rerr
   end
-  -- a project file is finished the same way (`opts.kind = "project"`, see `tasks_nvim.projects.close`)
-  local finder = opts.kind == "project" and require("tasks_nvim.projects").find or M.find
-  local plan, ferr = finder(id, { root = root })
+  -- a project file is finished the same way (`opts.kind = "project"`, see `tasks_nvim.projects.close`), a learning
+  -- path too (`"path"`, `tasks_nvim.paths.close`)
+  local file_kind = (opts.kind == "project" or opts.kind == "path") and opts.kind or "plan"
+  local plan, ferr = finder_of(file_kind)(id, { root = root })
   if not plan then
     local finished = scan.find_done(id, { root = root })
     if finished then
@@ -1086,7 +1139,7 @@ function M.close(id, opts)
   local new_text, uerr = fm.update_text(old_text, {
     { "status", "done" },
     { "updated", today },
-    { "closed_kind", opts.kind == "project" and "project" or "plan" },
+    { "closed_kind", file_kind },
   })
   if not new_text then
     return nil, "cannot update " .. plan.path .. ": " .. tostring(uerr)

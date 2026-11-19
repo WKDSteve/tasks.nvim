@@ -519,17 +519,46 @@ function M.project_path(root, area, slug)
   return M.projects_dir(root, area) .. "/" .. slug .. ".md"
 end
 
----The folder of a plan file (`kind` `plan`) or a project file (`project`), whichever form it has: `plans/<slug>.md`, or
----`plans/<slug>/<slug>.md` once something was attached to it (its assets lie in that folder).
----@param kind "plan"|"project"
+---`<area>/ROADMAP/paths`: the learning paths of the area (optional, `tasks_nvim.paths`). A path is read and written
+---like a plan file, with a learning tree in `## Lernpunkte` instead of stages.
+---@param root string
+---@param area string
+---@return string
+function M.paths_dir(root, area)
+  return root .. "/" .. area .. "/ROADMAP/paths"
+end
+
+---`<area>/ROADMAP/paths/<slug>.md`
+---@param root string
+---@param area string
+---@param slug string
+---@return string
+function M.path_path(root, area, slug)
+  return M.paths_dir(root, area) .. "/" .. slug .. ".md"
+end
+
+---The folder of a plan file (`kind` `plan`), a project file (`project`) or a learning path (`path`), whichever form it
+---has: `plans/<slug>.md`, or `plans/<slug>/<slug>.md` once something was attached to it (its assets lie in that folder).
+---@param kind "plan"|"project"|"path"
 ---@return fun(root: string, area: string): string
 local function dir_of(kind)
-  return kind == "project" and M.projects_dir or M.plans_dir
+  return (kind == "project" and M.projects_dir) or (kind == "path" and M.paths_dir) or M.plans_dir
+end
+M.file_kind_dir = dir_of
+
+---The plain file of a plan, project or path.
+---@param kind "plan"|"project"|"path"
+---@param root string
+---@param area string
+---@param slug string
+---@return string
+function M.file_kind_path(kind, root, area, slug)
+  return dir_of(kind)(root, area) .. "/" .. slug .. ".md"
 end
 
 ---`<area>/ROADMAP/plans/<slug>/<slug>.md` (or `projects/`): a plan or project file that has a folder for its assets.
 ---@param root string
----@param kind "plan"|"project"
+---@param kind "plan"|"project"|"path"
 ---@param area string
 ---@param slug string
 ---@return string
@@ -537,15 +566,16 @@ function M.plan_folder_path(root, kind, area, slug)
   return dir_of(kind)(root, area) .. "/" .. slug .. "/" .. slug .. ".md"
 end
 
----Find an open plan file (`kind` `plan`) or project file (`project`) on disk, whichever form it has.
+---Find an open plan file (`kind` `plan`), project file (`project`) or learning path (`path`) on disk, whichever form it
+---has.
 ---@param root string
----@param kind "plan"|"project"
+---@param kind "plan"|"project"|"path"
 ---@param area string
 ---@param slug string
 ---@return string|nil path
 ---@return boolean|string folder  # true for the folder form, false for a plain file; the error when there is none
 function M.resolve_plan(root, kind, area, slug)
-  local file = (kind == "project" and M.project_path or M.plan_path)(root, area, slug)
+  local file = M.file_kind_path(kind, root, area, slug)
   local folder = M.plan_folder_path(root, kind, area, slug)
   local has_file, has_folder = fsio.is_file(file), fsio.is_file(folder)
   if has_file and has_folder then
@@ -588,15 +618,15 @@ function M.resolve_meeting(root, area, slug)
   return nil, ("no such meeting: %s/%s"):format(area, slug)
 end
 
----Whether an open plan file, a project file or a meeting of this slug is in the area, in either form (one id
----namespace: a task, a plan, a project and a meeting never share an id).
+---Whether an open plan file, a project file, a learning path or a meeting of this slug is in the area, in either form
+---(one id namespace: a task, a plan, a project, a path and a meeting never share an id).
 ---@param root string
 ---@param area string
 ---@param slug string
 ---@return boolean
 function M.has_plan_or_project(root, area, slug)
-  for _, kind in ipairs({ "plan", "project" }) do
-    local file = (kind == "project" and M.project_path or M.plan_path)(root, area, slug)
+  for _, kind in ipairs({ "plan", "project", "path" }) do
+    local file = M.file_kind_path(kind, root, area, slug)
     if fsio.is_file(file) or fsio.is_file(M.plan_folder_path(root, kind, area, slug)) then
       return true
     end
