@@ -213,6 +213,53 @@ return function(H)
   eq(H.read(p2), p2_text, "the way back gives the path byte for byte")
   eq(scan.find(own.id, { root = root }), nil, "the task is gone")
 
+  -- ── set and reopen keep the point in step: blocked, open again ─────────────
+  local p3 = root .. "/lib.nvim/ROADMAP/paths/go.md"
+  H.write(
+    p3,
+    table.concat({
+      "---",
+      "title: Go",
+      "status: doing",
+      "updated: " .. TODAY,
+      "---",
+      "",
+      "## Lernpunkte",
+      "",
+      "- [ ] Goroutines {#go}",
+      "- [ ] Channels {#ch}",
+      "",
+    }, "\n")
+  )
+  local go = assert(promote.promote("lib.nvim/go", "go", o))
+  local blocked = assert(mutate.set(go.id, { status = "blocked" }, o))
+  eq(blocked.point, { container = "lib.nvim/go", key = "go", state = "blocked", changed = true })
+  has(H.read(p3), "- [!] Goroutines " .. ARROW .. " " .. go.id, "blocked is [!]")
+  local unblocked = assert(mutate.set(go.id, { status = "open" }, o))
+  eq(unblocked.point and unblocked.point.state, "open", "and back to open")
+  has(H.read(p3), "- [ ] Goroutines " .. ARROW .. " " .. go.id, "[ ] again")
+  local doing = assert(mutate.set(go.id, { status = "doing" }, o))
+  eq(doing.point, nil, "open -> doing keeps the mark: no container is read")
+  assert(mutate.set(go.id, { status = "open" }, o))
+  F.task(H, root, "lib.nvim", "no-point", F.meta("No point", "open"))
+  eq(
+    assert(mutate.set("lib.nvim/no-point", { status = "blocked" }, o)).point,
+    nil,
+    "a task without point: has nothing to mirror"
+  )
+  assert(
+    done_flow.run(
+      go.id,
+      vim.tbl_extend("force", o, { outcome = "seen", outcome_reason = "kurz", pick_next = false })
+    )
+  )
+  has(H.read(p3), "- [~] Goroutines " .. ARROW .. " " .. go.id .. " \226\128\147 Grund: kurz")
+  local reopened = assert(mutate.reopen(go.id, o))
+  eq(reopened.point and reopened.point.state, "open", "reopen puts the point back")
+  has(H.read(p3), "- [ ] Goroutines " .. ARROW .. " " .. go.id .. " {#go}\n", "without the reason")
+  -- the mark runs ahead the other way: [!] while the task is open
+  H.write(p3, (H.read(p3):gsub("%- %[ %] Goroutines", "- [!] Goroutines")))
+
   -- ── check ─────────────────────────────────────────────────────────────────
   F.task(
     H,
@@ -256,6 +303,10 @@ return function(H)
   table.sort(got)
   ok(vim.tbl_contains(got, "promote-point-dangling:lib.nvim/astray"), vim.inspect(got))
   ok(vim.tbl_contains(got, "promote-state-drift:" .. early.id), vim.inspect(got))
+  ok(
+    vim.tbl_contains(got, "promote-state-drift:" .. go.id),
+    "[!] against an open task: " .. vim.inspect(got)
+  )
   ok(
     vim.tbl_contains(got, "promote-cycle:lib.nvim/ring-a")
       or vim.tbl_contains(got, "promote-cycle:lib.nvim/ring-b"),

@@ -88,7 +88,8 @@
 ---    `path-image-missing`, `path-cycle` (warnings): the tree of `## Lernpunkte`
 ---  - promoted learning points (`tasks_nvim.promote`, warnings): `promote-point-dangling` (a task's `point:` names no
 ---    open path or task, or no point there whose arrow names the task), `promote-state-drift` (the mark of the point
----    says something else than the task: closed while it is open, or not the state of its outcome when finished),
+---    says something else than the task: closed while it is open, `[!]` against an open task or `[ ]` against a
+---    blocked one, or not the state of its outcome when finished),
 ---    `promote-cycle` (the `point:` of tasks lead back to one of them), `task-arrow-dangling` (an arrow in the
 ---    `## Lernpunkte` of an open learning task names a task that exists nowhere)
 ---
@@ -964,23 +965,19 @@ local function promote_findings(findings, open_ids, names, scan_opts, is_finishe
     end
     local want = lernbaum.state_of_task(finished and { status = "done", outcome = t.outcome } or t)
     local have = node.state or "open"
-    local drift
-    if finished then
-      drift = have ~= want
-    else
-      -- open or blocked while the task is open; a closed mark runs ahead of the task
-      drift = have ~= "open" and have ~= "blocked"
-    end
+    -- finished or open, the mark is the state of the task: `set` and `reopen` keep `[!]` and `[ ]` in step with
+    -- `blocked` as `done` does with the outcome
+    local drift = have ~= want
     if drift then
       add(
         findings,
         "warn",
         "promote-state-drift",
         t,
-        ("the point %s is marked %s, the task says %s (tasks done writes it; fix the mark by hand)"):format(
+        ("the point %s is marked %s, the task says %s (tasks done, set and reopen write it; fix the mark by hand)"):format(
           t.point,
           have,
-          finished and want or "open"
+          want
         )
       )
     end

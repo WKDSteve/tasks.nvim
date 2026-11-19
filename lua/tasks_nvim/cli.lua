@@ -1912,6 +1912,9 @@ function commands.set(ctx)
     vim.tbl_extend("force", { root = eo.root, today = eo.today }, co)
   )
   ctx.say(("set\t%s\t%s\t%s"):format(res.id, res.changed and "changed" or "unchanged", res.path))
+  if res.point_err then
+    ctx.warn("note: " .. res.point_err)
+  end
   report_index(ctx, res)
   return 0
 end

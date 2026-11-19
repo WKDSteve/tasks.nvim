@@ -142,6 +142,28 @@ local function keep_draft(drafts, task, text)
   end
 end
 
+---Give the learning point a task was promoted from (`point:`) the state of `status`, as `done` does for the finish:
+---`blocked` is `[!]`, every other open status `[ ]` (its reason dropped). Never raises; what went wrong is the second
+---value, for the caller's notes. `promote` is loaded here, not at the top: it requires this module.
+---@param id string
+---@param point string
+---@param status string
+---@param opts { root: string, today: string }
+---@return { container: string, key: string, state: string, changed: boolean }|nil result
+---@return string|nil note
+local function mirror_point(id, point, status, opts)
+  local ran, res, perr = pcall(require("tasks_nvim.promote").sync_point, {
+    id = id,
+    point = point,
+    status = status,
+  }, opts)
+  if not ran or (not res and perr) then
+    return nil,
+      ("the learning point %s was not updated: %s"):format(point, tostring(ran and perr or res))
+  end
+  return res, nil
+end
+
 ---The text of an open task found by `M.find_open`: the draft's, or the file's.
 ---@param task Tasks.Task
 ---@param drafts? table<string, Tasks.DraftTask>
@@ -1756,7 +1778,7 @@ end
 ---already names keeps its form, a value given as a wikilink is written as given, any other id in the form
 ---`opts.links` / `setup({ links })` / `$TASKS_LINKS` asks for (`plain` ids by default).
 ---@param opts? { root?: string, today?: string, index?: boolean, allow_unknown?: boolean, if_match?: string, expect?: { key: string, value: any }, dry_run?: boolean, links?: "plain"|"wikilink", link_resolver?: Tasks.LinkResolver, drafts?: table<string, Tasks.DraftTask> }
----@return { id: string, path: string, changed: boolean, etag_before?: string, etag_after?: string, before?: table<string, any>, index?: Tasks.IndexResult, index_err?: string }|nil result
+---@return { id: string, path: string, changed: boolean, etag_before?: string, etag_after?: string, before?: table<string, any>, index?: Tasks.IndexResult, index_err?: string, point?: { container: string, key: string, state: string, changed: boolean }, point_err?: string }|nil result
 ---@return string|nil err
 ---@return table|nil info  # `{ code = "conflict"|"locked"|"lock_stuck"|"forbidden"|"io", ... }` when there is a reason to name
 function M.set(id, patch, opts)
@@ -1965,6 +1987,18 @@ function M.set(id, patch, opts)
         return fm.update(file.path, { { "status", "doing" }, { "updated", today } })
       end)
     end
+  end
+  -- A promoted task that goes to `blocked`, or out of it, takes its learning point along (`[!]` / `[ ]`). Only then:
+  -- a task without `point:`, or a status change that keeps the point's state (open -> doing), reads no container.
+  local before_status = result.before and result.before.status
+  if
+    task.point
+    and eff_status
+    and eff_status ~= before_status
+    and (eff_status == "blocked" or before_status == "blocked")
+  then
+    result.point, result.point_err =
+      mirror_point(task.id, task.point, eff_status, { root = root, today = today })
   end
   if opts.index ~= false and task.location ~= "backlog" then
     result.index, result.index_err = index.write_area(task.area, { root = root })
@@ -2406,7 +2440,7 @@ end
 ---reported, the task is open).
 ---@param id string
 ---@param opts? Tasks.ReopenOpts
----@return { id: string, area: string, path?: string, changed: boolean, etag_before?: string, etag_after?: string, notes: string[] }|nil result
+---@return { id: string, area: string, path?: string, changed: boolean, etag_before?: string, etag_after?: string, notes: string[], point?: { container: string, key: string, state: string, changed: boolean } }|nil result
 ---@return string|nil err
 ---@return table|nil info  # `{ code = "conflict"|"not_found"|"exists", ... }`
 function M.reopen(id, opts)
@@ -2551,6 +2585,16 @@ function M.reopen(id, opts)
     end)
     if not res then
       result.notes[#result.notes + 1] = "the row of the Backlog README stays: " .. tostring(rd_err2)
+    end
+  end
+  -- the learning point the task was promoted from goes back with it: `[ ]` (or `[!]` for a reopen as blocked)
+  local reparsed = fm.parse(new_text)
+  local point = reparsed and reparsed.has_block and reparsed.meta.point
+  if type(point) == "string" and point ~= "" then
+    local res, note = mirror_point(id, point, status, { root = root, today = today })
+    result.point = res
+    if note then
+      result.notes[#result.notes + 1] = note
     end
   end
   if opts.index ~= false then

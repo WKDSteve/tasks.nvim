@@ -536,7 +536,10 @@ From then on the **task owns the point's state**. `done` writes it into the cont
 it as `flow.point`). The rule of the parents is the tree's: a parent is closed when every leaf is, a promoted point
 counts as one leaf. A task can promote its own points again (Lua lernen -> C-Compiler -> Sprache C). Finishing a task
 whose `## Lernpunkte` still has open points is allowed (R3) and gives the note `finished with N open learning
-point(s)`; `tick_all` ticks `## Plan` only, never the learning points.
+point(s)`; `tick_all` ticks `## Plan` only, never the learning points. The way to `blocked` and back keeps the point in
+step too: `set status=blocked` marks it `[!]`, a `set` out of `blocked` gives it `[ ]` again, and `reopen` of a finished
+task gives it `[ ]` (its reason dropped; `[!]` for a reopen as `blocked`). A status change that keeps the point's
+state (`open` -> `doing`) reads no container. In `tasks-ops/1` the container is one more id in `changed_ids`.
 
 `--dry-run` names the task and the lines that would move; the result carries its `inverse`. `tasks unpromote
 <area>/<slug>#<key>` takes it back while the task holds no work of its own (status `open`, no commits, no assets): the
@@ -544,8 +547,8 @@ task's tree as it is now goes back below the point, the arrow goes, the task fil
 on is taken back by hand.
 
 `check` (warnings): `promote-point-dangling` (`point:` names no open path or task, or no point there whose arrow names
-the task), `promote-state-drift` (the mark of the point disagrees with the task: closed while the task is open, or not
-the state of its outcome when finished), `promote-cycle` (the `point:` of tasks lead back to one of them),
+the task), `promote-state-drift` (the mark of the point disagrees with the task: closed while the task is open, `[!]`
+while it is not blocked or `[ ]` while it is, or not the state of its outcome when finished), `promote-cycle` (the `point:` of tasks lead back to one of them),
 `task-arrow-dangling` (an arrow in the `## Lernpunkte` of an open learning task names a task that exists nowhere); a
 `point:` that is not `<area>/<slug>#<key>` is the error `bad-point`. In the editor: `:Tasks promote` / `unpromote`
 (the point under the cursor, or `<id>#<key>`) and the tree view `:Tasks learn` ([COMMANDS.md](COMMANDS.md)).

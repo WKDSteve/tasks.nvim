@@ -655,6 +655,22 @@ local function proposal_of(pairs_)
   return proposal
 end
 
+---A write that took the learning point of its task along (`set` to or from `blocked`, `reopen`): the container is
+---one more changed document, and its area's overview may list it.
+---@param ctx Tasks.OpsCtx
+---@param point { container: string, changed: boolean }|nil
+---@param changed string[]
+local function point_written(ctx, point, changed)
+  if not (point and point.changed) then
+    return
+  end
+  local carea = point.container:match("^([^/]+)/")
+  if carea then
+    ctx.touched[carea] = true
+  end
+  changed[#changed + 1] = point.container
+end
+
 ---@param op table
 ---@param ctx Tasks.OpsCtx
 ---@return table entry
@@ -752,6 +768,7 @@ local function do_set(op, ctx)
       patch = r.before,
       if_match = r.etag_after,
     })
+    point_written(ctx, r.point, entry.changed_ids)
   end
   return entry
 end
@@ -932,6 +949,7 @@ local function do_reopen(op, ctx)
   end
   if r.changed and not ctx.dry then
     ctx.touched[r.area] = true
+    point_written(ctx, r.point, entry.changed_ids)
   end
   return entry
 end

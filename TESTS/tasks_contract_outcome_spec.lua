@@ -126,4 +126,17 @@ return function(H)
   eq(item and item.outcome, "not-applicable")
   eq(item and item.outcome_reason, "C kommt später")
   eq(item and item.point, "lib.nvim/lua#c")
+
+  -- reopen and set to blocked take the point along: the path is a changed file of each
+  local lua_path = root .. "/lib.nvim/ROADMAP/paths/lua.md"
+  local re = run({ { op = "reopen", id = pr.id } })
+  eq(re.ok, true, vim.inspect(re))
+  ok(vim.tbl_contains(re.changed_ids, "lib.nvim/lua"), "reopen: " .. vim.inspect(re.changed_ids))
+  has(H.read(lua_path), "- [ ] C lernen")
+  local bl = run({ { op = "set", id = pr.id, patch = { status = "blocked" } } })
+  eq(bl.ok, true, vim.inspect(bl))
+  ok(vim.tbl_contains(bl.changed_ids, "lib.nvim/lua"), "set: " .. vim.inspect(bl.changed_ids))
+  has(H.read(lua_path), "- [!] C lernen")
+  local same = run({ { op = "set", id = pr.id, patch = { prio = 2 } } })
+  eq(same.changed_ids, { pr.id }, "a set that keeps the status names the task alone")
 end
