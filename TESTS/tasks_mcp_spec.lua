@@ -21,6 +21,12 @@ return function(H)
     names[t.name] = t
   end
   ok(names.tasks_list and names.tasks_task and names.tasks_check, "list, show and check are tools")
+  ok(names.tasks_paths and names.tasks_path, "the learning paths are read tools")
+  eq(names.tasks_path.inputSchema.required[1], "id", "tasks_path requires an id")
+  ok(
+    not names.tasks_promote and not names.tasks_node_set and not names.tasks_path_new,
+    "the writes of the learning paths are no tools"
+  )
   ok(not names.tasks_ops, "the write door ops is no tool")
   ok(
     not names.tasks_intent and not names.tasks_done_preview,

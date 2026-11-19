@@ -232,7 +232,7 @@ the file `done` says so and moves the task anyway.
 
 `scripts/mcp.lua` serves the read methods of `tasks-export/1` as MCP tools over stdio (`lib.nvim.mcp.server`):
 `tasks_hello`, `tasks_list`, `tasks_task`, `tasks_next`, `tasks_areas`, `tasks_check`, `tasks_find`, `tasks_waits`,
-`tasks_finished`. Each answers the contract's JSON document; an error document is an error result. There is no write
+`tasks_finished`, and for the learning paths `tasks_paths` and `tasks_path`. Each answers the contract's JSON document; an error document is an error result. There is no write
 tool: claiming, changing and finishing a task stay with the command line and the editor.
 
 ```sh

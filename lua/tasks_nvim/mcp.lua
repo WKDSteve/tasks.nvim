@@ -7,7 +7,8 @@
 --- Only reads. The write door `ops` (`tasks-ops/1`), `intent` (it saves with `yes`), `agent_answer` (it files an
 --- answer) and `done_preview` (it mints the token a `done` needs) are left out on purpose: an agent that can finish or
 --- rewrite tasks through a side door skips the claim, the review and the person who closes a task with `tasks done`.
---- A write tool would need its own policy (who may, with which confirmation); until that exists there is none.
+--- A write tool would need its own policy (who may, with which confirmation); until that exists there is none. The
+--- operations of the learning paths (`path_new`, `node_set`, `promote`, ...) are such writes and stay out as well.
 
 local M = {}
 
@@ -26,6 +27,10 @@ M.TOOLS = {
   find = "The open tasks that name one of the files in `refs` (vault-relative paths).",
   waits = "What open tasks wait for (`waits_for`), grouped; optionally of one `area`.",
   finished = "Finished tasks from the Backlogs (newest first), with filters and paging.",
+  paths = "The open learning paths (`<area>/ROADMAP/paths/`) with their progress "
+    .. "(learned, seen, dropped, open, blocked); optionally of one `area`.",
+  path = "One learning path by id: its body and its tree of learning points as a flat list "
+    .. "(state, derived state, progress per point, key, reason, the task a point was promoted to).",
 }
 
 ---The server over the vault `opts.root` (nil: `$TASKS_VAULT`, as the command line).
