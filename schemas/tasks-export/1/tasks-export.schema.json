@@ -77,6 +77,9 @@
       "$ref": "#/$defs/MeetingDocument"
     },
     {
+      "$ref": "#/$defs/MeetingParse"
+    },
+    {
       "$ref": "#/$defs/Paths"
     },
     {
@@ -532,6 +535,36 @@
         "progress": { "$ref": "#/$defs/PathProgress" }
       },
       "additionalProperties": false
+    },
+    "MeetingParse": {
+      "description": "tasks.meetingparse: one line of the quick capture read into a proposal of a meeting (capability `meeting_parse`). Nothing is written and no file is read: the front end shows the proposal in its form and sends `meeting_new` only when the person says so. `fields` are the keys `meeting_new` takes, as far as the line names them; `date` is always there (`assumed` holds `date` when the line named no day: today). `problems` are words that looked like a field but are none (`!soon`, `#nothing`); they are not in the title.",
+      "allOf": [{ "$ref": "#/$defs/Head" }],
+      "type": "object",
+      "required": ["kind", "title", "fields", "all_day", "assumed", "problems"],
+      "properties": {
+        "kind": { "const": "tasks.meetingparse" },
+        "title": { "type": "string", "description": "The words that are no field, in their order; may be empty." },
+        "fields": {
+          "type": "object",
+          "required": ["date"],
+          "properties": {
+            "date": { "$ref": "#/$defs/Date" },
+            "time": { "type": "string", "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$" },
+            "end": { "type": "string", "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$" },
+            "duration": { "type": "string", "description": "As written: `90m`, `2h`, `1h30m`." },
+            "location": { "type": "string" },
+            "online": { "type": "string", "pattern": "^[Hh][Tt][Tt][Pp][Ss]?://", "description": "An http or https address, untrusted text." },
+            "tasks": { "type": "array", "items": { "type": "string", "pattern": "^[^/]+/[^/]+$" } },
+            "notify": { "type": "array", "items": { "type": "string" }, "maxItems": 5 }
+          },
+          "additionalProperties": false
+        },
+        "online_service": { "enum": ["teams", "zoom", "meet", "webex", "jitsi", "link"], "description": "The service of `fields.online`, as a meeting entry tells it; absent without an address." },
+        "all_day": { "type": "boolean", "description": "The line names no time (or says `ganztägig`)." },
+        "assumed": { "type": "array", "items": { "enum": ["date"] } },
+        "problems": { "type": "array", "items": { "type": "string" } }
+      },
+      "unevaluatedProperties": false
     },
     "MeetingDocument": {
       "description": "tasks.meeting: one meeting with its body and the sections the engine reads. Capability `meeting`.",

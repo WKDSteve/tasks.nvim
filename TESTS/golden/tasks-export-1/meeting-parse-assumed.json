@@ -1,0 +1,27 @@
+{
+  "all_day": false,
+  "assumed": [
+    "date"
+  ],
+  "digest": "sha256:f781f7a3ef8a5494",
+  "engine": {
+    "git": "0000000",
+    "nvim": "0.0.0",
+    "version": "0.1.0-test"
+  },
+  "fields": {
+    "date": "2026-01-02",
+    "duration": "90m",
+    "location": "Raum 3.14",
+    "time": "09:30"
+  },
+  "generated_at": "2026-01-01T00:00:00Z",
+  "kind": "tasks.meetingparse",
+  "plugin": "tasks.nvim",
+  "problems": [],
+  "schema": 1,
+  "title": "Workshop",
+  "vault": {
+    "id": "vault"
+  }
+}

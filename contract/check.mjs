@@ -166,6 +166,12 @@ mutate("a meeting beginning that is no time", "meetings", (d) => (d.items[1].sta
 mutate("a meeting task that is no id", "meetings", (d) => (d.items[1].tasks = ["alpha"]));
 mutate("a notification with a field nobody defined", "meetings", (d) => (d.items[1].notify[0].when = "now"));
 mutate("a meetings page without undated", "meetings", (d) => delete d.undated);
+mutate("a quick proposal without a day", "meeting-parse", (d) => delete d.fields.date);
+mutate("a quick proposal with a field meeting_new does not take", "meeting-parse", (d) => (d.fields.status = "done"));
+mutate("a quick proposal with a time that is none", "meeting-parse", (d) => (d.fields.time = "25:00"));
+mutate("a quick proposal with an address that is no web address", "meeting-parse", (d) => (d.fields.online = "msteams:x"));
+mutate("a quick proposal of a service nobody defined", "meeting-parse", (d) => (d.online_service = "skype"));
+mutate("a quick proposal that assumed something nobody defined", "meeting-parse-assumed", (d) => (d.assumed = ["time"]));
 mutate("a meeting document of a kind of document nobody defined", "meeting", (d) => (d.documents[0].kind = "fax"));
 mutate("a participant without a name", "meeting", (d) => delete d.participants[0].name);
 mutate("a follow-up task that is no id", "meeting", (d) => (d.followups[0].task = "gamma"));

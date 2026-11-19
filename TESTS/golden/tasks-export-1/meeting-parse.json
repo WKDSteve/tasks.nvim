@@ -1,0 +1,34 @@
+{
+  "all_day": false,
+  "assumed": [],
+  "digest": "sha256:d7a23a52c26afd44",
+  "engine": {
+    "git": "0000000",
+    "nvim": "0.0.0",
+    "version": "0.1.0-test"
+  },
+  "fields": {
+    "date": "2026-01-05",
+    "end": "15:00",
+    "notify": [
+      "-15m"
+    ],
+    "online": "https://teams.microsoft.com/l/x",
+    "tasks": [
+      "lib.nvim/alpha"
+    ],
+    "time": "14:00"
+  },
+  "generated_at": "2026-01-01T00:00:00Z",
+  "kind": "tasks.meetingparse",
+  "online_service": "teams",
+  "plugin": "tasks.nvim",
+  "problems": [
+    "!soon"
+  ],
+  "schema": 1,
+  "title": "Sync mit Rick",
+  "vault": {
+    "id": "vault"
+  }
+}

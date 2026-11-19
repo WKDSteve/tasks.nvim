@@ -7,7 +7,7 @@
 --- the JSON Schemas in `schemas/tasks-export/1/`. The Markdown files stay the single source of truth.
 ---
 --- Documents (`kind`): `tasks.hello`, `tasks.snapshot`, `tasks.list`, `tasks.task`, `tasks.next`, `tasks.areas`, `tasks.finished`, `tasks.history`, `tasks.links`, `tasks.groupings`,
---- `tasks.views`, `tasks.waits`, `tasks.meetings`, `tasks.meeting`, `tasks.error`. Every one starts with the same head (`schema`, `plugin`, `kind`, `generated_at`, `vault.id`,
+--- `tasks.views`, `tasks.waits`, `tasks.meetings`, `tasks.meeting`, `tasks.meetingparse`, `tasks.error`. Every one starts with the same head (`schema`, `plugin`, `kind`, `generated_at`, `vault.id`,
 --- `engine`); a document that comes from a scan also carries `rev` (what the vault looked like) and `digest` (the hash
 --- of the content: without `generated_at` and `engine`, so two runs on an unchanged vault have the same digest).
 ---
@@ -84,6 +84,7 @@ M.CAPABILITIES = {
   "lists",
   "meeting",
   "meeting_ops",
+  "meeting_parse",
   "meetings",
   "move_area",
   "move_area_preview",
@@ -3147,6 +3148,61 @@ function M.meeting(id, opts)
     end, m.followups)
     return seal(doc, builder.rev_of({ m.id .. "\t" .. (m.etag or "") })), nil
   end)
+end
+
+---The longest line `meeting_parse` reads.
+M.MEETING_PARSE_MAX = 1000
+
+---Read one line of the quick capture into a proposal of a meeting (`meeting_quick`), nothing written, no file read:
+---`tasks.meetingparse`. The same parser as `tasks meeting parse` and `:Tasks meeting quick`, so a line reads the same in
+---every front end. A day the line does not name is `today` (`assumed`). `online_service` is the service of the address
+---(`meetings.online_service`), so a form names it before the meeting is made.
+---@param params { text?: string }
+---@param opts? { root?: string, today?: string }
+---@return table|nil doc
+---@return Tasks.ContractError|string|nil err
+function M.meeting_parse(params, opts)
+  params = params or {}
+  opts = opts or {}
+  local text = params.text
+  if type(text) ~= "string" or vim.trim(text) == "" then
+    return nil, bad_argument("meeting_parse needs text: one line")
+  end
+  if #text > M.MEETING_PARSE_MAX then
+    return nil,
+      bad_argument(("meeting_parse: text is at most %d bytes"):format(M.MEETING_PARSE_MAX))
+  end
+  if text:find("[%z\1-\31\127]") then
+    return nil, bad_argument("meeting_parse: text is one line without control characters")
+  end
+  local today = opts.today or model.today()
+  if not model.is_date(today) then
+    return nil, bad_argument("today must be YYYY-MM-DD")
+  end
+  local root, err = vault.root(opts)
+  if not root then
+    return nil, err
+  end
+  local p = require("tasks_nvim.meeting_quick").parse(text, { today = today })
+  local f = p.fields
+  local doc = M.head("tasks.meetingparse", root)
+  doc.title = p.title
+  doc.fields = json.object({
+    date = f.date,
+    time = f.time,
+    ["end"] = f["end"],
+    duration = f.duration,
+    location = f.location,
+    online = f.online,
+    tasks = f.tasks and json.array(f.tasks) or nil,
+    notify = f.notify and json.array(f.notify) or nil,
+  })
+  -- the service of the address, in the words of the meeting entry: a form shows the same sign before it is made
+  doc.online_service = f.online and meetings.online_service(f.online) or nil
+  doc.all_day = p.all_day
+  doc.assumed = json.array(p.assumed)
+  doc.problems = json.array(p.problems)
+  return seal(doc, nil), nil
 end
 
 -- ── learning paths ───────────────────────────────────────────────────────────

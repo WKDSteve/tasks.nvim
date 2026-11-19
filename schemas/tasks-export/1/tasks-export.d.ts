@@ -28,6 +28,7 @@ export type TasksExport =
   | Intent
   | Meetings
   | MeetingDocument
+  | MeetingParse
   | Paths
   | PathDocument
   | DonePreview
@@ -990,6 +991,51 @@ export type MeetingDocument = Head & {
      */
     task?: string;
   }[];
+};
+/**
+ * tasks.meetingparse: one line of the quick capture read into a proposal of a meeting (capability `meeting_parse`). Nothing is written and no file is read: the front end shows the proposal in its form and sends `meeting_new` only when the person says so. `fields` are the keys `meeting_new` takes, as far as the line names them; `date` is always there (`assumed` holds `date` when the line named no day: today). `problems` are words that looked like a field but are none (`!soon`, `#nothing`); they are not in the title.
+ */
+export type MeetingParse = Head & {
+  kind: "tasks.meetingparse";
+  /**
+   * The words that are no field, in their order; may be empty.
+   */
+  title: string;
+  fields: {
+    date: Date;
+    time?: string;
+    end?: string;
+    /**
+     * As written: `90m`, `2h`, `1h30m`.
+     */
+    duration?: string;
+    location?: string;
+    /**
+     * An http or https address, untrusted text.
+     */
+    online?: string;
+    tasks?: string[];
+    /**
+     * @maxItems 5
+     */
+    notify?:
+      | []
+      | [string]
+      | [string, string]
+      | [string, string, string]
+      | [string, string, string, string]
+      | [string, string, string, string, string];
+  };
+  /**
+   * The service of `fields.online`, as a meeting entry tells it; absent without an address.
+   */
+  online_service?: "teams" | "zoom" | "meet" | "webex" | "jitsi" | "link";
+  /**
+   * The line names no time (or says `ganztägig`).
+   */
+  all_day: boolean;
+  assumed: "date"[];
+  problems: string[];
 };
 /**
  * tasks.paths: the open learning paths of the vault or of an area, each with its progress; no tree (that is tasks.path). Capability `paths`.

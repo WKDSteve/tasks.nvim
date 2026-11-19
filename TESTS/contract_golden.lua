@@ -246,6 +246,19 @@ G.cases = {
     end,
   },
   {
+    -- a line of the quick capture read into a proposal (capability `meeting_parse`): a weekday, a time span, a service
+    -- word beside an address, a task, a notification and a word that looks like one but is none
+    name = "meeting-parse",
+    method = "meeting_parse",
+    request = '{"params":{"text":"Mo 14:00-15:00 Sync mit Rick @teams https://teams.microsoft.com/l/x #lib.nvim/alpha !-15m !soon"}}',
+  },
+  {
+    -- no day in the line: today, and `assumed` says so; a place with a blank
+    name = "meeting-parse-assumed",
+    method = "meeting_parse",
+    request = '{"params":{"text":"Workshop 9:30 90m @Raum_3.14"}}',
+  },
+  {
     -- one meeting with its body and the sections the engine reads (capability `meeting`)
     name = "meeting",
     method = "meeting",
