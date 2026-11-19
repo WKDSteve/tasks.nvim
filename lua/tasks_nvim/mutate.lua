@@ -2753,7 +2753,8 @@ local function plan_done(id, opts)
   end
   local ended, oerr = done_outcome(task, opts)
   if not ended then
-    return nil, oerr
+    -- a wrong word or a missing reason is the caller's (the contract answers `invalid_argument`, not `internal`)
+    return nil, oerr, { code = "invalid_argument" }
   end
   for _, kv in ipairs(ended) do
     patch[#patch + 1] = kv

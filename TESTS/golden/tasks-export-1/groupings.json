@@ -1,5 +1,5 @@
 {
-  "digest": "sha256:cac67e0dea3b7e42",
+  "digest": "sha256:ef13f0fc60a4f000",
   "engine": {
     "git": "0000000",
     "nvim": "0.0.0",
@@ -83,6 +83,18 @@
         "3",
         "4",
         "5"
+      ],
+      "writable": true
+    },
+    {
+      "field": "outcome",
+      "mode": "set",
+      "truncated": false,
+      "value_type": "string",
+      "values": [
+        "learned",
+        "seen",
+        "not-applicable"
       ],
       "writable": true
     },

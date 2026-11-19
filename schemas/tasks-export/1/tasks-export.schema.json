@@ -851,6 +851,9 @@
           "description": "The task has more meetings than `meetings` names.",
           "const": true
         },
+        "outcome": { "$ref": "#/$defs/Outcome" },
+        "outcome_reason": { "type": "string", "description": "Why it ended so (required by the engine for `seen` and `not-applicable`). Capability `outcome`." },
+        "point": { "$ref": "#/$defs/Point" },
         "id": {
           "type": "string",
           "pattern": "^[^/]+/[^/]+$"
@@ -3048,6 +3051,9 @@
         "phase": { "type": "string" },
         "done_in": { "type": "string" },
         "commits": { "type": "array", "items": { "type": "string" } },
+        "outcome": { "$ref": "#/$defs/Outcome" },
+        "outcome_reason": { "type": "string", "description": "Why it ended so (required by the engine for `seen` and `not-applicable`). Capability `outcome`." },
+        "point": { "$ref": "#/$defs/Point" },
         "file": { "type": "string" }
       },
       "additionalProperties": false
@@ -3513,6 +3519,7 @@
                   "kind",
                   "effort",
                   "value",
+                  "outcome",
                   "tags",
                   "plan",
                   "phase",
@@ -3720,6 +3727,15 @@
         "value": { "type": "string", "minLength": 1 }
       },
       "additionalProperties": false
+    },
+    "Outcome": {
+      "description": "How a finished task ended beside `status: done` (capability `outcome`): learned, seen (looked at, not done) or not-applicable. Absent: done as meant.",
+      "enum": ["learned", "seen", "not-applicable"]
+    },
+    "Point": {
+      "description": "The learning point a task was promoted from: `<container id>#<key>`, the container a learning path or a task with `## Lernpunkte` (capability `outcome`).",
+      "type": "string",
+      "pattern": "^[^/#\\s]+/[a-z0-9][a-z0-9-]*#[a-z0-9][a-z0-9-]*$"
     },
     "Cover": {
       "description": "A large picture of the item (`cover:`; capability `icon`): an image (png, jpg, jpeg, webp, svg) below `assets/` of its folder. Absent when it has none.",
@@ -4126,6 +4142,18 @@
           },
           "description": "The projects this finish closed after the plan (capability `projects`)."
         },
+        "point": {
+          "description": "`done`: the learning point the task was promoted from, set to the state of the finish (capability `outcome`).",
+          "type": "object",
+          "required": ["container", "key", "state", "changed"],
+          "properties": {
+            "container": { "type": "string" },
+            "key": { "type": "string" },
+            "state": { "enum": ["open", "learned", "seen", "dropped", "blocked"] },
+            "changed": { "type": "boolean" }
+          },
+          "additionalProperties": false
+        },
         "notes": {
           "type": "array",
           "items": {
@@ -4235,6 +4263,9 @@
           "type": "integer",
           "minimum": 0
         },
+        "outcome": { "$ref": "#/$defs/Outcome" },
+        "outcome_reason": { "type": "string", "description": "Why it ended so (required by the engine for `seen` and `not-applicable`). Capability `outcome`." },
+        "point": { "$ref": "#/$defs/Point" },
         "readme": {
           "type": "object",
           "required": ["state"],

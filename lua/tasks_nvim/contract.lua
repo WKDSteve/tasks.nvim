@@ -90,6 +90,7 @@ M.CAPABILITIES = {
   "next",
   "ops",
   "order",
+  "outcome",
   "plan_assets",
   "plan_close",
   "plan_compare",
@@ -377,6 +378,10 @@ local function task_entry(root, task, node, rank, meeting_ids)
     -- what the task stands for; only when the file has it (capability `icon`)
     icon = M.icon_entry(task.icon),
     cover = task.cover,
+    -- how the task ended, or a note of it in advance; the learning point it was promoted from (capability `outcome`)
+    outcome = model.is_outcome(task.outcome) and task.outcome or nil,
+    outcome_reason = task.outcome_reason,
+    point = task.point,
     summary = clip(task.summary or "", M.LIMITS.summary),
     -- the meetings that name the task (`tasks:` of a meeting file), the earliest first; only when there are some, so a
     -- document without meetings reads as before
@@ -2411,6 +2416,10 @@ function M.finished(params, opts)
       phase = t.phase,
       done_in = t.done_in,
       commits = (t.commits and #t.commits > 0) and vim.list_slice(t.commits, 1) or nil,
+      -- how it ended (capability `outcome`); only when the file says so
+      outcome = model.is_outcome(t.outcome) and t.outcome or nil,
+      outcome_reason = t.outcome_reason,
+      point = t.point,
       file = relative(root, t.path) or vim.fs.basename(t.path),
     })
   end
@@ -2734,6 +2743,7 @@ function M.groupings(opts)
   add("kind", model.KINDS, "set")
   add("effort", model.EFFORTS, "set")
   add("value", model.VALUES, "set")
+  add("outcome", model.OUTCOMES, "set")
   local tags, tags_cut = grouping_values(view.open, function(t)
     return t.tags
   end)
@@ -2831,7 +2841,12 @@ function M.done_preview(id, opts)
   if not root then
     return nil, rerr
   end
-  local pv, err, info = done_flow.preview(id, { root = root, today = opts.today })
+  local pv, err, info = done_flow.preview(id, {
+    root = root,
+    today = opts.today,
+    outcome = opts.outcome,
+    outcome_reason = opts.outcome_reason,
+  })
   if not pv then
     return nil, error_codes.classify(err, info, { patterns = M.ERROR_PATTERNS })
   end
@@ -2848,6 +2863,8 @@ function M.done_preview(id, opts)
   doc.to = relative(root, pv.to) or vim.fs.basename(pv.to)
   doc.resumed = pv.resumed == true
   doc.steps_ticked = pv.steps_ticked or 0
+  doc.outcome = pv.outcome
+  doc.outcome_reason = pv.outcome_reason
   doc.readme = json.object({ state = pv.readme, row = pv.readme_row })
   doc.plan = pv.plan_id
   doc.closes_plan = pv.closes_plan

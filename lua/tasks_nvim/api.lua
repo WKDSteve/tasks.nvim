@@ -222,10 +222,16 @@ local methods = {
     end,
   },
   done_preview = {
-    params = { id = "string" },
+    params = { id = "string", outcome = "string", outcome_reason = "string" },
     required = { "id" },
     run = function(params, opts)
-      return contract.done_preview(params.id, opts)
+      return contract.done_preview(
+        params.id,
+        vim.tbl_extend("force", opts or {}, {
+          outcome = params.outcome,
+          outcome_reason = params.outcome_reason,
+        })
+      )
     end,
   },
   ops = {

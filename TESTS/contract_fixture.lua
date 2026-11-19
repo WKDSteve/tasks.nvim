@@ -210,7 +210,7 @@ function M.build(H)
   )
   H.write(
     root .. "/cascade.nvim/Backlog/FEATURES/2025-12-31_shipped-feature.md",
-    "---\ntitle: Shipped feature\nstatus: done\nkind: feature\nprio: 2\neffort: M\ncreated: "
+    "---\ntitle: Shipped feature\nstatus: done\nkind: feature\nprio: 2\neffort: M\noutcome: learned\ncreated: "
       .. DATE
       .. "\nupdated: "
       .. DATE

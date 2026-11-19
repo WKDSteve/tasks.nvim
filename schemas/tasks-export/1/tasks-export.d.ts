@@ -339,6 +339,14 @@ export type PlanAssets = string[];
  */
 export type PlanAssetsTruncated = true;
 /**
+ * How a finished task ended beside `status: done` (capability `outcome`): learned, seen (looked at, not done) or not-applicable. Absent: done as meant.
+ */
+export type Outcome = "learned" | "seen" | "not-applicable";
+/**
+ * The learning point a task was promoted from: `<container id>#<key>`, the container a learning path or a task with `## Lernpunkte` (capability `outcome`).
+ */
+export type Point = string;
+/**
  * The statuses of a task in `ROADMAP/tasks`. `done` is only seen on a task that was left there after it was finished (listed under `unlisted`).
  */
 export type Status = "doing" | "decision" | "blocked" | "open" | "parked" | "done";
@@ -823,6 +831,7 @@ export type Groupings = Head & {
       | "kind"
       | "effort"
       | "value"
+      | "outcome"
       | "tags"
       | "plan"
       | "phase"
@@ -997,6 +1006,12 @@ export type DonePreview = Head & {
   to: string;
   resumed?: boolean;
   steps_ticked?: number;
+  outcome?: Outcome;
+  /**
+   * Why it ended so (required by the engine for `seen` and `not-applicable`). Capability `outcome`.
+   */
+  outcome_reason?: string;
+  point?: Point;
   readme?: {
     state: "missing" | "updated" | "unchanged";
     row?: string;
@@ -1264,6 +1279,12 @@ export interface TaskEntry {
    * The task has more meetings than `meetings` names.
    */
   meetings_truncated?: true;
+  outcome?: Outcome;
+  /**
+   * Why it ended so (required by the engine for `seen` and `not-applicable`). Capability `outcome`.
+   */
+  outcome_reason?: string;
+  point?: Point;
   id: string;
   area: string;
   slug: string;
@@ -1558,6 +1579,12 @@ export interface FinishedItem {
   phase?: string;
   done_in?: string;
   commits?: string[];
+  outcome?: Outcome;
+  /**
+   * Why it ended so (required by the engine for `seen` and `not-applicable`). Capability `outcome`.
+   */
+  outcome_reason?: string;
+  point?: Point;
   file: string;
 }
 /**
@@ -1960,6 +1987,15 @@ export interface ResultEntry {
    * The projects this finish closed after the plan (capability `projects`).
    */
   projects_closed?: string[];
+  /**
+   * `done`: the learning point the task was promoted from, set to the state of the finish (capability `outcome`).
+   */
+  point?: {
+    container: string;
+    key: string;
+    state: "open" | "learned" | "seen" | "dropped" | "blocked";
+    changed: boolean;
+  };
   notes?: string[];
   move?: MovePlan;
   /**

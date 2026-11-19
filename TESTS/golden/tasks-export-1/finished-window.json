@@ -1,5 +1,5 @@
 {
-  "digest": "sha256:039a889d464be74b",
+  "digest": "sha256:b01f7f35d3f64286",
   "engine": {
     "git": "0000000",
     "nvim": "0.0.0",
@@ -16,6 +16,7 @@
       "file": "cascade.nvim/Backlog/FEATURES/2025-12-31_shipped-feature.md",
       "id": "cascade.nvim/shipped-feature",
       "kind": "feature",
+      "outcome": "learned",
       "prio": 2,
       "slug": "shipped-feature",
       "tags": [],

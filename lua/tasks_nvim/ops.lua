@@ -202,6 +202,8 @@ local FIELDS = {
     done_in = "strings",
     commits = "strings",
     remind = "string",
+    outcome = "string",
+    outcome_reason = "string",
   },
   move_area = { id = "string", to_area = "string", if_match = "string" },
   tick_step = {
@@ -1351,9 +1353,26 @@ local function do_done(op, ctx)
   if op.id == nil then
     return refuse("invalid_argument", "done needs id")
   end
+  if op.outcome ~= nil and not model.is_outcome(op.outcome) then
+    return refuse(
+      "invalid_argument",
+      ("unknown outcome '%s' (expected %s)"):format(
+        tostring(op.outcome),
+        table.concat(model.OUTCOMES, ", ")
+      )
+    )
+  end
+  if has_control(op.outcome_reason) then
+    return refuse("invalid_argument", "outcome_reason contains a control character")
+  end
   if ctx.dry then
-    local pv, err, info =
-      done_flow.preview(op.id, { root = ctx.root, today = ctx.today, drafts = ctx.drafts })
+    local pv, err, info = done_flow.preview(op.id, {
+      root = ctx.root,
+      today = ctx.today,
+      drafts = ctx.drafts,
+      outcome = op.outcome,
+      outcome_reason = op.outcome_reason,
+    })
     if not pv then
       return fail(ctx, err, info)
     end
@@ -1396,12 +1415,22 @@ local function do_done(op, ctx)
     done_in = op.done_in,
     commits = op.commits,
     remind = op.remind,
+    outcome = op.outcome,
+    outcome_reason = op.outcome_reason,
     pick_next = false,
   })
   if not flow then
     return fail(ctx, err, info)
   end
   local done = flow.done
+  if flow.point and flow.point.changed then
+    -- the container of the learning point was written too
+    local cid = flow.point.container
+    local carea = cid:match("^([^/]+)/")
+    if carea then
+      ctx.touched[carea] = true
+    end
+  end
   local area = done.area
   if area and not done.already then
     ctx.touched[area] = true
@@ -1412,6 +1441,9 @@ local function do_done(op, ctx)
   end
   for _, project_id in ipairs(flow.projects_closed) do
     changed[#changed + 1] = project_id
+  end
+  if flow.point and flow.point.changed then
+    changed[#changed + 1] = flow.point.container
   end
   local notes = {}
   for _, note in ipairs(flow.notes) do
@@ -1426,6 +1458,13 @@ local function do_done(op, ctx)
     steps_ticked = flow.steps_ticked,
     plans_closed = flow.plans_closed,
     projects_closed = flow.projects_closed,
+    -- the learning point the task was promoted from, set to the finish's state (capability `outcome`)
+    point = flow.point and {
+      container = flow.point.container,
+      key = flow.point.key,
+      state = flow.point.state,
+      changed = flow.point.changed,
+    } or nil,
     notes = notes,
     changed_ids = done.already and {} or changed,
   }

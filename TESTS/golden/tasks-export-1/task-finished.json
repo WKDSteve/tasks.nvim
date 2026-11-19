@@ -1,7 +1,7 @@
 {
   "body": "\n## Akzeptanz\n\n- [x] it ships\n",
   "body_truncated": false,
-  "digest": "sha256:23cd92f52deb83af",
+  "digest": "sha256:8768777c23b764b3",
   "engine": {
     "git": "0000000",
     "nvim": "0.0.0",
@@ -12,7 +12,7 @@
   "kind": "tasks.task",
   "plugin": "tasks.nvim",
   "questions": [],
-  "rev": "rev:ac5f3c",
+  "rev": "rev:745218",
   "schema": 1,
   "steps": [],
   "task": {
@@ -25,11 +25,14 @@
     ],
     "created": "2026-01-01",
     "done_in": "lib.nvim@bbb2222",
-    "etag": "sha256:c9d7010031260a00",
+    "etag": "sha256:2f349e2d5cb52c86",
     "file": "lib.nvim/Backlog/FEATURES/2026-01-09_shipped.md",
     "folder": false,
     "id": "lib.nvim/shipped",
     "kind": "feature",
+    "outcome": "seen",
+    "outcome_reason": "only chapter 1",
+    "point": "lib.nvim/lua-path#cc",
     "problems": [],
     "refs": [],
     "slug": "shipped",
