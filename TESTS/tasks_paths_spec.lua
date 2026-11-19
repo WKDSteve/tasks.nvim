@@ -105,6 +105,14 @@ return function(H)
   local _, nerr, ninfo = paths.point(A .. "/nope", "k2", "learned", nil, opts)
   eq(ninfo and ninfo.code, "not_found", nerr)
 
+  -- a path file with no body at all: no such point, not "cannot place the body"
+  local bare = assert(paths.new(A, vim.tbl_extend("force", opts, { title = "Leer" })))
+  H.write(bare.path, "---\ntitle: Leer\nstatus: planning\n---\n")
+  local _, berr, binfo = paths.point(bare.id, "k", "learned", nil, opts)
+  eq(binfo and binfo.code, "invalid_argument")
+  ok(berr and berr:find("no such learning point", 1, true), berr)
+  os.remove(bare.path)
+
   -- ── set: the keys of a path; stages are none of them ──
   local sres, sset =
     paths.set(made.id, { status = "doing", links = { "https://www.lua.org" } }, opts)

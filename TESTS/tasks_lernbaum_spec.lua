@@ -120,6 +120,12 @@ return function(H)
   eq(en.progress.open, 1)
   eq(en.progress.blocked, 1)
 
+  -- `->` before a word that is no id is text, no arrow; `→` before one is a bad arrow
+  local text_arrow = lb.parse("## Lernpunkte\n- [ ] Lua -> C lernen\n- [ ] Map a -> b\n")
+  eq(text_arrow.problems, {})
+  eq(text_arrow.nodes[1].label, "Lua -> C lernen")
+  eq(text_arrow.nodes[2].promoted, nil)
+
   -- the problems one file can tell: no reason, a key twice, a bad key, an unknown mark, an arrow to no id, an image
   -- outside assets/
   local bad = lb.parse(table.concat({

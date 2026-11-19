@@ -176,7 +176,8 @@ function M.split(text)
   end
   for _, arrow in ipairs({ ARROW, "->" }) do
     local head, target = rest:match("^(.-)%s+" .. arrow:gsub("%-", "%%-") .. "%s*(%S*)$")
-    if head then
+    -- `->` is an arrow only before an id ("Lua -> C" is text); `→` is always one, and a bad target is named
+    if head and (arrow == ARROW or is_id(target)) then
       if is_id(target) then
         out.promoted = target
       else

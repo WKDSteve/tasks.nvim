@@ -199,7 +199,8 @@ function M.point(id, ref, state, reason, opts)
     end
     -- the body is the end of the text: what lies before it (the frontmatter) stays byte for byte
     local body = parsed.body or ""
-    if cur:sub(-#body) ~= body then
+    -- (`sub(-0)` would be the whole text: an empty body is placed at the end)
+    if #body > 0 and cur:sub(-#body) ~= body then
       return nil, "cannot place the body of " .. file.path, { code = "invalid_argument" }
     end
     local head = cur:sub(1, #cur - #body)
