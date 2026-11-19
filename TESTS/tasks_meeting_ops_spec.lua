@@ -400,6 +400,76 @@ return function(H)
   -- done back to planned through meeting_set
   eq(one({ op = "meeting_set", id = id, patch = { status = "planned" } }).outcome, "changed")
 
+  -- ── what a front end may not write ──
+  -- a control character in the body of a new meeting
+  eq(
+    code(one({
+      op = "meeting_new",
+      area = "lib.nvim",
+      title = "Ctl",
+      fields = { date = "2026-10-21" },
+      body = "Agenda" .. string.char(1),
+    })),
+    "invalid_argument"
+  )
+  -- a board folder that leaves the vault (a junction, as a shared vault could bring): never written through
+  local outside = H.tmpdir() .. "/outside"
+  vim.fn.mkdir(outside, "p")
+  H.write(outside .. "/skizze.ink.json", "theirs")
+  local linked = one({
+    op = "meeting_new",
+    area = "lib.nvim",
+    title = "Linked",
+    fields = { date = "2026-10-22" },
+  }).id
+  eq(
+    one({
+      op = "attach",
+      id = linked,
+      from = "upload",
+      upload = "memo.ogg",
+      name = "m.ogg",
+      kind = "audio",
+    }).ok,
+    true
+  )
+  local linked_dir = vim.fs.dirname(file(linked).path)
+  local junction_ok =
+    vim.uv.fs_symlink(outside, linked_dir .. "/assets/boards", { junction = true })
+  if junction_ok then
+    local theirs = require("tasks_nvim.fsio").etag("theirs")
+    local through = one({
+      op = "board_save",
+      id = linked,
+      name = "skizze",
+      format = "ink",
+      upload = "board.json",
+      if_match = theirs,
+    })
+    eq(code(through), "forbidden", vim.inspect(through))
+    eq(H.read(outside .. "/skizze.ink.json"), "theirs", "the file outside the vault is untouched")
+    vim.uv.fs_unlink(linked_dir .. "/assets/boards")
+  else
+    print("n/a  no junction on this machine")
+  end
+  -- a board file that is a link (where the system lets one be made)
+  local boards = linked_dir .. "/assets/boards"
+  vim.fn.mkdir(boards, "p")
+  if vim.uv.fs_symlink(outside .. "/skizze.ink.json", boards .. "/skizze.ink.json") then
+    local through = one({
+      op = "board_save",
+      id = linked,
+      name = "skizze",
+      format = "ink",
+      upload = "board.json",
+      if_match = require("tasks_nvim.fsio").etag("theirs"),
+    })
+    eq(code(through), "forbidden", vim.inspect(through))
+    eq(H.read(outside .. "/skizze.ink.json"), "theirs")
+  else
+    print("n/a  no file symlink on this machine (needs the right to make one)")
+  end
+
   -- ── the whole file is still a valid meeting ──
   local final = file(id)
   eq(final.valid, true, vim.inspect(final.errors))

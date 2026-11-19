@@ -2198,7 +2198,12 @@ local function do_meeting_new(op, ctx)
   if op.area == nil or op.title == nil then
     return refuse("invalid_argument", "meeting_new needs area and title")
   end
-  if any_control(op.fields) or has_control(op.title) or has_control(op.slug) then
+  if
+    any_control(op.fields)
+    or has_control(op.title)
+    or has_control(op.slug)
+    or has_control(op.body)
+  then
     return refuse("invalid_argument", "the meeting contains a control character")
   end
   if op.body and too_long(op.body, M.MAX_BODY) then

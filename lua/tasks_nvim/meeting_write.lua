@@ -1380,6 +1380,21 @@ function M.board_save(id, opts)
   if not made then
     return nil, "cannot create the board folder of " .. target.id .. ": " .. tostring(mkerr)
   end
+  -- A link in the vault is a way out of it (a vault is shared through git): the replace would write where it points.
+  local escape = vault.leaves(root, fsio.dirname(board_path))
+  if escape then
+    return nil, target.id .. ": the board folder " .. escape, { code = "forbidden" }
+  end
+  for _, p in ipairs({ board_path, preview_rel and (dir .. "/" .. preview_rel) or nil }) do
+    if p and fsio.is_link(p) then
+      return nil,
+        ("%s: %s is a symbolic link or junction: it is not written through"):format(
+          target.id,
+          p:sub(#dir + 2)
+        ),
+        { code = "forbidden" }
+    end
+  end
   local ok, werr, winfo = fsio.with_lock(board_path, function()
     local fresh = not fsio.is_file(board_path)
     if not fresh then
