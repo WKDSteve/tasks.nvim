@@ -147,6 +147,8 @@ M.ERROR_PATTERNS = {
   -- a task somebody else has claimed (`tasks_nvim.claims`): the message names the owner and the time; the shared
   -- vocabulary has no word of its own for it
   { code = "conflict", find = { " is claimed by " } },
+  -- git rewrites the tree of the vault (`tasks_nvim.gitbusy`): nothing was written, the same call works in a moment
+  { code = "locked", find = { "git is rewriting the vault" }, retryable = true },
   -- an intent `wkd-intent/1` the engine refused (`tasks_nvim.intent`): nothing was written, the message names every problem
   { code = "invalid_argument", find = { "intent refused: " } },
   { code = "not_found", find = { "vault not found", "unknown area" } },

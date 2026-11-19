@@ -734,6 +734,23 @@ function M.run(id, opts)
   if done.already then
     return flow, nil
   end
+  -- git rewrote the tree while the task was finished (another session's pull with an autostash): the open file is
+  -- back and may hold what the finished copy lacks. Said, not mended: only a person knows which text is meant.
+  if done.came_back then
+    flow.notes[#flow.notes + 1] = (
+      "the open task %s came back after the finish%s: it may hold changes the finished copy %s lacks; "
+      .. "merge them by hand and remove it (tasks check shows duplicate-id)"
+    ):format(
+      done.came_back,
+      done.git_busy and (" (git: " .. done.git_busy .. ")") or "",
+      tostring(done.to)
+    )
+  elseif done.git_busy then
+    flow.notes[#flow.notes + 1] = ("git was still busy when the finish ended (%s): look whether the open task %s comes back"):format(
+      done.git_busy,
+      tostring(done.from)
+    )
+  end
   if open_points > 0 then
     flow.notes[#flow.notes + 1] = ("finished with %d open learning point(s) in its ## Lernpunkte"):format(
       open_points

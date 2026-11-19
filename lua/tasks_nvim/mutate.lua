@@ -27,6 +27,7 @@ local fm = require("lib.nvim.markdown.frontmatter")
 
 local claims = require("tasks_nvim.claims")
 local fsio = require("tasks_nvim.fsio")
+local gitbusy = require("tasks_nvim.gitbusy")
 local index = require("tasks_nvim.index")
 local model = require("tasks_nvim.model")
 local scan = require("tasks_nvim.scan")
@@ -3145,6 +3146,16 @@ function M.done(id, opts)
   -- a draft is not a file: only a preview may look at one
   opts = vim.tbl_extend("force", {}, opts or {})
   opts.drafts = nil
+  -- While git rewrites the tree (a pull with an autostash of another session) the task file holds HEAD's text, and
+  -- the changes come back after the finish: one task in two places. Wait for git, or finish nothing.
+  local vroot = vault.root(opts)
+  if vroot then
+    local what, where = gitbusy.wait(vroot, opts)
+    if what then
+      ---@cast where string
+      return nil, gitbusy.message(what, where), { code = "locked", retryable = true }
+    end
+  end
   local plan, perr, pinfo = plan_done(id, opts)
   if not plan then
     return nil, perr, pinfo
@@ -3173,6 +3184,18 @@ function M.done(id, opts)
   -- a finished task has no claim (the file is in the Backlog now)
   claims.remove(plan.root, id)
 
+  -- git may have started while the task was finished (after the look above): then the text read may be HEAD's, and
+  -- the autostash writes the open file back once git is done. Wait for that, and say so when it happened.
+  local git_after = gitbusy.busy(plan.root)
+  local came_back
+  if git_after then
+    git_after = gitbusy.wait(plan.root, opts) or git_after
+  end
+  local open_path = plan.task.folder and plan.src_dir or plan.task.path
+  if open_path and fsio.stat(open_path) then
+    came_back = open_path
+  end
+
   return {
     id = id,
     area = plan.area,
@@ -3187,6 +3210,8 @@ function M.done(id, opts)
     outcome = plan.outcome,
     outcome_reason = plan.outcome_reason,
     index = type(res) == "table" and res or nil,
+    came_back = came_back,
+    git_busy = git_after,
   },
     nil
 end
