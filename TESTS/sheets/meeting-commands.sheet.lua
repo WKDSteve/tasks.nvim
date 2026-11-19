@@ -5,6 +5,7 @@
 return {
   id = "tasks.meeting-commands",
   title = "tasks.nvim: :Tasks meeting new, open (at a section), list (the coming first) and close",
+  feature = "tasks.meetings",
   task = "tasks.nvim/meetings-ops",
   engine = "rpc",
   sizes = { { rows = 30, cols = 120 } },
