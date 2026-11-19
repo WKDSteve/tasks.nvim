@@ -131,9 +131,11 @@ return function(H)
         "after",
         "category",
         -- history written down later: a shell flag, not a field of the form
+        "cover",
         "created",
         "due",
         "effort",
+        "icon",
         "kind",
         "lang",
         "links",
@@ -170,6 +172,7 @@ return function(H)
       cli = {
         "absent",
         "area",
+        "cover",
         "date",
         "dry-run",
         "duration",

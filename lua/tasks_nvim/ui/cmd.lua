@@ -632,6 +632,8 @@ function M.planfile(ctx)
     gate = flags.gate,
     target = flags.target,
     status = flags.status,
+    icon = flags.icon,
+    cover = flags.cover,
   })
   if not res then
     notify.error(tostring(err))
@@ -1779,6 +1781,8 @@ function M.task_new(ctx)
       "actor",
       "tags",
       "links",
+      "icon",
+      "cover",
       "category",
       "scope",
       "severity",
@@ -1834,6 +1838,8 @@ function M.task_new(ctx)
     "phase",
     "tags",
     "links",
+    "icon",
+    "cover",
     "category",
     "scope",
     "severity",
@@ -1870,6 +1876,8 @@ function M.task_new(ctx)
       status = values.status,
       waits_for = values.waits_for,
       web_links = values.links,
+      icon = values.icon,
+      cover = values.cover,
       -- a list: a string would be split at the commas of a file name (`a,b.lua`)
       refs = source and source.ref and { source.ref } or nil,
       folder = ctx.flags.folder == true,

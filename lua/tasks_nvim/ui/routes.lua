@@ -651,6 +651,8 @@ local FIELD_DESC = {
   effort = "Size: XS to XL, or days such as 0.5d",
   tags = "Free labels, comma-separated; filter with --tag",
   links = "Web addresses (http or https), comma-separated; paths go in refs",
+  icon = "What it stands for: one emoji, assets/<file> or a word (handshake)",
+  cover = "A large picture below assets/ (png, jpg, webp, svg)",
   due = "Deadline as YYYY-MM-DD (optional); the reminder is remind",
   start = "Earliest day to begin as YYYY-MM-DD (optional); never after due",
   ["repeat"] = "A routine: every N d, w, m or y (8w); finishing it starts the next round",
@@ -790,6 +792,8 @@ local function nested_routes()
         { key = "effort", type = "STRING", values = model.EFFORTS, desc = FIELD_DESC.effort },
         { key = "tags", type = "TASK_TAGS", desc = FIELD_DESC.tags },
         { key = "links", type = "STRING", desc = FIELD_DESC.links },
+        { key = "icon", type = "STRING", desc = FIELD_DESC.icon },
+        { key = "cover", type = "STRING", desc = FIELD_DESC.cover },
         {
           key = "category",
           type = "STRING",
@@ -1268,6 +1272,8 @@ local function nested_routes()
           enum = { "planning", "doing", "parked" },
           desc = "Status the new plan starts in (default: planning)",
         },
+        { name = "icon", type = "STRING", desc = FIELD_DESC.icon },
+        { name = "cover", type = "STRING", desc = FIELD_DESC.cover },
       },
       desc = "Create a plan file ROADMAP/plans/<slug>.md in an area (the words after the area are the title): the undertaking that tasks join with plan=<id> phase=<word>; --areas=a,b lists the areas whose tasks belong, --phases=a,b,c names the stages in order, --gate=hard forbids starting a stage before the earlier ones are finished, --target=<task> is the task that means done",
       run = function(ctx)
