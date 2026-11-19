@@ -210,4 +210,54 @@ return function(H)
     table.concat(out, "\n")
   )
   eq(assert(plans.find("lib.nvim/cli-plan", { root = root })).icon.value, CRAB)
+
+  -- ── check: an asset that is not there, image: as the old name of cover: ───
+  local check = require("tasks_nvim.check")
+  local meeting_dir = root .. "/lib.nvim/MEETINGS"
+  H.write(
+    meeting_dir .. "/old-sync.md",
+    table.concat({
+      "---",
+      "title: Old",
+      "status: planned",
+      "date: 2026-11-25",
+      "image: assets/o.png",
+      "---",
+      "Note.",
+      "",
+    }, "\n")
+  )
+  local function codes_of(res, id)
+    local found = {}
+    for _, f in ipairs(res.findings or {}) do
+      if f.id == id then
+        found[#found + 1] = f.code
+      end
+    end
+    for _, f in ipairs(res.hints or {}) do
+      if f.id == id then
+        found[#found + 1] = f.code
+      end
+    end
+    table.sort(found)
+    return found
+  end
+  local res = assert(check.run({ root = root, today = F.TODAY }))
+  eq(codes_of(res, made.id), { "cover-missing" }, "a folder task without its cover file")
+  eq(codes_of(res, doc.results[1].id), { "cover-missing" }, "a plain task cannot hold its cover")
+  eq(codes_of(res, project.id), { "cover-missing" }, "a project")
+  eq(codes_of(res, doc.results[2].id), { "cover-missing" }, "a plan")
+  eq(codes_of(res, plain.id), {}, "nothing to say about a task without the fields")
+  eq(codes_of(res, plan.id), {}, "an emoji needs no file")
+  eq(codes_of(res, meeting.results[1].id), { "meeting-image-missing" }, "a meeting")
+  eq(codes_of(res, "lib.nvim/old-sync"), { "meeting-image-alias", "meeting-image-missing" })
+  -- the files there: the finding goes, and a cover named only in the frontmatter is no unused asset
+  local dir = vim.fs.dirname(made.path)
+  H.write(dir .. "/assets/cover.png", "png")
+  assert(mutate.set(made.id, { icon = "assets/i.svg" }, o))
+  res = assert(check.run({ root = root, today = F.TODAY }))
+  eq(codes_of(res, made.id), { "icon-missing" }, "the cover is there now, the icon is not")
+  H.write(dir .. "/assets/i.svg", "<svg/>")
+  res = assert(check.run({ root = root, today = F.TODAY }))
+  eq(codes_of(res, made.id), {}, "both there, neither unused")
 end

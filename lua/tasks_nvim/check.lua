@@ -34,6 +34,9 @@
 ---  - `slug-conflict`: the same slug exists as a file and as a folder task
 ---  - `asset-dangling` (warning): a folder task links `assets/<file>` that is not there
 ---  - `asset-unused` (warning): a folder task has an image in `assets/` that its text never mentions
+---  - `bad-icon`, `bad-cover` (errors): `icon` is no emoji, no image below `assets/` and no word of `model.ICON_WORDS`,
+---    `cover` no image below `assets/` (task, plan, project, path); `icon-missing`, `cover-missing` (warnings): the
+---    asset is not there
 ---  - `index-stale`: `ROADMAP/TASKS.md` is missing, outdated, or left over
 ---  - `bad-blocked-by`, `blocked-by-self`, `blocked-by-dangling`: the blocker is
 ---    malformed, the task itself, or exists nowhere; `blocked-by-done` (warning):
@@ -73,11 +76,12 @@
 ---    (`meeting-bad-status`, `meeting-bad-date`, `meeting-bad-time`, `meeting-end-and-duration`,
 ---    `meeting-end-before-start`, `meeting-end-without-time`, `meeting-bad-duration`, `meeting-bad-tz`,
 ---    `meeting-bad-online`, `meeting-bad-recording`, `meeting-bad-task`, `meeting-bad-notify`, `meeting-bad-notify-to`,
----    `meeting-bad-image`, `meeting-bad-icon`, ...); `meeting-id-taken` (error): an open task, plan or project of the
----    area has the same slug; `meeting-task-dangling`, `meeting-image-missing`, `meeting-done-in-future` (warnings):
----    `tasks:` names a task that exists nowhere, `image:` names a file that is not there, a meeting is done before its
----    day; `meeting-done-without-result`, `meeting-overlap` (hints): done without `## Ergebnis` (allowed), two planned
----    meetings of the area at the same time
+---    `meeting-bad-image`, `meeting-bad-cover`, `meeting-bad-icon`, ...); `meeting-id-taken` (error): an open task, plan or project of the
+---    area has the same slug; `meeting-task-dangling`, `meeting-image-missing`, `meeting-icon-missing`,
+---    `meeting-done-in-future` (warnings): `tasks:` names a task that exists nowhere, `cover:` (or `image:`) or an icon
+---    asset names a file that is not there, a meeting is done before its day; `meeting-image-alias`,
+---    `meeting-done-without-result`, `meeting-overlap` (hints): `image:` is the old name of `cover:`, done without
+---    `## Ergebnis` (allowed), two planned meetings of the area at the same time
 ---  - learning paths (`<area>/ROADMAP/paths/`, `tasks_nvim.paths`): a broken path file with the codes of a plan file
 ---    as `path-...` (and `path-no-stages`); `path-id-taken` (error); `path-reason-missing`, `path-duplicate-key`,
 ---    `path-bad-key`, `path-bad-mark`, `path-bad-arrow`, `path-image-outside`, `path-arrow-dangling`,
@@ -133,6 +137,36 @@ local function add(list, severity, code, task, message)
     id = task.id,
     message = message,
   }
+end
+
+---`icon-missing` / `cover-missing` (warnings): the `icon` (an asset) or the `cover` of a task, plan, project, path or
+---meeting names a file below `assets/` that is not there. Only a folder form has a folder for assets, so a plain file
+---that names one always misses it. A meeting's codes say `meeting-icon-missing` / `meeting-image-missing`.
+---@param findings Tasks.Finding[]
+---@param item { area: string, path: string, id?: string, folder?: boolean, icon?: Tasks.Icon, cover?: string }
+---@param prefix? string  # `meeting-` for a meeting
+local function picture_findings(findings, item, prefix)
+  local function present(rel)
+    return item.folder == true and fsio.is_file(fsio.dirname(item.path) .. "/" .. rel)
+  end
+  if item.icon and item.icon.kind == "asset" and not present(item.icon.value) then
+    add(
+      findings,
+      "warn",
+      (prefix or "") .. "icon-missing",
+      item,
+      "icon " .. item.icon.value .. " is not there"
+    )
+  end
+  if item.cover and not present(item.cover) then
+    add(
+      findings,
+      "warn",
+      prefix and (prefix .. "image-missing") or "cover-missing",
+      item,
+      "cover " .. item.cover .. " is not there"
+    )
+  end
 end
 
 ---The files of the saved views that are no view (`<area>/ROADMAP/views/*.md`: a field the engine does not have, no
@@ -574,6 +608,7 @@ local function plan_file_findings(findings, open_ids, names, scan_opts, is_finis
       for i, msg in ipairs(file.errors) do
         add(findings, "error", file.error_codes[i] or "frontmatter-invalid", file, msg)
       end
+      picture_findings(findings, file)
       for _, p in ipairs(file.link_problems or {}) do
         add(findings, "error", p.code, file, link_problem_message(p))
       end
@@ -702,11 +737,13 @@ local function meeting_findings(findings, hints, open_ids, names, scan_opts, is_
           add(findings, "warn", "meeting-task-dangling", m, "tasks: " .. id .. " does not exist")
         end
       end
-      if m.cover then
-        local present = m.folder and fsio.is_file(fsio.dirname(m.path) .. "/" .. m.cover)
-        if not present then
-          add(findings, "warn", "meeting-image-missing", m, "cover " .. m.cover .. " is not there")
-        end
+      picture_findings(findings, m, "meeting-")
+      if m.image_alias then
+        hint(
+          "meeting-image-alias",
+          m,
+          "image: is the old name of cover: (both are read; write cover:)"
+        )
       end
       if m.status == "done" and m.date and m.date > today then
         add(
@@ -778,6 +815,7 @@ local function path_findings(findings, open_ids, names, scan_opts, is_finished)
       for i, msg in ipairs(p.errors) do
         add(findings, "error", p.error_codes[i] or "frontmatter-invalid", p, msg)
       end
+      picture_findings(findings, p)
       if
         open_ids[p.id]
         or is_finished(p.id)
@@ -901,6 +939,7 @@ local function project_findings(findings, open_ids, names, scan_opts, is_finishe
       for i, msg in ipairs(file.errors) do
         add(findings, "error", file.error_codes[i] or "frontmatter-invalid", file, msg)
       end
+      picture_findings(findings, file)
       for _, p in ipairs(file.link_problems or {}) do
         add(findings, "error", p.code, file, link_problem_message(p))
       end
@@ -1267,6 +1306,7 @@ function M.run(opts)
       for i, msg in ipairs(t.errors) do
         add(findings, "error", t.error_codes[i] or "frontmatter-invalid", t, msg)
       end
+      picture_findings(findings, t)
       for _, w in ipairs(t.warnings) do
         add(findings, "warn", "frontmatter-warning", t, "line kept but not understood: " .. w)
       end

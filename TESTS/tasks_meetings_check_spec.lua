@@ -39,7 +39,7 @@ return function(H)
     "status: done",
     "date: 2026-10-01",
     "tasks: [lib.nvim/real]",
-    "image: assets/cover.png",
+    "cover: assets/cover.png",
   }, "## Ergebnis\nAgreed.\n")
   H.write(dir .. "/good/assets/cover.png", "png")
   -- loud ones
@@ -57,7 +57,7 @@ return function(H)
   )
   meeting(
     dir .. "/noimage.md",
-    { "title: No image", "status: planned", "date: 2026-10-10", "image: assets/x.png" }
+    { "title: No image", "status: planned", "date: 2026-10-10", "cover: assets/x.png" }
   )
   meeting(dir .. "/future.md", { "title: Future", "status: done", "date: 2026-12-24" })
   meeting(
