@@ -52,12 +52,87 @@ return function(H)
   local again = index.stage_area("lib.nvim", { root = root })
   eq(again.action, "unchanged", "the second run changes nothing")
 
+  -- A tracked task changed in the tree only (another session's claim): the staged index keeps the staged
+  -- version. The repro of 2026-11-19 had nothing staged but that file committed.
+  local _, commit_code =
+    git({ "-c", "user.name=t", "-c", "user.email=t@example.org", "commit", "-q", "-m", "seed" })
+  eq(commit_code, 0, "seed commit")
+  local own = root .. "/lib.nvim/ROADMAP/tasks/own-task.md"
+  local committed_text = table.concat(vim.fn.readfile(own), "\n")
+  vim.fn.writefile(vim.split(committed_text:gsub("status: open", "status: doing"), "\n"), own)
+  local claimed = index.stage_area("lib.nvim", { root = root })
+  ok(claimed, "the run after a tree-only change succeeds")
+  local staged_after = git({ "show", ":lib.nvim/ROADMAP/TASKS.md" })
+  local row = staged_after:match("[^\n]*own%-task[^\n]*") or ""
+  ok(not row:find("doing", 1, true), "the row keeps the staged status, not the tree's: " .. row)
+  eq(claimed.action, "unchanged", "nothing to stage: the staged task did not change")
+  eq(claimed.staged, {}, "nothing of the area is staged apart from HEAD")
+
+  -- What really happened on 2026-11-19: an autostash that hit a conflict left the claim of the other session
+  -- staged. The index is built from the staging area, so the run must name that file.
+  git({ "add", "--", "lib.nvim/ROADMAP/tasks/own-task.md" })
+  local listed = index.stage_area("lib.nvim", { root = root })
+  ok(listed, "a staged change of a task is no error")
+  eq(listed.action, "written", "the staged claim reaches the index")
+  eq(listed.staged, { "lib.nvim/ROADMAP/tasks/own-task.md" }, "and the run names the staged file")
+  vim.fn.writefile(vim.split(committed_text, "\n"), own)
+  git({ "add", "--", "lib.nvim/ROADMAP/tasks/own-task.md" })
+  index.stage_area("lib.nvim", { root = root })
+
+  ---Put `rel` into the staging area as a conflict of three versions (`ls-files -u`).
+  ---@param rel string
+  local function conflict(rel)
+    local blobs = {}
+    for i, text in ipairs({ "base\n", "ours\n", "theirs\n" }) do
+      local out = vim
+        .system({ "git", "-C", root, "hash-object", "-w", "--stdin" }, { text = true, stdin = text })
+        :wait()
+      blobs[i] = vim.trim(out.stdout or "")
+    end
+    git({ "update-index", "--force-remove", "--", rel })
+    local info = {}
+    for i, blob in ipairs(blobs) do
+      info[i] = ("100644 %s %d\t%s"):format(blob, i, rel)
+    end
+    local out = vim
+      .system(
+        { "git", "-C", root, "update-index", "--index-info" },
+        { text = true, stdin = table.concat(info, "\n") .. "\n" }
+      )
+      :wait()
+    eq(out.code, 0, "update-index --index-info: " .. tostring(out.stderr))
+  end
+
+  -- A task file in conflict would drop out of the index without a word (`checkout-index` skips it): refused.
+  local stray = "lib.nvim/ROADMAP/tasks/stray.md"
+  conflict(stray)
+  local refused, refused_err = index.stage_area("lib.nvim", { root = root })
+  eq(refused, nil, "a conflict in a task file is refused")
+  ok(
+    tostring(refused_err):find("conflict", 1, true) and tostring(refused_err):find(stray, 1, true),
+    "and the message names it: " .. tostring(refused_err)
+  )
+  git({ "update-index", "--force-remove", "--", stray })
+
+  -- A conflict in the generated index alone is what this run resolves.
+  conflict("lib.nvim/ROADMAP/TASKS.md")
+  local resolved, resolved_err = index.stage_area("lib.nvim", { root = root })
+  ok(resolved, "a conflicted index is rewritten: " .. tostring(resolved_err))
+  local left = git({ "ls-files", "--unmerged" })
+  eq(left, "", "and the conflict is gone")
+
   -- The last open task leaves the staging area: the index goes with it.
   git({ "rm", "-q", "--cached", "--", "lib.nvim/ROADMAP/tasks/own-task.md" })
   local gone = index.stage_area("lib.nvim", { root = root })
   eq(gone.action, "removed", "an area without open tasks loses its index")
   local _, gone_code = git({ "show", ":lib.nvim/ROADMAP/TASKS.md" })
   ok(gone_code ~= 0, "and it is out of the staging area")
+
+  -- A conflicted index of an area without open tasks: nothing to write, the conflict still goes.
+  conflict("lib.nvim/ROADMAP/TASKS.md")
+  local dropped = index.stage_area("lib.nvim", { root = root })
+  eq(dropped and dropped.action, "removed", "the conflicted index of an empty area is removed")
+  eq(git({ "ls-files", "--unmerged" }), "", "and leaves no conflict behind")
 
   local none, none_err = index.stage_area("no-such.nvim", { root = root })
   eq(none, nil, "an unknown area is an error")

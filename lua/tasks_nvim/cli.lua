@@ -137,7 +137,9 @@ commands:
                                           value; default status open,doing,decision. --report writes the Markdown
   index [<area>] [--check]                (re)write ROADMAP/TASKS.md; --check only reports
   index <area> --staged                   build it from the staging area and stage it; the working tree stays as it
-                                          is, so another session's uncommitted tasks stay out of the commit
+                                          is, so another session's uncommitted tasks stay out of the commit;
+                                          lists the staged files of the area (`staged<TAB><path>`) and refuses a
+                                          staging area with a conflict
                                           index without an area also writes down the figures of today when the vault
                                           keeps a series (_Telemetry/history exists); --no-history leaves that out
   history [<area>] [--since=YYYY-MM-DD] [--until=YYYY-MM-DD] [--resolution=day|week] [--format=tsv|json]
@@ -1708,6 +1710,16 @@ function commands.index(ctx)
       return 1
     end
     ctx.say(("%s	%s	%d open	%s (staged)"):format(res.action, res.area, res.open, res.path))
+    -- The index is built from these as well: a file that is not the caller's (an autostash that hit a conflict
+    -- stages the whole tree) must be seen before the commit, not after the push.
+    for _, path in ipairs(res.staged or {}) do
+      ctx.say("staged	" .. path)
+    end
+    if res.staged and #res.staged > 0 then
+      ctx.warn(
+        "note: the index counts the staged files above; one that is not yours: `git restore --staged <path>`, then run again"
+      )
+    end
     return 0
   end
   local opts = { root = eo.root, check = args.opt.check == true }

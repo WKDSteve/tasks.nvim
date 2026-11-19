@@ -220,6 +220,47 @@ function M.stage_area(area, opts)
   end
   top = vim.trim(top)
   local prefix = vim.trim(git(root, { "rev-parse", "--show-prefix" }) or "")
+  local rel = prefix .. area .. "/ROADMAP/TASKS.md"
+
+  -- `checkout-index --all` skips a path in conflict without a word: a task file in one would drop out of the
+  -- index. A conflicted generated index is no input (it is what this run rewrites); anything else must be resolved.
+  local unmerged_out, uerr = git(top, { "ls-files", "--unmerged", "-z" })
+  if not unmerged_out then
+    return nil, uerr
+  end
+  local unmerged, seen, index_unmerged = {}, {}, false
+  for entry in unmerged_out:gmatch("[^%z]+") do
+    local path = entry:match("^%d+ %x+ %d+\t(.+)$")
+    if path == rel then
+      index_unmerged = true
+    elseif path and not seen[path] and not path:match("/ROADMAP/TASKS%.md$") then
+      seen[path] = true
+      unmerged[#unmerged + 1] = path
+    end
+  end
+  if #unmerged > 0 then
+    table.sort(unmerged)
+    return nil,
+      ("the staging area holds a conflict (an autostash that did not apply?): %s; resolve it, then run again"):format(
+        table.concat(unmerged, ", ")
+      )
+  end
+
+  -- What of the area goes into the commit besides the index. A `pull --rebase --autostash` whose stash conflicts
+  -- leaves every other change of the tree staged, another session's claim among them: the index is then built from
+  -- it, rightly so, and only this list shows the caller that the staging area holds more than they put there.
+  local diff_out, derr =
+    git(top, { "diff", "--cached", "--name-only", "-z", "--", prefix .. area .. "/" })
+  if not diff_out then
+    return nil, derr
+  end
+  local staged = {}
+  for path in diff_out:gmatch("[^%z]+") do
+    if path ~= rel then
+      staged[#staged + 1] = path
+    end
+  end
+  table.sort(staged)
 
   local tmp = vim.fn.tempname()
   local function run()
@@ -234,8 +275,11 @@ function M.stage_area(area, opts)
     if not result then
       return nil, werr
     end
-    local rel = prefix .. area .. "/ROADMAP/TASKS.md"
     local _, serr
+    if index_unmerged and result.action == "unchanged" then
+      -- `checkout-index` left the conflicted index out, and no open task asks for one: the conflict goes with it.
+      result.action = "removed"
+    end
     if result.action == "removed" then
       _, serr = git(top, { "update-index", "--force-remove", "--", rel })
     elseif result.action == "written" then
@@ -251,6 +295,7 @@ function M.stage_area(area, opts)
       return nil, serr
     end
     result.path = rel
+    result.staged = staged
     return result
   end
   local ran, result, err = pcall(run)

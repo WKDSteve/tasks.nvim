@@ -126,6 +126,8 @@ function M.fix_lines(done_in_roadmap, stale_areas)
     "  stage your task files first, then this, then commit: `--staged` builds the index"
   lines[#lines + 1] =
     "  from the staging area, so another session's uncommitted tasks stay out of it."
+  lines[#lines + 1] =
+    "  it lists the staged files it counted (`staged`): unstage one that is not yours and run it again."
   return lines
 end
 

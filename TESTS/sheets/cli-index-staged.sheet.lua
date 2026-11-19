@@ -52,6 +52,11 @@ return {
       note = "it says the index is staged",
     },
     {
+      expect = [[_G.out:find("staged\tlib.nvim/ROADMAP/tasks/own-task.md", 1, true) ~= nil
+        and not _G.out:find("foreign-task", 1, true)]],
+      note = "it names the staged task file it counted, not the one only in the tree",
+    },
+    {
       expect = [[(function()
         local staged, code = _G.git("show", ":lib.nvim/ROADMAP/TASKS.md")
         return code == 0 and staged:find("own-task", 1, true) ~= nil and not staged:find("foreign-task", 1, true)
