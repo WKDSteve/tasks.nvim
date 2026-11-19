@@ -97,10 +97,14 @@ return {
 
     -- a repository git refuses
     { keys = ":bwipeout!<CR>" },
-    { keys = ":Tasks plan cascade.nvim --stale=refs<CR>", ignore_errmsg = true },
     {
-      expect = [[vim.v.errmsg == "" or not vim.v.errmsg:find("E5108", 1, true)]],
-      note = "a repository without a commit is no Lua error",
+      keys = ":Tasks plan cascade.nvim --stale=refs<CR>",
+      note = "a repository without a commit: no error message",
+    },
+    {
+      wait = [[_G.buf_has("Fresh repo")]],
+      timeout = 10000,
+      note = "the task whose refs git could not date stays in the plan (an unreadable signal is never 'not stale')",
     },
   },
   judge = {},
