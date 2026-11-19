@@ -330,7 +330,8 @@ local function items_of(lines, with_task)
         if not head then
           head, id = text:match("^(.-)%s*" .. arrow .. "%s*(%S+)$")
         end
-        if id and vault.parse_id(id) then
+        -- an id with a slug: `parse_id` reads a bare word as an area
+        if id and select(2, vault.parse_id(id)) then
           item.text, item.task = fsio.clean(head), id
         end
       end

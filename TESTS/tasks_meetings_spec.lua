@@ -134,6 +134,12 @@ return function(H)
   eq(arrow.followups[1].task, "lib.nvim/do-it")
   eq(arrow.followups[1].text, "Do it")
   eq(arrow.has_result, false)
+  -- a bare word after the arrow is no task id
+  local word = parse(
+    { "title: x", "status: done", "date: 2026-11-24" },
+    "## Folgeaufgaben\n- [ ] Ask -> later\n"
+  )
+  eq(word.followups[1], { n = 1, text = "Ask -> later", ticked = false })
   eq(arrow.all_day, true)
   eq(arrow.start, "2026-11-24")
   eq(arrow.ends, "2026-11-24")
