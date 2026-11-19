@@ -181,7 +181,7 @@ local function selection(ticks)
 end
 
 ---Fresh form text.
----@param opts? { area?: string, title?: string, summary?: string, areas?: string[], tags?: string, other?: string, refs?: string, links?: string, after?: string, plan?: string, project?: string, phase?: string, due?: string, start?: string, ticks?: table<string, string|string[]>, hint?: string, lang?: "de"|"en", sections?: table<string, string> }
+---@param opts? { area?: string, title?: string, summary?: string, areas?: string[], tags?: string, other?: string, refs?: string, links?: string, icon?: string, cover?: string, after?: string, plan?: string, project?: string, phase?: string, due?: string, start?: string, ticks?: table<string, string|string[]>, hint?: string, lang?: "de"|"en", sections?: table<string, string> }
 ---  `ticks` overrides the ticked values per field name; `hint` is the second line (the keys of the user's setup);
 ---  `lang` picks the headings of the body sections (default `de`); `sections` fills them (`acceptance` = its lines).
 ---@return string[] lines
@@ -238,6 +238,8 @@ function M.template(opts)
   lines[#lines + 1] = "Tags: " .. (opts.tags or "")
   lines[#lines + 1] = "Refs: " .. (opts.refs or "")
   lines[#lines + 1] = "Links: " .. (opts.links or "")
+  lines[#lines + 1] = "Icon: " .. (opts.icon or "")
+  lines[#lines + 1] = "Cover: " .. (opts.cover or "")
   lines[#lines + 1] = "After: " .. (opts.after or "")
   lines[#lines + 1] = "Plan: " .. (opts.plan or "")
   lines[#lines + 1] = "Project: " .. (opts.project or "")
@@ -267,6 +269,8 @@ end
 ---@field other string   # The `Other:` line under the scope list: scope words not ticked, and anything else (it goes to the tags).
 ---@field refs string
 ---@field links string
+---@field icon string    # An emoji, a file below `assets/` or a word (`model.icon_of`); empty for none.
+---@field cover string   # A picture below `assets/`; empty for none.
 ---@field after string   # Task ids, comma separated.
 ---@field plan string
 ---@field project string  # A task of a project itself (instead of `Plan:`).
@@ -290,6 +294,8 @@ function M.parse(lines)
     other = "",
     refs = "",
     links = "",
+    icon = "",
+    cover = "",
     after = "",
     plan = "",
     project = "",
@@ -340,6 +346,8 @@ function M.parse(lines)
           or key == "other"
           or key == "refs"
           or key == "links"
+          or key == "icon"
+          or key == "cover"
           or key == "after"
           or key == "plan"
           or key == "project"
@@ -492,6 +500,22 @@ function M.validate(parsed, areas, root, lang)
       end
     end
     opts.web_links = links
+  end
+  -- what the task stands for, judged as `set` judges it
+  local mutate = require("tasks_nvim.mutate")
+  for _, f in ipairs({
+    { "icon", "Icon", mutate.icon_field },
+    { "cover", "Cover", mutate.cover_field },
+  }) do
+    local text = trim(parsed[f[1]] or "")
+    if text ~= "" then
+      local stored, ferr = f[3](text)
+      if stored == nil then
+        errors[#errors + 1] = f[2] .. ": " .. tostring(ferr)
+      else
+        opts[f[1]] = stored
+      end
+    end
   end
   -- the relations are judged by the engine (`after-dangling`, `plan-unknown`, `project-unknown`, `plan-phase`), the dates here too
   for _, key in ipairs({ "after", "plan", "project", "phase" }) do

@@ -235,6 +235,7 @@ window.
 | `<C-s>` (normal and insert) | submit |
 | `q` (normal) / `<C-q>` | cancel -- nothing is created |
 | `g?` | help in a float that stays until `q` / `<Esc>` or until you leave it |
+| `<C-e>` (normal) | pick the icon with emojis.nvim (soft dependency) into the `Icon:` line |
 | `g?` | help |
 
 The tick is cascade.nvim's checkbox toggle (`require("cascade").toggle_checkbox`) when that

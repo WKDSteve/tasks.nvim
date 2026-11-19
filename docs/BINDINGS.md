@@ -62,7 +62,7 @@ require("tasks_nvim").setup({
 
 An action that is not named keeps its default. Dashboard actions: `status prio done filter sort export rescan
 backlog roadmap preview view assign move_down move_up help`, and while the AI functions are on `agent agent_run` (`gh` / `gH`:
-the task under the cursor to `:Tasks agent`, prefill / run). Form actions: `tick_space tick_enter submit cancel cancel_ctrl help`. An unknown
+the task under the cursor to `:Tasks agent`, prefill / run). Form actions: `tick_space tick_enter submit cancel cancel_ctrl help icon`. An unknown
 action name is reported (and listed in `:checkhealth`), never bound. The help (`g?`) lists the default keys.
 
 ## Form (`:Tasks new` without arguments)
@@ -75,6 +75,7 @@ Buffer-local keys of the form buffer:
 | `<C-s>` (normal and insert) | submit |
 | `q` (normal) / `<C-q>` | cancel; asks first when text was typed |
 | `g?` | help |
+| `<C-e>` (normal) | pick the icon with emojis.nvim into the `Icon:` line (without it: the cursor goes there, type it) |
 
 ## Headless
 

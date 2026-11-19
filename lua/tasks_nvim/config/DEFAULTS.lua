@@ -156,6 +156,7 @@ return {
       cancel = "q",
       cancel_ctrl = "<C-q>",
       help = "g?",
+      icon = "<C-e>",
     },
   },
 }

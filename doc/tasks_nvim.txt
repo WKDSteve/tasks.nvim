@@ -254,7 +254,8 @@ In the input window the same actions are on `<M-s> <M-p> <M-d> <M-f> <M-l> <M-o>
 <M-e> <M-r> <M-i> <M-b> <M-m> <M-v> <M-?>` (and `<M-h> <M-H>` for the agent) (they shadow some snacks defaults).
 
 In the task form: `<Space>`/`<CR>` tick a line, `<C-s>` submit, `q`/`<C-q>`
-cancel (asks when text was typed), `g?` help.
+cancel (asks when text was typed), `g?` help, `<C-e>` pick the icon with
+emojis.nvim into the `Icon:` line (an emoji, `assets/<file>` or a word).
 
 ==============================================================================
 6. TASK FILE FORMAT                                            *tasks_nvim-format*

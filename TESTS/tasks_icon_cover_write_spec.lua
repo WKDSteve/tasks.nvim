@@ -293,4 +293,62 @@ return function(H)
   eq(mdoc.icon, { kind = "emoji", value = CRAB })
   eq(mdoc.cover, "assets/m.png")
   eq(mdoc.image, "assets/m.png", "image: the old name, the same value")
+
+  -- ── the form: Icon: and Cover: lines, judged as set judges them ───────────
+  local form = require("tasks_nvim.form")
+  local function line_of(lines, prefix)
+    for i, l in ipairs(lines) do
+      if l:sub(1, #prefix) == prefix then
+        return i
+      end
+    end
+  end
+  local lines = form.template({ area = "lib.nvim", title = "Form icon", icon = CRAB })
+  eq(lines[line_of(lines, "Icon: ")], "Icon: " .. CRAB, "the template carries a given icon")
+  ok(line_of(lines, "Cover: "), "a Cover: line")
+  lines[line_of(lines, "Cover: ")] = "Cover: assets/c.webp"
+  local values, errs = form.validate(form.parse(lines), { "lib.nvim" })
+  eq(errs, {})
+  eq(values.opts.icon, CRAB)
+  eq(values.opts.cover, "assets/c.webp")
+  lines[line_of(lines, "Icon: ")] = "Icon: rocket"
+  lines[line_of(lines, "Cover: ")] = "Cover: c.png"
+  local _, errs2 = form.validate(form.parse(lines), { "lib.nvim" })
+  eq(#errs2, 2, vim.inspect(errs2))
+  ok(errs2[1]:find("^Icon: unknown icon"), errs2[1])
+  ok(errs2[2]:find("^Cover: "), errs2[2])
+  local empty = form.template({ area = "lib.nvim", title = "No icon" })
+  local v3 = form.validate(form.parse(empty), { "lib.nvim" })
+  eq(v3.opts.icon, nil, "an empty Icon: line sets nothing")
+  eq(v3.opts.cover, nil)
+
+  -- ── the form UI: <C-e> asks emojis.nvim, which writes into the Icon: line ─
+  local ui_form = require("tasks_nvim.ui.form")
+  local buf = vim.api.nvim_create_buf(false, true)
+  vim.api.nvim_set_current_buf(buf)
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "Title: x", "Icon: old", "Cover: " })
+  local saved = package.loaded["emojis"]
+  package.loaded["emojis"] = {
+    insert = function()
+      -- what emojis.nvim's insert picker does with a pick: put it at the cursor
+      local row, col = unpack(vim.api.nvim_win_get_cursor(0))
+      local l = vim.api.nvim_buf_get_lines(buf, row - 1, row, false)[1]
+      vim.api.nvim_buf_set_lines(
+        buf,
+        row - 1,
+        row,
+        false,
+        { l:sub(1, col) .. CRAB .. l:sub(col + 1) }
+      )
+    end,
+  }
+  ok(ui_form.pick_icon(buf), "picked")
+  local after_pick = form.parse(vim.api.nvim_buf_get_lines(buf, 0, -1, false))
+  eq(vim.trim(after_pick.icon), CRAB, "the old value is replaced by the pick")
+  package.loaded["emojis"] = false
+  ok(not ui_form.pick_icon(buf), "without emojis.nvim nothing is picked")
+  eq(vim.api.nvim_win_get_cursor(0)[1], 2, "the cursor is on the Icon: line")
+  package.loaded["emojis"] = saved
+  vim.api.nvim_buf_delete(buf, { force = true })
+  eq(require("tasks_nvim.config").get().keys.form.icon, "<C-e>")
 end

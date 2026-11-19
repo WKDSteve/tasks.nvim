@@ -11,6 +11,7 @@
 ---  - `<Space>` / `<CR>` on a choice bullet: tick / untick it (cascade.nvim's
 ---    checkbox toggle when installed, an own flip otherwise)
 ---  - `<C-s>` (normal and insert): submit
+---  - `<C-e>` (normal): pick the icon with emojis.nvim (soft dependency) into the `Icon:` line
 ---  - `q` (normal) / `<C-q>`: cancel, nothing is created
 ---  - `g?`: help
 ---
@@ -67,9 +68,12 @@ function M.help_lines(keys)
       key("cancel_ctrl")
     ),
     ("%s               this help"):format(key("help")),
+    ("%s            pick the icon with emojis.nvim (into the Icon: line)"):format(key("icon")),
     "",
     "Area and Title are required. Tags, Refs and Links are comma separated;",
     "Links takes web addresses (http:// or https://), Refs paths and commits.",
+    "Icon is one emoji, a file below assets/ or a word (handshake, idea, ...);",
+    "Cover a picture below assets/ (png, jpg, webp, svg). Both are optional.",
     "Area may name several areas (a, b): one task is created in each.",
     "Summary is the one line that ends up in the index.",
     "Kontext / Akzeptanz / Notizen at the end are free text (an Akzeptanz line without",
@@ -188,6 +192,39 @@ function M.toggle_here(buf)
   return true
 end
 
+---Pick the icon with emojis.nvim (soft dependency): its insert picker writes the emoji into the `Icon:` line, which is
+---emptied first. Without emojis.nvim the cursor goes to that line and a note says to type the icon (an emoji, a file
+---below `assets/` or a word).
+---@param buf integer
+---@return boolean picked  `false` when the form has no `Icon:` line or emojis.nvim is not there
+function M.pick_icon(buf)
+  local lines = buf_lines(buf)
+  local lnum
+  for i, line in ipairs(lines) do
+    if line:match("^Icon:") then
+      lnum = i
+      break
+    end
+  end
+  if not lnum then
+    return false
+  end
+  local emojis = require("tasks_nvim.soft").check({ "insert" }, pcall(require, "emojis"))
+  if not emojis then
+    vim.api.nvim_win_set_cursor(0, { lnum, #lines[lnum] })
+    vim.notify(
+      "emojis.nvim is not installed: type the icon after Icon: (an emoji, assets/<file> or a word)",
+      vim.log.levels.INFO
+    )
+    return false
+  end
+  vim.api.nvim_buf_set_lines(buf, lnum - 1, lnum, false, { "Icon: " })
+  -- the picker inserts at the cursor: after "Icon: " (a column past the end is the end of the line)
+  vim.api.nvim_win_set_cursor(0, { lnum, #"Icon: " })
+  emojis.insert()
+  return true
+end
+
 ---Show the error report at the top of the form, replacing an earlier one.
 ---@param buf integer
 ---@param errors string[]
@@ -288,6 +325,8 @@ end
 ---@field other? string  # The `Other:` line.
 ---@field refs? string
 ---@field links? string  # Web addresses, comma separated.
+---@field icon? string   # The `Icon:` line (an emoji, a file below `assets/` or a word).
+---@field cover? string  # The `Cover:` line (a picture below `assets/`).
 ---@field after? string  # Task ids, comma separated.
 ---@field plan? string
 ---@field project? string
@@ -338,6 +377,8 @@ function M.open(opts)
       other = opts.other,
       refs = opts.refs,
       links = opts.links,
+      icon = opts.icon,
+      cover = opts.cover,
       after = opts.after,
       plan = opts.plan,
       project = opts.project,
@@ -415,6 +456,9 @@ function M.open(opts)
   bind("n", "help", function()
     M.show_help()
   end, "Task form: help")
+  bind("n", "icon", function()
+    M.pick_icon(buf)
+  end, "Task form: pick the icon (emojis.nvim)")
 
   -- Start on the first free text line.
   local lines = buf_lines(buf)

@@ -223,8 +223,10 @@ return function(H)
     "actor",
     "after",
     "category",
+    "cover",
     "due",
     "effort",
+    "icon",
     "kind",
     "links",
     "phase",
@@ -244,10 +246,20 @@ return function(H)
   for _, f in ipairs(form.fields()) do
     in_form[#in_form + 1] = f.name
   end
-  vim.list_extend(
-    in_form,
-    { "tags", "refs", "links", "summary", "after", "plan", "project", "phase", "due", "start" }
-  )
+  vim.list_extend(in_form, {
+    "tags",
+    "refs",
+    "links",
+    "icon",
+    "cover",
+    "summary",
+    "after",
+    "plan",
+    "project",
+    "phase",
+    "due",
+    "start",
+  })
   table.sort(in_form)
   eq(in_form, FORM_FIELDS, "the fields of the :Tasks new form")
   local engine_new = {}
@@ -255,15 +267,7 @@ return function(H)
     -- the slug comes from the title; `waits_for` creates a task that is parked from the start, which no form offers
     -- (a task is parked with a reason later: `set <id> waits_for=<key>`); a routine is made with `repeat=` on the
     -- command line or `set`, not by the form
-    -- (`icon` and `cover` reach the form in their own step)
-    if
-      name ~= "slug"
-      and name ~= "waits_for"
-      and name ~= "repeat"
-      and name ~= "repeat_from"
-      and name ~= "icon"
-      and name ~= "cover"
-    then
+    if name ~= "slug" and name ~= "waits_for" and name ~= "repeat" and name ~= "repeat_from" then
       engine_new[#engine_new + 1] = name
     end
   end
