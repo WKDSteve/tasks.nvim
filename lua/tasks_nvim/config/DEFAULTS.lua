@@ -100,7 +100,7 @@ return {
   area_groups = {},
   steps = { ask_finish = false },
   sheet_run = { testing_cli = nil },
-  reminders = { on_start = true },
+  reminders = { on_start = false },
   attach = { screenshot_dirs = {}, max_age_s = 300 },
   completion = { finished = true },
   form = { mode = "float" },

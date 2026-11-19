@@ -150,7 +150,7 @@ require("tasks_nvim").setup({
   next = { popup = true, cdx_hint = true },                                     -- the dialog after done
   chain = { marker_docs = {} },                                                 -- documents with generated plan blocks
   steps = { ask_finish = false },                                               -- ask to finish when the last step is ticked
-  reminders = { on_start = true },                                              -- one line at startup when a reminder is due
+  reminders = { on_start = false },                                              -- opt-in: one line at startup when a reminder is due
   completion = { finished = true },                                             -- <Tab> offers finished tasks: true (all), false (none) or N (finished in the last N days)
   lists = {},                                                                   -- named lists, see below
   area_groups = {},                                                             -- area groups on top of <vault>/area-groups.json, see below

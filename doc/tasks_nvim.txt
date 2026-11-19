@@ -49,7 +49,7 @@ blockers, plan or estimate is valid and stays visible everywhere.
     next = { popup = true, cdx_hint = true },
     chain = { marker_docs = {} },
     steps = { ask_finish = false },
-    reminders = { on_start = true },
+    reminders = { on_start = false },
     completion = { finished = true },   -- true, false or N days
     quick_wins = { min_value = 4, max_effort = "S" },
     lists = {},
@@ -94,7 +94,7 @@ blockers, plan or estimate is valid and stays visible everywhere.
   steps.ask_finish         In a task buffer, ticking the last `## Plan` step asks to finish
                            the task (off by default: it adds an autocommand).
   reminders.on_start       One line shortly after startup when reminders (`remind:`) are due
-                           (once per session, only with a UI; `false` turns it off).
+                           (once per session, only with a UI; off by default, `true` turns it on).
   tree                     The vault in a tree view that reads lib.nvim's tree registry (the
                            own tree of filetree.nvim): a count of open tasks next to an area
                            folder, a view `tasks` (areas, below them their open tasks), and

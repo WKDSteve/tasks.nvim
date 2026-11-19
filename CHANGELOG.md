@@ -5,6 +5,10 @@ the version is not tagged yet (the repository is not published).
 
 ## [Unreleased]
 
+### Changed
+
+- `reminders.on_start` is opt-in now: the one line at startup about due reminders no longer shows unless `setup({ reminders = { on_start = true } })` asks for it.
+
 ### Added
 
 - Writing meetings, `tasks-ops/1` (additive, capability `meeting_ops`): `meeting_new` (a dry run names the id; the slug is title and date), `meeting_set` (with `inverse`), `meeting_close` (at any time, `result` writes `## Ergebnis`, `without_result` says it has none), `meeting_capture` (one line of the minutes with its time, a task, decision or question also in its section; board, photo and audio embed an asset), `meeting_attend` (tick a participant), `meeting_followups` (tasks with `refs: [<meeting>]`, the id behind the line, a failure per line) and `board_save` (a whiteboard in `assets/boards/`, `ink`, `excalidraw` or the file of an external app, replaced only on the version read, else `conflict` with a free name). `tick_step`, `add_steps` (`section: agenda|followups`), `append_note`, `set_section`, `set_body` and `attach` take a meeting id; `attach` has the kinds `audio` and `board`. `move_area` rewrites `tasks:` and follow-up arrows of the meetings (kind `meeting`), `done` of a follow-up ticks its line, `find` names the meetings of a task and every match carries `kind`. `tasks_nvim.meeting_quick` reads one line into a proposal of a meeting. CLI `tasks meeting new|set|close|followups|attend|show|parse` and `tasks meetings`; `:Tasks meeting list|open|new|close` in the editor (a picker of the coming meetings, a jump to a section).

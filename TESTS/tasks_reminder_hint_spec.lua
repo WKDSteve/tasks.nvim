@@ -276,14 +276,19 @@ return function(H)
   notify.create = orig_create
   hint.reset()
 
-  -- the option: on by default; a bad value is reported and ignored, the default stays
-  eq(config.get().reminders.on_start, true)
+  -- the option: opt-in (off by default); a bad value is reported and ignored, the default stays
+  config.merge({ reminders = { on_start = false } })
+  eq(
+    require("tasks_nvim.config.DEFAULTS").reminders.on_start,
+    false,
+    "opt-in: the plugin default is off"
+  )
   config.take_unannounced()
   eq(config.validate({ reminders = { on_start = "no" } }), { reminders = {} })
   has(table.concat(config.take_unannounced(), "\n"), "`reminders.on_start` must be true or false")
   eq(config.validate({ reminders = false }), {})
   has(table.concat(config.take_unannounced(), "\n"), "`reminders` must be a table")
-  eq(config.get().reminders.on_start, true, "the default stays")
+  eq(config.get().reminders.on_start, false, "the default stays")
 
   -- setup() registers the hint only when the option is on
   local calls = 0
