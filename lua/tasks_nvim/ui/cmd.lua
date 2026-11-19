@@ -1369,6 +1369,8 @@ function M.task_new_form(given)
     tags = given.tags,
     refs = given.refs,
     links = given.links,
+    icon = given.icon,
+    cover = given.cover,
     after = given.after,
     plan = given.plan,
     project = given.project,

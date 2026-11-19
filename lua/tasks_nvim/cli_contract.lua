@@ -238,6 +238,8 @@ local function run_show(ctx)
   field("after", t.after)
   field("refs", t.refs)
   field("links", t.links)
+  field("icon", t.icon and ("%s (%s)"):format(t.icon.value, t.icon.kind) or nil)
+  field("cover", t.cover)
   field("commits", t.commits)
   field("open_questions", t.open_questions)
   if t.sheets then

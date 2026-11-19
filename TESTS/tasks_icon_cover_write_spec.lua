@@ -351,4 +351,30 @@ return function(H)
   package.loaded["emojis"] = saved
   vim.api.nvim_buf_delete(buf, { force = true })
   eq(require("tasks_nvim.config").get().keys.form.icon, "<C-e>")
+
+  -- `:Tasks new icon=... cover=...` without an area opens the form with both filled in
+  local cmd = require("tasks_nvim.ui.cmd")
+  require("tasks_nvim.vault").set_root(root)
+  local captured
+  cmd.form_open = function(spec)
+    captured = spec
+  end
+  cmd.task_new({
+    args = { area = nil },
+    kv = { icon = CRAB, cover = "assets/f.png" },
+    flags = {},
+    rest = {},
+    range = { range = 0, line1 = 1, line2 = 1 },
+  })
+  cmd.form_open = nil
+  ok(captured, "the form was opened")
+  eq(captured.icon, CRAB, "icon= pre-fills the form")
+  eq(captured.cover, "assets/f.png", "cover= too")
+
+  -- `tasks show` names both
+  out = {}
+  eq(cli.run({ "show", made.id, "--vault=" .. root, "--today=" .. F.TODAY }, io_), 0)
+  local shown = table.concat(out, "")
+  has(shown, "icon: assets/i.svg (asset)")
+  has(shown, "cover: assets/cover.png")
 end
