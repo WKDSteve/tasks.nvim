@@ -95,6 +95,22 @@ return function(H)
   eq({ learn.locate(scratch).id, learn.locate(scratch).kind }, { "lib.nvim/plain-task", "task" })
   vim.api.nvim_buf_set_name(scratch, H.tmpdir() .. "/elsewhere.md")
   has(select(2, learn.locate(scratch)), "not a file of the vault")
+  -- the vault reached over a link (macOS: /var is /private/var): the file is still the vault's
+  local link = H.tmpdir() .. "/vault-link"
+  if vim.uv.fs_symlink(root, link, { dir = true, junction = true }) then
+    vault.set_root(link)
+    vim.api.nvim_buf_set_name(scratch, root .. "/lib.nvim/ROADMAP/tasks/plain-task.md")
+    eq(
+      learn.locate(scratch).id,
+      "lib.nvim/plain-task",
+      "the root over a link, the file by its real path"
+    )
+    vault.set_root(root)
+    vim.api.nvim_buf_set_name(scratch, link .. "/lib.nvim/ROADMAP/tasks/plain-task.md")
+    eq(learn.locate(scratch).id, "lib.nvim/plain-task", "the file over a link")
+  else
+    print("n/a  no symbolic link or junction can be made here")
+  end
   vim.api.nvim_buf_delete(scratch, { force = true })
 
   -- ── the point under the cursor ─────────────────────────────────────────────

@@ -79,7 +79,14 @@ function M.locate(buf)
   end
   local file = fsio.norm(name)
   if not fsio.is_inside(root, file) then
-    return nil, "not a file of the vault: " .. file
+    -- the vault or the file reached over a link (macOS: /var is /private/var; a junction on Windows): compare where
+    -- both really are
+    local uv = vim.uv or vim.loop
+    local real_root, real_file = uv.fs_realpath(root), uv.fs_realpath(file)
+    if not (real_root and real_file and fsio.is_inside(real_root, real_file)) then
+      return nil, "not a file of the vault: " .. file
+    end
+    root, file = fsio.norm(real_root), fsio.norm(real_file)
   end
   local rel = file:sub(#root + 2)
   for _, folder in ipairs({ "paths", "tasks" }) do
