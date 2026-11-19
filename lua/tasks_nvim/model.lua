@@ -43,7 +43,8 @@ M.KINDS = { "feature", "task", "bug", "idea", "research" }
 ---`set category=`, `check` and the `hello` enums read. New words go at the end: the order is the output order of
 ---`model.categories`. `ux` = what the user sees or does (a new user-facing feature), `bindings` = keymaps,
 ---commands, shortcuts; `refactor`, `tests`, `ci` = internal work on the code, the test suite, the pipeline; `learning` = work done to learn
----and get better (a protocol, a terminal), not out of need.
+---and get better (a protocol, a terminal), not out of need, also the learning in learning paths (its scaffold lines:
+---sources, result, self-check, open questions; `plans.new` has the template `learning`).
 ---@type string[]
 M.CATEGORIES = {
   "bug",
@@ -154,6 +155,28 @@ M.SCAFFOLD = {
         id = "caller-impact",
         de = "Auswirkung für Aufrufer (API, Typen) notiert",
         en = "Effect on callers (API, types) noted",
+      },
+    },
+    learning = {
+      {
+        id = "learn-sources",
+        de = "Quellen durchgearbeitet, je Quelle ein Satz festgehalten",
+        en = "Sources worked through, one sentence noted per source",
+      },
+      {
+        id = "learn-result",
+        de = "Ergebnis geschrieben und verlinkt (refs)",
+        en = "Result written and linked (refs)",
+      },
+      {
+        id = "learn-selfcheck",
+        de = "Selbstcheck ohne Notizen beantwortet",
+        en = "Self-check answered without notes",
+      },
+      {
+        id = "learn-questions",
+        de = "Offene Fragen notiert (an wen, bis wann)",
+        en = "Open questions noted (to whom, by when)",
       },
     },
   },

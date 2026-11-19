@@ -483,6 +483,84 @@ end
 ---The longest slug of a plan (the file name has room for `-NN` and `.md`).
 M.MAX_SLUG = 200
 
+---The stages a learning plan proposes (`template = "learning"`); free to change.
+---@type string[]
+M.LEARNING_PHASES = { "orientieren", "grundlagen", "vertiefen", "anwenden", "festigen" }
+
+---The bodies of `template`, per kind of file (Lernplan-Konzept §5): a plan keeps it short, a path carries the sections a
+---learner works through, with the tree in `## Lernpunkte`.
+---@type table<string, table<string, string[]>>
+M.TEMPLATES = {
+  learning = {
+    plan = {
+      "## Ziel und Kompetenzstufe",
+      "",
+      "<!-- Ziel in einem Satz; Kompetenzziel (T/P-Stufe); Ergebnis-Artefakt. -->",
+      "",
+      "## Definition of done",
+      "",
+      "<!-- Selbstcheck bestanden, Ergebnis geschrieben und verlinkt, offene Fragen gestellt. -->",
+      "",
+      "## Entscheidungen",
+      "",
+      "<!-- Verweise auf decision-Tasks, nicht kopieren. -->",
+      "",
+      "## Notizen",
+      "",
+    },
+    path = {
+      "## Ziel und Kompetenzstufe",
+      "",
+      "<!-- Ziel in einem Satz; Kompetenzziel (T/P-Stufe); Status und Datum; Ergebnis-Artefakt. -->",
+      "",
+      "## Zugang",
+      "",
+      "<!-- Welcher Zugang fehlt, was ersatzweise geht (Demo, Logs, Screenshots). -->",
+      "",
+      "## Zeitplan",
+      "",
+      "| Sitzung | Dauer | Ergebnis |",
+      "| --- | --- | --- |",
+      "",
+      "## Quellen",
+      "",
+      "| Quelle | Typ | Worauf achten | Zugang |",
+      "| --- | --- | --- | --- |",
+      "",
+      "## Lernpunkte",
+      "",
+      '<!-- - [ ] Punkt {#schluessel}: [x] gelernt, [~] angeschaut, [-] entfaellt (mit "– Grund: ..."), [!] blockiert -->',
+      "",
+      "## Selbstcheck",
+      "",
+      "<!-- 8 bis 12 Fragen, schriftlich, ohne Notizen. -->",
+      "",
+      "## Offene Fragen",
+      "",
+      "<!-- An wen, bis wann; spaeter mit Antwort. -->",
+      "",
+      "## Wiederholung",
+      "",
+      "<!-- Termine und welche Fragen wieder. -->",
+      "",
+      "## Notizen",
+      "",
+    },
+    project = {
+      "## Ziel und Kompetenzstufe",
+      "",
+      "<!-- Was das Lernvorhaben als Ganzes erreichen soll. -->",
+      "",
+      "## Definition of done",
+      "",
+      "<!-- Wann ist es fertig? -->",
+      "",
+      "## Notizen",
+      "",
+    },
+  },
+}
+
 ---@class Tasks.NewPlanOpts
 ---@field root? string
 ---@field title string
@@ -500,6 +578,7 @@ M.MAX_SLUG = 200
 ---@field cover? string           # `cover:`: a picture below `assets/`.
 ---@field today? string
 ---@field dry_run? boolean  # Name the plan the call would make and write nothing.
+---@field template? "learning"  # The body (and, for a plan without `phases`, the stages) of a learning plan or path.
 
 ---Create `<area>/ROADMAP/plans/<slug>.md` (never overwrites; a taken slug gets `-2`, `-3`, ...). Plans, open tasks and
 ---Backlog files share ONE id namespace per area: a finished plan lands in `Backlog/FEATURES` and would read as a
@@ -553,9 +632,23 @@ function M.new(area, opts)
       return nil, "areas: invalid area name " .. a
     end
   end
+  if opts.template ~= nil and not M.TEMPLATES[opts.template] then
+    return nil,
+      ("unknown template '%s' (expected learning)"):format(tostring(opts.template)),
+      { code = "invalid_argument" }
+  end
   local phases, perr = list(opts.phases, "phases")
   if not phases then
     return nil, perr
+  end
+  -- a learning plan proposes its stages; a path has none, and phases given win
+  if
+    opts.template == "learning"
+    and #phases == 0
+    and opts.kind ~= "path"
+    and opts.kind ~= "project"
+  then
+    phases = vim.list_slice(M.LEARNING_PHASES, 1)
   end
   for _, p in ipairs(phases) do
     local serr, details = vault.slug_error("phase", p)
@@ -712,19 +805,19 @@ function M.new(area, opts)
   pairs_[#pairs_ + 1] = { "created", today }
   pairs_[#pairs_ + 1] = { "updated", today }
   local lead = opts.summary and (vim.trim(opts.summary) .. "\n\n") or ""
-  local sections = file_kind == "path"
-      and {
-        "## Warum",
-        "",
-        "<!-- Wozu dieser Lernpfad dient, und woran man merkt, dass man es kann. -->",
-        "",
-        "## Lernpunkte",
-        "",
-        '<!-- - [ ] Punkt {#schluessel}: [x] gelernt, [~] angeschaut, [-] entfaellt (mit "– Grund: ..."), [!] blockiert -->',
-        "",
-        "## Notizen",
-        "",
-      }
+  local sections = opts.template == "learning" and M.TEMPLATES.learning[file_kind]
+    or file_kind == "path" and {
+      "## Warum",
+      "",
+      "<!-- Wozu dieser Lernpfad dient, und woran man merkt, dass man es kann. -->",
+      "",
+      "## Lernpunkte",
+      "",
+      '<!-- - [ ] Punkt {#schluessel}: [x] gelernt, [~] angeschaut, [-] entfaellt (mit "– Grund: ..."), [!] blockiert -->',
+      "",
+      "## Notizen",
+      "",
+    }
     or nil
   local body = "\n"
     .. lead

@@ -121,7 +121,8 @@ brings code in line with a rule set (for example the ones `rules.nvim` loads), o
 field `rules: [LLS-45]` names the rule ids; `ux` = something the user sees or does, such as a
 new user-facing feature; `bindings` = keymaps, commands, shortcuts; `refactor`, `tests`, `ci` =
 internal work on the code, the test suite, the build pipeline; `learning` = work done to learn and get better,
-not out of need, such as a protocol or a terminal). An unknown value is `unknown-category`. The
+not out of need, such as a protocol or a terminal, and the learning in learning paths; its scaffold lines: sources
+worked through, result written and linked, self-check answered without notes, open questions noted). An unknown value is `unknown-category`. The
 *effective* categories (`model.categories`, what `--category=` filters on) are the written
 list, plus `bug` for every `kind: bug`, plus every tag spelled like a category -- so tasks
 written before the field existed are filterable without touching them. Categories narrow a
@@ -799,7 +800,7 @@ nvim --headless -u NONE -l scripts/tasks.lua check
 | `plan [area] [--for=id] [filters] [--ready] [--format=md\|tsv\|ids]` | the plan: ready now, decisions by leverage, stages, critical path |
 | `next [area] [--n=3] [--actor=cdx\|me\|pair\|none] [--format=json]` | `next: <id> <title> <reason>`, `then: ...`, `freed:`, `cdx:`, `empty:` and `remind:` lines; `remind: <id>\t<title>\t<date>` lists the open tasks whose reminder is due (oldest first, judged by `--today`, which must be a date), a last `remind: N finished task(s) with a reminder due (`list --done --reminders`)` counts the finished ones; `--format=json` is the `tasks.next` document (no `remind:` there) |
 | `estimate [area] [--for=id] [filters]` | the estimate line, `quick wins:`, `unestimated:` |
-| `plan-new <area> <title> [--areas --target --phases --gate --summary]` | create a plan file under `ROADMAP/plans/` |
+| `plan-new <area> <title> [--areas --target --phases --gate --summary --template=learning]` | create a plan file under `ROADMAP/plans/`; `--template=learning` writes the sections of a learning plan and proposes the stages `orientieren, grundlagen, vertiefen, anwenden, festigen` (stages given win). `paths.new` takes the same template: goal and competence level, access, schedule, sources, `## Lernpunkte`, self-check, open questions, repetition |
 | `migrate-actor [area] [--write]` | propose `actor=me` for tasks that wait for you (status decision, tag needs-user), leave the rest empty; dry run unless `--write` |
 | `attach <area>/<slug> <file> [--name=n] [--no-index]` | copy a file to `<slug>/assets/` (a plain task becomes a folder task), print the Markdown link |
 | `attach <area>/<slug> --clipboard\|--latest[=<folder>] [--name=n] [--no-index]` | the same for the image on the clipboard (PNG) or the newest image of the screenshot folder(s) (`attach.screenshot_dirs`) modified within `attach.max_age_s` (300 s); named `<slug>-<date>-<HHMM>.<ext>`, a taken name gets `-2`; older: an error that names the file, nothing guessed |

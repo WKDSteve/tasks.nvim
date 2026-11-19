@@ -172,6 +172,28 @@
             "id": "caller-impact"
           }
         ],
+        "learning": [
+          {
+            "de": "Quellen durchgearbeitet, je Quelle ein Satz festgehalten",
+            "en": "Sources worked through, one sentence noted per source",
+            "id": "learn-sources"
+          },
+          {
+            "de": "Ergebnis geschrieben und verlinkt (refs)",
+            "en": "Result written and linked (refs)",
+            "id": "learn-result"
+          },
+          {
+            "de": "Selbstcheck ohne Notizen beantwortet",
+            "en": "Self-check answered without notes",
+            "id": "learn-selfcheck"
+          },
+          {
+            "de": "Offene Fragen notiert (an wen, bis wann)",
+            "en": "Open questions noted (to whom, by when)",
+            "id": "learn-questions"
+          }
+        ],
         "refactor": [
           {
             "de": "Auswirkung für Aufrufer (API, Typen) notiert",

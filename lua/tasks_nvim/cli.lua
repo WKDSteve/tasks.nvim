@@ -92,7 +92,7 @@ commands:
         --sheet: the state of the test-sheet block testing.nvim wrote into the task, its worst sheet (inbox:
         green and waiting for your judgement), any: a task with the block, none: a task without it; nothing is run;
         --claimed: own: a valid claim of this name (`claim`), foreign: of somebody else, none: free or expired)
-  plan-new <area> <title> [--areas=a,b] [--target=<id>] [--phases=a,b,c] [--gate=hard] [--summary=text] [--links=url,url] [--icon=<emoji|assets/x.svg|word>] [--cover=assets/x.png]
+  plan-new <area> <title> [--areas=a,b] [--target=<id>] [--phases=a,b,c] [--gate=hard] [--summary=text] [--links=url,url] [--icon=<emoji|assets/x.svg|word>] [--cover=assets/x.png] [--template=learning]
                                           create ROADMAP/plans/<slug>.md; tasks join it with plan=<id> phase=<word>
   meeting new <area> <title> --date=YYYY-MM-DD [--time=HH:MM] [--end=HH:MM|--duration=45m] [--location=]
               [--online=url] [--tasks=a/b,c/d] [--notify=-15m,-1d@18:00] [--tags=] [--quick="<line>"] [--dry-run]
@@ -393,6 +393,7 @@ local SPECS = {
       "links",
       "icon",
       "cover",
+      "template",
     },
     flag = {},
   },
@@ -1286,6 +1287,7 @@ commands["plan-new"] = function(ctx)
     web_links = args.opt.links --[[@as string|nil]],
     icon = args.opt.icon --[[@as string|nil]],
     cover = args.opt.cover --[[@as string|nil]],
+    template = args.opt.template --[[@as "learning"|nil]],
   })
   if not res then
     ctx.warn("error: " .. tostring(err))
