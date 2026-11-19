@@ -88,6 +88,7 @@ return function(H)
     "eff_prio",
     "etag",
     "if_match",
+    "meeting_ops",
     "move_area",
     "move_area_preview",
     "plan_assets",
