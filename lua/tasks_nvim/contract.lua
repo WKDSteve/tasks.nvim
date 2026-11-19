@@ -82,6 +82,7 @@ M.CAPABILITIES = {
   "list",
   "lists",
   "meeting",
+  "meeting_ops",
   "meetings",
   "move_area",
   "move_area_preview",

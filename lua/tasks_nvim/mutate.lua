@@ -111,6 +111,22 @@ function M.attach_target(id, root, drafts)
         return nil, folder --[[@as string]]
       end
     end
+    -- a meeting (`<area>/MEETINGS/`): its assets lie in its folder form like those of a plan
+    local mpath, mfolder = vault.resolve_meeting(root, area, slug)
+    if mpath then
+      return {
+        id = area .. "/" .. slug,
+        area = area,
+        slug = slug,
+        path = fsio.norm(mpath),
+        folder = mfolder == true,
+        file_kind = "meeting",
+      },
+        nil
+    end
+    if tostring(mfolder):find("as file and as folder", 1, true) then
+      return nil, mfolder --[[@as string]]
+    end
   end
   return nil, ferr
 end
@@ -3036,10 +3052,16 @@ M.ASSETS_DIR = "assets"
 ---The folder below `assets/` for each kind of asset: a video, an image, a screenshot. An asset without a kind lies in
 ---`assets/` itself.
 ---@type table<string, string>
-M.ASSET_KIND_DIRS = { video = "videos", image = "images", screenshot = "screenshots" }
+M.ASSET_KIND_DIRS = {
+  video = "videos",
+  image = "images",
+  screenshot = "screenshots",
+  audio = "audio",
+  board = "boards",
+}
 
 ---What `kind` may be, for a message.
-M.ASSET_KINDS_TEXT = "'video', 'image' or 'screenshot'"
+M.ASSET_KINDS_TEXT = "'video', 'image', 'screenshot', 'audio' or 'board'"
 
 ---The folder of an asset below the task folder: `assets`, or `assets/<folder of the kind>`.
 ---@param kind any  # nil: no kind
@@ -3063,8 +3085,14 @@ end
 ---@return string|nil path  the new task file
 ---@return string|nil err
 local function to_folder(root, task)
-  local dest = task.file_kind and vault.plan_folder_path(root, task.file_kind, task.area, task.slug)
-    or vault.folder_task_path(root, task.area, task.slug)
+  local dest
+  if task.file_kind == "meeting" then
+    dest = vault.meetings_dir(root, task.area) .. "/" .. task.slug .. "/" .. task.slug .. ".md"
+  elseif task.file_kind then
+    dest = vault.plan_folder_path(root, task.file_kind, task.area, task.slug)
+  else
+    dest = vault.folder_task_path(root, task.area, task.slug)
+  end
   local dir = fsio.dirname(dest)
   if fsio.is_dir(dir) then
     return nil, "folder already exists: " .. dir

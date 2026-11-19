@@ -1829,8 +1829,41 @@ export interface ResultEntry {
     | "attach"
     | "claim"
     | "release"
-    | "history_record";
+    | "history_record"
+    | "meeting_new"
+    | "meeting_set"
+    | "meeting_close"
+    | "meeting_capture"
+    | "meeting_attend"
+    | "meeting_followups"
+    | "board_save";
   id?: string;
+  /**
+   * `meeting_close`: the meeting has no `## Ergebnis` afterwards (allowed: a hint for the front end).
+   */
+  without_result?: boolean;
+  /**
+   * `meeting_followups`: one entry per follow-up line it worked on: the task made of it (`id`) or why not (`error`).
+   */
+  items?: {
+    n: number;
+    ok: boolean;
+    id?: string;
+    error?: string;
+    note?: string;
+  }[];
+  /**
+   * `board_save`: the preview of the board below its folder (`assets/boards/<name>.svg`).
+   */
+  preview?: string;
+  /**
+   * The version of a file: `sha256:` and 16 hex digits of the hash of its bytes.
+   */
+  etag?: string;
+  /**
+   * `board_save`: true when the board was new, false when it replaced one.
+   */
+  created?: boolean;
   ok: boolean;
   /**
    * `would_*` is what a dry run says; `blocked` is a move that cannot be made.
@@ -1930,7 +1963,21 @@ export interface Inverse {
     | "view_save"
     | "view_delete"
     | "plan_set"
-    | "project_set";
+    | "project_set"
+    | "meeting_set"
+    | "meeting_attend";
+  /**
+   * `tick_step` of a meeting: the section of the item (`agenda`, `followups`).
+   */
+  section?: "agenda" | "followups";
+  /**
+   * `meeting_attend`: the participant, by name.
+   */
+  name?: string;
+  /**
+   * `meeting_attend`: whether the participant is to be ticked present.
+   */
+  present?: boolean;
   id: string;
   /**
    * `tick_step`: the number of the step.

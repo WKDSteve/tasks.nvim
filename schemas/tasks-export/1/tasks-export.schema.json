@@ -3760,7 +3760,19 @@
       "required": ["op", "id"],
       "properties": {
         "op": {
-          "enum": ["set", "reorder", "tick_step", "answer", "set_body", "set_section", "move_area", "view_save", "view_delete", "plan_set", "project_set"]
+          "enum": ["set", "reorder", "tick_step", "answer", "set_body", "set_section", "move_area", "view_save", "view_delete", "plan_set", "project_set", "meeting_set", "meeting_attend"]
+        },
+        "section": {
+          "description": "`tick_step` of a meeting: the section of the item (`agenda`, `followups`).",
+          "enum": ["agenda", "followups"]
+        },
+        "name": {
+          "description": "`meeting_attend`: the participant, by name.",
+          "type": "string"
+        },
+        "present": {
+          "description": "`meeting_attend`: whether the participant is to be ticked present.",
+          "type": "boolean"
         },
         "id": {
           "type": "string"
@@ -3919,10 +3931,53 @@
           "minimum": 1
         },
         "op": {
-          "enum": ["set", "new", "reorder", "done", "move_area", "plan_new", "plan_set", "plan_close", "project_new", "project_set", "project_close", "tick_step", "add_steps", "answer", "append_note", "reopen", "set_body", "set_section", "view_save", "view_delete", "attach", "claim", "release", "history_record"]
+          "enum": ["set", "new", "reorder", "done", "move_area", "plan_new", "plan_set", "plan_close", "project_new", "project_set", "project_close", "tick_step", "add_steps", "answer", "append_note", "reopen", "set_body", "set_section", "view_save", "view_delete", "attach", "claim", "release", "history_record", "meeting_new", "meeting_set", "meeting_close", "meeting_capture", "meeting_attend", "meeting_followups", "board_save"]
         },
         "id": {
           "type": "string"
+        },
+        "without_result": {
+          "description": "`meeting_close`: the meeting has no `## Ergebnis` afterwards (allowed: a hint for the front end).",
+          "type": "boolean"
+        },
+        "items": {
+          "description": "`meeting_followups`: one entry per follow-up line it worked on: the task made of it (`id`) or why not (`error`).",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["n", "ok"],
+            "properties": {
+              "n": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "ok": {
+                "type": "boolean"
+              },
+              "id": {
+                "type": "string"
+              },
+              "error": {
+                "type": "string"
+              },
+              "note": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "preview": {
+          "description": "`board_save`: the preview of the board below its folder (`assets/boards/<name>.svg`).",
+          "type": "string"
+        },
+        "etag": {
+          "description": "`board_save`: the version of the board file now (send it as `if_match` to replace it).",
+          "$ref": "#/$defs/Etag"
+        },
+        "created": {
+          "description": "`board_save`: true when the board was new, false when it replaced one.",
+          "type": "boolean"
         },
         "ok": {
           "type": "boolean"

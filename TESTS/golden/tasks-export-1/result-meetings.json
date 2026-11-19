@@ -1,0 +1,157 @@
+{
+  "client_op_id": "golden-meetings",
+  "digest": "sha256:10729a7abc83c668",
+  "dry_run": false,
+  "engine": {
+    "git": "0000000",
+    "nvim": "0.0.0",
+    "version": "0.1.0-test"
+  },
+  "generated_at": "2026-01-01T00:00:00Z",
+  "kind": "tasks.result",
+  "ok": false,
+  "plugin": "tasks.nvim",
+  "results": [
+    {
+      "changed_ids": [
+        "lib.nvim/sync-2026-10-20"
+      ],
+      "etag_after": "sha256:374d11d5f43f1432",
+      "file": "lib.nvim/MEETINGS/sync-2026-10-20.md",
+      "id": "lib.nvim/sync-2026-10-20",
+      "index": {
+        "action": "written"
+      },
+      "n": 1,
+      "ok": true,
+      "op": "meeting_new",
+      "outcome": "created",
+      "renamed": false,
+      "slug": "sync-2026-10-20"
+    },
+    {
+      "changed_ids": [
+        "lib.nvim/sync-2026-10-20"
+      ],
+      "etag_after": "sha256:16b74e79cf1bcce0",
+      "etag_before": "sha256:374d11d5f43f1432",
+      "file": "lib.nvim/MEETINGS/sync-2026-10-20.md",
+      "id": "lib.nvim/sync-2026-10-20",
+      "index": {
+        "action": "written"
+      },
+      "inverse": {
+        "body": "\n## Teilnehmer\n\n- [ ] Rick (Organisator)\n",
+        "id": "lib.nvim/sync-2026-10-20",
+        "if_match": "sha256:16b74e79cf1bcce0",
+        "op": "set_body"
+      },
+      "n": 2,
+      "ok": true,
+      "op": "meeting_capture",
+      "outcome": "changed"
+    },
+    {
+      "changed_ids": [
+        "lib.nvim/sync-2026-10-20"
+      ],
+      "etag_after": "sha256:cbeea11dc51d7c37",
+      "etag_before": "sha256:16b74e79cf1bcce0",
+      "file": "lib.nvim/MEETINGS/sync-2026-10-20.md",
+      "id": "lib.nvim/sync-2026-10-20",
+      "index": {
+        "action": "written"
+      },
+      "inverse": {
+        "body": "\n## Teilnehmer\n\n- [ ] Rick (Organisator)\n\n## Protokoll\n\n- 14:05 Aufgabe: Lizenz klären\n\n## Folgeaufgaben\n\n- [ ] Lizenz klären\n",
+        "id": "lib.nvim/sync-2026-10-20",
+        "if_match": "sha256:cbeea11dc51d7c37",
+        "op": "set_body"
+      },
+      "n": 3,
+      "ok": true,
+      "op": "meeting_capture",
+      "outcome": "changed"
+    },
+    {
+      "changed_ids": [],
+      "error": {
+        "code": "invalid_argument",
+        "message": "entry.text is needed for a text",
+        "retryable": false
+      },
+      "n": 4,
+      "ok": false,
+      "op": "meeting_capture",
+      "outcome": "failed"
+    },
+    {
+      "changed_ids": [
+        "lib.nvim/sync-2026-10-20"
+      ],
+      "etag_after": "sha256:1e4f1c295cbc9da2",
+      "etag_before": "sha256:cbeea11dc51d7c37",
+      "file": "lib.nvim/MEETINGS/sync-2026-10-20.md",
+      "id": "lib.nvim/sync-2026-10-20",
+      "index": {
+        "action": "written"
+      },
+      "inverse": {
+        "id": "lib.nvim/sync-2026-10-20",
+        "if_match": "sha256:1e4f1c295cbc9da2",
+        "n": 1,
+        "op": "meeting_attend",
+        "present": false
+      },
+      "n": 5,
+      "ok": true,
+      "op": "meeting_attend",
+      "outcome": "changed"
+    },
+    {
+      "changed_ids": [
+        "lib.nvim/sync-2026-10-20",
+        "lib.nvim/lizenz-klaeren"
+      ],
+      "etag_after": "sha256:283159dd29e69cea",
+      "etag_before": "sha256:1e4f1c295cbc9da2",
+      "file": "lib.nvim/MEETINGS/sync-2026-10-20.md",
+      "id": "lib.nvim/sync-2026-10-20",
+      "index": {
+        "action": "written"
+      },
+      "items": [
+        {
+          "id": "lib.nvim/lizenz-klaeren",
+          "n": 1,
+          "ok": true
+        }
+      ],
+      "n": 6,
+      "ok": true,
+      "op": "meeting_followups",
+      "outcome": "changed"
+    },
+    {
+      "changed_ids": [
+        "lib.nvim/sync-2026-10-20"
+      ],
+      "etag_after": "sha256:f07a979aa55cdc0f",
+      "etag_before": "sha256:283159dd29e69cea",
+      "file": "lib.nvim/MEETINGS/sync-2026-10-20.md",
+      "id": "lib.nvim/sync-2026-10-20",
+      "index": {
+        "action": "written"
+      },
+      "n": 7,
+      "ok": true,
+      "op": "meeting_close",
+      "outcome": "changed",
+      "without_result": false
+    }
+  ],
+  "schema": 1,
+  "vault": {
+    "id": "vault"
+  }
+}

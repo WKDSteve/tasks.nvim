@@ -153,6 +153,13 @@ M.OPS = {
   "claim",
   "release",
   "history_record",
+  "meeting_new",
+  "meeting_set",
+  "meeting_close",
+  "meeting_capture",
+  "meeting_attend",
+  "meeting_followups",
+  "board_save",
 }
 
 ---Longest `client_op_id`.
@@ -193,8 +200,14 @@ local FIELDS = {
     remind = "string",
   },
   move_area = { id = "string", to_area = "string", if_match = "string" },
-  tick_step = { id = "string", n = "integer", done = "boolean", if_match = "string" },
-  add_steps = { id = "string", steps = "strings", if_match = "string" },
+  tick_step = {
+    id = "string",
+    n = "integer",
+    done = "boolean",
+    section = "string",
+    if_match = "string",
+  },
+  add_steps = { id = "string", steps = "strings", section = "string", if_match = "string" },
   answer = {
     id = "string",
     question = "string",
@@ -262,6 +275,33 @@ local FIELDS = {
   plan_close = { id = "string" },
   project_close = { id = "string" },
   history_record = {},
+  meeting_new = {
+    area = "string",
+    title = "string",
+    fields = "object",
+    body = "string",
+    slug = "string",
+    lang = "string",
+  },
+  meeting_set = { id = "string", patch = "object", if_match = "string" },
+  meeting_close = { id = "string", result = "string", if_match = "string" },
+  meeting_capture = { id = "string", entry = "object", if_match = "string" },
+  meeting_attend = {
+    id = "string",
+    n = "integer",
+    name = "string",
+    present = "boolean",
+    if_match = "string",
+  },
+  meeting_followups = { id = "string", n = "integer", area = "string", fields = "object" },
+  board_save = {
+    id = "string",
+    name = "string",
+    format = "string",
+    upload = "string",
+    preview = "string",
+    if_match = "string",
+  },
 }
 
 for _, name in ipairs({
@@ -496,6 +536,50 @@ local function drafts_of(ctx)
   return ctx.dry and ctx.drafts or nil
 end
 
+---Whether `id` names a meeting (`<area>/MEETINGS/<slug>.md`, either form): an id is one file of the area, so a task a
+---dry run would create under it is no meeting.
+---@param ctx Tasks.OpsCtx
+---@param id any
+---@return boolean
+local function is_meeting(ctx, id)
+  if type(id) ~= "string" or (ctx.dry and ctx.drafts[id]) then
+    return false
+  end
+  local area, slug = vault.parse_id(id)
+  if not area or not slug or not vault.valid_area(area) or not vault.has_area(ctx.root, area) then
+    return false
+  end
+  return vault.resolve_meeting(ctx.root, area, slug) ~= nil
+end
+
+---Change the text of a task (`mutate.edit_text`) or of a meeting (`meeting_write.edit`, `meeting_transform` when
+---given: a meeting has other sections than a task). The result has the same shape; a meeting's says
+---`location = "meeting"`.
+---@param id string
+---@param ctx Tasks.OpsCtx
+---@param transform fun(text: string): string|nil, string|nil, any
+---@param opts table  # The options of `mutate.edit_text`.
+---@param meeting_transform? fun(text: string, meeting: Tasks.Meeting): string|nil, string|nil, any
+---@return table|nil
+---@return any
+---@return table|nil
+local function edit_text_of(id, ctx, transform, opts, meeting_transform)
+  if is_meeting(ctx, id) then
+    local r, err, info =
+      require("tasks_nvim.meeting_write").edit(id, meeting_transform or transform, {
+        root = ctx.root,
+        today = ctx.today,
+        if_match = opts.if_match,
+        dry_run = ctx.dry,
+      })
+    if r then
+      r.location = "meeting"
+    end
+    return r, err, info
+  end
+  return mutate.edit_text(id, transform, opts)
+end
+
 ---The relations a patch sets, in the shape `edges.validate` takes.
 ---@param pairs_ table[]
 ---@return Tasks.EdgeProposal
@@ -632,10 +716,31 @@ local function text_entry(ctx, r)
     etag_after = (not ctx.dry) and r.etag_after or nil,
     changed_ids = (r.changed and not ctx.dry) and { r.id } or {},
   }
-  if r.changed and not ctx.dry then
+  -- a meeting is in no index of its area
+  if r.changed and not ctx.dry and r.location ~= "meeting" then
     ctx.touched[r.area] = true
   end
   return entry
+end
+
+---The checkbox section of a meeting `tick_step` and `add_steps` work on (`section`: `agenda`, the default, or
+---`followups`); a task takes no `section`.
+---@param op table
+---@param ctx Tasks.OpsCtx
+---@return string|nil key
+---@return table|nil refusal
+local function item_section(op, ctx)
+  if not is_meeting(ctx, op.id) then
+    if op.section ~= nil then
+      return nil, refuse("invalid_argument", op.op .. ": section belongs to a meeting")
+    end
+    return nil, nil
+  end
+  local key = op.section or "agenda"
+  if not require("tasks_nvim.meeting_write").ITEM_SECTIONS[key] then
+    return nil, refuse("invalid_argument", op.op .. ": section must be agenda or followups")
+  end
+  return key, nil
 end
 
 ---@param op table
@@ -645,21 +750,38 @@ local function do_tick_step(op, ctx)
   if op.id == nil or op.n == nil then
     return refuse("invalid_argument", "tick_step needs id and n")
   end
+  local key, refusal = item_section(op, ctx)
+  if refusal then
+    return refusal
+  end
   local done = op.done ~= false
-  local r, err, info = mutate.edit_text(op.id, function(text)
-    local new_text, step, serr = steps.set_step(text, op.n, done)
-    if not new_text then
-      return nil, serr
-    end
-    return new_text, nil, { was = step and step.done or false }
-  end, {
-    root = ctx.root,
-    today = ctx.today,
-    index = false,
-    if_match = op.if_match,
-    dry_run = ctx.dry,
-    drafts = drafts_of(ctx),
-  })
+  local mw = require("tasks_nvim.meeting_write")
+  local r, err, info = edit_text_of(
+    op.id,
+    ctx,
+    function(text)
+      local new_text, step, serr = steps.set_step(text, op.n, done)
+      if not new_text then
+        return nil, serr
+      end
+      return new_text, nil, { was = step and step.done or false }
+    end,
+    {
+      root = ctx.root,
+      today = ctx.today,
+      index = false,
+      if_match = op.if_match,
+      dry_run = ctx.dry,
+      drafts = drafts_of(ctx),
+    },
+    mw.on_body(function(body)
+      local new_body, was = mw.tick_item(body, key or "agenda", op.n, done)
+      if not new_body then
+        return nil, tostring(was)
+      end
+      return new_body, nil, { was = was }
+    end)
+  )
   if not r then
     return mutate_failure(ctx, err, info)
   end
@@ -670,6 +792,7 @@ local function do_tick_step(op, ctx)
       id = r.id,
       n = op.n,
       done = r.extra and r.extra.was or false,
+      section = op.section,
       if_match = r.etag_after,
     })
   end
@@ -772,16 +895,32 @@ local function do_append_note(op, ctx)
   if has_control(op.text) then
     return refuse("invalid_argument", "text contains a control character")
   end
-  local r, err, info = mutate.edit_text(op.id, function(text)
-    return steps.add_note(text, op.text, ctx.today)
-  end, {
-    root = ctx.root,
-    today = ctx.today,
-    index = false,
-    if_match = op.if_match,
-    dry_run = ctx.dry,
-    drafts = drafts_of(ctx),
-  })
+  local mw = require("tasks_nvim.meeting_write")
+  local r, err, info = edit_text_of(
+    op.id,
+    ctx,
+    function(text)
+      return steps.add_note(text, op.text, ctx.today)
+    end,
+    {
+      root = ctx.root,
+      today = ctx.today,
+      index = false,
+      if_match = op.if_match,
+      dry_run = ctx.dry,
+      drafts = drafts_of(ctx),
+    },
+    mw.on_body(function(body)
+      -- a meeting's notes are its minutes: one line with the time, as a capture of text writes it
+      if op.text:find("[\r\n]") or vim.trim(op.text) == "" then
+        return nil, "a note is one line of text"
+      end
+      return mw.capture_body(
+        body,
+        { kind = "text", text = op.text, at = tostring(os.date("%H:%M")) }
+      )
+    end)
+  )
   if not r then
     return mutate_failure(ctx, err, info)
   end
@@ -826,7 +965,7 @@ local function do_set_body(op, ctx)
   if too_long(op.body, M.MAX_SET_BODY) then
     return refuse("payload_too_large", ("body is longer than %d characters"):format(M.MAX_SET_BODY))
   end
-  local r, err, info = mutate.edit_text(op.id, function(text)
+  local r, err, info = edit_text_of(op.id, ctx, function(text)
     local parsed = fm.parse(text)
     if not parsed or not parsed.has_block or parsed.unterminated then
       return nil, "the file has no frontmatter block to write below"
@@ -894,7 +1033,7 @@ local function do_set_section(op, ctx)
       "text holds a '## ' heading; only deeper headings (###) belong to a section"
     )
   end
-  local r, err, info = mutate.edit_text(op.id, function(file_text)
+  local r, err, info = edit_text_of(op.id, ctx, function(file_text)
     local parsed = fm.parse(file_text)
     if not parsed or not parsed.has_block or parsed.unterminated then
       return nil, "the file has no frontmatter block to write below"
@@ -965,21 +1104,38 @@ local function do_add_steps(op, ctx)
   if has_control(items) then
     return refuse("invalid_argument", "steps contains a control character")
   end
-  local r, err, info = mutate.edit_text(op.id, function(text)
-    local new_text, serr = steps.add_steps(text, items)
-    if not new_text then
-      return nil, serr
-    end
-    local parsed = fm.parse(text)
-    return new_text, nil, { old = parsed and parsed.has_block and fsio.lf(parsed.body) or nil }
-  end, {
-    root = ctx.root,
-    today = ctx.today,
-    index = false,
-    if_match = op.if_match,
-    dry_run = ctx.dry,
-    drafts = drafts_of(ctx),
-  })
+  local key, refusal = item_section(op, ctx)
+  if refusal then
+    return refusal
+  end
+  local mw = require("tasks_nvim.meeting_write")
+  local r, err, info = edit_text_of(
+    op.id,
+    ctx,
+    function(text)
+      local new_text, serr = steps.add_steps(text, items)
+      if not new_text then
+        return nil, serr
+      end
+      local parsed = fm.parse(text)
+      return new_text, nil, { old = parsed and parsed.has_block and fsio.lf(parsed.body) or nil }
+    end,
+    {
+      root = ctx.root,
+      today = ctx.today,
+      index = false,
+      if_match = op.if_match,
+      dry_run = ctx.dry,
+      drafts = drafts_of(ctx),
+    },
+    mw.on_body(function(body)
+      local new_body, aerr = mw.add_items(body, key or "agenda", items)
+      if not new_body then
+        return nil, aerr
+      end
+      return new_body, nil, { old = fsio.lf(body) }
+    end)
+  )
   if not r then
     return mutate_failure(ctx, err, info)
   end
@@ -1976,8 +2132,383 @@ local function do_history_record(_, ctx)
   return { ok = true, outcome = outcome, changed_ids = {}, rows = r.rows, file = r.file }
 end
 
+-- ── meetings ─────────────────────────────────────────────────────────────────
+
+---The answer of a meeting operation that failed: a conflict keeps what the caller needs to try again (the version on
+---disk, a free name for a board).
+---@param ctx Tasks.OpsCtx
+---@param err any
+---@param info table|nil
+---@return table
+local function meeting_failure(ctx, err, info)
+  if info and info.code == "conflict" then
+    return refuse("conflict", contract.redact(ctx.root, tostring(err)), {
+      actual = info.actual,
+      expected = info.expected,
+      suggestion = info.suggestion,
+    })
+  end
+  if info and info.code then
+    return refuse(info.code, contract.redact(ctx.root, tostring(err)), info.details)
+  end
+  return mutate_failure(ctx, err, info)
+end
+
+---The entry of a meeting edit (`meeting_write.edit`): changed or not, the versions, the meeting's area touched.
+---@param ctx Tasks.OpsCtx
+---@param r Tasks.MeetingEdit
+---@return table
+local function meeting_entry(ctx, r)
+  return {
+    ok = true,
+    id = r.id,
+    outcome = r.changed and (ctx.dry and "would_change" or "changed") or "unchanged",
+    file = rel(ctx, r.path),
+    etag_before = r.etag_before,
+    etag_after = (not ctx.dry) and r.etag_after or nil,
+    changed_ids = (r.changed and not ctx.dry) and { r.id } or {},
+  }
+end
+
+---Whether any value of a table (deep) has a control character.
+---@param t any
+---@return boolean
+local function any_control(t)
+  if type(t) ~= "table" then
+    return has_control(t)
+  end
+  for k, v in pairs(t) do
+    if has_control(k) or any_control(v) then
+      return true
+    end
+  end
+  return false
+end
+
+---`meeting_new` { area, title, fields?, body?, slug?, lang? }: make a meeting file (`meeting_write.new`); a dry run names
+---the id it would get.
+---@param op table
+---@param ctx Tasks.OpsCtx
+---@return table entry
+local function do_meeting_new(op, ctx)
+  if op.area == nil or op.title == nil then
+    return refuse("invalid_argument", "meeting_new needs area and title")
+  end
+  if any_control(op.fields) or has_control(op.title) or has_control(op.slug) then
+    return refuse("invalid_argument", "the meeting contains a control character")
+  end
+  if op.body and too_long(op.body, M.MAX_BODY) then
+    return refuse("payload_too_large", ("body is longer than %d characters"):format(M.MAX_BODY))
+  end
+  local over = over_limit("title", op.title)
+  for key, value in pairs(op.fields or {}) do
+    over = over or over_limit(key, value)
+  end
+  if over then
+    return refuse("payload_too_large", over)
+  end
+  if op.lang ~= nil and op.lang ~= "de" and op.lang ~= "en" then
+    return refuse("invalid_argument", "lang must be de or en")
+  end
+  local r, err, info = require("tasks_nvim.meeting_write").new(op.area, {
+    root = ctx.root,
+    today = ctx.today,
+    title = op.title,
+    fields = op.fields,
+    body = op.body,
+    slug = op.slug,
+    lang = op.lang,
+    dry_run = ctx.dry,
+  })
+  if not r then
+    return meeting_failure(ctx, err, info)
+  end
+  return {
+    ok = true,
+    id = r.id,
+    outcome = ctx.dry and "would_create" or "created",
+    file = rel(ctx, r.path),
+    slug = r.slug,
+    renamed = r.renamed,
+    etag_after = (not ctx.dry) and etag_of_file(r.path) or nil,
+    changed_ids = ctx.dry and {} or { r.id },
+  }
+end
+
+---`meeting_set` { id, patch, if_match? }: change the frontmatter of a meeting; the answer has an `inverse`.
+---@param op table
+---@param ctx Tasks.OpsCtx
+---@return table entry
+local function do_meeting_set(op, ctx)
+  if op.id == nil or op.patch == nil then
+    return refuse("invalid_argument", "meeting_set needs id and patch")
+  end
+  if any_control(op.patch) then
+    return refuse("invalid_argument", "the patch contains a control character")
+  end
+  for key, value in pairs(op.patch) do
+    local over = over_limit(key, value)
+    if over then
+      return refuse("payload_too_large", over)
+    end
+  end
+  local r, err, info = require("tasks_nvim.meeting_write").set(op.id, op.patch, {
+    root = ctx.root,
+    today = ctx.today,
+    if_match = op.if_match,
+    dry_run = ctx.dry,
+  })
+  if not r then
+    return meeting_failure(ctx, err, info)
+  end
+  local entry = meeting_entry(ctx, r)
+  if r.changed and not ctx.dry then
+    entry.inverse = json.object({
+      op = "meeting_set",
+      id = r.id,
+      patch = json.object(r.before),
+      if_match = r.etag_after,
+    })
+  end
+  return entry
+end
+
+---`meeting_close` { id, result?, if_match? }: finish a meeting at any time; `result` writes `## Ergebnis` in the same
+---step; `without_result` says it has none. The inverse opens it again (`meeting_set` status planned).
+---@param op table
+---@param ctx Tasks.OpsCtx
+---@return table entry
+local function do_meeting_close(op, ctx)
+  if op.id == nil then
+    return refuse("invalid_argument", "meeting_close needs id")
+  end
+  if op.result ~= nil and (has_control(op.result) or too_long(op.result, M.MAX_SECTION)) then
+    return refuse("invalid_argument", "result is too long or contains a control character")
+  end
+  local r, err, info = require("tasks_nvim.meeting_write").close(op.id, {
+    root = ctx.root,
+    today = ctx.today,
+    if_match = op.if_match,
+    dry_run = ctx.dry,
+    result = op.result,
+  })
+  if not r then
+    return meeting_failure(ctx, err, info)
+  end
+  local entry = meeting_entry(ctx, r)
+  entry.without_result = r.without_result
+  if
+    r.changed
+    and not ctx.dry
+    and r.status_before
+    and r.status_before ~= "done"
+    and op.result == nil
+  then
+    entry.inverse = json.object({
+      op = "meeting_set",
+      id = r.id,
+      patch = json.object({ status = r.status_before }),
+      if_match = r.etag_after,
+    })
+  end
+  return entry
+end
+
+---`meeting_capture` { id, entry, if_match? }: one line of the minutes (`meeting_write.capture`); the inverse sets the
+---body as it was (`set_body`).
+---@param op table
+---@param ctx Tasks.OpsCtx
+---@return table entry
+local function do_meeting_capture(op, ctx)
+  if op.id == nil or op.entry == nil then
+    return refuse("invalid_argument", "meeting_capture needs id and entry")
+  end
+  local allowed = { kind = true, text = true, asset = true, at = true }
+  for key, value in pairs(op.entry) do
+    if not allowed[key] then
+      return refuse(
+        "invalid_argument",
+        "entry: unknown field " .. tostring(key) .. " (kind, text, asset, at)"
+      )
+    end
+    if type(value) ~= "string" then
+      return refuse("invalid_argument", "entry." .. tostring(key) .. " must be text")
+    end
+  end
+  if any_control(op.entry) then
+    return refuse("invalid_argument", "entry contains a control character")
+  end
+  local r, err, info = require("tasks_nvim.meeting_write").capture(op.id, op.entry, {
+    root = ctx.root,
+    today = ctx.today,
+    if_match = op.if_match,
+    dry_run = ctx.dry,
+  })
+  if not r then
+    return meeting_failure(ctx, err, info)
+  end
+  local entry = meeting_entry(ctx, r)
+  if r.changed and not ctx.dry and not too_long(r.body_before, M.MAX_SET_BODY) then
+    entry.inverse =
+      json.object({ op = "set_body", id = r.id, body = r.body_before, if_match = r.etag_after })
+  end
+  return entry
+end
+
+---`meeting_attend` { id, n | name, present?, if_match? }: tick (present, the default) or untick a participant.
+---@param op table
+---@param ctx Tasks.OpsCtx
+---@return table entry
+local function do_meeting_attend(op, ctx)
+  if op.id == nil or (op.n == nil) == (op.name == nil) then
+    return refuse("invalid_argument", "meeting_attend needs id and one of n and name")
+  end
+  if has_control(op.name) then
+    return refuse("invalid_argument", "name contains a control character")
+  end
+  local present = op.present ~= false
+  local r, err, info = require("tasks_nvim.meeting_write").attend(
+    op.id,
+    { n = op.n, name = op.name },
+    present,
+    {
+      root = ctx.root,
+      today = ctx.today,
+      if_match = op.if_match,
+      dry_run = ctx.dry,
+    }
+  )
+  if not r then
+    return meeting_failure(ctx, err, info)
+  end
+  local entry = meeting_entry(ctx, r)
+  if r.changed and not ctx.dry then
+    entry.inverse = json.object({
+      op = "meeting_attend",
+      id = r.id,
+      n = op.n,
+      name = op.name,
+      present = r.was_present == true,
+      if_match = r.etag_after,
+    })
+  end
+  return entry
+end
+
+---`meeting_followups` { id, n?, area?, fields? }: make tasks of the follow-ups (line `n`, else every line without a
+---task), each with `refs: [<meeting>]`; `items` tells each line (`ok`, `id` or `error`). No `inverse`.
+---@param op table
+---@param ctx Tasks.OpsCtx
+---@return table entry
+local function do_meeting_followups(op, ctx)
+  if op.id == nil then
+    return refuse("invalid_argument", "meeting_followups needs id")
+  end
+  if any_control(op.fields) or has_control(op.area) then
+    return refuse("invalid_argument", "the request contains a control character")
+  end
+  local r, err, info = require("tasks_nvim.meeting_write").followups(op.id, {
+    root = ctx.root,
+    today = ctx.today,
+    items = op.n and { op.n } or nil,
+    area = op.area,
+    fields = op.fields,
+    dry_run = ctx.dry,
+  })
+  if not r then
+    return meeting_failure(ctx, err, info)
+  end
+  local items, made = {}, {}
+  for _, item in ipairs(r.items) do
+    items[#items + 1] = json.object({
+      n = item.n,
+      ok = item.ok,
+      id = item.id,
+      error = item.error and contract.redact(ctx.root, item.error) or nil,
+      note = item.note and contract.redact(ctx.root, item.note) or nil,
+    })
+    if item.ok and item.id and item.code ~= "unchanged" and not ctx.dry then
+      made[#made + 1] = item.id
+    end
+  end
+  if #made > 0 then
+    ctx.touched[r.area] = true
+  end
+  local changed = vim.list_extend({}, made)
+  if r.changed and not ctx.dry then
+    table.insert(changed, 1, r.id)
+  end
+  return {
+    ok = true,
+    id = r.id,
+    outcome = (#made > 0 or r.changed) and (ctx.dry and "would_change" or "changed")
+      or (ctx.dry and #r.items > 0 and "would_change" or "unchanged"),
+    file = rel(ctx, r.path),
+    etag_before = r.etag_before,
+    etag_after = (not ctx.dry) and r.etag_after or nil,
+    items = items,
+    notes = r.error and { contract.redact(ctx.root, tostring(r.error)) } or nil,
+    changed_ids = changed,
+  }
+end
+
+---`board_save` { id, name, format, upload, preview?, if_match? }: save a whiteboard into `assets/boards/` of a meeting,
+---task, plan or project; a board that is there is replaced only on the version read. The answer has `asset`,
+---`preview`, `etag` and `created`.
+---@param op table
+---@param ctx Tasks.OpsCtx
+---@return table entry
+local function do_board_save(op, ctx)
+  if op.id == nil or op.name == nil or op.format == nil or op.upload == nil then
+    return refuse("invalid_argument", "board_save needs id, name, format and upload")
+  end
+  if not (ctx.attach and ctx.attach.upload_dir) then
+    return refuse("invalid_argument", "board_save: no upload folder was given")
+  end
+  if has_control(op.name) then
+    return refuse("invalid_argument", "name contains a control character")
+  end
+  local r, err, info = require("tasks_nvim.meeting_write").board_save(op.id, {
+    root = ctx.root,
+    today = ctx.today,
+    name = op.name,
+    format = op.format,
+    upload = op.upload,
+    preview = op.preview,
+    if_match = op.if_match,
+    upload_dir = ctx.attach.upload_dir,
+    dry_run = ctx.dry,
+  })
+  if not r then
+    return meeting_failure(ctx, err, info)
+  end
+  local area = r.id:match("^([^/]+)/")
+  if not ctx.dry then
+    ctx.touched[area] = true
+  end
+  return {
+    ok = true,
+    id = r.id,
+    outcome = ctx.dry and (r.created and "would_create" or "would_change")
+      or (r.created and "created" or "changed"),
+    file = rel(ctx, r.path),
+    asset = r.asset,
+    preview = r.preview,
+    etag = r.etag,
+    created = r.created,
+    changed_ids = ctx.dry and {} or { r.id },
+  }
+end
+
 ---@type table<string, fun(op: table, ctx: Tasks.OpsCtx): table>
 local HANDLERS = {
+  meeting_new = do_meeting_new,
+  meeting_set = do_meeting_set,
+  meeting_close = do_meeting_close,
+  meeting_capture = do_meeting_capture,
+  meeting_attend = do_meeting_attend,
+  meeting_followups = do_meeting_followups,
+  board_save = do_board_save,
   set = do_set,
   new = do_new,
   reorder = do_reorder,

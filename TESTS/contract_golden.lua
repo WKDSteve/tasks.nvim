@@ -407,6 +407,42 @@ G.cases = {
     end,
   },
   {
+    -- meetings for real: made, a capture of each kind that has a section, a participant present, a follow-up made a
+    -- task, closed with a result; a capture without text refused
+    name = "result-meetings",
+    method = "ops",
+    fresh = true,
+    request = function()
+      local id = "lib.nvim/sync-2026-10-20"
+      return encode({
+        client_op_id = "golden-meetings",
+        ops = {
+          {
+            op = "meeting_new",
+            area = "lib.nvim",
+            title = "Sync",
+            fields = { date = "2026-10-20", time = "14:00", duration = "45m" },
+            body = "## Teilnehmer\n\n- [ ] Rick (Organisator)",
+          },
+          {
+            op = "meeting_capture",
+            id = id,
+            entry = { kind = "task", text = "Lizenz klären", at = "14:05" },
+          },
+          {
+            op = "meeting_capture",
+            id = id,
+            entry = { kind = "decision", text = "Start Dezember", at = "14:06" },
+          },
+          { op = "meeting_capture", id = id, entry = { kind = "text", at = "14:07" } },
+          { op = "meeting_attend", id = id, n = 1 },
+          { op = "meeting_followups", id = id },
+          { op = "meeting_close", id = id, result = "Vereinbart." },
+        },
+      })
+    end,
+  },
+  {
     -- saved views for real: made, replaced on the version read, replaced on a stale one, deleted, a view that is not there
     name = "result-views",
     method = "ops",
