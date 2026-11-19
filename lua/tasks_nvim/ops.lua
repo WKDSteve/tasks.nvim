@@ -261,6 +261,8 @@ local FIELDS = {
     project = "string",
     phase = "string",
     links = "strings",
+    icon = "string",
+    cover = "string",
   },
   project_new = {
     area = "string",
@@ -273,6 +275,8 @@ local FIELDS = {
     summary = "string",
     slug = "string",
     links = "strings",
+    icon = "string",
+    cover = "string",
   },
   plan_set = { id = "string", patch = "object", if_match = "string" },
   project_set = { id = "string", patch = "object", if_match = "string" },
@@ -349,6 +353,8 @@ local NEW_FIELDS = {
   summary = true,
   refs = true,
   links = true,
+  icon = true,
+  cover = true,
   status = true,
   slug = true,
   after = true,
@@ -1546,6 +1552,8 @@ local function new_file(op, ctx, kind)
     "phases",
     "project",
     "phase",
+    "icon",
+    "cover",
   }) do
     if has_control(op[key]) then
       return refuse("invalid_argument", key .. " contains a control character")
@@ -1579,6 +1587,8 @@ local function new_file(op, ctx, kind)
     project = op.project,
     phase = op.phase,
     web_links = op.links,
+    icon = op.icon,
+    cover = op.cover,
     dry_run = ctx.dry,
   })
   if not r then

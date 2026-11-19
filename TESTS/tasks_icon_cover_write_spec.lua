@@ -1,0 +1,213 @@
+-- TESTS/tasks_icon_cover_write_spec.lua -- writing `icon` and `cover`: `new`, `set` (an empty value removes), plans,
+-- projects and paths (`plans.new` / `plans.set`), the write door (`new`, `plan_new`, `project_new`, `plan_set`,
+-- `meeting_new`) and the CLI. A task without the fields is written as before.
+-- @scans-data: the folders it lists are the fixture vault in the temp folder
+
+---@diagnostic disable: need-check-nil, param-type-mismatch
+-- Why: a value is bound with assert()/ok() in the same body, so a nil fails the spec at that line.
+
+return function(H)
+  local eq, ok, has = H.eq, H.ok, H.has
+  local F = dofile(vim.fs.dirname(debug.getinfo(1, "S").source:sub(2)) .. "/fixture.lua")
+  local mutate = require("tasks_nvim.mutate")
+  local plans = require("tasks_nvim.plans")
+  local paths = require("tasks_nvim.paths")
+  local scan = require("tasks_nvim.scan")
+  local ops = require("tasks_nvim.ops")
+
+  local root = F.vault(H)
+  local o = { root = root, today = F.TODAY }
+
+  -- UTF-8 by byte, so the file stays ASCII
+  local CRAB = "\240\159\166\128" -- U+1F980
+  local HASH_KEY = "#\239\184\143\226\131\163" -- # U+FE0F U+20E3: starts with # (a YAML comment if unquoted)
+  local STAR_KEY = "*\239\184\143\226\131\163" -- * U+FE0F U+20E3: starts with * (a YAML alias if unquoted)
+  local FAMILY = "\240\159\145\168\226\128\141\240\159\145\169\226\128\141\240\159\145\167"
+
+  -- ── new: both written after links, read back the same ─────────────────────
+  local made = assert(
+    mutate.new(
+      "lib.nvim",
+      vim.tbl_extend(
+        "force",
+        o,
+        { title = "With icon", icon = CRAB, cover = "assets/cover.png", folder = true }
+      )
+    )
+  )
+  local text = assert(H.read(made.path))
+  has(text, "icon: " .. CRAB .. "\ncover: assets/cover.png\n")
+  local task = assert(scan.find(made.id, { root = root }))
+  eq(task.icon, { kind = "emoji", value = CRAB })
+  eq(task.cover, "assets/cover.png")
+  ok(task.valid, "valid")
+
+  -- a task without them: no line, the same text as before the fields existed
+  local plain = assert(mutate.new("lib.nvim", vim.tbl_extend("force", o, { title = "No icon" })))
+  local plain_text = assert(H.read(plain.path))
+  ok(not plain_text:find("icon:", 1, true), "no icon line")
+  ok(not plain_text:find("cover:", 1, true), "no cover line")
+
+  -- refused before anything is written
+  local bad, berr =
+    mutate.new("lib.nvim", vim.tbl_extend("force", o, { title = "Bad icon", icon = "rocket" }))
+  eq(bad, nil)
+  has(berr, "unknown icon 'rocket'")
+  ok(not H.exists(root .. "/lib.nvim/ROADMAP/tasks/bad-icon.md"), "nothing written")
+  local _, cerr =
+    mutate.new("lib.nvim", vim.tbl_extend("force", o, { title = "Bad cover", cover = "../c.png" }))
+  has(cerr, "below assets/")
+
+  -- ── set: every form, a value that YAML would misread is quoted, empty removes ─
+  for _, v in ipairs({ HASH_KEY, STAR_KEY, FAMILY, "handshake", "assets/i.svg", CRAB }) do
+    assert(mutate.set(plain.id, { icon = v }, o))
+    local t = assert(scan.find(plain.id, { root = root }))
+    eq(t.icon and t.icon.value, v, "set and read back: " .. v)
+    ok(t.valid, "valid after set: " .. v)
+  end
+  local _, serr = mutate.set(plain.id, { icon = CRAB .. CRAB }, o)
+  has(serr, "neither one emoji")
+  eq(assert(scan.find(plain.id, { root = root })).icon.value, CRAB, "a refused set changes nothing")
+  assert(mutate.set(plain.id, { cover = "assets/big.webp" }, o))
+  eq(assert(scan.find(plain.id, { root = root })).cover, "assets/big.webp")
+  assert(mutate.set(plain.id, { icon = mutate.REMOVE, cover = mutate.REMOVE }, o))
+  local removed = assert(H.read(plain.path))
+  ok(
+    not removed:find("icon:", 1, true) and not removed:find("cover:", 1, true),
+    "REMOVE drops both"
+  )
+  ok(vim.tbl_contains(mutate.SETTABLE, "icon") and vim.tbl_contains(mutate.SETTABLE, "cover"))
+
+  -- ── plans, projects and paths ─────────────────────────────────────────────
+  local plan = assert(
+    plans.new("lib.nvim", vim.tbl_extend("force", o, { title = "Iconic plan", icon = CRAB }))
+  )
+  eq(assert(plans.find(plan.id, { root = root })).icon, { kind = "emoji", value = CRAB })
+  local _, perr =
+    plans.new("lib.nvim", vim.tbl_extend("force", o, { title = "Bad plan", icon = "nope" }))
+  has(perr, "unknown icon")
+  local project = assert(
+    plans.new(
+      "lib.nvim",
+      vim.tbl_extend(
+        "force",
+        o,
+        { title = "Iconic project", kind = "project", cover = "assets/p.jpg" }
+      )
+    )
+  )
+  eq(assert(require("tasks_nvim.projects").find(project.id, { root = root })).cover, "assets/p.jpg")
+  local path = assert(
+    paths.new("lib.nvim", vim.tbl_extend("force", o, { title = "Lua lernen", icon = "idea" }))
+  )
+  eq(assert(paths.find(path.id, { root = root })).icon, { kind = "word", value = "idea" })
+  for _, kind in ipairs({ "plan", "project", "path" }) do
+    ok(vim.tbl_contains(plans.SET_KEYS[kind], "icon"), kind .. " sets icon")
+    ok(vim.tbl_contains(plans.SET_KEYS[kind], "cover"), kind .. " sets cover")
+  end
+  assert(paths.set(path.id, { icon = "assets/lua.svg", cover = "assets/lua.png" }, o))
+  local p = assert(paths.find(path.id, { root = root }))
+  eq(p.icon, { kind = "asset", value = "assets/lua.svg" })
+  eq(p.cover, "assets/lua.png")
+  local _, pserr, pinfo = plans.set(plan.id, { cover = "assets/x.gif" }, o)
+  has(pserr, "no image")
+  eq(pinfo.code, "invalid_argument")
+  assert(paths.set(path.id, { icon = vim.NIL, cover = "" }, o))
+  local p2 = assert(paths.find(path.id, { root = root }))
+  eq(p2.icon, nil, "vim.NIL removes")
+  eq(p2.cover, nil, "an empty text removes")
+
+  -- ── the write door ────────────────────────────────────────────────────────
+  local doc = assert(ops.run({
+    ops = {
+      {
+        op = "new",
+        area = "lib.nvim",
+        title = "Door icon",
+        fields = { icon = CRAB, cover = "assets/d.png" },
+      },
+      { op = "plan_new", area = "lib.nvim", title = "Door plan", icon = "review" },
+      { op = "project_new", area = "lib.nvim", title = "Door project", cover = "assets/x.svg" },
+    },
+  }, { root = root, today = F.TODAY }))
+  for i = 1, 3 do
+    ok(doc.results[i].ok, vim.inspect(doc.results[i]))
+  end
+  eq(assert(scan.find(doc.results[1].id, { root = root })).icon.value, CRAB)
+  eq(assert(plans.find(doc.results[2].id, { root = root })).icon.value, "review")
+  local refused = assert(ops.run({
+    ops = {
+      { op = "new", area = "lib.nvim", title = "Door bad", fields = { icon = "rocket" } },
+    },
+  }, { root = root, today = F.TODAY }))
+  ok(not refused.results[1].ok, "a bad icon is refused")
+  local set_doc = assert(ops.run({
+    ops = {
+      {
+        op = "plan_set",
+        id = doc.results[2].id,
+        patch = { icon = vim.NIL, cover = "assets/c.png" },
+      },
+    },
+  }, { root = root, today = F.TODAY }))
+  ok(set_doc.results[1].ok, vim.inspect(set_doc.results[1]))
+  local after = assert(plans.find(doc.results[2].id, { root = root }))
+  eq(after.icon, nil)
+  eq(after.cover, "assets/c.png")
+  local meeting = assert(ops.run({
+    ops = {
+      {
+        op = "meeting_new",
+        area = "lib.nvim",
+        title = "Sync",
+        fields = { date = "2026-11-24", icon = CRAB, cover = "assets/m.png" },
+      },
+    },
+  }, { root = root, today = F.TODAY }))
+  ok(meeting.results[1].ok, vim.inspect(meeting.results[1]))
+  local m = assert(require("tasks_nvim.meetings").find(meeting.results[1].id, { root = root }))
+  eq(m.icon, { kind = "emoji", value = CRAB })
+  eq(m.cover, "assets/m.png")
+
+  -- ── the CLI ───────────────────────────────────────────────────────────────
+  local cli = require("tasks_nvim.cli")
+  local out = {}
+  local io_ = {
+    out = function(s)
+      out[#out + 1] = s
+    end,
+    err = function(s)
+      out[#out + 1] = s
+    end,
+  }
+  eq(
+    cli.run({
+      "new",
+      "lib.nvim",
+      "Cli icon",
+      "--icon=handshake",
+      "--cover=assets/c.png",
+      "--vault=" .. root,
+      "--today=" .. F.TODAY,
+    }, io_),
+    0,
+    table.concat(out, "\n")
+  )
+  local cli_task = assert(scan.find("lib.nvim/cli-icon", { root = root }))
+  eq(cli_task.icon, { kind = "word", value = "handshake" })
+  eq(cli_task.cover, "assets/c.png")
+  out = {}
+  eq(
+    cli.run({
+      "plan-new",
+      "lib.nvim",
+      "Cli plan",
+      "--icon=" .. CRAB,
+      "--vault=" .. root,
+      "--today=" .. F.TODAY,
+    }, io_),
+    0,
+    table.concat(out, "\n")
+  )
+  eq(assert(plans.find("lib.nvim/cli-plan", { root = root })).icon.value, CRAB)
+end

@@ -255,7 +255,15 @@ return function(H)
     -- the slug comes from the title; `waits_for` creates a task that is parked from the start, which no form offers
     -- (a task is parked with a reason later: `set <id> waits_for=<key>`); a routine is made with `repeat=` on the
     -- command line or `set`, not by the form
-    if name ~= "slug" and name ~= "waits_for" and name ~= "repeat" and name ~= "repeat_from" then
+    -- (`icon` and `cover` reach the form in their own step)
+    if
+      name ~= "slug"
+      and name ~= "waits_for"
+      and name ~= "repeat"
+      and name ~= "repeat_from"
+      and name ~= "icon"
+      and name ~= "cover"
+    then
       engine_new[#engine_new + 1] = name
     end
   end

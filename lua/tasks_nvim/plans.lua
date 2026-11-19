@@ -496,6 +496,8 @@ M.MAX_SLUG = 200
 ---@field summary? string
 ---@field slug? string
 ---@field web_links? string[]|string  # Web addresses for `links:` (http/https; a text is split at commas).
+---@field icon? string            # `icon:`: an emoji, a file below `assets/` or a word (`model.icon_of`).
+---@field cover? string           # `cover:`: a picture below `assets/`.
 ---@field today? string
 ---@field dry_run? boolean  # Name the plan the call would make and write nothing.
 
@@ -662,6 +664,22 @@ function M.new(area, opts)
     end
     web_links = given
   end
+  local mutate = require("tasks_nvim.mutate")
+  local icon, cover
+  if opts.icon ~= nil then
+    local ierr
+    icon, ierr = mutate.icon_field(opts.icon)
+    if icon == nil then
+      return nil, ierr, { code = "invalid_argument" }
+    end
+  end
+  if opts.cover ~= nil then
+    local cerr
+    cover, cerr = mutate.cover_field(opts.cover)
+    if cover == nil then
+      return nil, cerr, { code = "invalid_argument" }
+    end
+  end
 
   local pairs_ = { { "title", title }, { "status", status } }
   if #areas > 0 then
@@ -684,6 +702,12 @@ function M.new(area, opts)
   end
   if #web_links > 0 then
     pairs_[#pairs_ + 1] = { "links", web_links }
+  end
+  if icon then
+    pairs_[#pairs_ + 1] = { "icon", icon }
+  end
+  if cover then
+    pairs_[#pairs_ + 1] = { "cover", cover }
   end
   pairs_[#pairs_ + 1] = { "created", today }
   pairs_[#pairs_ + 1] = { "updated", today }
@@ -787,9 +811,21 @@ M.SET_KEYS = {
     "project",
     "phase",
     "links",
+    "icon",
+    "cover",
   },
-  project = { "title", "status", "areas", "target", "phase_order", "gate", "links" },
-  path = { "title", "status", "areas", "target", "project", "links" },
+  project = {
+    "title",
+    "status",
+    "areas",
+    "target",
+    "phase_order",
+    "gate",
+    "links",
+    "icon",
+    "cover",
+  },
+  path = { "title", "status", "areas", "target", "project", "links", "icon", "cover" },
 }
 
 ---The finder of a kind of file: plans here, projects and paths in their own modules (required where used: they
@@ -887,6 +923,12 @@ function M.set(id, patch, opts)
         return nil, lerr, { code = "invalid_argument" }
       end
       pairs_[#pairs_ + 1] = { key, list }
+    elseif key == "icon" or key == "cover" then
+      local stored, ierr = (key == "icon" and mutate.icon_field or mutate.cover_field)(value)
+      if stored == nil then
+        return nil, ierr, { code = "invalid_argument" }
+      end
+      pairs_[#pairs_ + 1] = { key, stored }
     else
       if type(value) ~= "string" then
         return nil, key .. " must be a text", { code = "invalid_argument" }

@@ -416,6 +416,12 @@ local function meta_pairs(meta)
   if meta.links then
     pairs_[#pairs_ + 1] = { "links", meta.links }
   end
+  if meta.icon then
+    pairs_[#pairs_ + 1] = { "icon", meta.icon }
+  end
+  if meta.cover then
+    pairs_[#pairs_ + 1] = { "cover", meta.cover }
+  end
   if meta.rules then
     pairs_[#pairs_ + 1] = { "rules", meta.rules }
   end
@@ -739,6 +745,8 @@ local SETTABLE = {
   "phase",
   "refs",
   "links",
+  "icon",
+  "cover",
   "rules",
   "done_in",
   "commits",
@@ -843,6 +851,39 @@ local function id_list_field(value, key, ctx)
   return #ids == 1 and ids[1] or ids
 end
 
+---`icon`: an emoji, a file below `assets/` or a word of `model.ICON_WORDS` (`model.icon_of`), stored as written.
+---@param value any
+---@return any, string?
+local function icon_field(value)
+  local text, err = one_line(value, "icon")
+  if not text then
+    return nil, err
+  end
+  local icon, ierr = model.icon_of(vim.trim(text))
+  if not icon then
+    return nil, ierr
+  end
+  return icon.value
+end
+M.icon_field = icon_field
+
+---`cover`: a picture below `assets/` (`model.asset_error`).
+---@param value any
+---@return any, string?
+local function cover_field(value)
+  local text, err = one_line(value, "cover")
+  if not text then
+    return nil, err
+  end
+  text = vim.trim(text)
+  local cerr = model.asset_error(text, "cover")
+  if cerr then
+    return nil, cerr
+  end
+  return text
+end
+M.cover_field = cover_field
+
 ---Each settable field's check and the form it is stored in: `(value, key, ctx)` to the stored value, or nil and the
 ---refusal. A field not listed here (`summary`, an allowed unknown one) is a single-line text.
 ---@type table<string, fun(value: any, key: string, ctx: Tasks.NormalizeCtx): any, string?>
@@ -915,6 +956,8 @@ local FIELD_NORMALIZERS = {
     return value
   end,
   links = list_or_remove(link_list),
+  icon = icon_field,
+  cover = cover_field,
   category = list_or_remove(category_list),
   scope = list_or_remove(scope_list),
   tags = strings_field,
@@ -1359,6 +1402,22 @@ function M.new(area, opts)
     end
     links = #list > 0 and list or nil
   end
+  -- what the task stands for: an icon and a large picture (checked as `set` checks them)
+  local icon, cover
+  if opts.icon ~= nil then
+    local v, ierr = icon_field(opts.icon)
+    if v == nil then
+      return nil, ierr, { code = "invalid_argument" }
+    end
+    icon = v
+  end
+  if opts.cover ~= nil then
+    local v, cerr = cover_field(opts.cover)
+    if v == nil then
+      return nil, cerr, { code = "invalid_argument" }
+    end
+    cover = v
+  end
   local rules
   if opts.rules ~= nil then
     -- rule ids are single tokens, as tags are
@@ -1479,6 +1538,8 @@ function M.new(area, opts)
       repeat_from = opts.repeat_from,
       refs = refs,
       links = links,
+      icon = icon,
+      cover = cover,
       rules = rules,
       created = created,
       updated = today,

@@ -92,7 +92,7 @@ commands:
         --sheet: the state of the test-sheet block testing.nvim wrote into the task, its worst sheet (inbox:
         green and waiting for your judgement), any: a task with the block, none: a task without it; nothing is run;
         --claimed: own: a valid claim of this name (`claim`), foreign: of somebody else, none: free or expired)
-  plan-new <area> <title> [--areas=a,b] [--target=<id>] [--phases=a,b,c] [--gate=hard] [--summary=text] [--links=url,url]
+  plan-new <area> <title> [--areas=a,b] [--target=<id>] [--phases=a,b,c] [--gate=hard] [--summary=text] [--links=url,url] [--icon=<emoji|assets/x.svg|word>] [--cover=assets/x.png]
                                           create ROADMAP/plans/<slug>.md; tasks join it with plan=<id> phase=<word>
   meeting new <area> <title> --date=YYYY-MM-DD [--time=HH:MM] [--end=HH:MM|--duration=45m] [--location=]
               [--online=url] [--tasks=a/b,c/d] [--notify=-15m,-1d@18:00] [--tags=] [--quick="<line>"] [--dry-run]
@@ -153,6 +153,7 @@ commands:
   new <area>[,<area>...] <title> [--kind=k] [--prio=1..3] [--effort=XS..XL|0.5d] [--value=1..5] [--actor=cdx|me|pair] [--after=id,id] [--order=2.5] [--plan=id|--project=id] [--phase=word] [--created=YYYY-MM-DD] [--tags=a,b]
        [--category=c,d] [--scope=a,b] [--severity=low|medium|high|critical] [--due=YYYY-MM-DD] [--start=YYYY-MM-DD] [--repeat=8w] [--repeat-from=done|due] [--refs=path,repo@sha] [--links=https://...,...]
        [--summary=text] [--slug=slug] [--status=s] [--waits-for=key] [--outcome=learned|seen|not-applicable] [--reason=text]
+       [--icon=<emoji|assets/x.svg|word>] [--cover=assets/x.png]
        [--lang=de|en] [--folder]             create a task file (--lang: body headings;
                                                --folder: a folder task that can hold assets;
                                                --waits-for: created parked, waiting for that key;
@@ -375,7 +376,19 @@ local SPECS = {
   },
   next = { value = { "n", "actor", "format", "by" }, flag = {} },
   ["plan-new"] = {
-    value = { "areas", "target", "phases", "gate", "status", "summary", "slug", "title", "links" },
+    value = {
+      "areas",
+      "target",
+      "phases",
+      "gate",
+      "status",
+      "summary",
+      "slug",
+      "title",
+      "links",
+      "icon",
+      "cover",
+    },
     flag = {},
   },
   ["plan-close"] = { value = {}, flag = {} },
@@ -394,6 +407,7 @@ local SPECS = {
       "notify-to",
       "tags",
       "icon",
+      "cover",
       "image",
       "recording",
       "summary",
@@ -430,6 +444,8 @@ local SPECS = {
       "phase",
       "refs",
       "links",
+      "icon",
+      "cover",
       "due",
       "start",
       "repeat",
@@ -1261,6 +1277,8 @@ commands["plan-new"] = function(ctx)
     summary = args.opt.summary --[[@as string|nil]],
     slug = args.opt.slug --[[@as string|nil]],
     web_links = args.opt.links --[[@as string|nil]],
+    icon = args.opt.icon --[[@as string|nil]],
+    cover = args.opt.cover --[[@as string|nil]],
   })
   if not res then
     ctx.warn("error: " .. tostring(err))
@@ -1289,6 +1307,7 @@ local MEETING_FIELD_OPTS = {
   "notify-to",
   "tags",
   "icon",
+  "cover",
   "image",
   "recording",
   "summary",
@@ -1782,6 +1801,8 @@ function commands.new(ctx)
     phase = opt.phase --[[@as string|nil]],
     refs = opt.refs --[[@as string|nil]],
     web_links = opt.links --[[@as string|nil]],
+    icon = opt.icon --[[@as string|nil]],
+    cover = opt.cover --[[@as string|nil]],
     due = opt.due --[[@as string|nil]],
     start = opt.start --[[@as string|nil]],
     created = opt.created --[[@as string|nil]],

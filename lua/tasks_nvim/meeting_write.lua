@@ -38,6 +38,7 @@ M.KEYS = {
   "tasks",
   "notify",
   "notify_to",
+  "cover",
   "image",
   "icon",
   "tags",

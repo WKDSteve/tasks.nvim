@@ -144,6 +144,8 @@
 ---@field folder? boolean             # Create a folder task (`<slug>/<slug>.md`) so assets can be attached.
 ---@field refs? string[]|string       # Paths or `repo@commit`; a string is split at commas.
 ---@field web_links? string[]|string  # The `links` frontmatter: web addresses (`http://`, `https://`); a string is split at commas.
+---@field icon? string                # The `icon` frontmatter: an emoji, a file below `assets/` or a word (`model.icon_of`).
+---@field cover? string               # The `cover` frontmatter: a picture below `assets/` of the task folder.
 ---@field rules? string[]|string      # Rule ids the task fulfils (`ERR-03`); a string is split at commas.
 ---@field body? string                # The body in place of the template's sections.
 ---@field dry_run? boolean            # Only the id it would get; nothing is created.
