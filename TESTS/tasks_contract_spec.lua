@@ -87,6 +87,7 @@ return function(H)
     "claims",
     "eff_prio",
     "etag",
+    "icon",
     "if_match",
     "meeting_ops",
     "move_area",

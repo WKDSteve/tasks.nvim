@@ -93,9 +93,13 @@ export type Hello = Head & {
      */
     meeting_status?: string[];
     /**
-     * The icons a meeting may name (`icon`). Additive; capability `meetings`.
+     * The icons a meeting may name (`icon`). Additive; capability `meetings`. The same list as `icon_word`.
      */
     meeting_icon?: string[];
+    /**
+     * The words an `icon` of kind `word` may be (a front end draws its own sign for each). Additive; capability `icon`.
+     */
+    icon_word?: string[];
     /**
      * The services the address of a meeting is told as (`online_service`); `link` for any other. Additive; capability `meetings`.
      */
@@ -244,6 +248,8 @@ export type Snapshot = Head & {
     etag?: string;
     valid: boolean;
     links?: PlanLinks;
+    icon?: Icon;
+    cover?: Cover;
     folder?: PlanFolder;
     assets?: PlanAssets;
     assets_truncated?: PlanAssetsTruncated;
@@ -265,6 +271,8 @@ export type Snapshot = Head & {
     etag?: string;
     valid: boolean;
     links?: PlanLinks;
+    icon?: Icon;
+    cover?: Cover;
     folder?: PlanFolder;
     assets?: PlanAssets;
     assets_truncated?: PlanAssetsTruncated;
@@ -314,6 +322,10 @@ export type Etag = string;
  * The web addresses of a plan or project file (`links:`, http/https only; capability `plan_links`). Absent when it has none.
  */
 export type PlanLinks = string[];
+/**
+ * A large picture of the item (`cover:`; capability `icon`): an image (png, jpg, jpeg, webp, svg) below `assets/` of its folder. Absent when it has none.
+ */
+export type Cover = string;
 /**
  * The plan or project file is in its folder form (`<slug>/<slug>.md`, made by `attach` or `folderize`): the other files of that folder are its assets. Absent for a plain file.
  */
@@ -1100,6 +1112,13 @@ export interface AreaGroup {
   desc?: string;
 }
 /**
+ * What an item stands for (`icon:`; capability `icon`): an emoji (one grapheme cluster), an image below `assets/` of the item's folder, or a word of `hello.enums.icon_word`. Absent when the item has none.
+ */
+export interface Icon {
+  kind: "emoji" | "asset" | "word";
+  value: string;
+}
+/**
  * One task. A broken task is still here (`valid: false`, `problems`); a field that is missing is unknown, never 0 (no `effort` means no `effort_days` and no `roi`).
  */
 export interface TaskEntry {
@@ -1349,6 +1368,8 @@ export interface TaskEntry {
    * Web addresses of the task (`http://` or `https://`), apart from `refs`. Only when the task lists any.
    */
   links?: string[];
+  icon?: Icon;
+  cover?: Cover;
   summary: string;
   folder: boolean;
   /**
@@ -1768,8 +1789,12 @@ export interface MeetingEntry {
     | [string, string, string, string, string, string, string, string]
     | [string, string, string, string, string, string, string, string, string]
     | [string, string, string, string, string, string, string, string, string, string];
+  /**
+   * The old name of `cover`, kept for the readers of before: the same value.
+   */
   image?: string;
-  icon?: string;
+  cover?: Cover;
+  icon?: Icon;
   tags: string[];
   recording?: string;
   created?: Date;

@@ -1,7 +1,7 @@
 {
   "body": "\n## Akzeptanz\n\n- [x] it ships\n",
   "body_truncated": false,
-  "digest": "sha256:fdfa5c0fb0ec2c7d",
+  "digest": "sha256:23cd92f52deb83af",
   "engine": {
     "git": "0000000",
     "nvim": "0.0.0",
@@ -12,7 +12,7 @@
   "kind": "tasks.task",
   "plugin": "tasks.nvim",
   "questions": [],
-  "rev": "rev:2cfff6",
+  "rev": "rev:ac5f3c",
   "schema": 1,
   "steps": [],
   "task": {

@@ -150,6 +150,10 @@ mutate(
 mutate("a list page without its total", "list-page", (d) => delete d.total);
 mutate("a project link that is no web address", "snapshot", (d) => (d.projects[0].links = ["ftp://example.org/x"]));
 mutate("a plan folder that is false", "snapshot", (d) => (d.projects[0].folder = false));
+mutate("an icon of a kind nobody defined", "snapshot", (d) => (d.projects[0].icon.kind = "sticker"));
+mutate("an icon without its value", "snapshot", (d) => delete d.projects[0].icon.value);
+mutate("an icon as plain text", "meeting", (d) => (d.meeting.icon = "handshake"));
+mutate("a cover outside assets/", "snapshot", (d) => (d.projects[0].cover = "../x.png"));
 mutate("a phase suggestion that is no kebab-case word", "result-projects", (d) => {
   const failed = d.results.find((r) => r.error && r.error.details && r.error.details.suggestion);
   failed.error.details.suggestion = "Einführung";

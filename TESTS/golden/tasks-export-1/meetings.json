@@ -1,5 +1,5 @@
 {
-  "digest": "sha256:b40a7b6ca151b1a8",
+  "digest": "sha256:49c9b34f6ca389ab",
   "engine": {
     "git": "0000000",
     "nvim": "0.0.0",
@@ -27,7 +27,10 @@
       "has_decisions": false,
       "has_protocol": false,
       "has_result": true,
-      "icon": "handshake",
+      "icon": {
+        "kind": "word",
+        "value": "handshake"
+      },
       "id": "lib.nvim/kickoff",
       "notify": [],
       "participants": {
@@ -56,12 +59,13 @@
       "assets": [
         "assets/images/cover.png"
       ],
+      "cover": "assets/images/cover.png",
       "created": "2026-01-02",
       "date": "2026-01-12",
       "duration_min": 90,
       "end": "15:30",
       "ends_at": "2026-01-12T15:30",
-      "etag": "sha256:df772bf3b8f661c4",
+      "etag": "sha256:75d0ace36750fe61",
       "file": "lib.nvim/MEETINGS/sync/sync.md",
       "folder": true,
       "followups": {
@@ -71,6 +75,10 @@
       "has_decisions": false,
       "has_protocol": false,
       "has_result": false,
+      "icon": {
+        "kind": "word",
+        "value": "handshake"
+      },
       "id": "lib.nvim/sync",
       "image": "assets/images/cover.png",
       "location": "Room 3",
@@ -154,7 +162,7 @@
   "limit": 100,
   "offset": 0,
   "plugin": "tasks.nvim",
-  "rev": "rev:62a35e",
+  "rev": "rev:329f61",
   "schema": 1,
   "since": "2026-01-01",
   "total": 3,

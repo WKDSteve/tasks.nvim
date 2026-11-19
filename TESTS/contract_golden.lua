@@ -50,6 +50,7 @@ function G.write_meetings(root)
       "notify: [-15m, -1d@18:00]",
       "notify_to: [me@example.org]",
       "image: assets/images/cover.png",
+      "icon: handshake",
       "tags: [sync]",
       "created: 2026-01-02",
       "---",

@@ -46,7 +46,7 @@
     "listed": 14,
     "unlisted": 2
   },
-  "digest": "sha256:222faea3079e42a3",
+  "digest": "sha256:888fee3ac9eabc4c",
   "engine": {
     "git": "0000000",
     "nvim": "0.0.0",
@@ -162,10 +162,16 @@
         "lib.nvim"
       ],
       "assets": [
-        "assets/brief.pdf"
+        "assets/brief.pdf",
+        "assets/icon.svg"
       ],
-      "etag": "sha256:530fedc07c7833d2",
+      "cover": "assets/cover.png",
+      "etag": "sha256:452f0a48ba0f0204",
       "folder": true,
+      "icon": {
+        "kind": "asset",
+        "value": "assets/icon.svg"
+      },
       "id": "lib.nvim/the-project",
       "links": [
         "https://example.org/brief"
@@ -201,7 +207,7 @@
       "title": "Old and done"
     }
   ],
-  "rev": "rev:f69832",
+  "rev": "rev:bdf10a",
   "schema": 1,
   "tasks": [
     {
@@ -461,10 +467,14 @@
       ],
       "category": [],
       "created": "2026-01-01",
-      "etag": "sha256:6521f60ef65112d6",
+      "etag": "sha256:df150f9cf67ce4e3",
       "file": "cascade.nvim/ROADMAP/tasks/theta.md",
       "folder": false,
       "group": "blocked|-",
+      "icon": {
+        "kind": "emoji",
+        "value": "🦀"
+      },
       "id": "cascade.nvim/theta",
       "links": [
         "https://example.org/docs#intro",

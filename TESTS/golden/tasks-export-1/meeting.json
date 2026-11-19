@@ -13,7 +13,7 @@
   ],
   "body": "\nWhere alpha stands.\n\n## Agenda\n- [x] State\n- [ ] Next steps\n\n## Teilnehmer\n- [x] Rick \u003crick@example.org> (Organisator)\n- [ ] Stefan (Ich)\n\n## Unterlagen\n- [Slides](assets/slides.pdf)\n- https://example.org/wiki\n\n## Folgeaufgaben\n- [ ] Write it down -> lib.nvim/gamma\n- [x] Ask Rick\n",
   "body_truncated": false,
-  "digest": "sha256:4c5822be0d820c05",
+  "digest": "sha256:fb1b01664bb8d177",
   "documents": [
     {
       "href": "assets/slides.pdf",
@@ -58,12 +58,13 @@
     "assets": [
       "assets/images/cover.png"
     ],
+    "cover": "assets/images/cover.png",
     "created": "2026-01-02",
     "date": "2026-01-12",
     "duration_min": 90,
     "end": "15:30",
     "ends_at": "2026-01-12T15:30",
-    "etag": "sha256:df772bf3b8f661c4",
+    "etag": "sha256:75d0ace36750fe61",
     "file": "lib.nvim/MEETINGS/sync/sync.md",
     "folder": true,
     "followups": {
@@ -73,6 +74,10 @@
     "has_decisions": false,
     "has_protocol": false,
     "has_result": false,
+    "icon": {
+      "kind": "word",
+      "value": "handshake"
+    },
     "id": "lib.nvim/sync",
     "image": "assets/images/cover.png",
     "location": "Room 3",
@@ -129,7 +134,7 @@
     }
   ],
   "plugin": "tasks.nvim",
-  "rev": "rev:52b492",
+  "rev": "rev:58cac2",
   "schema": 1,
   "vault": {
     "id": "vault"

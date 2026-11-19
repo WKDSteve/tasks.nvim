@@ -76,6 +76,7 @@ M.CAPABILITIES = {
   "groupings",
   "hello",
   "history",
+  "icon",
   "if_match",
   "intent",
   "links",
@@ -373,6 +374,9 @@ local function task_entry(root, task, node, rank, meeting_ids)
       local ok = vim.tbl_filter(model.is_web_link, task.links or {})
       return #ok > 0 and ok or nil
     end)(),
+    -- what the task stands for; only when the file has it (capability `icon`)
+    icon = M.icon_entry(task.icon),
+    cover = task.cover,
     summary = clip(task.summary or "", M.LIMITS.summary),
     -- the meetings that name the task (`tasks:` of a meeting file), the earliest first; only when there are some, so a
     -- document without meetings reads as before
@@ -645,7 +649,8 @@ local function area_groups_of(view)
 end
 
 ---What a plan or project entry adds when the file has it, so a document without it reads as before: `links` (the
----web addresses; a hand-written entry that is none is the file's `bad-link` problem and is not handed on), `folder`
+---web addresses; a hand-written entry that is none is the file's `bad-link` problem and is not handed on), `icon` and
+---`cover` (capability `icon`), `folder`
 ---and `assets` (the files in its folder, relative to it, at most 100; `assets_truncated` beyond).
 ---@param entry table
 ---@param f Tasks.PlanFile
@@ -653,6 +658,8 @@ end
 local function with_links_and_assets(entry, f)
   local ok = vim.tbl_filter(model.is_web_link, f.links or {})
   entry.links = #ok > 0 and ok or nil
+  entry.icon = M.icon_entry(f.icon)
+  entry.cover = f.cover
   if f.folder then
     entry.folder = true
     local assets, truncated = require("tasks_nvim.plans").assets(f, M.LIMITS.list_items)
@@ -660,6 +667,17 @@ local function with_links_and_assets(entry, f)
     entry.assets_truncated = truncated or nil
   end
   return entry
+end
+
+---The entry of an `icon:` (`model.icon_of`): `{ kind, value }`, `kind` `emoji`, `asset` (a file below `assets/` of the
+---item's folder) or `word` (one of `hello.enums.icon_word`); nil when the item has none.
+---@param icon Tasks.Icon|nil
+---@return table|nil
+function M.icon_entry(icon)
+  if not icon then
+    return nil
+  end
+  return json.object({ kind = icon.kind, value = icon.value })
 end
 
 ---`snapshot.projects`: the project files with what each adds up to (`projects.rollup`) and its plans. The finished
@@ -794,6 +812,7 @@ function M.hello(opts)
     severity = vim.list_slice(model.SEVERITIES, 1),
     meeting_status = vim.list_slice(meetings.STATUSES, 1),
     meeting_icon = vim.list_slice(meetings.ICONS, 1),
+    icon_word = vim.list_slice(model.ICON_WORDS, 1),
     online_service = vim.list_slice(meetings.SERVICES, 1),
     -- not a word list: the fixed acceptance lines by kind, category and scope (`model.scaffold` joins them)
     scaffold = json.object({
@@ -2898,8 +2917,10 @@ local function meeting_entry(root, m)
       })
     end, m.notify),
     notify_to = #m.notify_to > 0 and vim.list_slice(m.notify_to, 1) or nil,
+    -- `image` is the old name of `cover`, kept for the readers of before (capability `icon`)
     image = m.cover,
-    icon = m.icon and m.icon.value,
+    cover = m.cover,
+    icon = M.icon_entry(m.icon),
     tags = vim.list_slice(m.tags, 1),
     recording = m.recording,
     created = m.created,

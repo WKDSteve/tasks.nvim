@@ -260,4 +260,37 @@ return function(H)
   H.write(dir .. "/assets/i.svg", "<svg/>")
   res = assert(check.run({ root = root, today = F.TODAY }))
   eq(codes_of(res, made.id), {}, "both there, neither unused")
+
+  -- ── the contract: the fields only when the file has them ──────────────────
+  local api = require("tasks_nvim.api")
+  local function call(method, params)
+    -- one value: the reply is the text alone
+    local reply = api.call(method, vim.json.encode({ params = params or vim.empty_dict() }), {
+      root = root,
+    })
+    return vim.json.decode(reply)
+  end
+  local entry = call("task", { id = made.id }).task
+  eq(entry.icon, { kind = "asset", value = "assets/i.svg" })
+  eq(entry.cover, "assets/cover.png")
+  local bare = call("task", { id = plain.id }).task
+  eq(bare.icon, nil, "no icon key without the field")
+  eq(bare.cover, nil, "no cover key without the field")
+  local hello = call("hello")
+  ok(vim.tbl_contains(hello.capabilities, "icon"), "capability icon")
+  eq(hello.enums.icon_word, require("tasks_nvim.model").ICON_WORDS)
+  local snap = call("snapshot")
+  local seen = {}
+  for _, f in ipairs(snap.plans or {}) do
+    seen[f.id] = f
+  end
+  for _, f in ipairs(snap.projects or {}) do
+    seen[f.id] = f
+  end
+  eq(seen[plan.id].icon, { kind = "emoji", value = CRAB }, "a plan in the snapshot")
+  eq(seen[project.id].cover, "assets/p.jpg", "a project in the snapshot")
+  local mdoc = call("meeting", { id = meeting.results[1].id }).meeting
+  eq(mdoc.icon, { kind = "emoji", value = CRAB })
+  eq(mdoc.cover, "assets/m.png")
+  eq(mdoc.image, "assets/m.png", "image: the old name, the same value")
 end

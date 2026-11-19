@@ -18,6 +18,7 @@
     "groupings",
     "hello",
     "history",
+    "icon",
     "if_match",
     "intent",
     "links",
@@ -91,6 +92,20 @@
       "L",
       "XL",
       "\u003cn>d"
+    ],
+    "icon_word": [
+      "call",
+      "coffee",
+      "handshake",
+      "idea",
+      "meeting",
+      "people",
+      "phone",
+      "planning",
+      "presentation",
+      "review",
+      "video",
+      "workshop"
     ],
     "kind": [
       "feature",

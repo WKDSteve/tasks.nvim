@@ -1,6 +1,6 @@
 {
   "areas": 1,
-  "digest": "sha256:060d51315cb8eb84",
+  "digest": "sha256:605cc55d3af597ac",
   "engine": {
     "git": "0000000",
     "nvim": "0.0.0",
@@ -57,6 +57,14 @@
     },
     {
       "area": "lib.nvim",
+      "code": "cover-missing",
+      "file": "lib.nvim/ROADMAP/projects/the-project/the-project.md",
+      "id": "lib.nvim/the-project",
+      "message": "cover assets/cover.png is not there",
+      "severity": "warn"
+    },
+    {
+      "area": "lib.nvim",
       "code": "ui-tag-without-ux",
       "file": "lib.nvim/ROADMAP/tasks/alpha.md",
       "id": "lib.nvim/alpha",
@@ -93,13 +101,13 @@
   "notes": [],
   "ok": false,
   "plugin": "tasks.nvim",
-  "rev": "rev:f69832",
+  "rev": "rev:bdf10a",
   "schema": 1,
   "tasks": 15,
-  "total": 10,
+  "total": 11,
   "truncated": false,
   "vault": {
     "id": "vault"
   },
-  "warnings": 4
+  "warnings": 5
 }

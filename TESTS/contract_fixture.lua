@@ -148,9 +148,11 @@ function M.build(H)
   -- asset
   vim.fn.mkdir(root .. "/lib.nvim/ROADMAP/projects/the-project/assets", "p")
   H.write(root .. "/lib.nvim/ROADMAP/projects/the-project/assets/brief.pdf", "%PDF-1.4 brief")
+  -- an icon and a cover (capability `icon`): the icon is there, the cover is not (`check`: `cover-missing`)
+  H.write(root .. "/lib.nvim/ROADMAP/projects/the-project/assets/icon.svg", "<svg/>")
   H.write(
     root .. "/lib.nvim/ROADMAP/projects/the-project/the-project.md",
-    "---\ntitle: The project\nstatus: doing\nareas: [lib.nvim]\nphase_order: [first, second]\nlinks: [https://example.org/brief]\ncreated: "
+    "---\ntitle: The project\nstatus: doing\nareas: [lib.nvim]\nphase_order: [first, second]\nlinks: [https://example.org/brief]\nicon: assets/icon.svg\ncover: assets/cover.png\ncreated: "
       .. DATE
       .. "\nupdated: "
       .. DATE
@@ -177,6 +179,8 @@ function M.build(H)
     { "blocked_by", "[lib.nvim/old-done]" },
     { "refs", "[lib.nvim@abc1234, lua/x.lua]" },
     { "links", "[https://example.org/docs#intro, http://example.com]" },
+    -- an emoji icon (capability `icon`), U+1F980 written as bytes so the file stays ASCII
+    { "icon", "\240\159\166\128" },
   }, "blocked", "Theta was blocked by a finished task")
   task(
     H,

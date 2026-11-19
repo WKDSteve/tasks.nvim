@@ -1,6 +1,6 @@
 {
   "client_op_id": "golden-projects",
-  "digest": "sha256:273802bfb46c80ea",
+  "digest": "sha256:dc89be7fa007ab65",
   "dry_run": false,
   "engine": {
     "git": "0000000",
@@ -90,13 +90,13 @@
       "changed_ids": [
         "lib.nvim/the-project"
       ],
-      "etag_after": "sha256:a993adb8f78571af",
-      "etag_before": "sha256:530fedc07c7833d2",
+      "etag_after": "sha256:019b89bd3af7bcd3",
+      "etag_before": "sha256:452f0a48ba0f0204",
       "file": "lib.nvim/ROADMAP/projects/the-project/the-project.md",
       "id": "lib.nvim/the-project",
       "inverse": {
         "id": "lib.nvim/the-project",
-        "if_match": "sha256:a993adb8f78571af",
+        "if_match": "sha256:019b89bd3af7bcd3",
         "op": "project_set",
         "patch": {
           "gate": null

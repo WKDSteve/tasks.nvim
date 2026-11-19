@@ -214,12 +214,12 @@
           }
         },
         "image": {
+          "description": "The old name of `cover`, kept for the readers of before: the same value.",
           "type": "string",
           "pattern": "^assets/"
         },
-        "icon": {
-          "type": "string"
-        },
+        "cover": { "$ref": "#/$defs/Cover" },
+        "icon": { "$ref": "#/$defs/Icon" },
         "tags": {
           "type": "array",
           "items": {
@@ -1025,6 +1025,8 @@
             "pattern": "^[Hh][Tt][Tt][Pp][Ss]?://"
           }
         },
+        "icon": { "$ref": "#/$defs/Icon" },
+        "cover": { "$ref": "#/$defs/Cover" },
         "summary": {
           "type": "string"
         },
@@ -1272,7 +1274,14 @@
               }
             },
             "meeting_icon": {
-              "description": "The icons a meeting may name (`icon`). Additive; capability `meetings`.",
+              "description": "The icons a meeting may name (`icon`). Additive; capability `meetings`. The same list as `icon_word`.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "icon_word": {
+              "description": "The words an `icon` of kind `word` may be (a front end draws its own sign for each). Additive; capability `icon`.",
               "type": "array",
               "items": {
                 "type": "string"
@@ -1663,6 +1672,8 @@
                 "type": "boolean"
               },
               "links": { "$ref": "#/$defs/PlanLinks" },
+              "icon": { "$ref": "#/$defs/Icon" },
+              "cover": { "$ref": "#/$defs/Cover" },
               "folder": { "$ref": "#/$defs/PlanFolder" },
               "assets": { "$ref": "#/$defs/PlanAssets" },
               "assets_truncated": { "$ref": "#/$defs/PlanAssetsTruncated" }
@@ -1690,6 +1701,8 @@
               },
               "valid": { "type": "boolean" },
               "links": { "$ref": "#/$defs/PlanLinks" },
+              "icon": { "$ref": "#/$defs/Icon" },
+              "cover": { "$ref": "#/$defs/Cover" },
               "folder": { "$ref": "#/$defs/PlanFolder" },
               "assets": { "$ref": "#/$defs/PlanAssets" },
               "assets_truncated": { "$ref": "#/$defs/PlanAssetsTruncated" },
@@ -3697,6 +3710,21 @@
         "io",
         "internal"
       ]
+    },
+    "Icon": {
+      "description": "What an item stands for (`icon:`; capability `icon`): an emoji (one grapheme cluster), an image below `assets/` of the item's folder, or a word of `hello.enums.icon_word`. Absent when the item has none.",
+      "type": "object",
+      "required": ["kind", "value"],
+      "properties": {
+        "kind": { "enum": ["emoji", "asset", "word"] },
+        "value": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "Cover": {
+      "description": "A large picture of the item (`cover:`; capability `icon`): an image (png, jpg, jpeg, webp, svg) below `assets/` of its folder. Absent when it has none.",
+      "type": "string",
+      "pattern": "^assets/"
     },
     "PlanLinks": {
       "description": "The web addresses of a plan or project file (`links:`, http/https only; capability `plan_links`). Absent when it has none.",
