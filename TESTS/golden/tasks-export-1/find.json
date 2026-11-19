@@ -1,5 +1,5 @@
 {
-  "digest": "sha256:4f5e33c4906f92fa",
+  "digest": "sha256:95614183f8fc9b54",
   "engine": {
     "git": "0000000",
     "nvim": "0.0.0",
@@ -11,6 +11,7 @@
     {
       "area": "cascade.nvim",
       "id": "cascade.nvim/theta",
+      "kind": "task",
       "location": "open",
       "ref": "lib.nvim@abc1234",
       "status": "blocked"
@@ -18,6 +19,7 @@
     {
       "area": "lib.nvim",
       "id": "lib.nvim/alpha",
+      "kind": "task",
       "location": "open",
       "ref": "docs/shared.md",
       "status": "open"
@@ -25,6 +27,7 @@
     {
       "area": "lib.nvim",
       "id": "lib.nvim/alpha-twin",
+      "kind": "task",
       "location": "open",
       "ref": "docs/shared.md",
       "status": "open"

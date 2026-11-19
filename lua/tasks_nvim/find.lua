@@ -23,12 +23,14 @@ M.MAX_REFS = 50
 ---@field id string
 ---@field area string
 ---@field status string
----@field location "open"|"done"
+---@field location "open"|"done"   # A meeting: `open` while planned, `done` when done or cancelled.
+---@field kind "task"|"meeting"
 ---@field title? string
 
----The tasks that name any of `refs`, open ones first, then by id, a task once per ref it holds.
+---The tasks that name any of `refs`, open ones first, then by id, a task once per ref it holds; and the meetings that
+---name one of them (in `tasks:` or behind a follow-up, `-> <id>`), unless `opts.tasks_only`.
 ---@param refs string[]
----@param opts? { root?: string }
+---@param opts? { root?: string, tasks_only?: boolean }
 ---@return Tasks.FindMatch[]
 function M.by_refs(refs, opts)
   local root = vault.root(opts)
@@ -60,6 +62,7 @@ function M.by_refs(refs, opts)
             area = t.area,
             status = type(t.status) == "string" and t.status or "unknown",
             location = location,
+            kind = "task",
             title = t.title,
           }
         end
@@ -69,6 +72,37 @@ function M.by_refs(refs, opts)
   for _, area in ipairs(vault.area_names(root)) do
     take(scan.area(area, scan_opts), "open")
     take(scan.backlog(area, scan_opts), "done")
+  end
+  if not (opts and opts.tasks_only) then
+    for _, m in ipairs(require("tasks_nvim.meetings").all({ root = root }) or {}) do
+      local named = {}
+      for _, id in ipairs(m.tasks) do
+        named[id] = true
+      end
+      for _, f in ipairs(m.followups) do
+        if f.task then
+          named[f.task] = true
+        end
+      end
+      local hits = {}
+      for ref in pairs(wanted) do
+        if named[ref] then
+          hits[#hits + 1] = ref
+        end
+      end
+      table.sort(hits)
+      for _, ref in ipairs(hits) do
+        out[#out + 1] = {
+          ref = ref,
+          id = m.id,
+          area = m.area,
+          status = m.status or "unknown",
+          location = m.status == "planned" and "open" or "done",
+          kind = "meeting",
+          title = m.title,
+        }
+      end
+    end
   end
   table.sort(out, function(a, b)
     if a.location ~= b.location then

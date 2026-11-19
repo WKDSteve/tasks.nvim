@@ -2909,7 +2909,7 @@
       "unevaluatedProperties": false
     },
     "FindMatch": {
-      "description": "A task that names a ref: the ref, the task (id, area, status) and where it is, `open` (ROADMAP) or `done` (Backlog). Never a path.",
+      "description": "A task that names a ref: the ref, the task (id, area, status) and where it is, `open` (ROADMAP) or `done` (Backlog). Never a path. A meeting (`kind` `meeting`, capability `meeting_ops`) matches a task id it names in `tasks:` or behind a follow-up; it is `open` while planned.",
       "type": "object",
       "required": ["ref", "id", "area", "status", "location"],
       "properties": {
@@ -2917,7 +2917,8 @@
         "id": { "type": "string" },
         "area": { "type": "string" },
         "status": { "type": "string" },
-        "location": { "enum": ["open", "done"] }
+        "location": { "enum": ["open", "done"] },
+        "kind": { "enum": ["task", "meeting"] }
       },
       "additionalProperties": false
     },
@@ -3899,7 +3900,8 @@
                   "after",
                   "plan_target",
                   "refs",
-                  "document"
+                  "document",
+                  "meeting"
                 ]
               },
               "id": {
@@ -4117,7 +4119,7 @@
             "required": ["kind", "id"],
             "properties": {
               "kind": {
-                "enum": ["blocked_by", "after", "refs", "plan_target"]
+                "enum": ["blocked_by", "after", "refs", "plan_target", "meeting"]
               },
               "id": {
                 "type": "string"

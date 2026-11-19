@@ -29,8 +29,8 @@ local wikilinks = require("tasks_nvim.wikilinks")
 local M = {}
 
 ---@class Tasks.MoveReference
----@field kind "blocked_by"|"after"|"plan_target"|"refs"|"document"
----@field id? string        # The task or plan that names the old id.
+---@field kind "blocked_by"|"after"|"plan_target"|"refs"|"document"|"meeting"
+---@field id? string        # The task, plan or meeting that names the old id.
 ---@field path? string      # For a document: the file.
 
 ---@class Tasks.MovePreview
@@ -107,6 +107,9 @@ function M.preview(id, to_area, opts)
   if plans.find(new_id, { root = root }) then
     conflict("slug-taken", ("%s is a plan already"):format(new_id))
   end
+  if vault.resolve_meeting(root, to_area, task.slug) then
+    conflict("slug-taken", ("%s is a meeting already"):format(new_id))
+  end
 
   -- who names the old id
   local all, scan_errors
@@ -141,6 +144,16 @@ function M.preview(id, to_area, opts)
   for _, file in ipairs(files) do
     if file.target == id then
       out.references[#out.references + 1] = { kind = "plan_target", id = file.id }
+    end
+  end
+  -- a meeting names the task in `tasks:` or behind a follow-up (`-> <id>`)
+  for _, m in ipairs(require("tasks_nvim.meetings").all({ root = root }) or {}) do
+    local names = vim.tbl_contains(m.tasks, id)
+    for _, f in ipairs(m.followups) do
+      names = names or f.task == id
+    end
+    if names then
+      out.references[#out.references + 1] = { kind = "meeting", id = m.id }
     end
   end
   for _, doc in ipairs(done_flow.marker_docs({ root = root })) do
@@ -270,7 +283,15 @@ function M.move(id, to_area, opts)
     tracked[#tracked + 1] = report.to
   end
   local notes = vim.deepcopy(report.notes)
+  -- the meetings that name the task: their new text, computed now and written with the rest
+  local meeting_renames =
+    require("tasks_nvim.meeting_write").renames_for_move(root, id, report.new_id, today)
+  for _, mr in ipairs(meeting_renames) do
+    tracked[#tracked + 1] = mr.path
+    rewritten[#rewritten + 1] = { kind = "meeting", id = mr.id }
+  end
   for _, ref in ipairs(report.references) do
+    -- a meeting (`kind = "meeting"`) is written from `meeting_renames`
     if ref.kind == "plan_target" then
       local file = plans.find(ref.id, { root = root })
       if file then
@@ -283,7 +304,7 @@ function M.move(id, to_area, opts)
         .. id
         .. " and is not rewritten: "
         .. tostring(ref.path)
-    else
+    elseif ref.kind ~= "meeting" then
       local other = scan.find(ref.id, { root = root })
       if other then
         if not patches[ref.id] then
@@ -373,6 +394,18 @@ function M.move(id, to_area, opts)
       end)
       if not wrote then
         return nil, "cannot rewrite " .. file.path .. ": " .. tostring(werr)
+      end
+    end
+    for _, mr in ipairs(meeting_renames) do
+      local wrote, werr = fsio.with_lock(mr.path, function()
+        if fsio.read(mr.path) ~= mr.old then
+          return nil,
+            mr.id .. " changed while the task was being moved; nothing was changed, run it again"
+        end
+        return fsio.write_atomic(mr.path, mr.new)
+      end)
+      if not wrote then
+        return nil, "cannot rewrite " .. mr.id .. ": " .. tostring(werr)
       end
     end
     if opts.index ~= false then

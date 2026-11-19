@@ -505,6 +505,7 @@ end
 ---@field status_before? string     # `close`: the status it had.
 ---@field body_before? string       # `capture`: the body before the line.
 ---@field was_present? boolean      # `attend`: the participant was present before.
+---@field location? string          # `ops`: "meeting" (the task ops tell a meeting from a task by it).
 
 ---Change a meeting file under its lock. `transform(text, meeting)` gives the new text (or nil and an error, and an
 ---extra value handed back in `extra`); `updated` is set when the text changed. The change is refused when the file is

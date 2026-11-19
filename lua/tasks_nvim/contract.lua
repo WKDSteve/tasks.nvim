@@ -1965,6 +1965,7 @@ local function match_entry(m)
     area = m.area,
     status = m.status,
     location = m.location,
+    kind = m.kind,
   })
 end
 

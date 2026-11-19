@@ -475,7 +475,7 @@ function M.run(input, opts)
   ---@return Tasks.IntentResult|nil
   ---@return string|nil err
   local function take()
-    local matches = finder.by_refs({ ref }, { root = root })
+    local matches = finder.by_refs({ ref }, { root = root, tasks_only = true })
     if #matches > 0 then
       local first = matches[1]
       return {

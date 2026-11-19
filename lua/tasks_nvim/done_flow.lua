@@ -58,6 +58,7 @@ local M = {}
 ---@field project_summaries table<string, Tasks.ProjectSummary>  # What each closed project amounted to.
 ---@field docs_refreshed string[]    # Generated plan blocks that were refreshed.
 ---@field next_round? { id: string, due: string, path: string }  # The next round of a routine that was started.
+---@field meetings_ticked? string[]  # Meetings whose follow-up line of this task was ticked.
 ---@field notes string[]             # Follow-up steps that did not work; the finish itself stands.
 ---@field next? Tasks.NextPick       # What to start next (`next_pick`); absent when not asked for or not computable.
 
@@ -776,6 +777,28 @@ function M.run(id, opts)
       end
     end)
   end
+
+  -- b3. the follow-up line of the meeting the task was made in (`refs: [<meeting>]`, `-> <id>`): ticked
+  step("ticking the follow-up in its meeting", function()
+    local root = vault.root(opts)
+    -- the finished file carries the task's refs
+    local text = type(done.to) == "string" and require("tasks_nvim.fsio").read(done.to) or nil
+    local parsed = root and type(text) == "string" and fm.parse(text) or nil
+    local refs = parsed and parsed.has_block and parsed.meta.refs or nil
+    if type(refs) == "string" then
+      refs = { refs }
+    end
+    if root and type(refs) == "table" and #refs > 0 then
+      local ticked, notes = require("tasks_nvim.meeting_write").tick_done(
+        root,
+        done.id,
+        refs,
+        opts.today or require("tasks_nvim.model").today()
+      )
+      flow.meetings_ticked = ticked
+      vim.list_extend(flow.notes, notes)
+    end
+  end)
 
   -- c. the generated blocks of the documents the user named, and only those (a batch does this once at its end)
   if opts.refresh_docs ~= false then

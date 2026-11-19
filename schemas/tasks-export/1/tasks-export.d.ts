@@ -1692,7 +1692,7 @@ export interface ViewSelect {
   query?: string;
 }
 /**
- * A task that names a ref: the ref, the task (id, area, status) and where it is, `open` (ROADMAP) or `done` (Backlog). Never a path.
+ * A task that names a ref: the ref, the task (id, area, status) and where it is, `open` (ROADMAP) or `done` (Backlog). Never a path. A meeting (`kind` `meeting`, capability `meeting_ops`) matches a task id it names in `tasks:` or behind a follow-up; it is `open` while planned.
  */
 export interface FindMatch {
   ref: string;
@@ -1700,6 +1700,7 @@ export interface FindMatch {
   area: string;
   status: string;
   location: "open" | "done";
+  kind?: "task" | "meeting";
 }
 /**
  * One meeting (`<area>/MEETINGS/<slug>.md`). A broken meeting is still here (`valid: false`, `problems`); a field that is missing is unknown. Nothing changes with the day: whether a meeting is past is for the reader to say from `starts_at` and `ends_at` (local wall time, or the time of `tz`).
@@ -1944,7 +1945,7 @@ export interface ResultEntry {
    * `move_area`: the places that named the old id and now name the new one.
    */
   rewritten?: {
-    kind: "blocked_by" | "after" | "refs" | "plan_target";
+    kind: "blocked_by" | "after" | "refs" | "plan_target" | "meeting";
     id: string;
   }[];
 }
@@ -2067,7 +2068,7 @@ export interface MovePlan {
    * Places that name the old id and would dangle.
    */
   references: {
-    kind: "blocked_by" | "after" | "plan_target" | "refs" | "document";
+    kind: "blocked_by" | "after" | "plan_target" | "refs" | "document" | "meeting";
     id?: string;
     path?: string;
   }[];
