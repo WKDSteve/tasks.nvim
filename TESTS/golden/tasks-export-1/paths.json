@@ -1,0 +1,75 @@
+{
+  "digest": "sha256:719e7717e4acb4b8",
+  "engine": {
+    "git": "0000000",
+    "nvim": "0.0.0",
+    "version": "0.1.0-test"
+  },
+  "generated_at": "2026-01-01T00:00:00Z",
+  "incomplete": [],
+  "items": [
+    {
+      "area": "lib.nvim",
+      "areas": [],
+      "created": "2026-01-02",
+      "etag": "sha256:817c959fc3bb07da",
+      "file": "lib.nvim/ROADMAP/paths/leer.md",
+      "has_tree": false,
+      "id": "lib.nvim/leer",
+      "points": 0,
+      "problems": [],
+      "progress": {
+        "blocked": 0,
+        "dropped": 0,
+        "learned": 0,
+        "open": 0,
+        "seen": 0,
+        "total": 0
+      },
+      "slug": "leer",
+      "status": "planning",
+      "summary": "Noch kein Baum.",
+      "title": "Leer",
+      "updated": "2026-01-02",
+      "valid": true
+    },
+    {
+      "area": "lib.nvim",
+      "areas": [
+        "lib.nvim"
+      ],
+      "created": "2026-01-01",
+      "etag": "sha256:295bf56049d80b0e",
+      "file": "lib.nvim/ROADMAP/paths/lua-lernen.md",
+      "has_tree": true,
+      "icon": {
+        "kind": "emoji",
+        "value": "🦀"
+      },
+      "id": "lib.nvim/lua-lernen",
+      "points": 8,
+      "problems": [],
+      "progress": {
+        "blocked": 1,
+        "dropped": 1,
+        "learned": 1,
+        "open": 2,
+        "seen": 2,
+        "total": 6
+      },
+      "slug": "lua-lernen",
+      "status": "doing",
+      "summary": "Plugins schreiben können.",
+      "title": "Lua lernen",
+      "updated": "2026-01-05",
+      "valid": true
+    }
+  ],
+  "kind": "tasks.paths",
+  "plugin": "tasks.nvim",
+  "rev": "rev:0afba3",
+  "schema": 1,
+  "vault": {
+    "id": "vault"
+  }
+}

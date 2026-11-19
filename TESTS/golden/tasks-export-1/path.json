@@ -1,0 +1,234 @@
+{
+  "body": "\nPlugins schreiben können.\n\n## Lernpunkte\n\n- [ ] Lua lernen {#lua}\n  - [ ] Syntax {#syntax}\n    - [x] [Manual](https://www.lua.org/manual/5.4/)\n      > Notiz: Rangfolge von `..` und `^`.\n    - [~] Programming in Lua – Grund: nur Kapitel 1\n  - [ ] C-Compiler → lib.nvim/c-compiler {#cc}\n  - [-] JIT – Grund: nicht nötig\n  - [!] Profiler {#prof}\n  - [~] Ohne Grund\n",
+  "body_truncated": false,
+  "digest": "sha256:e30ab3307be288d6",
+  "engine": {
+    "git": "0000000",
+    "nvim": "0.0.0",
+    "version": "0.1.0-test"
+  },
+  "generated_at": "2026-01-01T00:00:00Z",
+  "kind": "tasks.path",
+  "nodes": [
+    {
+      "children": 5,
+      "closed": false,
+      "depth": 0,
+      "derived": "partial",
+      "index": 1,
+      "key": "lua",
+      "label": "Lua lernen",
+      "line": 6,
+      "mark": " ",
+      "progress": {
+        "blocked": 1,
+        "dropped": 1,
+        "learned": 1,
+        "open": 2,
+        "seen": 2,
+        "total": 6
+      },
+      "state": "open"
+    },
+    {
+      "children": 2,
+      "closed": true,
+      "depth": 1,
+      "derived": "partial",
+      "index": 2,
+      "key": "syntax",
+      "label": "Syntax",
+      "line": 7,
+      "mark": " ",
+      "parent": 1,
+      "progress": {
+        "blocked": 0,
+        "dropped": 0,
+        "learned": 1,
+        "open": 0,
+        "seen": 1,
+        "total": 2
+      },
+      "state": "open"
+    },
+    {
+      "children": 0,
+      "closed": true,
+      "depth": 2,
+      "derived": "learned",
+      "index": 3,
+      "label": "[Manual](https://www.lua.org/manual/5.4/)",
+      "line": 8,
+      "link": "https://www.lua.org/manual/5.4/",
+      "mark": "x",
+      "note": "Notiz: Rangfolge von `..` und `^`.",
+      "parent": 2,
+      "progress": {
+        "blocked": 0,
+        "dropped": 0,
+        "learned": 1,
+        "open": 0,
+        "seen": 0,
+        "total": 1
+      },
+      "state": "learned"
+    },
+    {
+      "children": 0,
+      "closed": true,
+      "depth": 2,
+      "derived": "seen",
+      "index": 4,
+      "label": "Programming in Lua",
+      "line": 10,
+      "mark": "~",
+      "parent": 2,
+      "progress": {
+        "blocked": 0,
+        "dropped": 0,
+        "learned": 0,
+        "open": 0,
+        "seen": 1,
+        "total": 1
+      },
+      "reason": "nur Kapitel 1",
+      "state": "seen"
+    },
+    {
+      "children": 0,
+      "closed": false,
+      "depth": 1,
+      "derived": "open",
+      "index": 5,
+      "key": "cc",
+      "label": "C-Compiler",
+      "line": 11,
+      "mark": " ",
+      "parent": 1,
+      "progress": {
+        "blocked": 0,
+        "dropped": 0,
+        "learned": 0,
+        "open": 1,
+        "seen": 0,
+        "total": 1
+      },
+      "promoted": "lib.nvim/c-compiler",
+      "state": "open"
+    },
+    {
+      "children": 0,
+      "closed": true,
+      "depth": 1,
+      "derived": "dropped",
+      "index": 6,
+      "label": "JIT",
+      "line": 12,
+      "mark": "-",
+      "parent": 1,
+      "progress": {
+        "blocked": 0,
+        "dropped": 1,
+        "learned": 0,
+        "open": 0,
+        "seen": 0,
+        "total": 1
+      },
+      "reason": "nicht nötig",
+      "state": "dropped"
+    },
+    {
+      "children": 0,
+      "closed": false,
+      "depth": 1,
+      "derived": "blocked",
+      "index": 7,
+      "key": "prof",
+      "label": "Profiler",
+      "line": 13,
+      "mark": "!",
+      "parent": 1,
+      "progress": {
+        "blocked": 1,
+        "dropped": 0,
+        "learned": 0,
+        "open": 1,
+        "seen": 0,
+        "total": 1
+      },
+      "state": "blocked"
+    },
+    {
+      "children": 0,
+      "closed": true,
+      "depth": 1,
+      "derived": "seen",
+      "index": 8,
+      "label": "Ohne Grund",
+      "line": 14,
+      "mark": "~",
+      "parent": 1,
+      "progress": {
+        "blocked": 0,
+        "dropped": 0,
+        "learned": 0,
+        "open": 0,
+        "seen": 1,
+        "total": 1
+      },
+      "state": "seen"
+    }
+  ],
+  "path": {
+    "area": "lib.nvim",
+    "areas": [
+      "lib.nvim"
+    ],
+    "created": "2026-01-01",
+    "etag": "sha256:295bf56049d80b0e",
+    "file": "lib.nvim/ROADMAP/paths/lua-lernen.md",
+    "has_tree": true,
+    "icon": {
+      "kind": "emoji",
+      "value": "🦀"
+    },
+    "id": "lib.nvim/lua-lernen",
+    "points": 8,
+    "problems": [],
+    "progress": {
+      "blocked": 1,
+      "dropped": 1,
+      "learned": 1,
+      "open": 2,
+      "seen": 2,
+      "total": 6
+    },
+    "slug": "lua-lernen",
+    "status": "doing",
+    "summary": "Plugins schreiben können.",
+    "title": "Lua lernen",
+    "updated": "2026-01-05",
+    "valid": true
+  },
+  "plugin": "tasks.nvim",
+  "progress": {
+    "blocked": 1,
+    "dropped": 1,
+    "learned": 1,
+    "open": 2,
+    "seen": 2,
+    "total": 6
+  },
+  "rev": "rev:a8dce6",
+  "schema": 1,
+  "tree_problems": [
+    {
+      "code": "path-reason-missing",
+      "line": 14,
+      "message": "[~] needs a reason (– Grund: …)"
+    }
+  ],
+  "vault": {
+    "id": "vault"
+  }
+}

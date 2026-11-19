@@ -24,6 +24,50 @@ local function encode(value)
   return vim.json.encode(value)
 end
 
+---Two learning paths for the golden cases `paths` and `path`.
+---@param root string
+local function write_learning_paths(root)
+  local dir = root .. "/lib.nvim/ROADMAP/paths"
+  vim.fn.mkdir(dir, "p")
+  local function put(path, text)
+    local fh = assert(io.open(path, "wb"))
+    fh:write(text)
+    fh:close()
+  end
+  put(
+    dir .. "/lua-lernen.md",
+    table.concat({
+      "---",
+      "title: Lua lernen",
+      "status: doing",
+      "areas: [lib.nvim]",
+      'icon: "\240\159\166\128"',
+      "created: 2026-01-01",
+      "updated: 2026-01-05",
+      "---",
+      "",
+      "Plugins schreiben können.",
+      "",
+      "## Lernpunkte",
+      "",
+      "- [ ] Lua lernen {#lua}",
+      "  - [ ] Syntax {#syntax}",
+      "    - [x] [Manual](https://www.lua.org/manual/5.4/)",
+      "      > Notiz: Rangfolge von `..` und `^`.",
+      "    - [~] Programming in Lua \226\128\147 Grund: nur Kapitel 1",
+      "  - [ ] C-Compiler \226\134\146 lib.nvim/c-compiler {#cc}",
+      "  - [-] JIT \226\128\147 Grund: nicht nötig",
+      "  - [!] Profiler {#prof}",
+      "  - [~] Ohne Grund",
+      "",
+    }, "\n")
+  )
+  put(
+    dir .. "/leer.md",
+    "---\ntitle: Leer\nstatus: planning\ncreated: 2026-01-02\nupdated: 2026-01-02\n---\n\nNoch kein Baum.\n"
+  )
+end
+
 ---Write the meetings of the golden cases `meetings`, `meeting` and `task-with-meetings` into `root`.
 ---@param root string
 function G.write_meetings(root)
@@ -166,6 +210,28 @@ G.cases = {
       )
       fh:close()
       return '{"params":{"id":"lib.nvim/shipped","finished":true}}'
+    end,
+  },
+  {
+    -- the open learning paths with their progress (capability `paths`): one with a tree of every state, a promoted
+    -- point, a note and an image; one without a tree
+    name = "paths",
+    method = "paths",
+    fresh = true,
+    request = function(root)
+      write_learning_paths(root)
+      return '{"params":{}}'
+    end,
+  },
+  {
+    -- one learning path with its tree as a flat list (capability `path`): states, the derived state of a parent,
+    -- progress per point, key, reason, arrow, link, image, note, and the problems of the tree
+    name = "path",
+    method = "path",
+    fresh = true,
+    request = function(root)
+      write_learning_paths(root)
+      return '{"params":{"id":"lib.nvim/lua-lernen"}}'
     end,
   },
   {

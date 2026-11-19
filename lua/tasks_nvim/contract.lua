@@ -91,6 +91,8 @@ M.CAPABILITIES = {
   "ops",
   "order",
   "outcome",
+  "path",
+  "paths",
   "plan_assets",
   "plan_close",
   "plan_compare",
@@ -3139,6 +3141,168 @@ function M.meeting(id, opts)
       return json.object({ n = f.n, text = f.text, ticked = f.ticked, task = f.task })
     end, m.followups)
     return seal(doc, builder.rev_of({ m.id .. "\t" .. (m.etag or "") })), nil
+  end)
+end
+
+-- ── learning paths ───────────────────────────────────────────────────────────
+
+---The progress of a tree or a node (`lernbaum`): learned, seen, dropped, open (blocked ones counted as open and once more
+---as blocked), total.
+---@param p Tasks.LernProgress
+---@return table
+local function progress_entry(p)
+  return json.object({
+    learned = p.learned,
+    seen = p.seen,
+    dropped = p.dropped,
+    open = p.open,
+    blocked = p.blocked,
+    total = p.total,
+  })
+end
+
+---A learning path as the documents carry it (`tasks.paths` items, `tasks.path`): the head of its file, its progress and
+---its version; no tree (that is `tasks.path`).
+---@param root string
+---@param f Tasks.PlanFile
+---@param text? string  # The file as read (its `etag`).
+---@return table
+local function path_entry(root, f, text)
+  local tree = f.tree or require("tasks_nvim.lernbaum").parse("")
+  return with_links_and_assets({
+    id = f.id,
+    area = f.area,
+    slug = f.slug,
+    title = f.title,
+    status = f.status,
+    areas = vim.list_slice(f.areas or {}, 1),
+    target = f.target,
+    project = f.project,
+    created = model.is_date(f.created) and f.created or nil,
+    updated = model.is_date(f.updated) and f.updated or nil,
+    summary = clip(f.summary or "", M.LIMITS.summary),
+    has_tree = tree.has_section,
+    points = #tree.nodes,
+    progress = progress_entry(tree.progress),
+    file = relative(root, f.path) or vim.fs.basename(f.path),
+    etag = text and fsio.etag(text) or nil,
+    valid = f.valid ~= false and #(f.errors or {}) == 0,
+    problems = vim.tbl_map(function(e)
+      return redact(root, tostring(e))
+    end, f.errors or {}),
+  }, f)
+end
+
+---`tasks.paths`: the open learning paths of the vault or of one area (an area group stands for its members), each with
+---its progress. The `rev` is that of the path files.
+---@param params? { area?: string }
+---@param opts? { root?: string }
+---@return table|nil doc
+---@return Tasks.ContractError|string|nil err
+function M.paths(params, opts)
+  params = params or {}
+  return fsio.read_scope(function()
+    local root, rerr = vault.root(opts)
+    if not root then
+      return nil, rerr
+    end
+    local names
+    if params.area ~= nil then
+      local scope = vault.area_scope(root, params.area)
+      if not scope then
+        return nil,
+          {
+            code = "not_found",
+            message = "unknown area: " .. tostring(params.area),
+            retryable = false,
+          }
+      end
+      names = scope.areas
+    else
+      names = vim.tbl_map(function(a)
+        return a.name
+      end, vault.areas(root))
+    end
+    local paths_mod = require("tasks_nvim.paths")
+    local items, lines, incomplete = {}, {}, {}
+    for _, name in ipairs(names) do
+      local list, errs = paths_mod.area(name, { root = root })
+      for _, e in ipairs(type(errs) == "table" and errs or {}) do
+        incomplete[#incomplete + 1] = redact(root, tostring(e))
+      end
+      for _, f in ipairs(list or {}) do
+        local text = fsio.read(f.path)
+        local entry = path_entry(root, f, text)
+        items[#items + 1] = json.object(entry)
+        lines[#lines + 1] = f.id .. "\t" .. (entry.etag or "")
+      end
+    end
+    local doc = M.head("tasks.paths", root)
+    doc.items = items
+    doc.incomplete = incomplete
+    return seal(doc, builder.rev_of(lines)), nil
+  end)
+end
+
+---`tasks.path`: one learning path with its body (cut at `body_bytes`) and its tree as a flat list in document order:
+---each point with its position (`index`, `parent`, `depth`), its own state and the one derived from its leaves, its
+---progress, its key, reason, arrow, link, image and note, and the problems of the tree (`path-...` codes).
+---@param id string
+---@param opts? { root?: string }
+---@return table|nil doc
+---@return Tasks.ContractError|string|nil err
+function M.path(id, opts)
+  local area, slug, perr = vault.parse_id(tostring(id))
+  if not area or not slug then
+    return nil, bad_argument(perr or "expected <area>/<slug>")
+  end
+  return fsio.read_scope(function()
+    local root, rerr = vault.root(opts)
+    if not root then
+      return nil, rerr
+    end
+    local f, err = require("tasks_nvim.paths").find(id, { root = root })
+    if not f then
+      return nil, { code = "not_found", message = redact(root, tostring(err)), retryable = false }
+    end
+    local text = fsio.read(f.path) or ""
+    local parsed = require("lib.nvim.markdown.frontmatter").parse(text)
+    local body = parsed and parsed.body or ""
+    local truncated = #body > M.LIMITS.body_bytes
+    if truncated then
+      body = body:sub(1, M.LIMITS.body_bytes)
+    end
+    local tree = f.tree or require("tasks_nvim.lernbaum").parse("")
+    local doc = M.head("tasks.path", root)
+    doc.path = json.object(path_entry(root, f, text))
+    doc.body = body
+    doc.body_truncated = truncated
+    doc.nodes = vim.tbl_map(function(n)
+      return json.object({
+        index = n.index,
+        line = n.line,
+        depth = n.depth,
+        parent = n.parent and n.parent.index or nil,
+        children = #n.children,
+        mark = n.mark,
+        state = n.state,
+        derived = n.derived,
+        closed = n.closed,
+        label = n.label,
+        key = n.key,
+        reason = n.reason,
+        promoted = n.promoted,
+        link = n.link,
+        image = n.image,
+        note = n.note,
+        progress = progress_entry(n.progress),
+      })
+    end, tree.nodes)
+    doc.progress = progress_entry(tree.progress)
+    doc.tree_problems = vim.tbl_map(function(p)
+      return json.object({ code = p.code, line = p.line, key = p.key, message = p.message })
+    end, tree.problems)
+    return seal(doc, builder.rev_of({ f.id .. "\t" .. fsio.etag(text) })), nil
   end)
 end
 

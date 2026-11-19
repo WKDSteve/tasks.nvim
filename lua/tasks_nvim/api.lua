@@ -221,6 +221,20 @@ local methods = {
       return contract.meeting(params.id, opts)
     end,
   },
+  paths = {
+    params = { area = "string" },
+    required = {},
+    run = function(params, opts)
+      return contract.paths(params, opts)
+    end,
+  },
+  path = {
+    params = { id = "string" },
+    required = { "id" },
+    run = function(params, opts)
+      return contract.path(params.id, opts)
+    end,
+  },
   done_preview = {
     params = { id = "string", outcome = "string", outcome_reason = "string" },
     required = { "id" },

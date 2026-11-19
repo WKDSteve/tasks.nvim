@@ -33,6 +33,8 @@
     "ops",
     "order",
     "outcome",
+    "path",
+    "paths",
     "plan_assets",
     "plan_close",
     "plan_compare",

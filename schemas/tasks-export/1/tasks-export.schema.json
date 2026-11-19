@@ -77,6 +77,12 @@
       "$ref": "#/$defs/MeetingDocument"
     },
     {
+      "$ref": "#/$defs/Paths"
+    },
+    {
+      "$ref": "#/$defs/PathDocument"
+    },
+    {
       "$ref": "#/$defs/DonePreview"
     },
     {
@@ -410,6 +416,122 @@
         }
       },
       "unevaluatedProperties": false
+    },
+    "Paths": {
+      "description": "tasks.paths: the open learning paths of the vault or of an area, each with its progress; no tree (that is tasks.path). Capability `paths`.",
+      "allOf": [{ "$ref": "#/$defs/Head" }],
+      "type": "object",
+      "required": ["kind", "rev", "digest", "items", "incomplete"],
+      "properties": {
+        "kind": { "const": "tasks.paths" },
+        "rev": { "$ref": "#/$defs/Rev" },
+        "digest": { "$ref": "#/$defs/Digest" },
+        "items": { "type": "array", "items": { "$ref": "#/$defs/PathEntry" } },
+        "incomplete": { "type": "array", "items": { "type": "string" } }
+      },
+      "unevaluatedProperties": false
+    },
+    "PathDocument": {
+      "description": "tasks.path: one learning path with its body and its tree as a flat list in document order. Capability `path`.",
+      "allOf": [{ "$ref": "#/$defs/Head" }],
+      "type": "object",
+      "required": ["kind", "rev", "digest", "path", "body", "body_truncated", "nodes", "progress", "tree_problems"],
+      "properties": {
+        "kind": { "const": "tasks.path" },
+        "rev": { "$ref": "#/$defs/Rev" },
+        "digest": { "$ref": "#/$defs/Digest" },
+        "path": { "$ref": "#/$defs/PathEntry" },
+        "body": { "type": "string", "description": "The file after the frontmatter, untrusted text." },
+        "body_truncated": { "type": "boolean" },
+        "nodes": { "type": "array", "items": { "$ref": "#/$defs/PathNode" } },
+        "progress": { "$ref": "#/$defs/PathProgress" },
+        "tree_problems": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["code", "line", "message"],
+            "properties": {
+              "code": { "type": "string", "pattern": "^path-" },
+              "line": { "type": "integer", "minimum": 1 },
+              "key": { "type": "string" },
+              "message": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "unevaluatedProperties": false
+    },
+    "PathEntry": {
+      "description": "A learning path (`<area>/ROADMAP/paths/<slug>.md`): the head of its file, its progress over the leaves of its tree, its version.",
+      "type": "object",
+      "required": ["id", "area", "slug", "title", "areas", "summary", "has_tree", "points", "progress", "file", "valid", "problems"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[^/]+/[^/]+$" },
+        "area": { "type": "string" },
+        "slug": { "type": "string" },
+        "title": { "type": "string" },
+        "status": { "enum": ["planning", "doing", "parked", "done"] },
+        "areas": { "type": "array", "items": { "type": "string" } },
+        "target": { "type": "string" },
+        "project": { "type": "string" },
+        "created": { "$ref": "#/$defs/Date" },
+        "updated": { "$ref": "#/$defs/Date" },
+        "summary": { "type": "string" },
+        "has_tree": { "type": "boolean", "description": "The file has a `## Lernpunkte` section." },
+        "points": { "type": "integer", "minimum": 0, "description": "The learning points of the tree, parents included." },
+        "progress": { "$ref": "#/$defs/PathProgress" },
+        "links": { "type": "array", "items": { "type": "string", "pattern": "^[Hh][Tt][Tt][Pp][Ss]?://" } },
+        "icon": { "$ref": "#/$defs/Icon" },
+        "cover": { "$ref": "#/$defs/Cover" },
+        "folder": { "type": "boolean" },
+        "assets": { "$ref": "#/$defs/PlanAssets" },
+        "assets_truncated": { "$ref": "#/$defs/PlanAssetsTruncated" },
+        "file": { "type": "string" },
+        "etag": { "$ref": "#/$defs/Etag" },
+        "valid": { "type": "boolean" },
+        "problems": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false
+    },
+    "PathProgress": {
+      "description": "Progress over leaves, counted apart: learned, seen, dropped, open (blocked ones counted as open and once more as blocked).",
+      "type": "object",
+      "required": ["learned", "seen", "dropped", "open", "blocked", "total"],
+      "properties": {
+        "learned": { "type": "integer", "minimum": 0 },
+        "seen": { "type": "integer", "minimum": 0 },
+        "dropped": { "type": "integer", "minimum": 0 },
+        "open": { "type": "integer", "minimum": 0 },
+        "blocked": { "type": "integer", "minimum": 0 },
+        "total": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "PathNode": {
+      "description": "One learning point of a tree. A parent has no mark of its own: its `derived` state comes from its leaves (learned, partial, open); `closed` when every leaf is.",
+      "type": "object",
+      "required": ["index", "line", "depth", "children", "mark", "derived", "closed", "label", "progress"],
+      "properties": {
+        "index": { "type": "integer", "minimum": 1, "description": "Position in document order; `#<index>` names the point where it has no key." },
+        "line": { "type": "integer", "minimum": 1, "description": "The line of the body it stands on." },
+        "depth": { "type": "integer", "minimum": 0 },
+        "parent": { "type": "integer", "minimum": 1, "description": "The `index` of its parent; absent for a root." },
+        "children": { "type": "integer", "minimum": 0 },
+        "mark": { "type": "string", "maxLength": 4 },
+        "state": { "enum": ["open", "learned", "seen", "dropped", "blocked"], "description": "Absent for an unknown mark (a tree problem)." },
+        "derived": { "enum": ["open", "learned", "seen", "dropped", "blocked", "partial"] },
+        "closed": { "type": "boolean" },
+        "label": { "type": "string", "description": "As written (Markdown, untrusted)." },
+        "key": { "type": "string" },
+        "reason": { "type": "string" },
+        "promoted": { "type": "string", "pattern": "^[^/]+/[^/]+$", "description": "The task the point was promoted to; it owns the point's state." },
+        "link": { "type": "string" },
+        "image": { "type": "string", "description": "A file below `assets/` of the path; a client draws it as an image only." },
+        "note": { "type": "string" },
+        "progress": { "$ref": "#/$defs/PathProgress" }
+      },
+      "additionalProperties": false
     },
     "MeetingDocument": {
       "description": "tasks.meeting: one meeting with its body and the sections the engine reads. Capability `meeting`.",

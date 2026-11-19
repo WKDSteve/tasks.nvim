@@ -28,6 +28,8 @@ export type TasksExport =
   | Intent
   | Meetings
   | MeetingDocument
+  | Paths
+  | PathDocument
   | DonePreview
   | Result
   | Error;
@@ -990,6 +992,38 @@ export type MeetingDocument = Head & {
   }[];
 };
 /**
+ * tasks.paths: the open learning paths of the vault or of an area, each with its progress; no tree (that is tasks.path). Capability `paths`.
+ */
+export type Paths = Head & {
+  kind: "tasks.paths";
+  rev: Rev;
+  digest: Digest;
+  items: PathEntry[];
+  incomplete: string[];
+};
+/**
+ * tasks.path: one learning path with its body and its tree as a flat list in document order. Capability `path`.
+ */
+export type PathDocument = Head & {
+  kind: "tasks.path";
+  rev: Rev;
+  digest: Digest;
+  path: PathEntry;
+  /**
+   * The file after the frontmatter, untrusted text.
+   */
+  body: string;
+  body_truncated: boolean;
+  nodes: PathNode[];
+  progress: PathProgress;
+  tree_problems: {
+    code: string;
+    line: number;
+    key?: string;
+    message: string;
+  }[];
+};
+/**
  * tasks.donepreview: what finishing a task would do, with nothing written, and the `confirm` token that `done` needs for exactly this version of the file.
  */
 export type DonePreview = Head & {
@@ -1852,6 +1886,95 @@ export interface MeetingEntry {
   etag?: Etag;
   valid: boolean;
   problems: Problem[];
+}
+/**
+ * A learning path (`<area>/ROADMAP/paths/<slug>.md`): the head of its file, its progress over the leaves of its tree, its version.
+ */
+export interface PathEntry {
+  id: string;
+  area: string;
+  slug: string;
+  title: string;
+  status?: "planning" | "doing" | "parked" | "done";
+  areas: string[];
+  target?: string;
+  project?: string;
+  created?: Date;
+  updated?: Date;
+  summary: string;
+  /**
+   * The file has a `## Lernpunkte` section.
+   */
+  has_tree: boolean;
+  /**
+   * The learning points of the tree, parents included.
+   */
+  points: number;
+  progress: PathProgress;
+  links?: string[];
+  icon?: Icon;
+  cover?: Cover;
+  folder?: boolean;
+  assets?: PlanAssets;
+  assets_truncated?: PlanAssetsTruncated;
+  file: string;
+  etag?: Etag;
+  valid: boolean;
+  problems: string[];
+}
+/**
+ * Progress over leaves, counted apart: learned, seen, dropped, open (blocked ones counted as open and once more as blocked).
+ */
+export interface PathProgress {
+  learned: number;
+  seen: number;
+  dropped: number;
+  open: number;
+  blocked: number;
+  total: number;
+}
+/**
+ * One learning point of a tree. A parent has no mark of its own: its `derived` state comes from its leaves (learned, partial, open); `closed` when every leaf is.
+ */
+export interface PathNode {
+  /**
+   * Position in document order; `#<index>` names the point where it has no key.
+   */
+  index: number;
+  /**
+   * The line of the body it stands on.
+   */
+  line: number;
+  depth: number;
+  /**
+   * The `index` of its parent; absent for a root.
+   */
+  parent?: number;
+  children: number;
+  mark: string;
+  /**
+   * Absent for an unknown mark (a tree problem).
+   */
+  state?: "open" | "learned" | "seen" | "dropped" | "blocked";
+  derived: "open" | "learned" | "seen" | "dropped" | "blocked" | "partial";
+  closed: boolean;
+  /**
+   * As written (Markdown, untrusted).
+   */
+  label: string;
+  key?: string;
+  reason?: string;
+  /**
+   * The task the point was promoted to; it owns the point's state.
+   */
+  promoted?: string;
+  link?: string;
+  /**
+   * A file below `assets/` of the path; a client draws it as an image only.
+   */
+  image?: string;
+  note?: string;
+  progress: PathProgress;
 }
 /**
  * What happened to one operation of a request, in the order they were sent. A failed operation does not stop the others.
