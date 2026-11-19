@@ -45,6 +45,20 @@ return function(H)
     lib.items[1].progress,
     { learned = 1, seen = 0, dropped = 0, open = 1, blocked = 0, total = 2 }
   )
+  -- a status that is no word of the paths is left out of the entry (the schema names the four words)
+  H.write(
+    root .. "/lib.nvim/ROADMAP/paths/odd.md",
+    "---\ntitle: Odd\nstatus: open\n---\n\n## Lernpunkte\n\n- [ ] Eins\n"
+  )
+  local odd
+  for _, i in ipairs(call("paths", { area = "lib.nvim" }).items) do
+    if i.id == "lib.nvim/odd" then
+      odd = i
+    end
+  end
+  ok(odd, "the odd path is listed")
+  eq(odd.status, nil, "status open is no status of a path")
+  os.remove(root .. "/lib.nvim/ROADMAP/paths/odd.md")
   local _, unknown = call("paths", { area = "nope.nvim" })
   eq(unknown, "not_found")
 

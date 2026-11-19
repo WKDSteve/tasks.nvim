@@ -3179,7 +3179,8 @@ local function path_entry(root, f, text)
     area = f.area,
     slug = f.slug,
     title = f.title,
-    status = f.status,
+    -- only a word of the paths (a hand-written `status: open` is a problem of the file, not a value the schema refuses)
+    status = vim.tbl_contains(require("tasks_nvim.plans").STATUSES, f.status) and f.status or nil,
     areas = vim.list_slice(f.areas or {}, 1),
     target = f.target,
     project = f.project,
