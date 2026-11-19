@@ -547,8 +547,8 @@ on is taken back by hand.
 the task), `promote-state-drift` (the mark of the point disagrees with the task: closed while the task is open, or not
 the state of its outcome when finished), `promote-cycle` (the `point:` of tasks lead back to one of them),
 `task-arrow-dangling` (an arrow in the `## Lernpunkte` of an open learning task names a task that exists nowhere); a
-`point:` that is not `<area>/<slug>#<key>` is the error `bad-point`. The operation of `tasks-ops/1` and the editor's
-command come with the contract and the tree view.
+`point:` that is not `<area>/<slug>#<key>` is the error `bad-point`. In the editor: `:Tasks promote` / `unpromote`
+(the point under the cursor, or `<id>#<key>`) and the tree view `:Tasks learn` ([COMMANDS.md](COMMANDS.md)).
 
 ### Folder tasks
 

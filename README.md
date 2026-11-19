@@ -157,6 +157,7 @@ require("tasks_nvim").setup({
   quick_wins = { min_value = 4, max_effort = "S" },                              -- what counts as a quick win (both written on the task)
   tree = true,                                                                  -- the vault in a tree view: true, false or { keys = { done = "<key>", claim = "<key>" } }
   ai = "auto",                                                                  -- AI functions: false (none), true, or "auto" (only where ai.nvim or ai-desktop is found)
+  learning = { auto = false },                                                  -- the learning tree view (:Tasks learn) by itself on paths and learning tasks
 })
 ```
 
@@ -207,7 +208,8 @@ empty group and a member that is no area.
 
 A wrong key or value is reported (and listed in `:checkhealth`) and the default stays. Every key of the
 dashboard and the form can be moved or switched off with `keys = { dashboard = {...}, dashboard_input = {...},
-form = {...} }`, for example `keys = { form = { cancel = false } }` ([docs/BINDINGS.md](docs/BINDINGS.md)).
+form = {...}, learning = {...} }`, for example `keys = { form = { cancel = false } }`; the learning tree view binds no
+key unless `keys.learning` names one ([docs/BINDINGS.md](docs/BINDINGS.md)).
 
 ## Headless
 

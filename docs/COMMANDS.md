@@ -885,6 +885,35 @@ browser" in the `e` menu) put the rendered Markdown in the browser through
   `ui.preview.opener` (open + start the preview, returns `ok, err`),
   `ui.preview.temp_root` (temp directory).
 
+### The learning tree: `:Tasks learn`, `point`, `promote`, `unpromote`
+
+They work on a buffer that holds a learning path (`<area>/ROADMAP/paths/<slug>.md`) or a task with `## Lernpunkte`
+(`tasks_nvim.ui.learn`; the tree itself: [ENGINE.md](ENGINE.md), "Learning paths").
+
+- `:Tasks learn [toggle|on|off]` puts the view on the buffer (or takes it off): the progress of every parent and of the
+  whole tree on its heading as virtual text (`7 gelernt · 2 angeschaut · 1 entfällt · 3 offen`), a fold per parent
+  (`foldmethod=expr`, all open at first; `off` gives the window its fold options back), and a placeholder line
+  `[image] assets/...` below each point with an image (`(missing)` when the file is not there). It redraws while you
+  type. `setup({ learning = { auto = true } })` puts it on by itself when a path or a task with `## Lernpunkte` is
+  shown.
+- `:Tasks learn image` shows the image of the point under the cursor: through images.nvim in the terminal, else the
+  whole file in mdview.nvim's browser preview, else its path as a message. Only a file below the `assets/` of the path
+  or task is shown.
+- `:Tasks learn follow` opens the task the point under the cursor was promoted to (`→ <id>`).
+- `:Tasks point [next|open|learned|seen|dropped|blocked] [reason...]` changes the mark of the point under the cursor
+  (`next`, the default: `[ ]` -> `[x]` -> `[~]` -> `[-]` -> `[ ]`). `seen` and `dropped` need a reason: the rest of
+  the line, or a question that offers the old one (cancelled: nothing changes). A path buffer without unsaved changes
+  is written on disk through `paths.point` (under the file's lock, refused when the file changed below the buffer) and
+  reloaded; a task file, or a buffer with unsaved changes, is changed in the buffer, write it yourself. A parent has no
+  mark of its own, and a promoted point is refused: its state belongs to the task (`done` writes it).
+- `:Tasks promote [<area>/<slug>#<key|n>] [--area= --title= --actor= --dry-run --no-index]` makes a task of the point
+  (the one under the cursor when no point is named; the buffer must be written first): its subtree moves into the
+  task, the point's line becomes `… → <id>`, the container's buffers are reloaded and the new task opens.
+  `:Tasks unpromote [<area>/<slug>#<key|n>] [--dry-run --no-index]` takes it back while the task holds no work of its
+  own. The same rules as the CLI's `promote` / `unpromote` ([ENGINE.md](ENGINE.md), "Promoting a learning point").
+
+No key is bound unless `keys.learning` names one ([BINDINGS.md](BINDINGS.md)).
+
 ### `:Tasks folder <area> [folder] [--action=files|grep|smart] [--list] [--to=]`
 
 A picker over the files of **one folder of one area**. `folder` is `tasks`

@@ -3,7 +3,7 @@
 ## Command
 
 `:Tasks <verb>` (a `lib.nvim` composer verb, `<Tab>` completes verbs, areas, task ids and values). No default
-keymaps and no autocommands at load time (the browser preview adds a short-lived `TasksPreviewTemp` group while a temporary file exists). Set `vim.g.tasks_nvim_no_command = true` to register your own verb from
+keymaps and no autocommands at load time (the browser preview adds a short-lived `TasksPreviewTemp` group while a temporary file exists; the learning tree view adds buffer-local ones in the group `TasksLearn` while it is on, and `learning = { auto = true }` the group `TasksLearnAuto`). Set `vim.g.tasks_nvim_no_command = true` to register your own verb from
 `tasks_nvim.ui.routes` instead.
 
 | Verb | Arguments | Does |
@@ -19,6 +19,10 @@ keymaps and no autocommands at load time (the browser preview adds a short-lived
 | `open` | `<id>` | open the file of a task |
 | `preview` | `<id>` | browser preview through mdview.nvim |
 | `folder` | `<area> [tasks\|roadmap\|backlog\|handover\|notes\|all] [--action=] [--list] [--to=]` | picker over an area folder |
+| `learn` | `[toggle\|on\|off\|image\|follow]` | the learning tree view in this buffer: progress, folds, image placeholders; the image or the promoted task of the point under the cursor |
+| `point` | `[next\|open\|learned\|seen\|dropped\|blocked] [reason...]` | the mark of the learning point under the cursor; `[~]` and `[-]` ask for the reason |
+| `promote` | `[<area>/<slug>#<key\|n>] [--area= --title= --actor= --dry-run --no-index]` | make a task of a learning point (default: the one under the cursor) and open it |
+| `unpromote` | `[<area>/<slug>#<key\|n>] [--dry-run --no-index]` | take a promotion back while the task holds no work |
 
 Details of every verb: [COMMANDS.md](COMMANDS.md).
 
@@ -56,14 +60,34 @@ require("tasks_nvim").setup({
     dashboard = { done = "X", preview = false },     -- list window; false: no key for that action
     dashboard_input = { sort = "<M-t>", filter = false },  -- input window (normal and insert mode)
     form = { cancel = false, submit = "<C-CR>" },    -- `:Tasks new` form
+    learning = { cycle = "<localleader>x" },          -- learning tree view (none by default)
   },
 })
 ```
 
 An action that is not named keeps its default. Dashboard actions: `status prio done filter sort export rescan
 backlog roadmap preview view assign move_down move_up help`, and while the AI functions are on `agent agent_run` (`gh` / `gH`:
-the task under the cursor to `:Tasks agent`, prefill / run). Form actions: `tick_space tick_enter submit cancel cancel_ctrl help icon`. An unknown
+the task under the cursor to `:Tasks agent`, prefill / run). Form actions: `tick_space tick_enter submit cancel cancel_ctrl help icon`. Learning tree actions: `cycle promote unpromote image follow`. An unknown
 action name is reported (and listed in `:checkhealth`), never bound. The help (`g?`) lists the default keys.
+
+## Learning tree (`:Tasks learn`, buffer-local, none by default)
+
+The view maps no key unless `keys.learning` names one; then the key is buffer-local while the view is on:
+
+| Action | Does |
+| --- | --- |
+| `cycle` | next mark of the point under the cursor: `[ ]` -> `[x]` -> `[~]` -> `[-]` -> `[ ]` (`[~]` and `[-]` ask for the reason) |
+| `promote` | promote the point under the cursor to a task (`:Tasks promote`) |
+| `unpromote` | take its promotion back (`:Tasks unpromote`) |
+| `image` | show its image: images.nvim, else mdview.nvim's browser preview, else the path |
+| `follow` | open the task it was promoted to |
+
+```lua
+require("tasks_nvim").setup({
+  learning = { auto = true },  -- the view by itself on learning paths and tasks with ## Lernpunkte
+  keys = { learning = { cycle = "<localleader>x", promote = "<localleader>p", follow = "gd" } },
+})
+```
 
 ## Form (`:Tasks new` without arguments)
 
