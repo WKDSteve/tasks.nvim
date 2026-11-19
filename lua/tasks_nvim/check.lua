@@ -67,6 +67,15 @@
 ---    `area-group-shadowed`, `area-group-empty`, `area-group-unknown-member`, `area-group-nested` (warnings): a group
 ---    named like an area (the area wins), one that matches no area, names an area that is none, or names a group
 ---    (whole-vault runs only, area `""`)
+---  - meetings (`<area>/MEETINGS/`, `tasks_nvim.meetings`): a broken meeting file is reported with its own codes
+---    (`meeting-bad-status`, `meeting-bad-date`, `meeting-bad-time`, `meeting-end-and-duration`,
+---    `meeting-end-before-start`, `meeting-end-without-time`, `meeting-bad-duration`, `meeting-bad-tz`,
+---    `meeting-bad-online`, `meeting-bad-recording`, `meeting-bad-task`, `meeting-bad-notify`, `meeting-bad-notify-to`,
+---    `meeting-bad-image`, `meeting-bad-icon`, ...); `meeting-id-taken` (error): an open task, plan or project of the
+---    area has the same slug; `meeting-task-dangling`, `meeting-image-missing`, `meeting-done-in-future` (warnings):
+---    `tasks:` names a task that exists nowhere, `image:` names a file that is not there, a meeting is done before its
+---    day; `meeting-done-without-result`, `meeting-overlap` (hints): done without `## Ergebnis` (allowed), two planned
+---    meetings of the area at the same time
 ---
 --- Not its job: fixing anything (`index.write_area` regenerates an index).
 
@@ -76,6 +85,7 @@ local fsio = require("tasks_nvim.fsio")
 ---@type table<string, boolean>
 local IMAGE_EXT =
   { png = true, jpg = true, jpeg = true, gif = true, webp = true, svg = true, bmp = true }
+local meetings = require("tasks_nvim.meetings")
 local model = require("tasks_nvim.model")
 local plan = require("tasks_nvim.plan")
 local plans = require("tasks_nvim.plans")
@@ -601,6 +611,86 @@ local function plan_file_findings(findings, open_ids, names, scan_opts, is_finis
           file.id
         )
       )
+    end
+  end
+end
+
+---The findings of the meeting files of the areas checked: a broken file with its own codes, an id another file of the
+---area has, a task that exists nowhere, an image that is not there, a meeting done before its day (warnings), and as
+---hints a meeting done without a result (allowed: decision F4) and two planned meetings of the area at the same time.
+---@param findings Tasks.Finding[]
+---@param hints Tasks.Finding[]
+---@param open_ids table<string, Tasks.Task>
+---@param names string[]
+---@param scan_opts table
+---@param is_finished fun(id: string): boolean
+---@param today string
+local function meeting_findings(findings, hints, open_ids, names, scan_opts, is_finished, today)
+  local function hint(code, m, message)
+    hints[#hints + 1] =
+      { code = code, severity = "info", area = m.area, path = m.path, id = m.id, message = message }
+  end
+  for _, name in ipairs(names) do
+    local list, errs = meetings.area(name, scan_opts)
+    for _, e in ipairs(type(errs) == "table" and errs or {}) do
+      add(
+        findings,
+        "error",
+        "unreadable",
+        { area = name, path = vault.meetings_dir(scan_opts.root, name) },
+        e
+      )
+    end
+    local timed = {}
+    for _, m in ipairs(list or {}) do
+      for i, msg in ipairs(m.errors) do
+        add(findings, "error", m.error_codes[i] or "frontmatter-invalid", m, msg)
+      end
+      if open_ids[m.id] or (plans.find(m.id, scan_opts)) or (projects.find(m.id, scan_opts)) then
+        add(
+          findings,
+          "error",
+          "meeting-id-taken",
+          m,
+          "an open task, plan or project of the area has the same id: " .. m.id
+        )
+      end
+      for _, id in ipairs(m.tasks) do
+        if not open_ids[id] and not is_finished(id) then
+          add(findings, "warn", "meeting-task-dangling", m, "tasks: " .. id .. " does not exist")
+        end
+      end
+      if m.image then
+        local present = m.folder and fsio.is_file(fsio.dirname(m.path) .. "/" .. m.image)
+        if not present then
+          add(findings, "warn", "meeting-image-missing", m, "image " .. m.image .. " is not there")
+        end
+      end
+      if m.status == "done" and m.date and m.date > today then
+        add(
+          findings,
+          "warn",
+          "meeting-done-in-future",
+          m,
+          ("done, but the meeting is on %s, after today (%s)"):format(m.date, today)
+        )
+      end
+      if m.status == "done" and not m.has_result then
+        hint("meeting-done-without-result", m, "done without a result (## Ergebnis is empty)")
+      end
+      if m.status == "planned" and m.time and m.start and m.ends then
+        timed[#timed + 1] = m
+      end
+    end
+    table.sort(timed, meetings.less)
+    for i, a in ipairs(timed) do
+      for j = i + 1, #timed do
+        local b = timed[j]
+        if b.start >= a.ends then
+          break
+        end
+        hint("meeting-overlap", b, ("at the same time as %s (%s)"):format(a.id, a.start))
+      end
     end
   end
 end
@@ -1143,6 +1233,7 @@ function M.run(opts)
   end
   plan_file_findings(findings, open_ids, names, scan_opts, is_finished)
   project_findings(findings, open_ids, names, scan_opts, is_finished)
+  meeting_findings(findings, hints, open_ids, names, scan_opts, is_finished, today)
   view_findings(findings, root, names)
   if not opts.area then
     area_group_findings(findings, root)
