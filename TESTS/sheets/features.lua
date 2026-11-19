@@ -50,6 +50,17 @@ return {
     docs = "docs/COMMANDS.md",
   },
   {
+    id = "tasks.learning-tree",
+    title = ":Tasks learn|point|promote|unpromote: the learning tree in the buffer, its marks, progress, folds and images",
+    surface = {
+      "command:Tasks learn",
+      "command:Tasks point",
+      "command:Tasks promote",
+      "command:Tasks unpromote",
+    },
+    docs = "docs/COMMANDS.md",
+  },
+  {
     id = "tasks.preview",
     title = ":Tasks preview <id> and :Tasks list --to=mdview show the task or the list rendered in the browser",
     surface = { "command:Tasks preview", "command:Tasks list --to=mdview" },
