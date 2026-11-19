@@ -154,6 +154,20 @@ mutate("a phase suggestion that is no kebab-case word", "result-projects", (d) =
   const failed = d.results.find((r) => r.error && r.error.details && r.error.details.suggestion);
   failed.error.details.suggestion = "Einführung";
 });
+mutate("a meeting with an unknown field", "meetings", (d) => (d.items[0].surprise = 1));
+mutate("a meeting of a status nobody defined", "meetings", (d) => (d.items[0].status = "held"));
+mutate("a meeting address of a service nobody defined", "meetings", (d) => (d.items[1].online_service = "skype"));
+mutate("a meeting address that is no web address", "meetings", (d) => (d.items[1].online = "javascript:alert(1)"));
+mutate("a meeting beginning that is no time", "meetings", (d) => (d.items[1].starts_at = "soon"));
+mutate("a meeting task that is no id", "meetings", (d) => (d.items[1].tasks = ["alpha"]));
+mutate("a notification with a field nobody defined", "meetings", (d) => (d.items[1].notify[0].when = "now"));
+mutate("a meetings page without undated", "meetings", (d) => delete d.undated);
+mutate("a meeting document of a kind of document nobody defined", "meeting", (d) => (d.documents[0].kind = "fax"));
+mutate("a participant without a name", "meeting", (d) => delete d.participants[0].name);
+mutate("a follow-up task that is no id", "meeting", (d) => (d.followups[0].task = "gamma"));
+mutate("a task entry with more than 20 meetings", "task-with-meetings", (d) => {
+  d.task.meetings = Array.from({ length: 21 }, (_, i) => `lib.nvim/m${i}`);
+});
 mutate("a check without its findings", "check", (d) => delete d.findings);
 mutate("a finished list without its stats", "finished", (d) => delete d.stats);
 mutate("a link of a kind nobody defined", "links", (d) => (d.pairs[0].edges[0].kind = "magic"));

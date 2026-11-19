@@ -71,6 +71,12 @@
       "$ref": "#/$defs/Intent"
     },
     {
+      "$ref": "#/$defs/Meetings"
+    },
+    {
+      "$ref": "#/$defs/MeetingDocument"
+    },
+    {
       "$ref": "#/$defs/DonePreview"
     },
     {
@@ -81,6 +87,469 @@
     }
   ],
   "$defs": {
+    "MeetingEntry": {
+      "description": "One meeting (`<area>/MEETINGS/<slug>.md`). A broken meeting is still here (`valid: false`, `problems`); a field that is missing is unknown. Nothing changes with the day: whether a meeting is past is for the reader to say from `starts_at` and `ends_at` (local wall time, or the time of `tz`).",
+      "type": "object",
+      "required": [
+        "id",
+        "area",
+        "slug",
+        "title",
+        "tasks",
+        "notify",
+        "tags",
+        "summary",
+        "participants",
+        "agenda",
+        "followups",
+        "has_result",
+        "has_decisions",
+        "has_protocol",
+        "file",
+        "valid",
+        "problems"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[^/]+/[^/]+$"
+        },
+        "area": {
+          "type": "string"
+        },
+        "slug": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "status": {
+          "enum": ["planned", "done", "cancelled"],
+          "description": "Absent for a file with no valid status."
+        },
+        "date": {
+          "$ref": "#/$defs/Date"
+        },
+        "time": {
+          "type": "string",
+          "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$",
+          "description": "The beginning; absent: all day."
+        },
+        "end": {
+          "type": "string",
+          "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$",
+          "description": "The end as written (`end:`), when the file names one."
+        },
+        "duration_min": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "From `duration`, or from `time` and `end`."
+        },
+        "all_day": {
+          "type": "boolean",
+          "description": "Only beside a valid date."
+        },
+        "starts_at": {
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}(T([01][0-9]|2[0-3]):[0-5][0-9])?$",
+          "description": "`YYYY-MM-DDTHH:MM`, or the day of an all-day meeting."
+        },
+        "ends_at": {
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}(T([01][0-9]|2[0-3]):[0-5][0-9])?$",
+          "description": "The end in the same form (an all-day meeting: its last day)."
+        },
+        "tz": {
+          "type": "string",
+          "description": "An IANA time zone the times are written in (only its form is checked)."
+        },
+        "location": {
+          "type": "string"
+        },
+        "online": {
+          "type": "string",
+          "pattern": "^[Hh][Tt][Tt][Pp][Ss]?://"
+        },
+        "online_service": {
+          "enum": ["teams", "zoom", "meet", "webex", "jitsi", "link"]
+        },
+        "tasks": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[^/]+/[^/]+$"
+          }
+        },
+        "notify": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["spec"],
+            "properties": {
+              "spec": {
+                "type": "string"
+              },
+              "before_min": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "days_before": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "at": {
+                "type": "string",
+                "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "notify_to": {
+          "type": "array",
+          "maxItems": 10,
+          "items": {
+            "type": "string",
+            "pattern": "^[^@\\s]+@[^@\\s]+$"
+          }
+        },
+        "image": {
+          "type": "string",
+          "pattern": "^assets/"
+        },
+        "icon": {
+          "type": "string"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "recording": {
+          "type": "string",
+          "pattern": "^[Hh][Tt][Tt][Pp][Ss]?://"
+        },
+        "created": {
+          "$ref": "#/$defs/Date"
+        },
+        "updated": {
+          "$ref": "#/$defs/Date"
+        },
+        "summary": {
+          "type": "string"
+        },
+        "participants": {
+          "type": "object",
+          "required": ["total"],
+          "properties": {
+            "total": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "present": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "ticked": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false
+        },
+        "agenda": {
+          "type": "object",
+          "required": ["total"],
+          "properties": {
+            "total": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "present": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "ticked": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false
+        },
+        "followups": {
+          "type": "object",
+          "required": ["total"],
+          "properties": {
+            "total": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "present": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "ticked": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false
+        },
+        "has_result": {
+          "type": "boolean"
+        },
+        "has_decisions": {
+          "type": "boolean"
+        },
+        "has_protocol": {
+          "type": "boolean"
+        },
+        "folder": {
+          "const": true
+        },
+        "assets": {
+          "$ref": "#/$defs/PlanAssets"
+        },
+        "assets_truncated": {
+          "$ref": "#/$defs/PlanAssetsTruncated"
+        },
+        "file": {
+          "type": "string"
+        },
+        "etag": {
+          "$ref": "#/$defs/Etag"
+        },
+        "valid": {
+          "type": "boolean"
+        },
+        "problems": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Problem"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "Meetings": {
+      "description": "tasks.meetings: the meetings whose days touch the window `since`..`until`, the earliest first, one page. Capability `meetings`.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/Head"
+        }
+      ],
+      "type": "object",
+      "required": [
+        "kind",
+        "rev",
+        "digest",
+        "since",
+        "until",
+        "total",
+        "offset",
+        "limit",
+        "undated",
+        "items",
+        "incomplete"
+      ],
+      "properties": {
+        "kind": {
+          "const": "tasks.meetings"
+        },
+        "rev": {
+          "$ref": "#/$defs/Rev"
+        },
+        "digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "since": {
+          "$ref": "#/$defs/Date"
+        },
+        "until": {
+          "$ref": "#/$defs/Date"
+        },
+        "area": {
+          "type": "string"
+        },
+        "task": {
+          "type": "string"
+        },
+        "total": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "next_offset": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "undated": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Meetings that match but have no valid date: in no window."
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/MeetingEntry"
+          }
+        },
+        "incomplete": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "unevaluatedProperties": false
+    },
+    "MeetingDocument": {
+      "description": "tasks.meeting: one meeting with its body and the sections the engine reads. Capability `meeting`.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/Head"
+        }
+      ],
+      "type": "object",
+      "required": [
+        "kind",
+        "rev",
+        "digest",
+        "meeting",
+        "body",
+        "body_truncated",
+        "agenda",
+        "participants",
+        "documents",
+        "followups"
+      ],
+      "properties": {
+        "kind": {
+          "const": "tasks.meeting"
+        },
+        "rev": {
+          "$ref": "#/$defs/Rev"
+        },
+        "digest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "meeting": {
+          "$ref": "#/$defs/MeetingEntry"
+        },
+        "body": {
+          "type": "string",
+          "description": "The file after the frontmatter, untrusted text."
+        },
+        "body_truncated": {
+          "type": "boolean"
+        },
+        "agenda": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["n", "text", "ticked"],
+            "properties": {
+              "n": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "text": {
+                "type": "string"
+              },
+              "ticked": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "participants": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["n", "name", "present"],
+            "properties": {
+              "n": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "name": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string"
+              },
+              "role": {
+                "type": "string"
+              },
+              "present": {
+                "type": "boolean",
+                "description": "Ticked in `## Teilnehmer`."
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "documents": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["n", "text", "kind"],
+            "properties": {
+              "n": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "text": {
+                "type": "string"
+              },
+              "kind": {
+                "enum": ["web", "asset", "path", "text"]
+              },
+              "href": {
+                "type": "string",
+                "description": "The address, or the path below the meeting folder; a path of a machine is never named."
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "followups": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["n", "text", "ticked"],
+            "properties": {
+              "n": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "text": {
+                "type": "string"
+              },
+              "ticked": {
+                "type": "boolean"
+              },
+              "task": {
+                "type": "string",
+                "pattern": "^[^/]+/[^/]+$",
+                "description": "The task made of the line (`-> <id>`)."
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "unevaluatedProperties": false
+    },
     "Status": {
       "description": "The statuses of a task in `ROADMAP/tasks`. `done` is only seen on a task that was left there after it was finished (listed under `unlisted`).",
       "enum": ["doing", "decision", "blocked", "open", "parked", "done"]
@@ -369,6 +838,19 @@
         "problems"
       ],
       "properties": {
+        "meetings": {
+          "description": "The meetings that name the task (`tasks:` of a meeting file), the earliest first, at most 20. Only when there are some. Additive; capability `meetings`.",
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "type": "string",
+            "pattern": "^[^/]+/[^/]+$"
+          }
+        },
+        "meetings_truncated": {
+          "description": "The task has more meetings than `meetings` names.",
+          "const": true
+        },
         "id": {
           "type": "string",
           "pattern": "^[^/]+/[^/]+$"
@@ -782,6 +1264,27 @@
             "severity"
           ],
           "properties": {
+            "meeting_status": {
+              "description": "The statuses of a meeting. Additive; capability `meetings`.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "meeting_icon": {
+              "description": "The icons a meeting may name (`icon`). Additive; capability `meetings`.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "online_service": {
+              "description": "The services the address of a meeting is told as (`online_service`); `link` for any other. Additive; capability `meetings`.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
             "status": {
               "type": "array",
               "items": {

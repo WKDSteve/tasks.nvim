@@ -70,6 +70,7 @@ TESTS/              specs (run with scripts/test.sh, i.e. testing.nvim)
 | `tasks_nvim.moves` | Moving a task to another area, stage 1: `preview(id, to_area, { root })` answers whether the move could be made (the area exists, the slug is free there among open tasks, finished tasks and plans: otherwise `conflicts` with `slug-taken`) and what would dangle (`references`: the `blocked_by`, `after` and `refs` of other tasks, the `target` of a plan file, a configured document that names the id), with notes such as a plan that does not list the new area. Nothing is written; rewriting the references with a rollback is stage 2, until then the move itself is refused. | `preview` |
 | `tasks_nvim.steps` | The optional `## Plan` section of a task (`- [ ] 1. step -- Acceptance 1`): `parse` reads progress ("2/4") and the step texts, `tick_all` ticks the open steps byte-exactly (line endings kept; a step marked `(dropped)` / `(entfaellt)` is struck from the count and never ticked; code fences and other sections are not the plan), `uncovered_acceptance` names acceptance points no step refers to (a hint in `check`, never an error). A task without the section is complete: nothing is said about it. | `parse`, `tick_all`, `uncovered_acceptance`, `template_section` |
 | `tasks_nvim.plans` | Plan files, `<area>/ROADMAP/plans/<slug>.md` (or the folder form `<slug>/<slug>.md`, whose other files are assets: `assets` lists them): frontmatter `title`, `status` (planning / doing / parked / done), `areas`, `target`, `phase_order`, `gate` (`hard`), `links` (http/https), dates; no task list. `parse` / `from_file` always return a plan (a broken one carries errors), `area` / `all` / `find` read them, `members` picks the tasks that name one, `new` creates one (never overwrites), `close` finishes one like a task (moved to `Backlog/FEATURES/`, a README row, snapshot and rollback), `summary` says what a finished plan amounted to. | `parse`, `area`, `all`, `find`, `members`, `new`, `close`, `summary` |
+| `tasks_nvim.meetings` | Meeting files, `<area>/MEETINGS/<slug>.md` (or the folder form `<slug>/<slug>.md`), see [Meetings](#meetings-meetings): a meeting is no task and names its tasks (`tasks:`); `by_task` derives the meetings of a task. `parse` / `from_file` always return a meeting (a broken one carries errors; a parse cache by mtime and size), `area` / `all` / `find` read them, `online_service` tells the service of an address, `parse_duration`, `parse_notify`, `is_tz` read the fields. | `parse`, `from_file`, `area`, `all`, `find`, `by_task`, `less`, `online_service` |
 | `tasks_nvim.plan_scope` | The impure edge of the plan: one scan of the open tasks, finished ids looked up in the Backlogs when a blocker is not open, the scope cut like the commands do (area, `--for`, filters); `filter_readiness` serves `list --ready|--waiting`. `shared` is ONE pass over the vault (open tasks, finished ids, plan files, which file a ref means) that `load`, `filter_readiness` and the dashboard reuse. The marker blocks of documents: `refresh_document` (every block of a file, after a finish), `write_block` (`plan --write`), `marker_attrs`, `resolve_block`. | `shared`, `load`, `index`, `filter_readiness`, `refresh_document`, `write_block`, `marker_attrs`, `resolve_block` |
 | `tasks_nvim.plan_view` | A plan as Markdown (ready now, decisions by leverage, stages, critical path, warnings, the estimate line), `tsv` or `ids`; the `next` lines and the dialog text; the marker blocks of a document (`parse_blocks`, `replace_blocks`: fence-aware, per-line endings kept, the start marker carries attributes; `start_line`, `parse_start`). | `markdown`, `tsv`, `ids`, `next_lines`, `next_message`, `empty_text`, `parse_blocks`, `replace_blocks`, `replace_block`, `start_line`, `parse_start` |
 | `tasks_nvim.estimate` | Sums over tasks: effort days with how many tasks they are made of, a range (every size at its low and its high end), value, roi over the tasks with both numbers, quick wins, the split by actor, progress from finished tasks. A task without an estimate is missing, never 0. | `rollup`, `describe`, `fmt_days` |
@@ -402,6 +403,77 @@ and written as rows with `src: "git"` and the commit time as `at`. A day that ha
 written on its day is what the vault was; an area it has no row of gets one that ends a count filled in before it), a day without a commit gets none, a tree the engine cannot read is skipped
 and named. The day of a commit is the day of its committer time on this machine. Needs `git`; a few seconds for the
 first tree, then about a second per day.
+
+### Meetings (`MEETINGS/`)
+
+A meeting is a file of its own, not a task: it has no priority, effort or readiness, it is never "next", and it does
+not move to the Backlog when it is done (a meeting is an event with a date, and links to it must hold). The file is
+`<area>/MEETINGS/<slug>.md`, or `<area>/MEETINGS/<slug>/<slug>.md` once something was attached to it. The id is
+`<area>/<slug>` and shares the namespace of the area with tasks, plans and projects (`vault.has_plan_or_project` asks
+for meetings too; `check` says `meeting-id-taken` when a file of another kind has the id).
+
+The meeting holds the list of its tasks (`tasks:`); which meetings a task has is derived (`meetings.by_task`, the task
+entry's `meetings` in the contract), as a project does not list its plans: creating a meeting for five tasks changes
+one file, and two machines never collide on a list in a task file.
+
+```markdown
+---
+title: "Sync with Rick"
+status: planned            # planned | done | cancelled (done at any time, with or without a result)
+date: 2026-11-24
+time: "14:00"              # the beginning; none: all day
+end: "15:00"               # or: duration: 45m | 2h | 1h30m (at most 7 days); one of the two
+tz: Europe/Vienna          # optional; only its form is checked, the clients convert
+location: "Room 3"
+online: https://teams.microsoft.com/l/meetup-join/...   # http(s); the service is told from the host
+tasks: [lib.nvim/install, lib.nvim/licence]
+notify: [-15m, -1d@18:00]  # before the beginning, or a day before at a time; at most 5
+notify_to: [me@example.org]
+image: assets/images/cover.png   # a file below the meeting folder; or icon: handshake
+tags: [sync]
+recording: https://...
+---
+
+Sync on the install.
+
+## Agenda
+- [x] State of team 1
+
+## Teilnehmer
+- [x] Rick <rick@example.org> (Organisator)
+- [ ] Stefan (Ich)
+
+## Unterlagen
+- [Slides](assets/slides.pdf)
+
+## Protokoll
+## Beschlüsse
+## Folgeaufgaben
+- [ ] Clarify the licence -> lib.nvim/licence
+
+## Ergebnis
+```
+
+The sections the engine reads (German or English headings: `Participants`, `Documents`, `Minutes`, `Decisions`,
+`Follow-ups`, `Result`): the agenda and the follow-ups are checkboxes (`-> <area>/<slug>` at the end of a follow-up names
+the task made of it); a participant is `Name <mail> (role)`, mail and role optional, ticked = present; a document is a
+list line with a link, an address or a path (a path of a machine is never handed on). `has_result`, `has_decisions` and
+`has_protocol` say whether those sections hold text (an HTML comment of a template does not count).
+
+`starts_at` and `ends_at` (`YYYY-MM-DDTHH:MM`, or the day of an all-day meeting) are derived, in the wall time of the
+file. Nothing about a meeting changes with the day: whether one is past, which notification is due, is for the reader
+to say. The services of `online`: `teams` (`teams.microsoft.com`, `teams.live.com`), `zoom` (`zoom.us` and below),
+`meet` (`meet.google.com`), `webex` (`webex.com` and below), `jitsi` (`meet.jit.si`), `link` for any other host.
+
+The codes of `check`: a broken file with its own codes (`meeting-bad-status`, `meeting-bad-date`, `meeting-bad-time`,
+`meeting-end-and-duration`, `meeting-end-before-start`, `meeting-end-without-time`, `meeting-bad-duration`,
+`meeting-bad-tz`, `meeting-bad-online`, `meeting-bad-recording`, `meeting-bad-task`, `meeting-bad-notify`,
+`meeting-bad-notify-to`, `meeting-bad-image`, `meeting-bad-icon`), `meeting-id-taken` (error), `meeting-task-dangling`,
+`meeting-image-missing`, `meeting-done-in-future` (warnings), and the hints `meeting-done-without-result` (allowed) and
+`meeting-overlap` (two planned meetings of an area at the same time).
+
+Writing meetings (`meeting_new`, `meeting_set`, `meeting_close`, `meeting_capture`, ...) is not there yet: the files are
+written by hand or by the next stage of the engine.
 
 ### Folder tasks
 

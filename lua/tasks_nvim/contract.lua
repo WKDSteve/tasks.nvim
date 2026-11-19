@@ -7,7 +7,7 @@
 --- the JSON Schemas in `schemas/tasks-export/1/`. The Markdown files stay the single source of truth.
 ---
 --- Documents (`kind`): `tasks.hello`, `tasks.snapshot`, `tasks.list`, `tasks.task`, `tasks.next`, `tasks.areas`, `tasks.finished`, `tasks.history`, `tasks.links`, `tasks.groupings`,
---- `tasks.views`, `tasks.waits`, `tasks.error`. Every one starts with the same head (`schema`, `plugin`, `kind`, `generated_at`, `vault.id`,
+--- `tasks.views`, `tasks.waits`, `tasks.meetings`, `tasks.meeting`, `tasks.error`. Every one starts with the same head (`schema`, `plugin`, `kind`, `generated_at`, `vault.id`,
 --- `engine`); a document that comes from a scan also carries `rev` (what the vault looked like) and `digest` (the hash
 --- of the content: without `generated_at` and `engine`, so two runs on an unchanged vault have the same digest).
 ---
@@ -31,6 +31,7 @@ local fsio = require("tasks_nvim.fsio")
 local history = require("tasks_nvim.history")
 local json = require("lib.nvim.json.canonical")
 local links = require("tasks_nvim.links")
+local meetings = require("tasks_nvim.meetings")
 local model = require("tasks_nvim.model")
 local next_pick = require("tasks_nvim.next_pick")
 local plan = require("tasks_nvim.plan")
@@ -80,6 +81,8 @@ M.CAPABILITIES = {
   "links",
   "list",
   "lists",
+  "meeting",
+  "meetings",
   "move_area",
   "move_area_preview",
   "next",
@@ -117,6 +120,9 @@ M.CAPABILITIES = {
 
 ---Sizes the contract promises to keep.
 M.LIMITS = { title = 300, summary = 1000, body_bytes = 262144, list_items = 100, batch_ops = 100 }
+
+---The most meeting ids a task entry names (`meetings`); `meetings_truncated` says there are more.
+M.MEETINGS_PER_TASK = 20
 
 ---The messages of the engine that carry no code of their own, matched before the shared patterns of
 ---`lib.nvim.contract.errors` (`{ code, find, retryable? }`). The one fragile spot, until every source gives its code.
@@ -271,11 +277,6 @@ end
 
 -- ── entries ──────────────────────────────────────────────────────────────────
 
----@param root string
----@param task Tasks.Task
----@param node? Tasks.PlanNode
----@param rank? integer
----@return table
 ---The claim of a task as the entry carries it, `nil` when there is none. `expired` is the engine's judgement at the time
 ---of the document: a reader that keeps the document longer compares `until` with its own clock.
 ---@param root string
@@ -298,7 +299,13 @@ function M.claim_entry(root, id)
   })
 end
 
-local function task_entry(root, task, node, rank)
+---@param root string
+---@param task Tasks.Task
+---@param node? Tasks.PlanNode
+---@param rank? integer
+---@param meeting_ids? string[]  # The meetings that name the task (`meetings.by_task`), the earliest first.
+---@return table
+local function task_entry(root, task, node, rank, meeting_ids)
   local days = model.effort_days(task.effort)
   local roi = model.roi(task)
   local entry = {
@@ -366,6 +373,13 @@ local function task_entry(root, task, node, rank)
       return #ok > 0 and ok or nil
     end)(),
     summary = clip(task.summary or "", M.LIMITS.summary),
+    -- the meetings that name the task (`tasks:` of a meeting file), the earliest first; only when there are some, so a
+    -- document without meetings reads as before
+    meetings = meeting_ids
+        and #meeting_ids > 0
+        and vim.list_slice(meeting_ids, 1, M.MEETINGS_PER_TASK)
+      or nil,
+    meetings_truncated = meeting_ids and #meeting_ids > M.MEETINGS_PER_TASK or nil,
     folder = task.folder,
     file = relative(root, task.path) or vim.fs.basename(task.path),
     valid = task.valid,
@@ -512,6 +526,12 @@ function M.build_view(opts)
   for _, e in ipairs(shared.errors) do
     rel_errors[#rel_errors + 1] = redact(root, tostring(e))
   end
+  -- the meeting files: what a task entry derives its `meetings` from, and part of the revision when there are some
+  local meeting_files, meeting_errors = meetings.all({ root = root })
+  for _, e in ipairs(type(meeting_errors) == "table" and meeting_errors or {}) do
+    rel_errors[#rel_errors + 1] = redact(root, tostring(e))
+  end
+  meeting_files = meeting_files or {}
   return {
     root = root,
     open = shared.open,
@@ -523,6 +543,8 @@ function M.build_view(opts)
     errors = rel_errors,
     all = all,
     shared = shared,
+    meetings = meeting_files,
+    meetings_by_task = meetings.by_task(meeting_files),
   },
     nil
 end
@@ -693,6 +715,10 @@ local function rev_of(view, entries)
   for _, f in ipairs(view.projects or {}) do
     lines[#lines + 1] = "project:" .. f.id .. "\t" .. (file_etag(view, f.path) or "")
   end
+  -- the meeting files only when there are some: a vault without meetings keeps its revision
+  for _, m in ipairs(view.meetings or {}) do
+    lines[#lines + 1] = "meeting:" .. m.id .. "\t" .. (m.etag or "")
+  end
   for _, u in ipairs(view.unlisted) do
     lines[#lines + 1] = "unlisted:" .. u.id .. "\t" .. u.status
   end
@@ -765,6 +791,9 @@ function M.hello(opts)
     category = vim.list_slice(model.CATEGORIES, 1),
     scope = vim.list_slice(model.SCOPES, 1),
     severity = vim.list_slice(model.SEVERITIES, 1),
+    meeting_status = vim.list_slice(meetings.STATUSES, 1),
+    meeting_icon = vim.list_slice(meetings.ICONS, 1),
+    online_service = vim.list_slice(meetings.SERVICES, 1),
     -- not a word list: the fixed acceptance lines by kind, category and scope (`model.scaffold` joins them)
     scaffold = json.object({
       kind = json.object(vim.deepcopy(model.SCAFFOLD.kind)),
@@ -806,7 +835,8 @@ function M.build_snapshot(opts)
     return (view.rank[a.id] or math.huge) < (view.rank[b.id] or math.huge)
   end)
   for _, t in ipairs(ordered) do
-    entries[#entries + 1] = task_entry(view.root, t, view.plan.nodes[t.id], view.rank[t.id])
+    entries[#entries + 1] =
+      task_entry(view.root, t, view.plan.nodes[t.id], view.rank[t.id], view.meetings_by_task[t.id])
     statuses[#statuses + 1] = t.status
   end
   local doc = M.head("tasks.snapshot", view.root)
@@ -1000,7 +1030,8 @@ function M.list(params, opts)
   local items = {}
   for i = offset + 1, math.min(offset + limit, #matching) do
     local t = matching[i]
-    items[#items + 1] = task_entry(view.root, t, view.plan.nodes[t.id], view.rank[t.id])
+    items[#items + 1] =
+      task_entry(view.root, t, view.plan.nodes[t.id], view.rank[t.id], view.meetings_by_task[t.id])
   end
   local doc = M.head("tasks.list", view.root)
   doc.total = #matching
@@ -1225,10 +1256,16 @@ function M.task(id, opts)
   end
   local doc = M.head("tasks.task", view.root)
   if finished then
-    doc.task = task_entry(view.root, found, nil, nil)
+    doc.task = task_entry(view.root, found, nil, nil, view.meetings_by_task[found.id])
     doc.finished = true
   else
-    doc.task = task_entry(view.root, found, view.plan.nodes[found.id], view.rank[found.id])
+    doc.task = task_entry(
+      view.root,
+      found,
+      view.plan.nodes[found.id],
+      view.rank[found.id],
+      view.meetings_by_task[found.id]
+    )
   end
   doc.body = body
   doc.body_truncated = truncated
@@ -2799,6 +2836,270 @@ function M.done_preview(id, opts)
   doc.etag = pv.etag
   doc.confirm = pv.confirm
   return seal(doc, nil), nil
+end
+
+-- ── meetings ─────────────────────────────────────────────────────────────────
+
+---@param msg string
+---@return Tasks.ContractError
+local function bad_argument(msg)
+  return { code = "invalid_argument", message = msg, retryable = false }
+end
+
+---A meeting as the documents carry it (`tasks.meetings` items, `tasks.meeting`): the fields that are valid, the
+---derived ones (`starts_at`, `ends_at`, `online_service`, counts of the sections) and the problems of a broken file.
+---Nothing that changes with the day: whether a meeting is past is for the reader to say.
+---@param root string
+---@param m Tasks.Meeting
+---@return table
+local function meeting_entry(root, m)
+  local present, ticked_followups = 0, 0
+  for _, p in ipairs(m.participants) do
+    if p.present then
+      present = present + 1
+    end
+  end
+  for _, f in ipairs(m.followups) do
+    if f.ticked then
+      ticked_followups = ticked_followups + 1
+    end
+  end
+  local ticked_agenda = 0
+  for _, a in ipairs(m.agenda) do
+    if a.ticked then
+      ticked_agenda = ticked_agenda + 1
+    end
+  end
+  local entry = {
+    id = m.id,
+    area = m.area,
+    slug = m.slug,
+    title = m.title,
+    status = m.status,
+    date = m.date,
+    time = m.time,
+    ["end"] = m.end_time,
+    duration_min = m.duration_min,
+    starts_at = m.start,
+    ends_at = m.ends,
+    tz = m.tz,
+    location = m.location,
+    online = m.online,
+    online_service = m.online_service,
+    tasks = vim.list_slice(m.tasks, 1),
+    notify = vim.tbl_map(function(n)
+      return json.object({
+        spec = n.spec,
+        before_min = n.before_min,
+        days_before = n.days_before,
+        at = n.at,
+      })
+    end, m.notify),
+    notify_to = #m.notify_to > 0 and vim.list_slice(m.notify_to, 1) or nil,
+    image = m.image,
+    icon = m.icon,
+    tags = vim.list_slice(m.tags, 1),
+    recording = m.recording,
+    created = m.created,
+    updated = m.updated,
+    summary = clip(m.summary or "", M.LIMITS.summary),
+    participants = json.object({ total = #m.participants, present = present }),
+    agenda = json.object({ total = #m.agenda, ticked = ticked_agenda }),
+    followups = json.object({ total = #m.followups, ticked = ticked_followups }),
+    has_result = m.has_result,
+    has_decisions = m.has_decisions,
+    has_protocol = m.has_protocol,
+    file = relative(root, m.path) or vim.fs.basename(m.path),
+    etag = m.etag,
+    valid = m.valid,
+    problems = {},
+  }
+  -- only beside a valid date (`a and false or nil` would drop a false)
+  if m.date then
+    entry.all_day = m.all_day == true
+  end
+  for i, msg in ipairs(m.errors) do
+    entry.problems[#entry.problems + 1] =
+      { code = m.error_codes[i] or "invalid", msg = redact(root, msg) }
+  end
+  if m.folder then
+    entry.folder = true
+    local assets, truncated = require("tasks_nvim.plans").assets(m, M.LIMITS.list_items)
+    entry.assets = assets
+    entry.assets_truncated = truncated or nil
+  end
+  return entry
+end
+
+---The default window of `meetings`: the 30 days before `today` and the 90 after.
+M.MEETINGS_BEFORE, M.MEETINGS_AFTER = 30, 90
+
+---`tasks.meetings`: the meetings whose days touch the window `since`..`until` (both included; default 30 days back,
+---90 ahead of `today`), the earliest first, a page of them. `area` (an area or a group), `status` (list) and `task`
+---(the meetings that name it) narrow it. A meeting without a valid date is in no window: it is counted in `undated`
+---(it is listed in `check`). The revision is over the meetings listed.
+---@param params? table
+---@param opts? { root?: string, today?: string }
+---@return table|nil doc
+---@return Tasks.ContractError|string|nil err
+function M.meetings(params, opts)
+  params = params or {}
+  local limit = params.limit or M.LIMITS.list_items
+  local offset = params.offset or 0
+  if
+    type(limit) ~= "number"
+    or limit < 1
+    or limit > M.LIMITS.list_items
+    or limit ~= math.floor(limit)
+  then
+    return nil, bad_argument(("limit must be 1..%d"):format(M.LIMITS.list_items))
+  end
+  if type(offset) ~= "number" or offset < 0 or offset ~= math.floor(offset) then
+    return nil, bad_argument("offset must be a whole number of 0 or more")
+  end
+  for _, name in ipairs({ "since", "until" }) do
+    if params[name] ~= nil and not model.is_date(params[name]) then
+      return nil, bad_argument(name .. " must be a day, YYYY-MM-DD")
+    end
+  end
+  for _, s in ipairs(params.status or {}) do
+    if not vim.tbl_contains(meetings.STATUSES, s) then
+      return nil,
+        bad_argument(
+          ("unknown meeting status '%s' (expected %s)"):format(
+            tostring(s),
+            table.concat(meetings.STATUSES, ", ")
+          )
+        )
+    end
+  end
+  if params.task ~= nil and not select(2, vault.parse_id(params.task)) then
+    return nil, bad_argument("task: expected <area>/<slug>")
+  end
+  local today = opts and opts.today or model.today()
+  local since = params.since or model.add_days(today, -M.MEETINGS_BEFORE)
+  local until_ = params["until"] or model.add_days(today, M.MEETINGS_AFTER)
+  if since > until_ then
+    return nil, bad_argument("since is after until")
+  end
+  return fsio.read_scope(function()
+    local root, rerr = vault.root(opts)
+    if not root then
+      return nil, rerr
+    end
+    local area_set
+    if params.area ~= nil then
+      local scope = vault.area_scope(root, params.area)
+      if not scope then
+        return nil,
+          {
+            code = "not_found",
+            message = "unknown area: " .. tostring(params.area),
+            retryable = false,
+          }
+      end
+      area_set = scope.set
+    end
+    local statuses
+    if params.status and #params.status > 0 then
+      statuses = {}
+      for _, s in ipairs(params.status) do
+        statuses[s] = true
+      end
+    end
+    local all, errors = meetings.all({ root = root })
+    local matching, undated = {}, 0
+    for _, m in ipairs(all or {}) do
+      local wanted = (area_set == nil or area_set[m.area])
+        and (statuses == nil or (m.status ~= nil and statuses[m.status]))
+        and (params.task == nil or vim.tbl_contains(m.tasks, params.task))
+      if wanted then
+        if not m.date then
+          undated = undated + 1
+        else
+          -- the days of the meeting touch the window: it begins on or before `until` and ends on or after `since`
+          local last_day = (m.ends or m.date):sub(1, 10)
+          if m.date <= until_ and last_day >= since then
+            matching[#matching + 1] = m
+          end
+        end
+      end
+    end
+    table.sort(matching, meetings.less)
+    local doc = M.head("tasks.meetings", root)
+    doc.since, doc["until"] = since, until_
+    doc.area = params.area
+    doc.task = params.task
+    doc.total = #matching
+    doc.offset = offset
+    doc.limit = limit
+    doc.undated = undated
+    local items, lines = {}, {}
+    for i = offset + 1, math.min(#matching, offset + limit) do
+      local m = matching[i]
+      items[#items + 1] = meeting_entry(root, m)
+      lines[#lines + 1] = m.id .. "\t" .. (m.etag or "")
+    end
+    doc.items = items
+    if offset + limit < #matching then
+      doc.next_offset = offset + limit
+    end
+    doc.incomplete = vim.tbl_map(function(e)
+      return redact(root, tostring(e))
+    end, type(errors) == "table" and errors or {})
+    return seal(doc, builder.rev_of(lines)), nil
+  end)
+end
+
+---`tasks.meeting`: one meeting with its body (cut at `body_bytes`) and the sections the engine reads: the agenda, the
+---participants, the documents and the follow-ups.
+---@param id string
+---@param opts? { root?: string }
+---@return table|nil doc
+---@return Tasks.ContractError|string|nil err
+function M.meeting(id, opts)
+  local area, slug, perr = vault.parse_id(tostring(id))
+  if not area or not slug then
+    return nil, bad_argument(perr or "expected <area>/<slug>")
+  end
+  return fsio.read_scope(function()
+    local root, rerr = vault.root(opts)
+    if not root then
+      return nil, rerr
+    end
+    local m, err = meetings.find(id, { root = root })
+    if not m then
+      return nil, { code = "not_found", message = redact(root, tostring(err)), retryable = false }
+    end
+    local body = m.body or ""
+    local truncated = #body > M.LIMITS.body_bytes
+    if truncated then
+      body = body:sub(1, M.LIMITS.body_bytes)
+    end
+    local doc = M.head("tasks.meeting", root)
+    doc.meeting = meeting_entry(root, m)
+    doc.body = body
+    doc.body_truncated = truncated
+    doc.agenda = vim.tbl_map(function(a)
+      return json.object({ n = a.n, text = a.text, ticked = a.ticked })
+    end, m.agenda)
+    doc.participants = vim.tbl_map(function(p)
+      return json.object({
+        n = p.n,
+        name = p.name,
+        email = p.email,
+        role = p.role,
+        present = p.present,
+      })
+    end, m.participants)
+    doc.documents = vim.tbl_map(function(d)
+      return json.object({ n = d.n, text = d.text, kind = d.kind, href = d.href })
+    end, m.documents)
+    doc.followups = vim.tbl_map(function(f)
+      return json.object({ n = f.n, text = f.text, ticked = f.ticked, task = f.task })
+    end, m.followups)
+    return seal(doc, builder.rev_of({ m.id .. "\t" .. (m.etag or "") })), nil
+  end)
 end
 
 ---An error document.

@@ -24,6 +24,69 @@ local function encode(value)
   return vim.json.encode(value)
 end
 
+---Write the meetings of the golden cases `meetings`, `meeting` and `task-with-meetings` into `root`.
+---@param root string
+function G.write_meetings(root)
+  local function write(path, text)
+    vim.fn.mkdir(vim.fs.dirname(path), "p")
+    local fh = assert(io.open(path, "wb"))
+    fh:write(text)
+    fh:close()
+  end
+  local dir = root .. "/lib.nvim/MEETINGS"
+  write(
+    dir .. "/sync/sync.md",
+    table.concat({
+      "---",
+      'title: "Sync on alpha"',
+      "status: planned",
+      "date: 2026-01-12",
+      'time: "14:00"',
+      'end: "15:30"',
+      "tz: Europe/Vienna",
+      "location: Room 3",
+      "online: https://teams.microsoft.com/l/meetup-join/abc",
+      "tasks: [lib.nvim/alpha, lib.nvim/beta]",
+      "notify: [-15m, -1d@18:00]",
+      "notify_to: [me@example.org]",
+      "image: assets/images/cover.png",
+      "tags: [sync]",
+      "created: 2026-01-02",
+      "---",
+      "",
+      "Where alpha stands.",
+      "",
+      "## Agenda",
+      "- [x] State",
+      "- [ ] Next steps",
+      "",
+      "## Teilnehmer",
+      "- [x] Rick <rick@example.org> (Organisator)",
+      "- [ ] Stefan (Ich)",
+      "",
+      "## Unterlagen",
+      "- [Slides](assets/slides.pdf)",
+      "- https://example.org/wiki",
+      "",
+      "## Folgeaufgaben",
+      "- [ ] Write it down -> lib.nvim/gamma",
+      "- [x] Ask Rick",
+      "",
+    }, "\n")
+  )
+  write(dir .. "/sync/assets/images/cover.png", "png")
+  write(
+    dir .. "/kickoff.md",
+    "---\ntitle: Kickoff\nstatus: done\ndate: 2026-01-05\nduration: 48h\ntasks: [lib.nvim/alpha]\n"
+      .. "icon: handshake\n---\n\nThe start.\n\n## Ergebnis\nAgreed.\n"
+  )
+  write(
+    dir .. "/old-word.md",
+    "---\ntitle: Broken\nstatus: held\ndate: 2026-01-20\n---\n\nOld word.\n"
+  )
+  write(dir .. "/someday.md", "---\ntitle: Someday\nstatus: planned\n---\n\nNo date yet.\n")
+end
+
 ---Each case: the file name (without `.json`), the method and the request text (`nil`: no request; a function builds it
 ---from the vault it runs on). `fresh`: the case WRITES, so it runs on a vault of its own and cannot change what the
 ---other cases see.
@@ -101,6 +164,37 @@ G.cases = {
       )
       fh:close()
       return '{"params":{"id":"lib.nvim/shipped","finished":true}}'
+    end,
+  },
+  {
+    -- the meetings of a window (capability `meetings`): one with time, address, tasks, notifications and a folder,
+    -- one all day, one broken (still listed with its problems), one without a date (counted in `undated`)
+    name = "meetings",
+    method = "meetings",
+    fresh = true,
+    request = function(root)
+      G.write_meetings(root)
+      return '{"params":{"since":"2026-01-01","until":"2026-03-31"}}'
+    end,
+  },
+  {
+    -- one meeting with its body and the sections the engine reads (capability `meeting`)
+    name = "meeting",
+    method = "meeting",
+    fresh = true,
+    request = function(root)
+      G.write_meetings(root)
+      return '{"params":{"id":"lib.nvim/sync"}}'
+    end,
+  },
+  {
+    -- a task entry with the meetings that name it (`meetings`, the earliest first)
+    name = "task-with-meetings",
+    method = "task",
+    fresh = true,
+    request = function(root)
+      G.write_meetings(root)
+      return '{"params":{"id":"lib.nvim/alpha"}}'
     end,
   },
   {

@@ -1,0 +1,158 @@
+{
+  "body": "\nThe body of alpha.\n\n## Plan\n\n- [x] 1. first\n- [ ] 2. second\n- [ ] 3. third (dropped)\n\n\n## Offene Fragen\n\n### Which format? [q1]\nA line of text.\n- [ ] Section (empfohlen)\n- [ ] Frontmatter\n\n### Settled already [q2]\n- [x] Yes\n- [ ] No\n\n\u003c!-- testing:sheets:begin -->\n## Test sheets\n\n- **One** (`one`): automated part green, waiting for your judgement\n\u003c!-- testing:sheets:states one=inbox two=green -->\n\u003c!-- testing:sheets:end -->\n",
+  "body_truncated": false,
+  "digest": "sha256:b03cb003aa651ccf",
+  "engine": {
+    "git": "0000000",
+    "nvim": "0.0.0",
+    "version": "0.1.0-test"
+  },
+  "generated_at": "2026-01-01T00:00:00Z",
+  "kind": "tasks.task",
+  "plugin": "tasks.nvim",
+  "questions": [
+    {
+      "answered": false,
+      "key": "q1",
+      "n": 1,
+      "options": [
+        {
+          "chosen": false,
+          "n": 1,
+          "recommended": true,
+          "text": "Section"
+        },
+        {
+          "chosen": false,
+          "n": 2,
+          "recommended": false,
+          "text": "Frontmatter"
+        }
+      ],
+      "text": "A line of text.",
+      "title": "Which format?"
+    },
+    {
+      "answered": true,
+      "key": "q2",
+      "n": 2,
+      "options": [
+        {
+          "chosen": true,
+          "n": 1,
+          "recommended": false,
+          "text": "Yes"
+        },
+        {
+          "chosen": false,
+          "n": 2,
+          "recommended": false,
+          "text": "No"
+        }
+      ],
+      "text": "",
+      "title": "Settled already"
+    }
+  ],
+  "rev": "rev:aadd03",
+  "schema": 1,
+  "steps": [
+    {
+      "dropped": false,
+      "n": 1,
+      "text": "1. first",
+      "ticked": true
+    },
+    {
+      "dropped": false,
+      "n": 2,
+      "text": "2. second",
+      "ticked": false
+    },
+    {
+      "dropped": true,
+      "n": 3,
+      "text": "3. third (dropped)",
+      "ticked": false
+    }
+  ],
+  "task": {
+    "actor": "cdx",
+    "actor_written": true,
+    "after": [],
+    "area": "lib.nvim",
+    "blocked_by": [],
+    "category": [
+      "docs"
+    ],
+    "created": "2026-01-01",
+    "effort": "S",
+    "effort_days": 0.5,
+    "etag": "sha256:b3fc5b0215162275",
+    "file": "lib.nvim/ROADMAP/tasks/alpha.md",
+    "folder": false,
+    "group": "open|1",
+    "id": "lib.nvim/alpha",
+    "kind": "feature",
+    "meetings": [
+      "lib.nvim/kickoff",
+      "lib.nvim/sync"
+    ],
+    "open_questions": 1,
+    "prio": 1,
+    "problems": [],
+    "readiness": {
+      "eff_prio": 1,
+      "leverage": 2,
+      "open_blockers": [],
+      "rank": 2,
+      "same_file": [
+        "lib.nvim/alpha-twin"
+      ],
+      "stage": 0,
+      "state": "ready"
+    },
+    "refs": [
+      "docs/shared.md",
+      "\u003cexternal>/secret.md",
+      "\u003cexternal>/notes.md",
+      "repo@abc1234"
+    ],
+    "roi": 10,
+    "scope": [
+      "ui",
+      "usercmd"
+    ],
+    "sheets": {
+      "counts": {
+        "green": 1,
+        "inbox": 1,
+        "manual": 0,
+        "never": 0,
+        "red": 0,
+        "stale": 0
+      },
+      "state": "inbox",
+      "total": 2
+    },
+    "slug": "alpha",
+    "status": "open",
+    "steps": {
+      "dropped": 1,
+      "ticked": 1,
+      "total": 2
+    },
+    "summary": "The body of alpha.",
+    "tags": [
+      "ui",
+      "docs"
+    ],
+    "title": "Alpha \u003cscript>alert(1)\u003c/script> & \"quotes\" \\ slash",
+    "updated": "2026-01-01",
+    "valid": true,
+    "value": 5
+  },
+  "vault": {
+    "id": "vault"
+  }
+}

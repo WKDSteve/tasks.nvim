@@ -26,6 +26,8 @@ export type TasksExport =
   | Waits
   | Find
   | Intent
+  | Meetings
+  | MeetingDocument
   | DonePreview
   | Result
   | Error;
@@ -86,6 +88,18 @@ export type Hello = Head & {
    * The ranges of the fields, from the engine, so that nobody hard-codes them.
    */
   enums: {
+    /**
+     * The statuses of a meeting. Additive; capability `meetings`.
+     */
+    meeting_status?: string[];
+    /**
+     * The icons a meeting may name (`icon`). Additive; capability `meetings`.
+     */
+    meeting_icon?: string[];
+    /**
+     * The services the address of a meeting is told as (`online_service`); `link` for any other. Additive; capability `meetings`.
+     */
+    online_service?: string[];
     status: string[];
     kind: string[];
     prio: number[];
@@ -886,6 +900,75 @@ export type Intent = Head & {
   matches?: FindMatch[];
 };
 /**
+ * tasks.meetings: the meetings whose days touch the window `since`..`until`, the earliest first, one page. Capability `meetings`.
+ */
+export type Meetings = Head & {
+  kind: "tasks.meetings";
+  rev: Rev;
+  digest: Digest;
+  since: Date;
+  until: Date;
+  area?: string;
+  task?: string;
+  total: number;
+  offset: number;
+  limit: number;
+  next_offset?: number;
+  /**
+   * Meetings that match but have no valid date: in no window.
+   */
+  undated: number;
+  items: MeetingEntry[];
+  incomplete: string[];
+};
+/**
+ * tasks.meeting: one meeting with its body and the sections the engine reads. Capability `meeting`.
+ */
+export type MeetingDocument = Head & {
+  kind: "tasks.meeting";
+  rev: Rev;
+  digest: Digest;
+  meeting: MeetingEntry;
+  /**
+   * The file after the frontmatter, untrusted text.
+   */
+  body: string;
+  body_truncated: boolean;
+  agenda: {
+    n: number;
+    text: string;
+    ticked: boolean;
+  }[];
+  participants: {
+    n: number;
+    name: string;
+    email?: string;
+    role?: string;
+    /**
+     * Ticked in `## Teilnehmer`.
+     */
+    present: boolean;
+  }[];
+  documents: {
+    n: number;
+    text: string;
+    kind: "web" | "asset" | "path" | "text";
+    /**
+     * The address, or the path below the meeting folder; a path of a machine is never named.
+     */
+    href?: string;
+  }[];
+  followups: {
+    n: number;
+    text: string;
+    ticked: boolean;
+    /**
+     * The task made of the line (`-> <id>`).
+     */
+    task?: string;
+  }[];
+};
+/**
  * tasks.donepreview: what finishing a task would do, with nothing written, and the `confirm` token that `done` needs for exactly this version of the file.
  */
 export type DonePreview = Head & {
@@ -1020,6 +1103,148 @@ export interface AreaGroup {
  * One task. A broken task is still here (`valid: false`, `problems`); a field that is missing is unknown, never 0 (no `effort` means no `effort_days` and no `roi`).
  */
 export interface TaskEntry {
+  /**
+   * The meetings that name the task (`tasks:` of a meeting file), the earliest first, at most 20. Only when there are some. Additive; capability `meetings`.
+   *
+   * @maxItems 20
+   */
+  meetings?:
+    | []
+    | [string]
+    | [string, string]
+    | [string, string, string]
+    | [string, string, string, string]
+    | [string, string, string, string, string]
+    | [string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string, string, string, string, string, string]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string
+      ]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string
+      ]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string
+      ]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string
+      ]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string
+      ]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string
+      ];
+  /**
+   * The task has more meetings than `meetings` names.
+   */
+  meetings_truncated?: true;
   id: string;
   area: string;
   slug: string;
@@ -1475,6 +1700,105 @@ export interface FindMatch {
   area: string;
   status: string;
   location: "open" | "done";
+}
+/**
+ * One meeting (`<area>/MEETINGS/<slug>.md`). A broken meeting is still here (`valid: false`, `problems`); a field that is missing is unknown. Nothing changes with the day: whether a meeting is past is for the reader to say from `starts_at` and `ends_at` (local wall time, or the time of `tz`).
+ */
+export interface MeetingEntry {
+  id: string;
+  area: string;
+  slug: string;
+  title: string;
+  /**
+   * Absent for a file with no valid status.
+   */
+  status?: "planned" | "done" | "cancelled";
+  date?: Date;
+  /**
+   * The beginning; absent: all day.
+   */
+  time?: string;
+  /**
+   * The end as written (`end:`), when the file names one.
+   */
+  end?: string;
+  /**
+   * From `duration`, or from `time` and `end`.
+   */
+  duration_min?: number;
+  /**
+   * Only beside a valid date.
+   */
+  all_day?: boolean;
+  /**
+   * `YYYY-MM-DDTHH:MM`, or the day of an all-day meeting.
+   */
+  starts_at?: string;
+  /**
+   * The end in the same form (an all-day meeting: its last day).
+   */
+  ends_at?: string;
+  /**
+   * An IANA time zone the times are written in (only its form is checked).
+   */
+  tz?: string;
+  location?: string;
+  online?: string;
+  online_service?: "teams" | "zoom" | "meet" | "webex" | "jitsi" | "link";
+  tasks: string[];
+  notify: {
+    spec: string;
+    before_min?: number;
+    days_before?: number;
+    at?: string;
+  }[];
+  /**
+   * @maxItems 10
+   */
+  notify_to?:
+    | []
+    | [string]
+    | [string, string]
+    | [string, string, string]
+    | [string, string, string, string]
+    | [string, string, string, string, string]
+    | [string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string, string];
+  image?: string;
+  icon?: string;
+  tags: string[];
+  recording?: string;
+  created?: Date;
+  updated?: Date;
+  summary: string;
+  participants: {
+    total: number;
+    present?: number;
+    ticked?: number;
+  };
+  agenda: {
+    total: number;
+    present?: number;
+    ticked?: number;
+  };
+  followups: {
+    total: number;
+    present?: number;
+    ticked?: number;
+  };
+  has_result: boolean;
+  has_decisions: boolean;
+  has_protocol: boolean;
+  folder?: true;
+  assets?: PlanAssets;
+  assets_truncated?: PlanAssetsTruncated;
+  file: string;
+  etag?: Etag;
+  valid: boolean;
+  problems: Problem[];
 }
 /**
  * What happened to one operation of a request, in the order they were sent. A failed operation does not stop the others.

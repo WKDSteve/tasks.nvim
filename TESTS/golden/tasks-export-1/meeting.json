@@ -1,0 +1,137 @@
+{
+  "agenda": [
+    {
+      "n": 1,
+      "text": "State",
+      "ticked": true
+    },
+    {
+      "n": 2,
+      "text": "Next steps",
+      "ticked": false
+    }
+  ],
+  "body": "\nWhere alpha stands.\n\n## Agenda\n- [x] State\n- [ ] Next steps\n\n## Teilnehmer\n- [x] Rick \u003crick@example.org> (Organisator)\n- [ ] Stefan (Ich)\n\n## Unterlagen\n- [Slides](assets/slides.pdf)\n- https://example.org/wiki\n\n## Folgeaufgaben\n- [ ] Write it down -> lib.nvim/gamma\n- [x] Ask Rick\n",
+  "body_truncated": false,
+  "digest": "sha256:4c5822be0d820c05",
+  "documents": [
+    {
+      "href": "assets/slides.pdf",
+      "kind": "asset",
+      "n": 1,
+      "text": "Slides"
+    },
+    {
+      "href": "https://example.org/wiki",
+      "kind": "web",
+      "n": 2,
+      "text": "https://example.org/wiki"
+    }
+  ],
+  "engine": {
+    "git": "0000000",
+    "nvim": "0.0.0",
+    "version": "0.1.0-test"
+  },
+  "followups": [
+    {
+      "n": 1,
+      "task": "lib.nvim/gamma",
+      "text": "Write it down",
+      "ticked": false
+    },
+    {
+      "n": 2,
+      "text": "Ask Rick",
+      "ticked": true
+    }
+  ],
+  "generated_at": "2026-01-01T00:00:00Z",
+  "kind": "tasks.meeting",
+  "meeting": {
+    "agenda": {
+      "ticked": 1,
+      "total": 2
+    },
+    "all_day": false,
+    "area": "lib.nvim",
+    "assets": [
+      "assets/images/cover.png"
+    ],
+    "created": "2026-01-02",
+    "date": "2026-01-12",
+    "duration_min": 90,
+    "end": "15:30",
+    "ends_at": "2026-01-12T15:30",
+    "etag": "sha256:df772bf3b8f661c4",
+    "file": "lib.nvim/MEETINGS/sync/sync.md",
+    "folder": true,
+    "followups": {
+      "ticked": 1,
+      "total": 2
+    },
+    "has_decisions": false,
+    "has_protocol": false,
+    "has_result": false,
+    "id": "lib.nvim/sync",
+    "image": "assets/images/cover.png",
+    "location": "Room 3",
+    "notify": [
+      {
+        "before_min": 15,
+        "spec": "-15m"
+      },
+      {
+        "at": "18:00",
+        "days_before": 1,
+        "spec": "-1d@18:00"
+      }
+    ],
+    "notify_to": [
+      "me@example.org"
+    ],
+    "online": "https://teams.microsoft.com/l/meetup-join/abc",
+    "online_service": "teams",
+    "participants": {
+      "present": 1,
+      "total": 2
+    },
+    "problems": [],
+    "slug": "sync",
+    "starts_at": "2026-01-12T14:00",
+    "status": "planned",
+    "summary": "Where alpha stands.",
+    "tags": [
+      "sync"
+    ],
+    "tasks": [
+      "lib.nvim/alpha",
+      "lib.nvim/beta"
+    ],
+    "time": "14:00",
+    "title": "Sync on alpha",
+    "tz": "Europe/Vienna",
+    "valid": true
+  },
+  "participants": [
+    {
+      "email": "rick@example.org",
+      "n": 1,
+      "name": "Rick",
+      "present": true,
+      "role": "Organisator"
+    },
+    {
+      "n": 2,
+      "name": "Stefan",
+      "present": false,
+      "role": "Ich"
+    }
+  ],
+  "plugin": "tasks.nvim",
+  "rev": "rev:52b492",
+  "schema": 1,
+  "vault": {
+    "id": "vault"
+  }
+}
