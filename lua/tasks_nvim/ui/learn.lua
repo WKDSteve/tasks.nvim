@@ -180,9 +180,13 @@ local function reload(buf)
   for _, win in ipairs(vim.fn.win_findbuf(buf)) do
     views[win] = vim.api.nvim_win_call(win, vim.fn.winsaveview)
   end
+  -- reloading a Markdown buffer runs the undo of the runtime's ftplugin, whose `silent! nunmap` leaves E31 in
+  -- v:errmsg without a message: a key or a script that checks v:errmsg afterwards would see an error that is none
+  local errmsg = vim.v.errmsg
   pcall(vim.api.nvim_buf_call, buf, function()
     vim.cmd("silent keepjumps edit!")
   end)
+  vim.v.errmsg = errmsg
   for win, view in pairs(views) do
     if vim.api.nvim_win_is_valid(win) then
       pcall(vim.api.nvim_win_call, win, function()
@@ -249,8 +253,22 @@ function M.set_point(buf, row, state, reason)
     if not res then
       return nil, err
     end
+    local wins = {}
+    for _, win in ipairs(vim.fn.win_findbuf(buf)) do
+      if vim.api.nvim_win_get_cursor(win)[1] == row then
+        wins[#wins + 1] = win
+      end
+    end
     reload(buf)
-    return M.node_at(M.snapshot(buf), row), nil
+    -- the frontmatter can grow (`updated:` written the first time): the cursor follows the point, not the row
+    local after = M.snapshot(buf)
+    local new_row = after.offset + node.line
+    for _, win in ipairs(wins) do
+      if vim.api.nvim_win_is_valid(win) then
+        pcall(vim.api.nvim_win_set_cursor, win, { new_row, vim.api.nvim_win_get_cursor(win)[2] })
+      end
+    end
+    return M.node_at(after, new_row), nil
   end
   local changed, err = lernbaum.set_state(snap.tree, node.index, state, reason)
   if not changed then

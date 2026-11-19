@@ -130,6 +130,24 @@ return function(H)
   has(H.read(path_file), "  - [-] Syntax – Grund: doch nicht nötig {#syntax}\n")
   learn.cycle()
   has(H.read(path_file), "  - [ ] Syntax {#syntax}\n", "dropped -> open, the reason goes")
+  -- a path without `updated:` gets it on the first write: the frontmatter grows by a line, the cursor follows the point;
+  -- the reload leaves v:errmsg as it was (the Markdown ftplugin's `silent! nunmap` sets E31 on a reload)
+  local fresh_file = root .. "/lib.nvim/ROADMAP/paths/fresh.md"
+  H.write(
+    fresh_file,
+    "---\ntitle: Fresh\nstatus: doing\n---\n\n## Lernpunkte\n\n- [ ] Eins\n- [ ] Zwei\n"
+  )
+  local fbuf = open(fresh_file)
+  vim.bo[fbuf].filetype = "markdown"
+  at(9)
+  vim.v.errmsg = ""
+  learn.cycle()
+  has(H.read(fresh_file), "updated: ")
+  has(H.read(fresh_file), "- [x] Zwei\n")
+  eq(vim.api.nvim_win_get_cursor(0)[1], 10, "the cursor stays on the point it changed")
+  eq(vim.api.nvim_get_current_line(), "- [x] Zwei")
+  eq(vim.v.errmsg, "", "the reload leaves no error behind")
+  buf = open(path_file)
   -- a parent has no mark of its own
   at(11)
   learn.cycle()
