@@ -89,6 +89,7 @@ M.CAPABILITIES = {
   "move_area",
   "move_area_preview",
   "next",
+  "node_note",
   "node_set",
   "ops",
   "order",

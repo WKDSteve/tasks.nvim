@@ -494,6 +494,65 @@ function M.set_state(tree, ref, state, reason)
   return node, nil
 end
 
+---Write the note of a node: the `> ` lines below it (the blank lines between them included) give way to `text`, one
+---`> ` line per line of the text, indented two columns deeper than the node; an empty text (or only white space)
+---removes the note. Several lines are allowed, control characters are not (a tab is). Every other line stays byte for
+---byte, a change made with `set_state` before included; the tree is parsed anew, since the lines after the note move.
+---@param tree Tasks.LernTree
+---@param ref string|integer
+---@param text? string
+---@return Tasks.LernNode|nil node
+---@return string|nil err
+function M.set_note(tree, ref, text)
+  local node = M.node(tree, ref)
+  if not node then
+    return nil, "no such learning point: " .. tostring(ref)
+  end
+  text = (tostring(text or ""):gsub("\r\n", "\n"))
+  if text:find("[%z\1-\8\11-\31\127]") or text:find("\194[\128-\159]") then
+    return nil, "the note must be text without control characters"
+  end
+  if not text:match("%S") then
+    text = ""
+  end
+  text = (text:gsub("%s+$", ""))
+  local lines = vim.split(M.render(tree), "\n", { plain = true })
+  -- the note as it stands: `> ` lines deeper than the node, blank lines between them; the next other line ends it
+  local first, last
+  local i = node.line + 1
+  while lines[i] do
+    local l = lines[i]:gsub("\r$", "")
+    local nws = l:match("^(%s*)>")
+    if nws and width(nws) > node.indent then
+      first, last = first or i, i
+    elseif l:match("%S") then
+      break
+    end
+    i = i + 1
+  end
+  if first then
+    for _ = first, last do
+      table.remove(lines, first)
+    end
+  end
+  local pad = node.prefix:match("^(%s*)") .. "  "
+  local at = first or node.line + 1
+  if text ~= "" then
+    for k, l in ipairs(vim.split(text, "\n", { plain = true })) do
+      local quoted = l == "" and ">" or ("> " .. l)
+      table.insert(lines, at + k - 1, pad .. quoted .. node.cr)
+    end
+  end
+  local fresh = M.parse(table.concat(lines, "\n"))
+  for k in pairs(tree) do
+    tree[k] = nil
+  end
+  for k, v in pairs(fresh) do
+    tree[k] = v
+  end
+  return tree.nodes[node.index], nil
+end
+
 ---Drop the first `w` columns of leading white space of a line (a tab counts 4, as `width` does).
 ---@param line string
 ---@param w integer

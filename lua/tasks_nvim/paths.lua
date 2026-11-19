@@ -154,14 +154,15 @@ function M.close(id, opts)
   return plans.close(id, vim.tbl_extend("force", opts or {}, { kind = "path" }))
 end
 
----Change one learning point of an open path: its state and reason (`lernbaum.set_state`), under the lock of the file,
----every other byte as it was. `ref` is a key (`syntax`, `#syntax`) or a position (`#3`). `opts.if_match` is the version
----tag the caller read.
+---Change one learning point of an open path: its state and reason (`lernbaum.set_state`) and/or its note
+---(`opts.note`, `lernbaum.set_note`; an empty text removes it), under the lock of the file, every other byte as it
+---was. `ref` is a key (`syntax`, `#syntax`) or a position (`#3`). `state` may be nil when a note is given.
+---`opts.if_match` is the version tag the caller read.
 ---@param id string
 ---@param ref string|integer
----@param state string
+---@param state? string
 ---@param reason? string
----@param opts? { root?: string, today?: string, if_match?: string, dry_run?: boolean }
+---@param opts? { root?: string, today?: string, if_match?: string, dry_run?: boolean, note?: string }
 ---@return { id: string, path: string, etag_before: string, etag_after: string, changed: boolean, node: { line: integer, key?: string, state: string }, progress: Tasks.LernProgress }|nil result
 ---@return string|nil err
 ---@return table|nil info  # `{ code = "not_found"|"invalid_argument"|"conflict" }`
@@ -205,9 +206,21 @@ function M.point(id, ref, state, reason, opts)
     end
     local head = cur:sub(1, #cur - #body)
     local tree = lernbaum.parse(body)
-    local node, serr = lernbaum.set_state(tree, ref, state, reason)
-    if not node then
-      return nil, serr, { code = "invalid_argument" }
+    if state == nil and opts.note == nil then
+      return nil, "nothing to change: give a state or a note", { code = "invalid_argument" }
+    end
+    local node, serr
+    if state ~= nil then
+      node, serr = lernbaum.set_state(tree, ref, state, reason)
+      if not node then
+        return nil, serr, { code = "invalid_argument" }
+      end
+    end
+    if opts.note ~= nil then
+      node, serr = lernbaum.set_note(tree, ref, opts.note)
+      if not node then
+        return nil, serr, { code = "invalid_argument" }
+      end
     end
     result.node = { line = node.line, key = node.key, state = node.state }
     result.progress = tree.progress

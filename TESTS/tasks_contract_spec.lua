@@ -92,6 +92,7 @@ return function(H)
     "meeting_ops",
     "move_area",
     "move_area_preview",
+    "node_note",
     "node_set",
     "outcome",
     "path_close",

@@ -312,6 +312,7 @@ local FIELDS = {
     point = "string",
     state = "string",
     reason = "string",
+    note = "string",
     if_match = "string",
   },
   promote = {
@@ -1948,33 +1949,36 @@ local function point_ref(point)
   return n and tonumber(n) or point:gsub("^#", "")
 end
 
----Change one learning point of an open path: its state and reason (`paths.point`); the answer carries the progress
----after it and an `inverse` (the state and reason before).
+---Change one learning point of an open path: its state and reason and/or its note (`paths.point`); the answer carries
+---the progress after it and an `inverse` (what the op touched, as it was before; a note the point did not have is "").
 ---@param op table
 ---@param ctx Tasks.OpsCtx
 ---@return table entry
 local function do_node_set(op, ctx)
   local ref = point_ref(op.point)
-  if op.id == nil or ref == nil or op.state == nil then
-    return refuse("invalid_argument", "node_set needs id, point and state")
+  if op.id == nil or ref == nil or (op.state == nil and op.note == nil) then
+    return refuse("invalid_argument", "node_set needs id, point and a state or a note")
   end
   if has_control(op.reason) then
     return refuse("invalid_argument", "reason contains a control character")
+  end
+  if has_control(op.note) then
+    return refuse("invalid_argument", "note contains a control character")
   end
   local paths = require("tasks_nvim.paths")
   local before = paths.find(op.id, { root = ctx.root })
   local old
   if before and before.tree then
     local n = require("tasks_nvim.lernbaum").node(before.tree, ref)
-    old = n and { state = n.state, reason = n.reason } or nil
+    old = n and { state = n.state, reason = n.reason, note = n.note } or nil
   end
-  local r, err, info = paths.point(
-    op.id,
-    ref,
-    op.state,
-    op.reason,
-    { root = ctx.root, today = ctx.today, if_match = op.if_match, dry_run = ctx.dry }
-  )
+  local r, err, info = paths.point(op.id, ref, op.state, op.reason, {
+    root = ctx.root,
+    today = ctx.today,
+    if_match = op.if_match,
+    dry_run = ctx.dry,
+    note = op.note,
+  })
   if not r then
     if info and (info.code == "invalid_argument" or info.code == "not_found") then
       return refuse(info.code, contract.redact(ctx.root, tostring(err)))
@@ -1992,13 +1996,15 @@ local function do_node_set(op, ctx)
     progress = json.object(r.progress),
     changed_ids = (r.changed and not ctx.dry) and { r.id } or {},
   }
-  if r.changed and not ctx.dry and old and old.state then
+  -- the inverse gives back what the op touched: the state and reason the point had, its note ("" when it had none)
+  if r.changed and not ctx.dry and old and (op.state == nil or old.state) then
     entry.inverse = json.object({
       op = "node_set",
       id = r.id,
       point = r.node.key or ("#" .. tostring(ref)),
-      state = old.state,
-      reason = old.reason,
+      state = op.state ~= nil and old.state or nil,
+      reason = op.state ~= nil and old.reason or nil,
+      note = op.note ~= nil and (old.note or "") or nil,
       if_match = r.etag_after,
     })
   end

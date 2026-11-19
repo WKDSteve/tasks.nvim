@@ -163,4 +163,74 @@ return function(H)
   eq(#none.nodes, 0)
   eq(lb.render(none), "Prose.\n\n## Plan\n\n- [ ] 1. Schritt\n")
   eq(lb.parse("").has_section, false)
+
+  -- set_note: a note is written, changed and removed; every other line stays byte for byte
+  local NOTE = table.concat({
+    "## Lernpunkte",
+    "",
+    "- [ ] Lua lernen {#lua}",
+    "  - [x] Handbuch {#manual}",
+    "    > alt eins",
+    "",
+    "    > alt zwei",
+    "  - [ ] Syntax {#syntax}",
+    "",
+    "Prosa danach.",
+  }, "\n")
+  local tn = lb.parse(NOTE)
+  ok(lb.set_note(tn, "nope", "x") == nil, "no such point")
+  local n1, nerr = lb.set_note(tn, "syntax", "Erste Zeile\n\nZweite Zeile")
+  eq(nerr, nil)
+  eq(n1.note, "Erste Zeile\n\nZweite Zeile")
+  eq(
+    lb.render(tn),
+    NOTE:gsub(
+      "  %- %[ %] Syntax {#syntax}",
+      "  - [ ] Syntax {#syntax}\n    > Erste Zeile\n    >\n    > Zweite Zeile",
+      1
+    ),
+    "a new note below the point, two columns deeper"
+  )
+  -- the note of another point (with a blank line inside) is replaced as a whole; the lines after it move
+  local n2 = lb.set_note(tn, "manual", "neu ![Bild](assets/images/a.svg)")
+  eq(n2.note, "neu ![Bild](assets/images/a.svg)")
+  eq(n2.image, "assets/images/a.svg", "an image in the note is the image of the point")
+  eq(
+    tn.by_key.syntax.line,
+    6,
+    "the tree is parsed anew: three lines of the old note gave way to one"
+  )
+  eq(tn.by_key.syntax.note, "Erste Zeile\n\nZweite Zeile")
+  ok(lb.render(tn):find("    > neu ![Bild](assets/images/a.svg)\n  - [ ] Syntax", 1, true))
+  -- removed: an empty text (or only white space)
+  lb.set_note(tn, "manual", "  \n")
+  lb.set_note(tn, "syntax", "")
+  eq(
+    lb.render(tn),
+    table.concat({
+      "## Lernpunkte",
+      "",
+      "- [ ] Lua lernen {#lua}",
+      "  - [x] Handbuch {#manual}",
+      "  - [ ] Syntax {#syntax}",
+      "",
+      "Prosa danach.",
+    }, "\n")
+  )
+  eq(tn.by_key.manual.note, nil)
+  -- control characters are refused (a tab is text); CRLF in the text becomes one line break
+  local _, cerr = lb.set_note(tn, "syntax", "a\0b")
+  ok(cerr and cerr:find("control"), "a control character is refused")
+  ok(lb.set_note(tn, "syntax", "a\tb"), "a tab is text")
+  lb.set_note(tn, "syntax", "a\r\nb")
+  eq(tn.by_key.syntax.note, "a\nb")
+  -- a file with CRLF keeps it on the note lines; a state changed before stays
+  local tcr = lb.parse((NOTE:gsub("\n", "\r\n")))
+  lb.set_state(tcr, "syntax", "learned")
+  lb.set_note(tcr, "syntax", "eins")
+  ok(
+    lb.render(tcr):find("  - [x] Syntax {#syntax}\r\n    > eins\r\n\r\nProsa", 1, true),
+    lb.render(tcr)
+  )
+  eq(tcr.by_key.syntax.state, "learned")
 end

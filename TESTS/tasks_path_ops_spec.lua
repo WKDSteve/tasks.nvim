@@ -107,6 +107,54 @@ return function(H)
   eq(back.outcome, "changed", "the inverse puts the point back")
   has(H.read(file), "- [ ] Syntax {#syntax}")
 
+  -- node_set with a note: written below the point; the inverse carries the note it had ("" for none)
+  ok(vim.tbl_contains(hello.capabilities, "node_note"), "node_note")
+  local nothing_given = run({ { op = "node_set", id = "lib.nvim/lua-lernen", point = "syntax" } })
+  eq(nothing_given.ok, false)
+  eq(nothing_given.error.code, "invalid_argument")
+  local cr = run({
+    { op = "node_set", id = "lib.nvim/lua-lernen", point = "syntax", note = "a\rb" },
+  })
+  eq(cr.ok, false, "a carriage return is a control character")
+  local noted = run({
+    {
+      op = "node_set",
+      id = "lib.nvim/lua-lernen",
+      point = "syntax",
+      note = "Zeile eins\nZeile zwei",
+    },
+  })
+  eq(noted.outcome, "changed", vim.inspect(noted))
+  eq(noted.node.state, "open")
+  has(H.read(file), "- [ ] Syntax {#syntax}\n  > Zeile eins\n  > Zeile zwei\n- [ ] C lernen {#c}")
+  eq(noted.inverse, {
+    op = "node_set",
+    id = "lib.nvim/lua-lernen",
+    point = "syntax",
+    note = "",
+    if_match = noted.etag_after,
+  })
+  eq(call("path", { id = "lib.nvim/lua-lernen" }).nodes[1].note, "Zeile eins\nZeile zwei")
+  -- state and note in one op: the inverse gives back both
+  local both = run({
+    {
+      op = "node_set",
+      id = "lib.nvim/lua-lernen",
+      point = "syntax",
+      state = "learned",
+      note = "neu",
+    },
+  })
+  eq(both.inverse.state, "open")
+  eq(both.inverse.note, "Zeile eins\nZeile zwei")
+  eq(run({ both.inverse }).outcome, "changed")
+  eq(run({ noted.inverse }).outcome, "changed")
+  has(
+    H.read(file),
+    "- [ ] Syntax {#syntax}\n- [ ] C lernen {#c}",
+    "the inverses take the note away"
+  )
+
   -- ── promote / unpromote ───────────────────────────────────────────────────
   local pdry = run({ { op = "promote", container = "lib.nvim/lua-lernen", point = "c" } }, true)
   eq(pdry.outcome, "would_create", vim.inspect(pdry))

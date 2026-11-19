@@ -3978,6 +3978,10 @@
           "description": "`node_set`: the reason the point had.",
           "type": "string"
         },
+        "note": {
+          "description": "`node_set` that wrote a note: the note the point had, `\"\"` when it had none (capability `node_note`).",
+          "type": "string"
+        },
         "section": {
           "description": "`tick_step` of a meeting: the section of the item (`agenda`, `followups`).",
           "enum": ["agenda", "followups"]

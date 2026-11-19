@@ -2261,6 +2261,10 @@ export interface Inverse {
    */
   reason?: string;
   /**
+   * `node_set` that wrote a note: the note the point had, `""` when it had none (capability `node_note`).
+   */
+  note?: string;
+  /**
    * `tick_step` of a meeting: the section of the item (`agenda`, `followups`).
    */
   section?: "agenda" | "followups";
