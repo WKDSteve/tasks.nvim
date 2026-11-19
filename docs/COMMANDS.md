@@ -902,6 +902,20 @@ use one. Without pickers.nvim it falls back to a plain `vim.ui.select` over the 
 `*.md` files: no content search, and `--action=grep|smart` is answered with that hint.
 Full-text search over the whole vault is a job for your picker's own grep on the vault folder.
 
+### `:Tasks meeting list|open|new|close`
+
+The meetings of the vault (`<area>/MEETINGS/`) in the editor. `list [<area>] [--section=]` is a
+`vim.ui.select` over the meetings, the planned ones from yesterday on first (the earliest first),
+then the others (the latest first); a line names day and time, status, title, place or service
+and id; the one picked opens, at the section `--section=` names (`agenda`, `teilnehmer`,
+`unterlagen`, `protokoll`, `beschluesse`, `folgeaufgaben`, `ergebnis`, or the English words).
+`open <id> [--section=]` does the same for one id. `new <area> <line...>` reads the rest of the
+line with the quick capture (a day such as `Mo`, `morgen` or `24.11.`, a time or range, a
+duration, `ganztägig`, an address, `@place`, `#area/task`, `!-15m`; every other word is the
+title), makes the meeting through the write door and opens it at its agenda. `close <id>
+[--result=]` marks it done (at any time; the message says when it has no result). The headless
+twins: `tasks meeting new|set|close|followups|attend|show|parse` and `tasks meetings`.
+
 ### Headless: `import --from-rules` and `bootstrap` (rules.nvim)
 
 A run of [rules.nvim](https://github.com/WKDSteve/rules.nvim) written as a work list (`rules-work-list/1`, see

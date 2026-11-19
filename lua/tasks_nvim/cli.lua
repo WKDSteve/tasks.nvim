@@ -94,6 +94,19 @@ commands:
         --claimed: own: a valid claim of this name (`claim`), foreign: of somebody else, none: free or expired)
   plan-new <area> <title> [--areas=a,b] [--target=<id>] [--phases=a,b,c] [--gate=hard] [--summary=text] [--links=url,url]
                                           create ROADMAP/plans/<slug>.md; tasks join it with plan=<id> phase=<word>
+  meeting new <area> <title> --date=YYYY-MM-DD [--time=HH:MM] [--end=HH:MM|--duration=45m] [--location=]
+              [--online=url] [--tasks=a/b,c/d] [--notify=-15m,-1d@18:00] [--tags=] [--quick="<line>"] [--dry-run]
+                                          make <area>/MEETINGS/<slug>.md (slug: title and date); --quick reads one
+                                          line ("Mo 14:00-15:00 Sync @teams https://... #area/task !-15m"), the
+                                          options win over it
+  meeting set <id> --<field>=<value>      change a field (an empty value removes it); status planned|cancelled
+  meeting close <id> [--result="<text>"]  done, at any time; the result goes into ## Ergebnis
+  meeting followups <id> [--n=] [--area=] make tasks of the follow-ups (refs: the meeting; the id behind the line)
+  meeting attend <id> <n|name> [--absent] tick (untick) a participant
+  meeting show <id> [--format=json]       the meeting with participants and follow-ups (tasks.meeting)
+  meeting parse "<line>"                  what the quick capture reads from a line (JSON; nothing written)
+  meetings [area] [--since=] [--until=] [--task=<id>] [--format=json]
+                                          the meetings of a window (default: 30 days back, 90 ahead)
   plan-close <area>/<slug>                finish a plan by hand (refused while a member task is open); the project it
                                           belongs to is finished after it when nothing else holds it open
   project-close <area>/<slug>             finish a project by hand (refused while an own task or an open plan that is
@@ -364,6 +377,36 @@ local SPECS = {
   },
   ["plan-close"] = { value = {}, flag = {} },
   ["project-close"] = { value = {}, flag = {} },
+  meeting = {
+    value = {
+      "date",
+      "time",
+      "end",
+      "duration",
+      "tz",
+      "location",
+      "online",
+      "tasks",
+      "notify",
+      "notify-to",
+      "tags",
+      "icon",
+      "image",
+      "recording",
+      "summary",
+      "status",
+      "title",
+      "slug",
+      "lang",
+      "quick",
+      "result",
+      "n",
+      "area",
+      "format",
+    },
+    flag = { "dry-run", "absent" },
+  },
+  meetings = { value = { "since", "until", "task", "format" }, flag = {} },
   index = { value = {}, flag = { "check", "all", "staged", "no-history" } },
   new = {
     value = {
@@ -1220,6 +1263,271 @@ commands["plan-new"] = function(ctx)
   ctx.say(("created\t%s\t%s"):format(res.id, res.path))
   if res.ambiguous then
     ctx.warn("warn: " .. require("tasks_nvim.wikilinks").ambiguity_message(res.ambiguous))
+  end
+  return 0
+end
+
+-- ── meetings ─────────────────────────────────────────────────────────────────
+
+---The options of `meeting new` and `meeting set` that are fields of the meeting (`--end` is `end`).
+local MEETING_FIELD_OPTS = {
+  "date",
+  "time",
+  "end",
+  "duration",
+  "tz",
+  "location",
+  "online",
+  "tasks",
+  "notify",
+  "notify-to",
+  "tags",
+  "icon",
+  "image",
+  "recording",
+  "summary",
+  "status",
+  "title",
+}
+
+---The fields the options name (`--tasks=a,b` a list; `--x=` an empty value, which `set` reads as "remove").
+---@param opt table<string, any>
+---@return table<string, any>
+local function meeting_fields(opt)
+  local out = {}
+  for _, key in ipairs(MEETING_FIELD_OPTS) do
+    local value = opt[key]
+    if type(value) == "string" then
+      local field = key:gsub("%-", "_")
+      if field == "tasks" or field == "notify" or field == "notify_to" or field == "tags" then
+        local list = {}
+        for item in value:gmatch("[^,]+") do
+          list[#list + 1] = vim.trim(item)
+        end
+        out[field] = list
+      else
+        out[field] = value
+      end
+    end
+  end
+  return out
+end
+
+---Send one operation through the write door and say how it went: `<outcome>\t<id>` and the notes; the error of a
+---failed one. The entry, for more lines.
+---@param ctx Tasks.CliCtx
+---@param op table
+---@param dry boolean
+---@param upload_dir? string
+---@return integer code
+---@return table|nil entry
+local function meeting_op(ctx, op, dry, upload_dir)
+  local eo = ctx.eo
+  local doc, err = require("tasks_nvim.ops").run(
+    { ops = { op }, dry_run = dry or nil },
+    { root = eo.root, today = eo.today, attach = upload_dir and { upload_dir = upload_dir } or nil }
+  )
+  if not doc then
+    ctx.warn("error: " .. tostring(type(err) == "table" and err.message or err))
+    return 1, nil
+  end
+  local entry = doc.results[1]
+  if not entry.ok then
+    ctx.warn(("error: %s (%s)"):format(tostring(entry.error.message), tostring(entry.error.code)))
+    return entry.error.code == "invalid_argument" and 2 or 1, entry
+  end
+  ctx.say(("%s\t%s"):format(entry.outcome, entry.id or ""))
+  for _, note in ipairs(entry.notes or {}) do
+    ctx.warn("note: " .. note)
+  end
+  return 0, entry
+end
+
+---@type table<string, fun(ctx: Tasks.CliCtx, rest: string[]): integer>
+local MEETING_SUBS = {}
+
+MEETING_SUBS.new = function(ctx, rest)
+  local opt = ctx.args.opt
+  local area, title = rest[1], rest[2]
+  local fields = meeting_fields(opt)
+  if type(opt.quick) == "string" then
+    -- the line of the quick capture first, the options win over it
+    local proposal = require("tasks_nvim.meeting_quick").parse(opt.quick, { today = ctx.eo.today })
+    for _, p in ipairs(proposal.problems) do
+      ctx.warn("warn: not read: " .. p)
+    end
+    fields = vim.tbl_extend("force", proposal.fields, fields)
+    title = title or (proposal.title ~= "" and proposal.title or nil)
+  end
+  fields.title = nil
+  if not area or not title then
+    ctx.warn(
+      'error: usage: meeting new <area> "<title>" --date=YYYY-MM-DD [--time=HH:MM] [--end=HH:MM|--duration=45m] [--quick="<line>"]'
+    )
+    return 2
+  end
+  local code = meeting_op(ctx, {
+    op = "meeting_new",
+    area = area,
+    title = title,
+    fields = fields,
+    slug = opt.slug,
+    lang = opt.lang,
+  }, opt["dry-run"] == true)
+  return code
+end
+
+MEETING_SUBS.set = function(ctx, rest)
+  local id = rest[1]
+  local patch = meeting_fields(ctx.args.opt)
+  if not id or next(patch) == nil then
+    ctx.warn(
+      "error: usage: meeting set <area>/<slug> --<field>=<value> (an empty value removes the field)"
+    )
+    return 2
+  end
+  for key, value in pairs(patch) do
+    if value == "" then
+      patch[key] = vim.NIL
+    end
+  end
+  return (
+    meeting_op(ctx, { op = "meeting_set", id = id, patch = patch }, ctx.args.opt["dry-run"] == true)
+  )
+end
+
+MEETING_SUBS.close = function(ctx, rest)
+  local id = rest[1]
+  if not id then
+    ctx.warn('error: usage: meeting close <area>/<slug> [--result="<text>"]')
+    return 2
+  end
+  local code, entry = meeting_op(ctx, {
+    op = "meeting_close",
+    id = id,
+    result = ctx.args.opt.result,
+  }, ctx.args.opt["dry-run"] == true)
+  if entry and entry.ok and entry.without_result then
+    ctx.say("without-result\t" .. entry.id)
+  end
+  return code
+end
+
+MEETING_SUBS.followups = function(ctx, rest)
+  local id = rest[1]
+  if not id then
+    ctx.warn("error: usage: meeting followups <area>/<slug> [--n=<line>] [--area=<area>]")
+    return 2
+  end
+  local n = ctx.args.opt.n and tonumber(ctx.args.opt.n) or nil
+  local code, entry = meeting_op(ctx, {
+    op = "meeting_followups",
+    id = id,
+    n = n,
+    area = ctx.args.opt.area,
+  }, ctx.args.opt["dry-run"] == true)
+  for _, item in ipairs(entry and entry.items or {}) do
+    if item.ok then
+      ctx.say(("task\t%d\t%s"):format(item.n, item.id))
+    else
+      ctx.warn(("error: follow-up %d: %s"):format(item.n, tostring(item.error)))
+      code = 1
+    end
+  end
+  return code
+end
+
+MEETING_SUBS.attend = function(ctx, rest)
+  local id, who = rest[1], rest[2]
+  if not id or not who then
+    ctx.warn("error: usage: meeting attend <area>/<slug> <number|name> [--absent]")
+    return 2
+  end
+  local n = who:match("^%d+$") and tonumber(who) or nil
+  return (
+    meeting_op(ctx, {
+      op = "meeting_attend",
+      id = id,
+      n = n,
+      name = not n and who or nil,
+      present = ctx.args.opt.absent ~= true,
+    }, ctx.args.opt["dry-run"] == true)
+  )
+end
+
+MEETING_SUBS.show = function(ctx, rest)
+  local id = rest[1]
+  if not id then
+    ctx.warn("error: usage: meeting show <area>/<slug> [--format=json]")
+    return 2
+  end
+  local doc, err = contract.meeting(id, { root = ctx.eo.root })
+  if not doc then
+    ctx.warn("error: " .. tostring(type(err) == "table" and err.message or err))
+    return 1
+  end
+  if ctx.args.opt.format == "json" then
+    ctx.out(vim.json.encode(doc) .. "\n")
+    return 0
+  end
+  local m = doc.meeting or doc
+  ctx.say(("%s\t%s\t%s %s\t%s"):format(m.id, m.status, m.date or "", m.time or "", m.title))
+  -- the lists are the document's; the entry has their counts
+  for _, p in ipairs(doc.participants or {}) do
+    ctx.say(("participant\t%d\t%s\t%s"):format(p.n, p.present and "x" or " ", p.name))
+  end
+  for _, f in ipairs(doc.followups or {}) do
+    ctx.say(("followup\t%d\t%s\t%s\t%s"):format(f.n, f.ticked and "x" or " ", f.text, f.task or ""))
+  end
+  return 0
+end
+
+MEETING_SUBS.parse = function(ctx, rest)
+  if #rest == 0 then
+    ctx.warn('error: usage: meeting parse "<line>"')
+    return 2
+  end
+  local proposal =
+    require("tasks_nvim.meeting_quick").parse(table.concat(rest, " "), { today = ctx.eo.today })
+  ctx.out(vim.json.encode(proposal) .. "\n")
+  return 0
+end
+
+---`tasks meeting <new|show|set|close|followups|attend|parse> ...`
+---@param ctx Tasks.CliCtx
+---@return integer code
+commands.meeting = function(ctx)
+  local sub = ctx.args.pos[1]
+  local run = sub and MEETING_SUBS[sub]
+  if not run then
+    ctx.warn("error: usage: meeting <new|show|set|close|followups|attend|parse> ...")
+    return 2
+  end
+  return run(ctx, vim.list_slice(ctx.args.pos, 2))
+end
+
+---`tasks meetings [area] [--since= --until=] [--task=<id>] [--format=tsv|json]`: the meetings of a window, the earliest
+---first (`tasks.meetings`).
+---@param ctx Tasks.CliCtx
+---@return integer code
+commands.meetings = function(ctx)
+  local opt = ctx.args.opt
+  local doc, err = contract.meetings({
+    area = ctx.args.pos[1],
+    since = opt.since,
+    ["until"] = opt["until"],
+    task = opt.task,
+  }, { root = ctx.eo.root, today = ctx.eo.today })
+  if not doc then
+    ctx.warn("error: " .. tostring(type(err) == "table" and err.message or err))
+    return type(err) == "table" and err.code == "invalid_argument" and 2 or 1
+  end
+  if opt.format == "json" then
+    ctx.out(vim.json.encode(doc) .. "\n")
+    return 0
+  end
+  for _, m in ipairs(doc.items or {}) do
+    ctx.say(("%s\t%s\t%s\t%s"):format(m.id, m.starts_at or m.date or "", m.status, m.title))
   end
   return 0
 end

@@ -1468,6 +1468,84 @@ local function nested_routes()
     },
 
     {
+      path = { "meeting", "list" },
+      args = {
+        {
+          name = "area",
+          type = "TASK_AREA",
+          optional = true,
+          desc = "Area whose meetings to pick from (default: every area)",
+        },
+      },
+      flags = {
+        {
+          name = "section",
+          type = "STRING",
+          values = {
+            "agenda",
+            "teilnehmer",
+            "unterlagen",
+            "protokoll",
+            "beschluesse",
+            "folgeaufgaben",
+            "ergebnis",
+          },
+          desc = "Open the picked meeting at this section",
+        },
+      },
+      desc = "Picker over the meetings (the coming ones first) that opens the one picked; section=<word> jumps to a section",
+      run = function(ctx)
+        require("tasks_nvim.ui.meeting_cmd").list(ctx)
+      end,
+    },
+
+    {
+      path = { "meeting", "open" },
+      args = { { name = "id", type = "STRING", desc = "Id of the meeting, as area/slug" } },
+      flags = {
+        {
+          name = "section",
+          type = "STRING",
+          values = {
+            "agenda",
+            "teilnehmer",
+            "unterlagen",
+            "protokoll",
+            "beschluesse",
+            "folgeaufgaben",
+            "ergebnis",
+          },
+          desc = "Jump to this section",
+        },
+      },
+      desc = "Open a meeting file, at a section when section=<word> is given",
+      run = function(ctx)
+        require("tasks_nvim.ui.meeting_cmd").open_cmd(ctx)
+      end,
+    },
+
+    {
+      path = { "meeting", "new" },
+      args = { { name = "area", type = "TASK_AREA", desc = "Area to make the meeting in" } },
+      desc = 'Make a meeting from the rest of the line, read by the quick capture ("Mo 14:00-15:00 Sync @teams https://... #area/task !-15m"), and open it',
+      run = function(ctx)
+        require("tasks_nvim.ui.meeting_cmd").new(ctx)
+      end,
+    },
+
+    {
+      path = { "meeting", "close" },
+      args = { { name = "id", type = "STRING", desc = "Id of the meeting, as area/slug" } },
+      flags = {
+        { name = "result", type = "STRING", desc = "The result, written into ## Ergebnis" },
+      },
+      desc = "Mark a meeting done (at any time, with or without a result)",
+      run = function(ctx)
+        require("tasks_nvim.ui.meeting_cmd").close(ctx)
+      end,
+    },
+
+    {
       path = { "open" },
       args = {
         { name = "area", type = "TASK_AREA", desc = "Area whose files to pick from" },

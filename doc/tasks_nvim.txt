@@ -217,6 +217,14 @@ A wrong key or value is ignored with a message and listed in
                                          `--check` writes nothing.
   :Tasks folder {area} [folder] [--action=] [--list] [--to=]
                                          Picker over a folder of an area.
+  :Tasks meeting list [{area}] [--section=]
+                                         Picker over the meetings, the coming
+                                         ones first; opens the one picked.
+  :Tasks meeting open {id} [--section=]  Open a meeting at a section
+                                         (agenda, protokoll, folgeaufgaben, ...).
+  :Tasks meeting new {area} {line...}    Make a meeting from one line
+                                         ("Mo 14:00-15:00 Sync @teams !-15m").
+  :Tasks meeting close {id} [--result=]  Mark a meeting done.
 
   :TasksVault {verb} [{area}] [{part}] [--rel] [--file]
     verbs: open clipboard paste link find grep tree cdx; {part} is backlog (default),

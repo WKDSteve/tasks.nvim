@@ -67,6 +67,10 @@
 ---    nothing is attached: a name the task has already is `exists`, in a dry run too (a file sent again after its
 ---    answer was lost arrives once)
 ---
+---  - `meeting_new`, `meeting_set`, `meeting_close`, `meeting_capture`, `meeting_attend`, `meeting_followups`,
+---    `board_save`: the meetings (`tasks_nvim.meeting_write`, docs/CONTRACT.md); `tick_step`, `add_steps`
+---    (`section`), `append_note`, `set_section`, `set_body` and `attach` take a meeting id as well
+---
 --- Rules the door keeps:
 ---  - **the shape is checked first**, for the whole request: an unknown operation or field, a wrong type, too many
 ---    operations is `invalid_argument` and nothing runs. After that every operation runs on its own: one that fails
