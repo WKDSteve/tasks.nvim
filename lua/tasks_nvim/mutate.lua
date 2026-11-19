@@ -3186,10 +3186,10 @@ function M.done(id, opts)
 
   -- git may have started while the task was finished (after the look above): then the text read may be HEAD's, and
   -- the autostash writes the open file back once git is done. Wait for that, and say so when it happened.
-  local git_after = gitbusy.busy(plan.root)
-  local came_back
-  if git_after then
-    git_after = gitbusy.wait(plan.root, opts) or git_after
+  local git_seen = gitbusy.busy(plan.root)
+  local git_still, came_back
+  if git_seen then
+    git_still = gitbusy.wait(plan.root, opts)
   end
   local open_path = plan.task.folder and plan.src_dir or plan.task.path
   if open_path and fsio.stat(open_path) then
@@ -3211,7 +3211,8 @@ function M.done(id, opts)
     outcome_reason = plan.outcome_reason,
     index = type(res) == "table" and res or nil,
     came_back = came_back,
-    git_busy = git_after,
+    git_seen = git_seen,
+    git_busy = git_still,
   },
     nil
 end

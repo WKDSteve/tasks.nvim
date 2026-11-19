@@ -742,7 +742,7 @@ function M.run(id, opts)
       .. "merge them by hand and remove it (tasks check shows duplicate-id)"
     ):format(
       done.came_back,
-      done.git_busy and (" (git: " .. done.git_busy .. ")") or "",
+      done.git_seen and (" (git: " .. done.git_seen .. ")") or "",
       tostring(done.to)
     )
   elseif done.git_busy then

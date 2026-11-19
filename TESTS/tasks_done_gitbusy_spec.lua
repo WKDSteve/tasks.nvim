@@ -96,11 +96,28 @@ return function(H)
   local flow = assert(done_flow.run(b.id, o))
   restore()
   eq(flow.done.came_back, open_path, "the open file is back")
-  has(flow.done.git_busy, "rebase")
+  has(flow.done.git_seen, "rebase")
+  eq(flow.done.git_busy, nil, "git was done after the wait")
   local note = table.concat(flow.notes, "\n")
   has(note, "came back after the finish")
   has(note, "duplicate-id")
   ok(H.exists(flow.done.to), "the finished copy stays")
+
+  -- ── git runs during the finish, is done after the wait, nothing came back: nothing to say ──
+  local d = assert(mutate.new("lib.nvim", vim.tbl_extend("force", o, { title = "Busy d" })))
+  calls = 0
+  gitbusy.busy = function()
+    calls = calls + 1
+    if calls == 2 then
+      return "another git command (it holds index.lock)", root .. "/.git/index.lock"
+    end
+    return nil
+  end
+  local brief = assert(done_flow.run(d.id, o))
+  restore()
+  ok(brief.done.git_seen ~= nil, "git was seen after the finish")
+  eq(brief.done.git_busy, nil)
+  eq(brief.notes, {}, "no word about a git that is done")
 
   -- ── git still busy at the end, but nothing came back: a note to look ──
   local c = assert(mutate.new("lib.nvim", vim.tbl_extend("force", o, { title = "Busy c" })))
