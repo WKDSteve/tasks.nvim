@@ -18,6 +18,10 @@ return function(H)
   eq(
     paths(routes.routes()),
     {
+      "meeting close",
+      "meeting list",
+      "meeting new",
+      "meeting open",
       "open",
       "task agent",
       "task answer",
@@ -60,6 +64,10 @@ return function(H)
     "index",
     "list",
     "lists",
+    "meeting close",
+    "meeting list",
+    "meeting new",
+    "meeting open",
     "new",
     "next",
     "open",
@@ -80,7 +88,7 @@ return function(H)
   eq(#routes.routes({ flat = true }), #routes.routes(), "same number of routes")
 
   -- a second call must not see the first call's paths changed
-  eq(paths(routes.routes())[1], "open", "routes() builds a fresh list each time")
+  eq(paths(routes.routes())[1], "meeting close", "routes() builds a fresh list each time")
 
   local command = require("tasks_nvim.bindings.usrcmds")
   ok(command.register(), "register succeeds with lib.nvim on the runtimepath")

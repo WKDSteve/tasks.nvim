@@ -29,6 +29,8 @@ return function(H)
     "init-vault",
     -- `intent` takes a document of another app; the editor fills `:Tasks new` from it later
     "intent",
+    -- `meetings` lists a window of meetings for a script or a hub; the editor picks one with `:Tasks meeting list`
+    "meetings",
     "migrate-actor",
     "plan-new",
     "plans",
@@ -151,6 +153,38 @@ return function(H)
         "value",
         -- `waits_for=<key>` in the editor, as every field of `new` there
         "waits-for",
+      },
+    },
+    -- `:Tasks meeting` picks, opens at a section and makes a meeting from one line; the CLI sets every field (the
+    -- editor's side here is the options of its last route, `meeting close`, as for every verb of several routes)
+    ["meeting"] = {
+      composer = {},
+      cli = {
+        "absent",
+        "area",
+        "date",
+        "dry-run",
+        "duration",
+        "end",
+        "format",
+        "icon",
+        "image",
+        "lang",
+        "location",
+        "n",
+        "notify",
+        "notify-to",
+        "online",
+        "quick",
+        "recording",
+        "slug",
+        "status",
+        "summary",
+        "tags",
+        "tasks",
+        "time",
+        "title",
+        "tz",
       },
     },
     ["next"] = { composer = {}, cli = { "by", "format" } },
