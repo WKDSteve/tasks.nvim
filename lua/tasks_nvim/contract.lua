@@ -2898,8 +2898,8 @@ local function meeting_entry(root, m)
       })
     end, m.notify),
     notify_to = #m.notify_to > 0 and vim.list_slice(m.notify_to, 1) or nil,
-    image = m.image,
-    icon = m.icon,
+    image = m.cover,
+    icon = m.icon and m.icon.value,
     tags = vim.list_slice(m.tags, 1),
     recording = m.recording,
     created = m.created,

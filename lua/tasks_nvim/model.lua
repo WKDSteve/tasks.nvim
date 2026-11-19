@@ -928,6 +928,214 @@ function M.is_web_link(s)
   return rest ~= nil and rest:match("^[^/?#]+") ~= nil
 end
 
+---The words `icon:` may name (a front end draws its own sign for each); first the icons of the meetings.
+---@type string[]
+M.ICON_WORDS = {
+  "call",
+  "coffee",
+  "handshake",
+  "idea",
+  "meeting",
+  "people",
+  "phone",
+  "planning",
+  "presentation",
+  "review",
+  "video",
+  "workshop",
+}
+
+---The file types an `icon:` or `cover:` asset may have (lower case; the file name may write them in any case).
+---@type string[]
+M.IMAGE_EXTENSIONS = { "png", "jpg", "jpeg", "webp", "svg" }
+
+---The longest `icon:` or `cover:` value, in bytes (an emoji sequence is far shorter, an asset path too).
+M.MAX_ICON_BYTES = 200
+
+---The code points of a UTF-8 text; nil when it is not valid UTF-8 (a stray or overlong byte, a surrogate).
+---@param s string
+---@return integer[]|nil
+local function code_points(s)
+  local out, i, n = {}, 1, #s
+  while i <= n do
+    local c = s:byte(i)
+    local len, cp, min
+    if c < 0x80 then
+      len, cp, min = 1, c, 0
+    elseif c >= 0xC2 and c <= 0xDF then
+      len, cp, min = 2, c - 0xC0, 0x80
+    elseif c >= 0xE0 and c <= 0xEF then
+      len, cp, min = 3, c - 0xE0, 0x800
+    elseif c >= 0xF0 and c <= 0xF4 then
+      len, cp, min = 4, c - 0xF0, 0x10000
+    else
+      return nil
+    end
+    if i + len - 1 > n then
+      return nil
+    end
+    for k = 1, len - 1 do
+      local b = s:byte(i + k)
+      if b < 0x80 or b > 0xBF then
+        return nil
+      end
+      cp = cp * 64 + (b - 0x80)
+    end
+    if cp < min or cp > 0x10FFFF or (cp >= 0xD800 and cp <= 0xDFFF) then
+      return nil
+    end
+    out[#out + 1] = cp
+    i = i + len
+  end
+  return out
+end
+
+---Whether a code point starts an emoji: the pictographic blocks of Unicode (symbols, pictographs, dingbats,
+---arrows, the few marks of Latin-1 and the CJK blocks that are emoji). Letters, digits and punctuation are not.
+---@param cp integer
+---@return boolean
+local function is_pictograph(cp)
+  return (cp >= 0x1F000 and cp <= 0x1FAFF and not (cp >= 0x1F1E6 and cp <= 0x1F1FF))
+    or (cp >= 0x2600 and cp <= 0x27BF)
+    or (cp >= 0x2300 and cp <= 0x23FF)
+    or (cp >= 0x2190 and cp <= 0x21FF)
+    or (cp >= 0x25A0 and cp <= 0x25FF)
+    or (cp >= 0x2B00 and cp <= 0x2BFF)
+    or (cp >= 0x2934 and cp <= 0x2935)
+    or cp == 0x00A9
+    or cp == 0x00AE
+    or cp == 0x203C
+    or cp == 0x2049
+    or cp == 0x2122
+    or cp == 0x2139
+    or cp == 0x24C2
+    or cp == 0x3030
+    or cp == 0x303D
+    or cp == 0x3297
+    or cp == 0x3299
+end
+
+---Whether `s` is exactly one emoji: one grapheme cluster of an emoji sequence. That is a pictograph with an optional
+---presentation selector (U+FE0F/FE0E), skin tone (U+1F3FB..1F3FF) and tag sequence (subdivision flags), several of
+---those joined by U+200D (ZWJ: a family, a profession), a flag of two regional indicators, or a keycap (`1️⃣`).
+---Two emoji side by side, a letter or an emoji with text after it are not.
+---@param s any
+---@return boolean
+function M.is_emoji(s)
+  if type(s) ~= "string" or s == "" or #s > M.MAX_ICON_BYTES then
+    return false
+  end
+  local cps = code_points(s)
+  if not cps then
+    return false
+  end
+  local n = #cps
+  local function is_ri(cp)
+    return cp ~= nil and cp >= 0x1F1E6 and cp <= 0x1F1FF
+  end
+  -- a flag: exactly two regional indicators
+  if is_ri(cps[1]) then
+    return n == 2 and is_ri(cps[2])
+  end
+  -- a keycap: 0-9 # * with an optional U+FE0F and U+20E3
+  local first = cps[1]
+  if (first >= 0x30 and first <= 0x39) or first == 0x23 or first == 0x2A then
+    return (n == 2 and cps[2] == 0x20E3) or (n == 3 and cps[2] == 0xFE0F and cps[3] == 0x20E3)
+  end
+  local i = 1
+  while true do
+    if not (cps[i] and is_pictograph(cps[i])) then
+      return false
+    end
+    i = i + 1
+    if cps[i] == 0xFE0F or cps[i] == 0xFE0E then
+      i = i + 1
+    end
+    if cps[i] and cps[i] >= 0x1F3FB and cps[i] <= 0x1F3FF then
+      i = i + 1
+    end
+    if cps[i] and cps[i] >= 0xE0020 and cps[i] <= 0xE007E then
+      while cps[i] and cps[i] >= 0xE0020 and cps[i] <= 0xE007E do
+        i = i + 1
+      end
+      if cps[i] ~= 0xE007F then
+        return false
+      end
+      i = i + 1
+    end
+    if i > n then
+      return true
+    end
+    if cps[i] ~= 0x200D then
+      return false
+    end
+    i = i + 1
+  end
+end
+
+---Why `s` is no asset of an `icon:` or `cover:` (nil when it is one): a file below `assets/` of the own folder (R14:
+---no `..`, no backslash, no blank or control character) of an image type (`IMAGE_EXTENSIONS`).
+---@param s string
+---@param field string
+---@return string|nil err
+function M.asset_error(s, field)
+  if #s > M.MAX_ICON_BYTES then
+    return ("%s is longer than %d bytes"):format(field, M.MAX_ICON_BYTES)
+  end
+  if s:find("..", 1, true) or not s:match("^assets/[^%s%c\\]+$") or s:find("//", 1, true) then
+    return ("%s must be a file below assets/ of its own folder, got '%s'"):format(field, s)
+  end
+  local ext = s:match("%.([%w]+)$")
+  if not (ext and vim.tbl_contains(M.IMAGE_EXTENSIONS, ext:lower())) then
+    return ("%s '%s' is no image (expected %s)"):format(
+      field,
+      s,
+      table.concat(M.IMAGE_EXTENSIONS, ", ")
+    )
+  end
+  return nil
+end
+
+---@class Tasks.Icon
+---@field kind "emoji"|"asset"|"word"
+---@field value string
+
+---Read an `icon:` value: an emoji (one grapheme cluster, `is_emoji`), an image below `assets/` (`asset_error`) or a
+---word of `ICON_WORDS`. The one reader of tasks, plans, projects, paths and meetings.
+---@param value any  # The trimmed text of the field.
+---@return Tasks.Icon|nil icon
+---@return string|nil err  # Why the value is none of the three.
+function M.icon_of(value)
+  if type(value) ~= "string" or value == "" then
+    return nil, "icon must be a text"
+  end
+  if value:match("^assets/") then
+    local err = M.asset_error(value, "icon")
+    if err then
+      return nil, err
+    end
+    return { kind = "asset", value = value }, nil
+  end
+  if value:match("^[%w%-_]+$") and not value:match("^[%d#*]$") then
+    if vim.tbl_contains(M.ICON_WORDS, value) then
+      return { kind = "word", value = value }, nil
+    end
+    return nil,
+      ("unknown icon '%s' (an emoji, a file below assets/ or one of %s)"):format(
+        value,
+        table.concat(M.ICON_WORDS, ", ")
+      )
+  end
+  if M.is_emoji(value) then
+    return { kind = "emoji", value = value }, nil
+  end
+  return nil,
+    ("icon '%s' is neither one emoji, nor a file below assets/, nor one of %s"):format(
+      value,
+      table.concat(M.ICON_WORDS, ", ")
+    )
+end
+
 ---The slug of a task file: the filename without `.md`, and without the
 ---`YYYY-MM-DD_` prefix `done` gives files in `Backlog/`.
 ---@param path string
@@ -1388,6 +1596,26 @@ function M.parse_text(text, ctx)
     end
 
     task.summary = as_text(meta.summary, "summary", bad) or M.first_paragraph(parsed.body)
+
+    -- What the task stands for: an icon (emoji, asset or word) and a large picture (`cover`)
+    local icon_text = as_text(meta.icon, "icon", bad)
+    if icon_text then
+      local icon, icon_err = M.icon_of(icon_text)
+      if icon then
+        task.icon = icon
+      else
+        bad("bad-icon", icon_err)
+      end
+    end
+    local cover = as_text(meta.cover, "cover", bad)
+    if cover then
+      local cover_err = M.asset_error(cover, "cover")
+      if cover_err then
+        bad("bad-cover", cover_err)
+      else
+        task.cover = cover
+      end
+    end
 
     -- The optional `## Plan` section: progress only. A task without it is complete, nothing is said about it.
     task.plan_steps = steps.parse(parsed.body)

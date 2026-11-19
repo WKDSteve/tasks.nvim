@@ -38,22 +38,10 @@ M.STATUSES = { "planned", "done", "cancelled" }
 ---@type string[]
 M.SERVICES = { "teams", "zoom", "meet", "webex", "jitsi", "link" }
 
----The icons a meeting may name instead of an image (`icon:`); a front end draws its own sign for each.
+---The words a meeting may name as its icon (`icon:`, beside an emoji or an asset); a front end draws its own sign for
+---each. The one list of `model.ICON_WORDS`.
 ---@type string[]
-M.ICONS = {
-  "call",
-  "coffee",
-  "handshake",
-  "idea",
-  "meeting",
-  "people",
-  "phone",
-  "planning",
-  "presentation",
-  "review",
-  "video",
-  "workshop",
-}
+M.ICONS = model.ICON_WORDS
 
 ---The most entries of `notify`, `notify_to` and `tasks`.
 M.MAX_NOTIFY = 5
@@ -398,8 +386,9 @@ end
 ---@field tasks string[]
 ---@field notify Tasks.MeetingNotify[]
 ---@field notify_to string[]
----@field image? string
----@field icon? string
+---@field cover? string             # `cover:`, else the old name `image:`: a picture below `assets/`.
+---@field image_alias? boolean      # The file writes `image:` (the old name of `cover:`).
+---@field icon? Tasks.Icon           # `icon:` (`model.icon_of`): an emoji, an asset or a word of `ICONS`.
 ---@field tags string[]
 ---@field recording? string
 ---@field created? string
@@ -609,22 +598,34 @@ function M.parse(text, ctx)
     end
   end
 
-  local image = model.field_text(meta.image, "image", bad)
-  if image then
-    if image:find("..", 1, true) or not image:match("^assets/[^%s\\]+$") then
-      bad("meeting-bad-image", "image must be a file below assets/ of the meeting: " .. image)
+  -- the large picture is `cover:` as everywhere; `image:` is read as its old name (`check`: `meeting-image-alias`)
+  local cover = model.field_text(meta.cover, "cover", bad)
+  if cover then
+    local cover_err = model.asset_error(cover, "cover")
+    if cover_err then
+      bad("meeting-bad-cover", cover_err)
     else
-      m.image = image
+      m.cover = cover
     end
   end
-  local icon = model.field_text(meta.icon, "icon", bad)
-  if icon and not vim.tbl_contains(M.ICONS, icon) then
-    bad(
-      "meeting-bad-icon",
-      ("unknown icon '%s' (expected %s)"):format(icon, table.concat(M.ICONS, ", "))
-    )
-  else
-    m.icon = icon
+  local image = model.field_text(meta.image, "image", bad)
+  if image then
+    m.image_alias = true
+    local image_err = model.asset_error(image, "image")
+    if image_err then
+      bad("meeting-bad-image", image_err)
+    elseif not m.cover then
+      m.cover = image
+    end
+  end
+  local icon_text = model.field_text(meta.icon, "icon", bad)
+  if icon_text then
+    local icon, icon_err = model.icon_of(icon_text)
+    if icon then
+      m.icon = icon
+    else
+      bad("meeting-bad-icon", icon_err)
+    end
   end
 
   m.tags = model.field_list(meta.tags, "tags", bad)

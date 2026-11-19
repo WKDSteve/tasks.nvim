@@ -58,6 +58,8 @@ M.STATUSES = { "planning", "doing", "parked", "done" }
 ---@field created? string
 ---@field updated? string
 ---@field summary string
+---@field icon? Tasks.Icon             # `icon:` (`model.icon_of`).
+---@field cover? string               # `cover:`, a picture below `assets/` of the folder.
 ---@field errors string[]
 ---@field error_codes string[]
 ---@field valid boolean
@@ -258,6 +260,24 @@ function M.parse(text, ctx)
     end
     plan.summary = model.field_text(meta.summary, "summary", bad)
       or model.first_paragraph(parsed.body)
+    local icon_text = model.field_text(meta.icon, "icon", bad)
+    if icon_text then
+      local icon, icon_err = model.icon_of(icon_text)
+      if icon then
+        plan.icon = icon
+      else
+        bad("bad-icon", icon_err)
+      end
+    end
+    local cover = model.field_text(meta.cover, "cover", bad)
+    if cover then
+      local cover_err = model.asset_error(cover, "cover")
+      if cover_err then
+        bad("bad-cover", cover_err)
+      else
+        plan.cover = cover
+      end
+    end
     if file_kind == "path" then
       -- the problems of the tree are `check`'s findings, never a fault of the file (R3: nothing refuses a write)
       plan.tree = require("tasks_nvim.lernbaum").parse(parsed.body or "")

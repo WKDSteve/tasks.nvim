@@ -702,10 +702,10 @@ local function meeting_findings(findings, hints, open_ids, names, scan_opts, is_
           add(findings, "warn", "meeting-task-dangling", m, "tasks: " .. id .. " does not exist")
         end
       end
-      if m.image then
-        local present = m.folder and fsio.is_file(fsio.dirname(m.path) .. "/" .. m.image)
+      if m.cover then
+        local present = m.folder and fsio.is_file(fsio.dirname(m.path) .. "/" .. m.cover)
         if not present then
-          add(findings, "warn", "meeting-image-missing", m, "image " .. m.image .. " is not there")
+          add(findings, "warn", "meeting-image-missing", m, "cover " .. m.cover .. " is not there")
         end
       end
       if m.status == "done" and m.date and m.date > today then
