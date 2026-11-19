@@ -2012,7 +2012,13 @@ export interface ResultEntry {
     | "meeting_capture"
     | "meeting_attend"
     | "meeting_followups"
-    | "board_save";
+    | "board_save"
+    | "path_new"
+    | "path_set"
+    | "path_close"
+    | "node_set"
+    | "promote"
+    | "unpromote";
   id?: string;
   /**
    * `meeting_close`: the meeting has no `## Ergebnis` afterwards (allowed: a hint for the front end).
@@ -2058,8 +2064,35 @@ export interface ResultEntry {
     | "would_delete"
     | "closed"
     | "would_close"
+    | "removed"
+    | "would_remove"
     | "blocked"
     | "failed";
+  /**
+   * `node_set`: the learning point as it is now (capability `node_set`).
+   */
+  node?: {
+    line: number;
+    key?: string;
+    state: "open" | "learned" | "seen" | "dropped" | "blocked";
+  };
+  progress?: PathProgress1;
+  /**
+   * The learning point a task was promoted from: `<container id>#<key>`, the container a learning path or a task with `## Lernpunkte` (capability `outcome`).
+   */
+  promoted_from?: string;
+  /**
+   * `promote`: the lines of the point's subtree that moved into the task.
+   */
+  moved?: number;
+  /**
+   * `promote`, `unpromote`: the open tasks of points promoted below the moved one, whose `point` now names the new container.
+   */
+  repointed?: string[];
+  /**
+   * `unpromote`: the path or task the point is in.
+   */
+  container?: string;
   etag_before?: Etag;
   etag_after?: Etag;
   inverse?: Inverse;
@@ -2134,6 +2167,17 @@ export interface ResultEntry {
   }[];
 }
 /**
+ * Progress over leaves, counted apart: learned, seen, dropped, open (blocked ones counted as open and once more as blocked).
+ */
+export interface PathProgress1 {
+  learned: number;
+  seen: number;
+  dropped: number;
+  open: number;
+  blocked: number;
+  total: number;
+}
+/**
  * The operation that undoes a change: send it as a new operation (its `if_match` is the version the change left). A key the change added is `null` in the patch of a `set`.
  */
 export interface Inverse {
@@ -2150,7 +2194,26 @@ export interface Inverse {
     | "plan_set"
     | "project_set"
     | "meeting_set"
-    | "meeting_attend";
+    | "meeting_attend"
+    | "path_set"
+    | "node_set"
+    | "unpromote";
+  /**
+   * `unpromote`: the path or task the learning point is in.
+   */
+  container?: string;
+  /**
+   * `node_set`, `unpromote`: the learning point, its key or `#<index>`.
+   */
+  point?: string;
+  /**
+   * `node_set`: the state the point had.
+   */
+  state?: "open" | "learned" | "seen" | "dropped" | "blocked";
+  /**
+   * `node_set`: the reason the point had.
+   */
+  reason?: string;
   /**
    * `tick_step` of a meeting: the section of the item (`agenda`, `followups`).
    */

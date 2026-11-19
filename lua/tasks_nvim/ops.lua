@@ -164,6 +164,12 @@ M.OPS = {
   "meeting_attend",
   "meeting_followups",
   "board_save",
+  "path_new",
+  "path_set",
+  "path_close",
+  "node_set",
+  "promote",
+  "unpromote",
 }
 
 ---Longest `client_op_id`.
@@ -265,6 +271,7 @@ local FIELDS = {
     links = "strings",
     icon = "string",
     cover = "string",
+    template = "string",
   },
   project_new = {
     area = "string",
@@ -284,6 +291,39 @@ local FIELDS = {
   project_set = { id = "string", patch = "object", if_match = "string" },
   plan_close = { id = "string" },
   project_close = { id = "string" },
+  path_new = {
+    area = "string",
+    title = "string",
+    areas = "strings",
+    target = "string",
+    status = "string",
+    summary = "string",
+    slug = "string",
+    project = "string",
+    links = "strings",
+    icon = "string",
+    cover = "string",
+    template = "string",
+  },
+  path_set = { id = "string", patch = "object", if_match = "string" },
+  path_close = { id = "string" },
+  node_set = {
+    id = "string",
+    point = "string",
+    state = "string",
+    reason = "string",
+    if_match = "string",
+  },
+  promote = {
+    container = "string",
+    point = "string",
+    area = "string",
+    title = "string",
+    actor = "string",
+    if_match = "string",
+  },
+  -- `id` (the promoted task) is what the inverse of `promote` names for the reader; the point decides
+  unpromote = { id = "string", container = "string", point = "string", if_match = "string" },
   history_record = {},
   meeting_new = {
     area = "string",
@@ -1593,6 +1633,7 @@ local function new_file(op, ctx, kind)
     "phase",
     "icon",
     "cover",
+    "template",
   }) do
     if has_control(op[key]) then
       return refuse("invalid_argument", key .. " contains a control character")
@@ -1628,6 +1669,7 @@ local function new_file(op, ctx, kind)
     web_links = op.links,
     icon = op.icon,
     cover = op.cover,
+    template = op.template,
     dry_run = ctx.dry,
   })
   if not r then
@@ -1661,10 +1703,10 @@ local function do_project_new(op, ctx)
   return new_file(op, ctx, "project")
 end
 
----Change the frontmatter of a plan file or a project file (`kind`).
+---Change the frontmatter of a plan file, a project file or a learning path (`kind`).
 ---@param op table
 ---@param ctx Tasks.OpsCtx
----@param kind "plan"|"project"
+---@param kind "plan"|"project"|"path"
 ---@return table entry
 local function set_file(op, ctx, kind)
   local name = kind .. "_set"
@@ -1841,6 +1883,223 @@ end
 ---@return table entry
 local function do_project_close(op, ctx)
   return close_file(op, ctx, "project")
+end
+
+-- ── learning paths ───────────────────────────────────────────────────────────
+
+---@param op table
+---@param ctx Tasks.OpsCtx
+---@return table entry
+local function do_path_new(op, ctx)
+  -- a path has no stages: `phases`, `gate` and `phase` are no fields of `path_new` (the request is refused)
+  return new_file(op, ctx, "path")
+end
+
+---@param op table
+---@param ctx Tasks.OpsCtx
+---@return table entry
+local function do_path_set(op, ctx)
+  return set_file(op, ctx, "path")
+end
+
+---Finish a learning path by hand (moved to `Backlog/FEATURES/` with `closed_kind: path`). A path finished already is
+---`unchanged`; a dry run only says that it would be.
+---@param op table
+---@param ctx Tasks.OpsCtx
+---@return table entry
+local function do_path_close(op, ctx)
+  if op.id == nil then
+    return refuse("invalid_argument", "path_close needs id")
+  end
+  local paths = require("tasks_nvim.paths")
+  local file, ferr = paths.find(op.id, { root = ctx.root })
+  if not file then
+    local held = scan.find_done(op.id, { root = ctx.root })
+    if held and require("tasks_nvim.projects").finished_kind(held) == "path" then
+      return { ok = true, id = op.id, outcome = "unchanged", changed_ids = {} }
+    end
+    return refuse("not_found", tostring(ferr))
+  end
+  if ctx.dry then
+    return { ok = true, id = op.id, outcome = "would_close", changed_ids = {} }
+  end
+  local r, err = paths.close(op.id, { root = ctx.root, today = ctx.today, date = ctx.today })
+  if not r then
+    return mutate_failure(ctx, err, nil)
+  end
+  ctx.touched[file.area] = true
+  return {
+    ok = true,
+    id = op.id,
+    outcome = "closed",
+    to = rel(ctx, r.to),
+    changed_ids = { op.id },
+  }
+end
+
+---The reference of a learning point in an operation: its key (`syntax`, `#syntax`) or its position `#3`.
+---@param point any
+---@return string|integer|nil
+local function point_ref(point)
+  if type(point) ~= "string" or point == "" then
+    return nil
+  end
+  local n = point:match("^#(%d+)$")
+  return n and tonumber(n) or point:gsub("^#", "")
+end
+
+---Change one learning point of an open path: its state and reason (`paths.point`); the answer carries the progress
+---after it and an `inverse` (the state and reason before).
+---@param op table
+---@param ctx Tasks.OpsCtx
+---@return table entry
+local function do_node_set(op, ctx)
+  local ref = point_ref(op.point)
+  if op.id == nil or ref == nil or op.state == nil then
+    return refuse("invalid_argument", "node_set needs id, point and state")
+  end
+  if has_control(op.reason) then
+    return refuse("invalid_argument", "reason contains a control character")
+  end
+  local paths = require("tasks_nvim.paths")
+  local before = paths.find(op.id, { root = ctx.root })
+  local old
+  if before and before.tree then
+    local n = require("tasks_nvim.lernbaum").node(before.tree, ref)
+    old = n and { state = n.state, reason = n.reason } or nil
+  end
+  local r, err, info = paths.point(
+    op.id,
+    ref,
+    op.state,
+    op.reason,
+    { root = ctx.root, today = ctx.today, if_match = op.if_match, dry_run = ctx.dry }
+  )
+  if not r then
+    if info and (info.code == "invalid_argument" or info.code == "not_found") then
+      return refuse(info.code, contract.redact(ctx.root, tostring(err)))
+    end
+    return mutate_failure(ctx, err, info)
+  end
+  local entry = {
+    ok = true,
+    id = r.id,
+    outcome = r.changed and (ctx.dry and "would_change" or "changed") or "unchanged",
+    file = rel(ctx, r.path),
+    etag_before = r.etag_before,
+    etag_after = (not ctx.dry) and r.etag_after or nil,
+    node = json.object({ line = r.node.line, key = r.node.key, state = r.node.state }),
+    progress = json.object(r.progress),
+    changed_ids = (r.changed and not ctx.dry) and { r.id } or {},
+  }
+  if r.changed and not ctx.dry and old and old.state then
+    entry.inverse = json.object({
+      op = "node_set",
+      id = r.id,
+      point = r.node.key or ("#" .. tostring(ref)),
+      state = old.state,
+      reason = old.reason,
+      if_match = r.etag_after,
+    })
+  end
+  return entry
+end
+
+---Promote a learning point (of a path or of a task's `## Lernpunkte`) to a task (`tasks_nvim.promote`).
+---@param op table
+---@param ctx Tasks.OpsCtx
+---@return table entry
+local function do_promote(op, ctx)
+  local ref = point_ref(op.point)
+  if op.container == nil or ref == nil then
+    return refuse("invalid_argument", "promote needs container and point")
+  end
+  for _, key in ipairs({ "container", "point", "area", "title", "actor" }) do
+    if has_control(op[key]) then
+      return refuse("invalid_argument", key .. " contains a control character")
+    end
+  end
+  if op.title ~= nil and over_limit("title", op.title) then
+    return refuse("payload_too_large", over_limit("title", op.title))
+  end
+  local r, err, info = require("tasks_nvim.promote").promote(op.container, ref, {
+    root = ctx.root,
+    today = ctx.today,
+    area = op.area,
+    title = op.title,
+    actor = op.actor,
+    if_match = op.if_match,
+    dry_run = ctx.dry,
+    index = false,
+  })
+  if not r then
+    if info and (info.code == "invalid_argument" or info.code == "not_found") then
+      return refuse(info.code, contract.redact(ctx.root, tostring(err)))
+    end
+    return mutate_failure(ctx, err, info)
+  end
+  local changed = {}
+  if not ctx.dry then
+    changed = { r.id, r.container }
+    vim.list_extend(changed, r.repointed or {})
+    ctx.touched[r.id:match("^([^/]+)/")] = true
+    ctx.touched[r.container:match("^([^/]+)/")] = true
+  end
+  return {
+    ok = true,
+    id = r.id,
+    outcome = ctx.dry and "would_create" or "created",
+    promoted_from = r.point,
+    moved = r.moved,
+    repointed = r.repointed,
+    file = r.path and rel(ctx, r.path) or nil,
+    changed_ids = changed,
+    inverse = (not ctx.dry) and json.object({
+      op = "unpromote",
+      id = r.id,
+      container = r.container,
+      point = r.key,
+    }) or nil,
+  }
+end
+
+---Take a promotion back while the task holds no work of its own (`promote.unpromote`).
+---@param op table
+---@param ctx Tasks.OpsCtx
+---@return table entry
+local function do_unpromote(op, ctx)
+  local ref = point_ref(op.point)
+  if op.container == nil or ref == nil then
+    return refuse("invalid_argument", "unpromote needs container and point")
+  end
+  local r, err, info = require("tasks_nvim.promote").unpromote(op.container, ref, {
+    root = ctx.root,
+    today = ctx.today,
+    if_match = op.if_match,
+    dry_run = ctx.dry,
+    index = false,
+  })
+  if not r then
+    if info and (info.code == "invalid_argument" or info.code == "not_found") then
+      return refuse(info.code, contract.redact(ctx.root, tostring(err)))
+    end
+    return mutate_failure(ctx, err, info)
+  end
+  local changed = {}
+  if not ctx.dry then
+    changed = { r.container, r.id }
+    vim.list_extend(changed, r.repointed or {})
+    ctx.touched[r.container:match("^([^/]+)/")] = true
+    ctx.touched[r.id:match("^([^/]+)/")] = true
+  end
+  return {
+    ok = true,
+    id = r.id,
+    outcome = ctx.dry and "would_remove" or "removed",
+    container = r.container,
+    repointed = r.repointed,
+    changed_ids = changed,
+  }
 end
 
 ---The answer of a view operation that failed: the engine's words and the code that says why.
@@ -2574,6 +2833,12 @@ local HANDLERS = {
   move_area = do_move_area,
   plan_new = do_plan_new,
   plan_set = do_plan_set,
+  path_new = do_path_new,
+  path_set = do_path_set,
+  path_close = do_path_close,
+  node_set = do_node_set,
+  promote = do_promote,
+  unpromote = do_unpromote,
   plan_close = do_plan_close,
   project_new = do_project_new,
   project_set = do_project_set,

@@ -3927,7 +3927,23 @@
       "required": ["op", "id"],
       "properties": {
         "op": {
-          "enum": ["set", "reorder", "tick_step", "answer", "set_body", "set_section", "move_area", "view_save", "view_delete", "plan_set", "project_set", "meeting_set", "meeting_attend"]
+          "enum": ["set", "reorder", "tick_step", "answer", "set_body", "set_section", "move_area", "view_save", "view_delete", "plan_set", "project_set", "meeting_set", "meeting_attend", "path_set", "node_set", "unpromote"]
+        },
+        "container": {
+          "description": "`unpromote`: the path or task the learning point is in.",
+          "type": "string"
+        },
+        "point": {
+          "description": "`node_set`, `unpromote`: the learning point, its key or `#<index>`.",
+          "type": "string"
+        },
+        "state": {
+          "description": "`node_set`: the state the point had.",
+          "enum": ["open", "learned", "seen", "dropped", "blocked"]
+        },
+        "reason": {
+          "description": "`node_set`: the reason the point had.",
+          "type": "string"
         },
         "section": {
           "description": "`tick_step` of a meeting: the section of the item (`agenda`, `followups`).",
@@ -4099,7 +4115,7 @@
           "minimum": 1
         },
         "op": {
-          "enum": ["set", "new", "reorder", "done", "move_area", "plan_new", "plan_set", "plan_close", "project_new", "project_set", "project_close", "tick_step", "add_steps", "answer", "append_note", "reopen", "set_body", "set_section", "view_save", "view_delete", "attach", "claim", "release", "history_record", "meeting_new", "meeting_set", "meeting_close", "meeting_capture", "meeting_attend", "meeting_followups", "board_save"]
+          "enum": ["set", "new", "reorder", "done", "move_area", "plan_new", "plan_set", "plan_close", "project_new", "project_set", "project_close", "tick_step", "add_steps", "answer", "append_note", "reopen", "set_body", "set_section", "view_save", "view_delete", "attach", "claim", "release", "history_record", "meeting_new", "meeting_set", "meeting_close", "meeting_capture", "meeting_attend", "meeting_followups", "board_save", "path_new", "path_set", "path_close", "node_set", "promote", "unpromote"]
         },
         "id": {
           "type": "string"
@@ -4166,9 +4182,44 @@
             "would_delete",
             "closed",
             "would_close",
+            "removed",
+            "would_remove",
             "blocked",
             "failed"
           ]
+        },
+        "node": {
+          "description": "`node_set`: the learning point as it is now (capability `node_set`).",
+          "type": "object",
+          "required": ["line", "state"],
+          "properties": {
+            "line": { "type": "integer", "minimum": 1 },
+            "key": { "type": "string" },
+            "state": { "enum": ["open", "learned", "seen", "dropped", "blocked"] }
+          },
+          "additionalProperties": false
+        },
+        "progress": {
+          "description": "`node_set`: the progress of the path after the change.",
+          "$ref": "#/$defs/PathProgress"
+        },
+        "promoted_from": {
+          "description": "`promote`: the learning point the new task came from, `<container>#<key>` (capability `promote`).",
+          "$ref": "#/$defs/Point"
+        },
+        "moved": {
+          "description": "`promote`: the lines of the point's subtree that moved into the task.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "repointed": {
+          "description": "`promote`, `unpromote`: the open tasks of points promoted below the moved one, whose `point` now names the new container.",
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "container": {
+          "description": "`unpromote`: the path or task the point is in.",
+          "type": "string"
         },
         "etag_before": {
           "$ref": "#/$defs/Etag"
