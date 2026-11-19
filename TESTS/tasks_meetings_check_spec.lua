@@ -45,6 +45,12 @@ return function(H)
   -- loud ones
   meeting(dir .. "/broken.md", { "title: Broken", "status: held", "date: 2026-10-01" })
   meeting(dir .. "/same.md", { "title: Same id", "status: planned", "date: 2026-10-10" })
+  -- the id of a finished task is taken too (ids are global: `find` and wikilinks would name two files)
+  H.write(
+    root .. "/lib.nvim/Backlog/TASKS/2026-10-01_shipped.md",
+    "---\ntitle: Shipped\nstatus: done\ncreated: 2026-09-01\n---\n\nDone.\n"
+  )
+  meeting(dir .. "/shipped.md", { "title: Shipped id", "status: planned", "date: 2026-10-10" })
   meeting(
     dir .. "/dangling.md",
     { "title: Dangling", "status: planned", "date: 2026-10-10", "tasks: [lib.nvim/nowhere]" }
@@ -86,6 +92,7 @@ return function(H)
   eq(codes(res.hints, "lib.nvim/good"), {}, "with a result: no hint")
   eq(codes(res.findings, "lib.nvim/broken"), { "meeting-bad-status" })
   eq(codes(res.findings, "lib.nvim/same"), { "meeting-id-taken" })
+  eq(codes(res.findings, "lib.nvim/shipped"), { "meeting-id-taken" }, "a finished task's id")
   eq(codes(res.findings, "lib.nvim/dangling"), { "meeting-task-dangling" })
   eq(codes(res.findings, "lib.nvim/noimage"), { "meeting-image-missing" })
   eq(codes(res.findings, "lib.nvim/future"), { "meeting-done-in-future" })

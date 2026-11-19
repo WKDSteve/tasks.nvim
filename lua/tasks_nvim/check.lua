@@ -646,13 +646,19 @@ local function meeting_findings(findings, hints, open_ids, names, scan_opts, is_
       for i, msg in ipairs(m.errors) do
         add(findings, "error", m.error_codes[i] or "frontmatter-invalid", m, msg)
       end
-      if open_ids[m.id] or (plans.find(m.id, scan_opts)) or (projects.find(m.id, scan_opts)) then
+      -- ids are global: a finished task of the same id counts as much as an open one
+      if
+        open_ids[m.id]
+        or is_finished(m.id)
+        or (plans.find(m.id, scan_opts))
+        or (projects.find(m.id, scan_opts))
+      then
         add(
           findings,
           "error",
           "meeting-id-taken",
           m,
-          "an open task, plan or project of the area has the same id: " .. m.id
+          "a task (open or finished), plan or project of the area has the same id: " .. m.id
         )
       end
       for _, id in ipairs(m.tasks) do
