@@ -35,17 +35,18 @@ return function(H)
     "plan-new",
     "plans",
     "projects",
-    -- `promote` / `unpromote`: the editor gets them with the learning tree view (tasks.nvim, phase apps)
-    "promote",
     "show",
-    "unpromote",
   }
   local ONLY_COMPOSER = {
     -- `agent` hands the task of the editor to ai-desktop (or ai.nvim); tasks-desktop has its own button
     "agent",
     "folder",
+    -- `learn` and `point` work on the learning tree in the buffer under the cursor; tasks-ops/1 `node_set` is the
+    -- headless way to change a mark
+    "learn",
     "open",
     "planfile",
+    "point",
     "preview",
   }
   local OPTIONS = {

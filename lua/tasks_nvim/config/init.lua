@@ -42,9 +42,10 @@ local SCHEMA = {
   attach = { screenshot_dirs = "string_list", max_age_s = "posint" },
   completion = { finished = "finished_window" },
   form = { mode = "form_mode" },
+  learning = { auto = "boolean" },
   tree = "tree",
   ai = "ai",
-  keys = { dashboard = "keymap", dashboard_input = "keymap", form = "keymap" },
+  keys = { dashboard = "keymap", dashboard_input = "keymap", form = "keymap", learning = "keymap" },
 }
 
 ---What `validate` threw away (each message once), for `:checkhealth`: a one-time notification is easy to miss.

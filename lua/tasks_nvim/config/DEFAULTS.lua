@@ -53,6 +53,7 @@
 ---@field dashboard Tasks.KeyMap        Keys in the dashboard list window.
 ---@field dashboard_input Tasks.KeyMap  Keys in the dashboard input window (normal and insert mode).
 ---@field form Tasks.KeyMap             Buffer-local keys of the `:Tasks new` form.
+---@field learning Tasks.KeyMap         Buffer-local keys of the learning tree view (`:Tasks learn`): `cycle`, `promote`, `unpromote`, `image`, `follow`. None by default.
 
 ---@class Tasks.Opts
 ---@field vault string|nil          Vault folder (one folder per area). `nil`: `$TASKS_VAULT` is read.
@@ -76,8 +77,12 @@
 ---@field completion Tasks.CompletionConfig
 ---@field keys Tasks.KeysConfig
 ---@field form Tasks.FormConfig
+---@field learning Tasks.LearningConfig
 ---@field tree boolean|Tasks.Tree.Opts  The vault in a tree view that reads `lib.nvim.tree.registry` (the own tree of filetree.nvim): a count of open tasks on the area folders, a view `tasks`, and the actions "finish" and "claim" on a task. `true`: registered, the actions in the tree's menu; `{ keys = { done = "<key>", claim = "<key>" } }`: on those keys in the tree buffer as well; `false`: nothing is registered.
 ---@field ai boolean|"auto"  The AI functions of the ai family (handing a task to an agent of ai-desktop or ai.nvim): `false` none at all (no command, no key, no menu entry), `true` always offered, `"auto"` only where ai.nvim or ai-desktop is found on this machine. AI does not push itself forward; `:checkhealth tasks_nvim` says what is found. See `tasks_nvim.ai`.
+
+---@class Tasks.LearningConfig
+---@field auto boolean  Attach the learning tree view (`:Tasks learn`) by itself to a learning path or a task with `## Lernpunkte` when it is shown (group `TasksLearnAuto`). Off by default.
 
 ---@class Tasks.FormConfig
 ---@field mode "float"|"split"|"vsplit"|"current"  Window of the `:Tasks new` form: a centered float, a split below, a vertical split or the current window. `:Tasks new mode=...` overrides it for one call.
@@ -104,6 +109,7 @@ return {
   attach = { screenshot_dirs = {}, max_age_s = 300 },
   completion = { finished = true },
   form = { mode = "float" },
+  learning = { auto = false },
   tree = true,
   ai = "auto",
   keys = {
@@ -158,5 +164,6 @@ return {
       help = "g?",
       icon = "<C-e>",
     },
+    learning = { cycle = false, promote = false, unpromote = false, image = false, follow = false },
   },
 }

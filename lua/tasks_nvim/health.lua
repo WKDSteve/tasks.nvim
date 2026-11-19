@@ -262,6 +262,19 @@ function M.check()
   else
     info("mdview.nvim not found -- no browser preview")
   end
+  -- the learning tree view (`:Tasks learn`): none of these is needed, without them its images stay a placeholder line
+  if pcall(require, "images") then
+    ok("images.nvim -- the image of a learning point in the terminal (`:Tasks learn image`)")
+  else
+    info(
+      "images.nvim not found -- an image of a learning point stays a placeholder line (mdview.nvim shows it in the browser)"
+    )
+  end
+  if pcall(require, "emojis") then
+    ok("emojis.nvim -- an icon for `icon:` of a path or task (`:Emoji`)")
+  else
+    info("emojis.nvim not found -- type the icon of `icon:` yourself")
+  end
   local dialog_ok, dialog = pcall(require, "lib.nvim.ui.dialog")
   if dialog_ok and type(dialog) == "table" and dialog.confirm then
     local backend = type(dialog.backend) == "function" and dialog.backend() or "?"

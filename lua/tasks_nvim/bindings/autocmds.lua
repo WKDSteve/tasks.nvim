@@ -6,7 +6,9 @@
 --- ones the browser preview makes while a temporary preview file exists (group `TasksPreviewTemp`,
 --- `tasks_nvim.ui.preview`): they clean it up on buffer wipe and on `VimLeavePre`. One more is opt-in:
 --- `setup({ steps = { ask_finish = true } })` registers the group `TasksStepsWatch` (`tasks_nvim.ui.steps_watch`),
---- which looks only at task files of the vault.
+--- which looks only at task files of the vault. The learning tree view (`:Tasks learn`, `tasks_nvim.ui.learn`) adds
+--- buffer-local autocommands in the group `TasksLearn` while it is on, and `setup({ learning = { auto = true } })` the
+--- group `TasksLearnAuto` (puts the view on paths and learning tasks when they are shown).
 
 ---@type table[]
 return {}

@@ -70,6 +70,16 @@ function M.setup(opts)
       end
     end)
   end
+  -- The learning tree view by itself on paths and learning tasks is opt-in too (`learning = { auto = true }`); a
+  -- reload that switches it off removes the group by name (the view module need not be loaded for that).
+  local learn_auto = config.get().learning.auto
+  vim.schedule(function()
+    if learn_auto then
+      require("tasks_nvim.ui.learn").enable_auto(true)
+    else
+      pcall(vim.api.nvim_del_augroup_by_name, "TasksLearnAuto")
+    end
+  end)
   -- A line at startup when reminders are due (deferred; on by default, `reminders = { on_start = false }` turns it off).
   if config.get().reminders.on_start then
     vim.schedule(function()

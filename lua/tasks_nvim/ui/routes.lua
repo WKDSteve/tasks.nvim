@@ -53,6 +53,11 @@ local function cmd()
   return require("tasks_nvim.ui.cmd")
 end
 
+---@return table
+local function learn()
+  return require("tasks_nvim.ui.learn")
+end
+
 ---@param candidates string[]
 ---@param lead string
 ---@return string[]
@@ -1485,6 +1490,103 @@ local function nested_routes()
       desc = "Show the file of a task (an open one, else its finished copy in Backlog/) rendered in the browser through mdview.nvim; the file is opened as it is, nothing is written to the vault",
       run = function(ctx)
         cmd().task_preview(ctx)
+      end,
+    },
+
+    {
+      path = { "task", "learn" },
+      args = {
+        {
+          name = "action",
+          type = "STRING",
+          enum = { "toggle", "on", "off", "image", "follow" },
+          optional = true,
+          desc = "What to do (default: toggle)",
+          enum_desc = {
+            toggle = "the view on or off",
+            on = "progress, image placeholders and folds in this buffer",
+            off = "take the view off again",
+            image = "show the image of the point under the cursor",
+            follow = "open the task the point under the cursor was promoted to",
+          },
+        },
+      },
+      desc = "The learning tree of a path or a task's ## Lernpunkte in this buffer: progress per point as virtual text, folds per point, a placeholder line per image (images.nvim or mdview.nvim show it)",
+      run = function(ctx)
+        learn().cmd_learn(ctx)
+      end,
+    },
+
+    {
+      path = { "task", "point" },
+      args = {
+        {
+          name = "state",
+          type = "STRING",
+          enum = { "next", "open", "learned", "seen", "dropped", "blocked" },
+          optional = true,
+          desc = "The new mark (default: next, [ ] -> [x] -> [~] -> [-] -> [ ])",
+        },
+      },
+      desc = "Change the mark of the learning point under the cursor; seen and dropped take the reason as the rest of the line or ask for it",
+      run = function(ctx)
+        learn().cmd_point(ctx)
+      end,
+    },
+
+    {
+      path = { "task", "promote" },
+      args = {
+        {
+          name = "point",
+          type = "STRING",
+          optional = true,
+          desc = "<area>/<slug>#<key|n> of a path or task (default: the point under the cursor)",
+        },
+      },
+      flags = {
+        {
+          name = "area",
+          type = "STRING",
+          desc = "Area of the new task (default: the container's)",
+        },
+        {
+          name = "title",
+          type = "STRING",
+          desc = "Title of the new task (default: the point's text)",
+        },
+        {
+          name = "actor",
+          type = "STRING",
+          enum = { "cdx", "me", "pair" },
+          desc = "Who works on the new task",
+        },
+        { name = "dry-run", bool = true, desc = "Say what would happen, write nothing" },
+        { name = "no-index", bool = true, desc = "Leave the area indexes as they are" },
+      },
+      desc = "Make a task of a learning point: its subtree moves into the task, the point's line gets → <id>, the new task opens",
+      run = function(ctx)
+        learn().cmd_promote(ctx)
+      end,
+    },
+
+    {
+      path = { "task", "unpromote" },
+      args = {
+        {
+          name = "point",
+          type = "STRING",
+          optional = true,
+          desc = "<area>/<slug>#<key|n> (default: the point under the cursor)",
+        },
+      },
+      flags = {
+        { name = "dry-run", bool = true, desc = "Say what would happen, write nothing" },
+        { name = "no-index", bool = true, desc = "Leave the area indexes as they are" },
+      },
+      desc = "Take a promotion back while the task holds no work of its own: its tree returns below the point, the task file goes",
+      run = function(ctx)
+        learn().cmd_unpromote(ctx)
       end,
     },
 

@@ -3,7 +3,8 @@
 ---@description
 --- The plugin binds no key outside its own windows. The dashboard's keys are buffer-local to its picker
 --- (`tasks_nvim.ui.dash`, help on `g?`, listed in docs/BINDINGS.md); the Markdown form of `:Tasks new` maps
---- `<C-s>` in its own buffer. Bind `:Tasks ...` to whatever you like.
+--- `<C-s>` in its own buffer; the learning tree view maps the keys of `keys.learning` in its buffer, none by default.
+--- Bind `:Tasks ...` to whatever you like.
 
 ---@type table[]
 return {}
