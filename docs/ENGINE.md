@@ -520,6 +520,35 @@ write: `path-reason-missing`, `path-duplicate-key`, `path-bad-key`, `path-bad-ma
 `path-image-outside`, `path-arrow-dangling` (an arrow to no task), `path-image-missing` and `path-cycle` (promotions
 that run in a circle over the `## Lernpunkte` of the tasks they name).
 
+#### Promoting a learning point (`tasks_nvim.promote`)
+
+`tasks promote <area>/<slug>#<key|n>` (Lua: `promote.promote(container, ref, opts)`) makes a task of a learning point
+of a path or of a task's own `## Lernpunkte`:
+
+- the task (`kind: task`, `category: [learning]`, `point: <container>#<key>`) is made in the container's area or
+  `--area`, titled after the point's text without its Markdown (`--title`); its body names where it came from, copies
+  the point's link and note, and holds the point's **subtree** in its own `## Lernpunkte`, dedented to the root;
+- the point's line gets `→ <task id>`, the mark `[ ]` and a key when it had none; its note stays.
+
+From then on the **task owns the point's state**. `done` writes it into the container: `learned` for no outcome or
+`learned`, `[~]` for `seen` and `[-]` for `not-applicable` (the task's `outcome_reason` as the reason; the result names
+it as `flow.point`). The rule of the parents is the tree's: a parent is closed when every leaf is, a promoted point
+counts as one leaf. A task can promote its own points again (Lua lernen -> C-Compiler -> Sprache C). Finishing a task
+whose `## Lernpunkte` still has open points is allowed (R3) and gives the note `finished with N open learning
+point(s)`; `tick_all` ticks `## Plan` only, never the learning points.
+
+`--dry-run` names the task and the lines that would move; the result carries its `inverse`. `tasks unpromote
+<area>/<slug>#<key>` takes it back while the task holds no work of its own (status `open`, no commits, no assets): the
+task's tree as it is now goes back below the point, the arrow goes, the task file is removed. A task that was worked
+on is taken back by hand.
+
+`check` (warnings): `promote-point-dangling` (`point:` names no open path or task, or no point there whose arrow names
+the task), `promote-state-drift` (the mark of the point disagrees with the task: closed while the task is open, or not
+the state of its outcome when finished), `promote-cycle` (the `point:` of tasks lead back to one of them),
+`task-arrow-dangling` (an arrow in the `## Lernpunkte` of an open learning task names a task that exists nowhere); a
+`point:` that is not `<area>/<slug>#<key>` is the error `bad-point`. The operation of `tasks-ops/1` and the editor's
+command come with the contract and the tree view.
+
 ### Folder tasks
 
 A task is a file `tasks/<slug>.md` **or** a folder `tasks/<slug>/<slug>.md` (same name) that

@@ -494,6 +494,167 @@ function M.set_state(tree, ref, state, reason)
   return node, nil
 end
 
+---Drop the first `w` columns of leading white space of a line (a tab counts 4, as `width` does).
+---@param line string
+---@param w integer
+---@return string
+local function dedent(line, w)
+  local i, col = 1, 0
+  while col < w do
+    local c = line:sub(i, i)
+    if c == " " then
+      col = col + 1
+    elseif c == "\t" then
+      col = col + 4
+    else
+      break
+    end
+    i = i + 1
+  end
+  return line:sub(i)
+end
+
+---The lines a node's subtree spans: from its first child to the last line of its last descendant (a descendant's note
+---and the lines between descendants included; blank lines at the end left out). nil for a node without children.
+---@param tree Tasks.LernTree
+---@param node Tasks.LernNode
+---@return integer|nil first
+---@return integer|nil last
+function M.subtree_range(tree, node)
+  if #node.children == 0 then
+    return nil
+  end
+  local first = node.children[1].line
+  -- the end: the line before the next node that is no descendant, or before the next heading, or the end of the text
+  local stop = #tree.lines + 1
+  for i = node.index + 1, #tree.nodes do
+    local n = tree.nodes[i]
+    if n.indent <= node.indent then
+      stop = n.line
+      break
+    end
+  end
+  for i = first, stop - 1 do
+    if (tree.lines[i] or ""):gsub("\r$", ""):match("^#+%s") then
+      stop = i
+      break
+    end
+  end
+  local last = stop - 1
+  while last > first and not (tree.lines[last] or ""):gsub("\r$", ""):match("%S") do
+    last = last - 1
+  end
+  return first, last
+end
+
+---Promote a node: its subtree leaves the tree (returned as a `## Lernpunkte` body of its own, dedented to the root),
+---its line gets the arrow to `id` and the mark `[ ]` (the state belongs to the task from now on), and the key `key`
+---when it had none. Refused for a node that was promoted already and for a closed leaf (nothing left to learn).
+---@param tree Tasks.LernTree
+---@param ref string|integer
+---@param id string
+---@param key? string   # The key to write when the node has none.
+---@return { body: string, subtree: string, node: Tasks.LernNode }|nil result
+---@return string|nil err
+function M.promote(tree, ref, id, key)
+  local node = M.node(tree, ref)
+  if not node then
+    return nil, "no such learning point: " .. tostring(ref)
+  end
+  if node.promoted then
+    return nil,
+      ("learning point %s was promoted already (to %s)"):format(tostring(ref), node.promoted)
+  end
+  if #node.children == 0 and node.closed then
+    return nil, ("learning point %s is closed already (%s)"):format(tostring(ref), node.state)
+  end
+  if not is_id(id) then
+    return nil, "not an id <area>/<slug>: " .. tostring(id)
+  end
+  local sub = {}
+  local first, last = M.subtree_range(tree, node)
+  if first then
+    local w = node.children[1].indent
+    for i = first, last do
+      sub[#sub + 1] = dedent((tree.lines[i] or ""):gsub("\r$", ""), w)
+    end
+  end
+  node.promoted = id
+  node.key = node.key or key
+  node.mark, node.state, node.reason = " ", "open", nil
+  node.dirty = true
+  local lines = vim.split(M.render(tree), "\n", { plain = true })
+  if first then
+    for _ = first, last do
+      table.remove(lines, first)
+    end
+  end
+  return { body = table.concat(lines, "\n"), subtree = table.concat(sub, "\n"), node = node }, nil
+end
+
+---Take a promotion back: the arrow of the node goes, and `subtree` (a tree as a task keeps it in `## Lernpunkte`)
+---comes back below the node and its note, indented one level deeper. The node's mark stays open.
+---@param tree Tasks.LernTree
+---@param ref string|integer
+---@param subtree string
+---@return string|nil body
+---@return string|nil err
+function M.unpromote(tree, ref, subtree)
+  local node = M.node(tree, ref)
+  if not node then
+    return nil, "no such learning point: " .. tostring(ref)
+  end
+  if not node.promoted then
+    return nil, ("learning point %s is not promoted"):format(tostring(ref))
+  end
+  node.promoted = nil
+  node.dirty = true
+  local lines = vim.split(M.render(tree), "\n", { plain = true })
+  -- below the node's own note lines
+  local at = node.line
+  while true do
+    local nxt = (lines[at + 1] or ""):gsub("\r$", "")
+    local nws = nxt:match("^(%s*)>")
+    if nws and width(nws) > node.indent then
+      at = at + 1
+    else
+      break
+    end
+  end
+  local pad = node.prefix:match("^(%s*)") .. "  "
+  local add = {}
+  for _, l in ipairs(vim.split(subtree or "", "\n", { plain = true })) do
+    if l:match("%S") then
+      add[#add + 1] = pad .. l .. node.cr
+    elseif #add > 0 then
+      add[#add + 1] = node.cr
+    end
+  end
+  while #add > 0 and not add[#add]:match("%S") do
+    table.remove(add)
+  end
+  for i, l in ipairs(add) do
+    table.insert(lines, at + i, l)
+  end
+  return table.concat(lines, "\n"), nil
+end
+
+---The state a promoted task gives its learning point: open while it is open (`blocked` while it is blocked), and when
+---it is finished the state of its outcome (none or `learned`: learned; `seen`: seen; `not-applicable`: dropped).
+---@param task { status?: string, outcome?: string }
+---@return string state
+function M.state_of_task(task)
+  if task.status == "done" then
+    if task.outcome == "seen" then
+      return "seen"
+    elseif task.outcome == "not-applicable" then
+      return "dropped"
+    end
+    return "learned"
+  end
+  return task.status == "blocked" and "blocked" or "open"
+end
+
 ---"7 gelernt · 2 angeschaut · 1 entfällt · 3 offen": the progress in words (German, as the files are).
 ---@param p Tasks.LernProgress
 ---@return string

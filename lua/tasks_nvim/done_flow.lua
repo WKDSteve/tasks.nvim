@@ -50,6 +50,7 @@ local M = {}
 ---What a finish did. `done` is what `mutate.done` returned (`done.already` for a task that was finished before).
 ---@class Tasks.DoneFlow
 ---@field done table                 # The result of `mutate.done`.
+---@field point? { container: string, key: string, state: string, changed: boolean }  # The learning point the task was promoted from, set to the finish's state.
 ---@field steps_ticked integer       # Plan steps of the task ticked off.
 ---@field plan_summaries table<string, Tasks.PlanSummary>  # What each closed plan amounted to.
 ---@field freed string[]             # Ids of tasks whose last open blocker this was (set with `next`).
@@ -701,6 +702,16 @@ function M.run(id, opts)
     local root = vault.root(opts)
     passed = root and claims.overridden(root, id, opts) or nil
   end
+  -- learning points the task still has open: finished anyway (R3), with a warning
+  local open_points = 0
+  do
+    local root = vault.root(opts)
+    local open_task = root and not opts.drafts and mutate.find_open(id, root) or nil
+    local text = open_task and require("tasks_nvim.fsio").read(open_task.path) or nil
+    if type(text) == "string" then
+      open_points = require("tasks_nvim.promote").open_points(text)
+    end
+  end
   -- Step a is part of the finish itself: the ticked text is what `mutate.done` writes as the finished copy.
   local done, err, info =
     mutate.done(id, vim.tbl_extend("force", opts, { tick_steps = opts.chain ~= false }))
@@ -722,6 +733,35 @@ function M.run(id, opts)
   flow.steps_ticked = done.steps_ticked or 0
   if done.already then
     return flow, nil
+  end
+  if open_points > 0 then
+    flow.notes[#flow.notes + 1] = ("finished with %d open learning point(s) in its ## Lernpunkte"):format(
+      open_points
+    )
+  end
+  -- the learning point the task was promoted from takes the state of the finish (its outcome); before the chain
+  -- stops, so that a batch and `chain = false` keep the tree true as well
+  do
+    local text = type(done.to) == "string" and require("tasks_nvim.fsio").read(done.to) or nil
+    local parsed = type(text) == "string" and fm.parse(text) or nil
+    local meta = parsed and parsed.has_block and parsed.meta or nil
+    if meta and type(meta.point) == "string" then
+      local ran, res, perr = pcall(require("tasks_nvim.promote").sync_point, {
+        id = id,
+        point = meta.point,
+        status = "done",
+        outcome = type(meta.outcome) == "string" and meta.outcome or nil,
+        outcome_reason = type(meta.outcome_reason) == "string" and meta.outcome_reason or nil,
+      }, opts)
+      if not ran or (not res and perr) then
+        flow.notes[#flow.notes + 1] = ("the learning point %s was not updated: %s"):format(
+          meta.point,
+          tostring(ran and perr or res)
+        )
+      elseif res then
+        flow.point = res
+      end
+    end
   end
   if passed and done.to then
     require("tasks_nvim.claims").record_override_in_file(done.to, passed, opts)

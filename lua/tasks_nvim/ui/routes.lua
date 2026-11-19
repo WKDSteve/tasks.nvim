@@ -662,6 +662,7 @@ local FIELD_DESC = {
   severity = "How serious a bug or security task is",
   outcome = "How it ended: learned, seen or not-applicable (a note in advance)",
   outcome_reason = "Why it ended so; seen and not-applicable need one",
+  point = "Learning point it was promoted from (area/slug#key); set by promote",
   waits_for = "What the task waits for from outside (one word, e.g. mac); parks the task",
   value = "Expected benefit from 1 (little) to 5 (a lot)",
   actor = "Who can take the task on: an AI session, you or both",

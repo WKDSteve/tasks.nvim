@@ -311,6 +311,22 @@ function M.is_outcome(s)
   return type(s) == "string" and vim.tbl_contains(M.OUTCOMES, s)
 end
 
+---A `point` reference: `<area>/<slug>#<key>`, the learning point (of a path, or of a task's `## Lernpunkte`) a task
+---was promoted from. Answers the container id and the key, or nil.
+---@param s any
+---@return string|nil container
+---@return string|nil key
+function M.parse_point(s)
+  if type(s) ~= "string" then
+    return nil
+  end
+  local container, key = s:match("^([^/%s#]+/[a-z0-9][a-z0-9%-]*)#([a-z0-9][a-z0-9%-]*)$")
+  if not container or #key > 64 then
+    return nil
+  end
+  return container, key
+end
+
 ---The listing orders `sort` knows. `default` is what the index uses.
 ---@type string[]
 M.SORTS = {
@@ -1373,6 +1389,16 @@ function M.parse_text(text, ctx)
             msg = "severity is meant for bug or security tasks (kind: bug, or category bug/security)",
           }
         end
+      end
+    end
+
+    -- the learning point the task was promoted from (`tasks_nvim.promote`): `<container id>#<key>`
+    local point = as_text(meta.point, "point", bad)
+    if point then
+      if M.parse_point(point) then
+        task.point = point
+      else
+        bad("bad-point", ("point '%s' is not <area>/<slug>#<key>"):format(point))
       end
     end
 

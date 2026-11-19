@@ -167,6 +167,11 @@ commands:
                                           gets status open and loses the key; --dry-run only names the tasks
   answer <area>/<slug> <q1|#n> <n|clear>  answer a question of the `## Offene Fragen` section: tick option n (1-based),
                                           or take the answer back (clear)
+  promote <area>/<slug>#<key|n> [--area=a] [--title=t] [--actor=cdx|me|pair] [--dry-run]
+                                          make a task of a learning point (of a path or a task's ## Lernpunkte): its
+                                          subtree moves into the task, the point gets the arrow; done writes its state
+  unpromote <area>/<slug>#<key|n> [--dry-run]
+                                          take it back while the task holds no work (open, no commits, no assets)
   done <area>/<slug> [--commits=repo@sha,repo@sha] [--done-in=text] [--date=YYYY-MM-DD] [--remind=7d|YYYY-MM-DD]
                                           [--no-next] [--unblock] [--last]  (--commits adds to the task's own `commits`)
                                           [--outcome=learned|seen|not-applicable] [--reason=text]  how it ended:
@@ -468,6 +473,8 @@ local SPECS = {
   waits = { value = { "format" }, flag = {} },
   release = { value = {}, flag = { "dry-run", "no-index" } },
   answer = { value = {}, flag = { "no-index" } },
+  promote = { value = { "area", "title", "actor" }, flag = { "dry-run", "no-index" } },
+  unpromote = { value = {}, flag = { "dry-run", "no-index" } },
   ["migrate-actor"] = { value = {}, flag = { "write", "no-index" } },
   done = {
     value = { "done-in", "commits", "date", "remind", "by", "note", "outcome", "reason" },
@@ -1983,6 +1990,79 @@ function commands.release(ctx)
   end
   ctx.say(("release\t%s\t%d released, %d failed"):format(key, #done.changed, #done.failed))
   return (#done.failed > 0 or #res.incomplete > 0) and 1 or 0
+end
+
+---`<container>#<ref>` of `promote` and `unpromote`: the container id and the key (or `n` / `#n`, a position).
+---@param arg string|nil
+---@return string|nil container
+---@return string|integer|nil ref
+local function point_arg(arg)
+  local container, ref = (arg or ""):match("^([^#%s]+/[^#%s]+)#(%S+)$")
+  if not container then
+    return nil
+  end
+  return container, tonumber(ref) or ref
+end
+
+function commands.promote(ctx)
+  local args, eo = ctx.args, ctx.eo
+  local container, ref = point_arg(args.pos[1])
+  if not container or #args.pos > 1 then
+    ctx.warn(
+      "error: usage: promote <area>/<slug>#<key|n> [--area=a] [--title=t] [--actor=cdx|me|pair] [--dry-run]"
+    )
+    return 2
+  end
+  local res, err = require("tasks_nvim.promote").promote(container, ref, {
+    root = eo.root,
+    today = eo.today,
+    area = args.opt.area --[[@as string|nil]],
+    title = args.opt.title --[[@as string|nil]],
+    actor = args.opt.actor --[[@as string|nil]],
+    dry_run = args.opt["dry-run"] == true,
+    index = not args.opt["no-index"],
+  })
+  if not res then
+    ctx.warn("error: " .. tostring(err))
+    return 1
+  end
+  ctx.say(
+    ("%s\t%s\t%s\t%d line(s) moved"):format(
+      res.dry_run and "would-promote" or "promoted",
+      res.point,
+      res.id,
+      res.moved
+    )
+  )
+  return 0
+end
+
+function commands.unpromote(ctx)
+  local args, eo = ctx.args, ctx.eo
+  local container, ref = point_arg(args.pos[1])
+  if not container or #args.pos > 1 then
+    ctx.warn("error: usage: unpromote <area>/<slug>#<key|n> [--dry-run]")
+    return 2
+  end
+  local res, err = require("tasks_nvim.promote").unpromote(container, ref, {
+    root = eo.root,
+    today = eo.today,
+    dry_run = args.opt["dry-run"] == true,
+    index = not args.opt["no-index"],
+  })
+  if not res then
+    ctx.warn("error: " .. tostring(err))
+    return 1
+  end
+  ctx.say(
+    ("%s\t%s#%s\t%s"):format(
+      res.dry_run and "would-unpromote" or "unpromoted",
+      res.container,
+      tostring(res.key),
+      res.id
+    )
+  )
+  return 0
 end
 
 function commands.answer(ctx)

@@ -337,7 +337,7 @@ local function check_lang(lang)
 end
 
 ---Frontmatter keys in the order concept section 3 shows them.
----@param meta { title: string, status: string, kind?: string, prio?: integer|string, effort?: string, value?: integer|string, actor?: string, after?: string[], order?: number|string, plan?: string, project?: string, phase?: string, tags?: string[], category?: string[], scope?: string[], severity?: string, outcome?: string, outcome_reason?: string, waits_for?: string, due?: string, start?: string, refs?: string[], links?: string[], created: string, updated: string }
+---@param meta { title: string, status: string, kind?: string, prio?: integer|string, effort?: string, value?: integer|string, actor?: string, after?: string[], order?: number|string, plan?: string, project?: string, phase?: string, tags?: string[], category?: string[], scope?: string[], severity?: string, outcome?: string, outcome_reason?: string, point?: string, waits_for?: string, due?: string, start?: string, refs?: string[], links?: string[], created: string, updated: string }
 ---@return table[] pairs
 local function meta_pairs(meta)
   local pairs_ = {
@@ -395,6 +395,9 @@ local function meta_pairs(meta)
   end
   if meta.outcome_reason then
     pairs_[#pairs_ + 1] = { "outcome_reason", meta.outcome_reason }
+  end
+  if meta.point then
+    pairs_[#pairs_ + 1] = { "point", meta.point }
   end
   if meta.due then
     pairs_[#pairs_ + 1] = { "due", meta.due }
@@ -752,6 +755,7 @@ local SETTABLE = {
   "commits",
   "outcome",
   "outcome_reason",
+  "point",
   "created",
   "remind",
   "remind_at",
@@ -949,6 +953,12 @@ local FIELD_NORMALIZERS = {
   end,
   severity = one_of("severity", model.is_severity, model.SEVERITIES),
   outcome = one_of("outcome", model.is_outcome, model.OUTCOMES),
+  point = function(value)
+    if not model.parse_point(value) then
+      return nil, ("point '%s' is not <area>/<slug>#<key>"):format(tostring(value))
+    end
+    return value
+  end,
   waits_for = function(value)
     if not model.is_waits_for(value) then
       return nil, model.waits_for_error(value)
@@ -1386,6 +1396,9 @@ function M.new(area, opts)
   if oerr then
     return nil, oerr
   end
+  if opts.point ~= nil and not model.parse_point(opts.point) then
+    return nil, ("point '%s' is not <area>/<slug>#<key>"):format(tostring(opts.point))
+  end
   local refs
   if opts.refs ~= nil then
     local list, rerr2 = string_list(opts.refs, "refs")
@@ -1532,6 +1545,7 @@ function M.new(area, opts)
       severity = opts.severity,
       outcome = opts.outcome,
       outcome_reason = outcome_reason,
+      point = opts.point,
       due = opts.due,
       start = opts.start,
       repeat_every = opts.repeat_every,

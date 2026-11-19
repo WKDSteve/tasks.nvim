@@ -35,7 +35,10 @@ return function(H)
     "plan-new",
     "plans",
     "projects",
+    -- `promote` / `unpromote`: the editor gets them with the learning tree view (tasks.nvim, phase apps)
+    "promote",
     "show",
+    "unpromote",
   }
   local ONLY_COMPOSER = {
     -- `agent` hands the task of the editor to ai-desktop (or ai.nvim); tasks-desktop has its own button

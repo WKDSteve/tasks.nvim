@@ -31,6 +31,7 @@
 ---@field severity? string             # `low|medium|high|critical`, as written (meant for bug/security tasks; may be an unknown word, see `errors`).
 ---@field waits_for? string            # What a parked task waits for from outside (`mac`), as written; one key (`model.is_waits_for`).
 ---@field outcome? string              # How the task ended (`model.OUTCOMES`); nil: none written, or an unknown word (see `errors`).
+---@field point? string                # The learning point the task was promoted from, `<container id>#<key>` (`tasks_nvim.promote`).
 ---@field outcome_reason? string       # Why it ended so; `check` hints when `seen` / `not-applicable` have none.
 ---@field created? string             # `YYYY-MM-DD`
 ---@field updated? string             # `YYYY-MM-DD`

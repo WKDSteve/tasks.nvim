@@ -86,6 +86,11 @@
 ---    as `path-...` (and `path-no-stages`); `path-id-taken` (error); `path-reason-missing`, `path-duplicate-key`,
 ---    `path-bad-key`, `path-bad-mark`, `path-bad-arrow`, `path-image-outside`, `path-arrow-dangling`,
 ---    `path-image-missing`, `path-cycle` (warnings): the tree of `## Lernpunkte`
+---  - promoted learning points (`tasks_nvim.promote`, warnings): `promote-point-dangling` (a task's `point:` names no
+---    open path or task, or no point there whose arrow names the task), `promote-state-drift` (the mark of the point
+---    says something else than the task: closed while it is open, or not the state of its outcome when finished),
+---    `promote-cycle` (the `point:` of tasks lead back to one of them), `task-arrow-dangling` (an arrow in the
+---    `## Lernpunkte` of an open learning task names a task that exists nowhere)
 ---
 --- Not its job: fixing anything (`index.write_area` regenerates an index).
 
@@ -904,6 +909,146 @@ local function path_findings(findings, open_ids, names, scan_opts, is_finished)
   end
 end
 
+---The findings of promoted learning points, for the tasks (open and finished) of the checked areas that name one with
+---`point:`, and the arrows of the `## Lernpunkte` of open learning tasks. Warnings only (R3).
+---@param findings Tasks.Finding[]
+---@param open_ids table<string, Tasks.Task>
+---@param names string[]
+---@param scan_opts table
+---@param is_finished fun(id: string): boolean
+---@param finished_by_area table<string, Tasks.Task[]>  # The finished tasks `check` read already, per area.
+local function promote_findings(findings, open_ids, names, scan_opts, is_finished, finished_by_area)
+  local paths_mod = require("tasks_nvim.paths")
+  local fm = require("lib.nvim.markdown.frontmatter")
+  -- the tree of a container, read once
+  local trees = {}
+  local function tree_of(cid)
+    if trees[cid] == nil then
+      local p = paths_mod.find(cid, scan_opts)
+      if p and p.tree then
+        trees[cid] = p.tree
+      elseif open_ids[cid] then
+        local text = fsio.read(open_ids[cid].path)
+        local parsed = text and fm.parse(text) or nil
+        trees[cid] = lernbaum.parse(parsed and parsed.body or "")
+      else
+        trees[cid] = false
+      end
+    end
+    return trees[cid] or nil
+  end
+  local function check_task(t, finished)
+    local cid, key = model.parse_point(t.point)
+    if not cid then
+      return
+    end
+    local tree = tree_of(cid)
+    local node = tree and tree.by_key[key] or nil
+    if not node or node.promoted ~= t.id then
+      -- a container that was finished meanwhile keeps its tree in the Backlog: no finding
+      if not tree and is_finished(cid) then
+        return
+      end
+      add(
+        findings,
+        "warn",
+        "promote-point-dangling",
+        t,
+        ("point %s: %s"):format(
+          t.point,
+          tree and ("no point {#" .. key .. "} there whose arrow names " .. t.id)
+            or "no open learning path or task of that id"
+        )
+      )
+      return
+    end
+    local want = lernbaum.state_of_task(finished and { status = "done", outcome = t.outcome } or t)
+    local have = node.state or "open"
+    local drift
+    if finished then
+      drift = have ~= want
+    else
+      -- open or blocked while the task is open; a closed mark runs ahead of the task
+      drift = have ~= "open" and have ~= "blocked"
+    end
+    if drift then
+      add(
+        findings,
+        "warn",
+        "promote-state-drift",
+        t,
+        ("the point %s is marked %s, the task says %s (tasks done writes it; fix the mark by hand)"):format(
+          t.point,
+          have,
+          finished and want or "open"
+        )
+      )
+    end
+  end
+  local cycle_seen = {}
+  local open_by_area = {}
+  for _, t in pairs(open_ids) do
+    open_by_area[t.area] = open_by_area[t.area] or {}
+    table.insert(open_by_area[t.area], t)
+  end
+  for _, name in ipairs(names) do
+    local finished = finished_by_area[name] or {}
+    for _, t in ipairs(finished) do
+      if t.point then
+        check_task(t, true)
+      end
+    end
+    for _, t in ipairs(open_by_area[name] or {}) do
+      do
+        if t.point then
+          check_task(t, false)
+          -- the chain of `point:` back to the root: a task met twice is a circle
+          if not cycle_seen[t.id] then
+            local chain, at, on = { t.id }, t, { [t.id] = true }
+            while at and at.point do
+              local cid = model.parse_point(at.point)
+              if not cid then
+                break
+              end
+              if on[cid] then
+                chain[#chain + 1] = cid
+                add(
+                  findings,
+                  "warn",
+                  "promote-cycle",
+                  t,
+                  "the promotions run in a circle: " .. table.concat(chain, " -> ")
+                )
+                break
+              end
+              on[cid] = true
+              chain[#chain + 1] = cid
+              at = open_ids[cid]
+            end
+            for id in pairs(on) do
+              cycle_seen[id] = true
+            end
+          end
+        end
+        if vim.tbl_contains(t.category or {}, "learning") then
+          local tree = tree_of(t.id)
+          for _, node in ipairs(tree and tree.nodes or {}) do
+            if node.promoted and not open_ids[node.promoted] and not is_finished(node.promoted) then
+              add(
+                findings,
+                "warn",
+                "task-arrow-dangling",
+                t,
+                ("## Lernpunkte: the arrow names %s, which does not exist"):format(node.promoted)
+              )
+            end
+          end
+        end
+      end
+    end
+  end
+end
+
 ---Project files, the plans that name one (`project:`, `phase:`) and the tasks that name one themselves, reported for
 ---the checked areas. A project nobody wrote is an error (a typo); a project that is finished already, a stage the
 ---project does not list, an area the project does not list and a gate that is not enforced across plans are warnings.
@@ -1245,6 +1390,8 @@ function M.run(opts)
 
   local findings = {}
   local task_count = 0
+  ---@type table<string, Tasks.Task[]>
+  local finished_by_area = {}
   ---@type Tasks.Finding[]
   local hints = {}
 
@@ -1256,6 +1403,7 @@ function M.run(opts)
     end
     local finished, backlog_errors = scan.backlog(name, scan_opts)
     finished = finished or {}
+    finished_by_area[name] = finished
     -- A Backlog that could not be read is reported: without it `duplicate-id` stays silent and a blocker that
     -- was finished looks dangling.
     for _, e in ipairs(type(backlog_errors) == "table" and backlog_errors or {}) do
@@ -1450,6 +1598,7 @@ function M.run(opts)
   project_findings(findings, open_ids, names, scan_opts, is_finished)
   meeting_findings(findings, hints, open_ids, names, scan_opts, is_finished, today)
   path_findings(findings, open_ids, names, scan_opts, is_finished)
+  promote_findings(findings, open_ids, names, scan_opts, is_finished, finished_by_area)
   view_findings(findings, root, names)
   if not opts.area then
     area_group_findings(findings, root)
