@@ -126,15 +126,33 @@ function M.snapshot(buf)
     end
   end
   local tree = lernbaum.parse(body)
+  -- the heading of the tree: the last `## Lernpunkte` above its first point (any case, as `lernbaum` reads it)
   local heading
-  for i, line in ipairs(tree.lines) do
-    local hashes, name = line:gsub("\r$", ""):match("^(#+)%s+(.-)%s*$")
-    if hashes and #hashes == 2 and vim.tbl_contains(lernbaum.HEADINGS, name) then
-      heading = offset + i
-      break
+  local first = tree.nodes[1] and tree.nodes[1].line or 0
+  for i = 1, first - 1 do
+    local hashes, name = tree.lines[i]:gsub("\r$", ""):match("^(#+)%s+(.-)%s*$")
+    if hashes and #hashes == 2 then
+      heading = nil
+      for _, h in ipairs(lernbaum.HEADINGS) do
+        if name:lower() == h:lower() then
+          heading = offset + i
+        end
+      end
     end
   end
   return { tree = tree, offset = offset, heading = heading }
+end
+
+---Whether a buffer holds the text of a file (CRLF or LF, a byte order mark and the final newline aside).
+---@param buf integer
+---@param disk string
+---@return boolean
+function M.same_text(buf, disk)
+  local text = disk:gsub("\r\n", "\n"):gsub("^\239\187\191", "")
+  if text:sub(-1) == "\n" then
+    text = text:sub(1, -2)
+  end
+  return text == table.concat(vim.api.nvim_buf_get_lines(buf, 0, -1, false), "\n")
 end
 
 ---The point on buffer row `row` (1-based): the point's own line or one of its note lines (`> ` below it).
@@ -240,10 +258,10 @@ function M.set_point(buf, row, state, reason)
     if not disk then
       return nil, "cannot read " .. loc.path .. ": " .. tostring(rerr)
     end
-    -- the buffer must be the file: the point is named by its position, and the version tag guards the write
-    local buf_line = vim.api.nvim_buf_get_lines(buf, row - 1, row, false)[1] or ""
-    local disk_lines = vim.split(disk:gsub("\r\n", "\n"), "\n", { plain = true })
-    if disk_lines[row] ~= buf_line then
+    -- the buffer must be the file: the point is named by its position, and the version tag guards the write. The
+    -- whole text is compared (line ends and the final newline aside): a point added above and a line taken away
+    -- elsewhere would keep the row and move the position
+    if not M.same_text(buf, disk) then
       return nil, loc.id .. " changed on disk: reload the buffer (:edit) first"
     end
     local res, err = require("tasks_nvim.paths").point(loc.id, node.index, state, reason, {
@@ -515,7 +533,7 @@ function M.attach(buf)
     fold_window(buf, win)
   end
   local group = vim.api.nvim_create_augroup(M.AUGROUP, { clear = false })
-  vim.api.nvim_create_autocmd({ "TextChanged", "InsertLeave", "BufWritePost" }, {
+  vim.api.nvim_create_autocmd({ "TextChanged", "InsertLeave", "BufWritePost", "BufReadPost" }, {
     group = group,
     buffer = buf,
     desc = "tasks.nvim: redraw the learning tree",

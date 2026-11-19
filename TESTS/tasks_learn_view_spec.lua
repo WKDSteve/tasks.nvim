@@ -161,8 +161,17 @@ return function(H)
     "lib.nvim/lua-lernen changed on disk: reload the buffer (:edit) first"
   )
   has(H.read(path_file), "Syntax neu {#syntax}")
+  -- a point added above and a blank line taken away on disk: the row still reads the same, the position does not;
+  -- the whole text is compared, so the wrong point is never written
+  H.write(path_file, (disk_now:gsub("## Lernpunkte\n\n", "## Lernpunkte\n- [ ] Neu {#neu}\n", 1)))
+  eq(
+    select(2, learn.set_point(buf, 14, "dropped", "x")),
+    "lib.nvim/lua-lernen changed on disk: reload the buffer (:edit) first"
+  )
+  lacks(H.read(path_file), "Grund: x", "no point was written")
   H.write(path_file, disk_now)
   vim.cmd("silent edit!")
+  ok(learn.same_text(buf, H.crlf(disk_now)), "CRLF on disk is the same text")
 
   -- a buffer with unsaved changes is changed in the buffer, the file stays
   vim.api.nvim_buf_set_lines(buf, 6, 7, false, { "Warum: Plugins schreiben (geändert)." })
@@ -282,6 +291,16 @@ return function(H)
   preview.available = real_available
   eq(learn.image_path("/v/p.md", "assets/../x.png"), nil, "no way out of the folder")
   eq(learn.image_path("/v/p.md", "other/x.png"), nil, "only below assets/")
+  -- the file read again (`:e!` after a change outside): the view follows
+  local before_reread = H.read(path_file)
+  H.write(
+    path_file,
+    (before_reread:gsub("  %- %[ %] Syntax {#syntax}", "  - [x] Syntax {#syntax}", 1))
+  )
+  vim.cmd("silent edit!")
+  has(virt(), "11:  2 gelernt", "redrawn after the buffer was read again")
+  H.write(path_file, before_reread)
+  vim.cmd("silent edit!")
   -- off again: no virtual text, the window's folds as they were, no keys
   learn.detach(buf)
   eq(virt(), "")
@@ -292,6 +311,18 @@ return function(H)
   learn.cmd_learn({ args = { action = "toggle" }, rest = {}, flags = {}, kv = {} })
   ok(not learn.is_attached(buf), "toggle: off")
   config.merge({})
+
+  -- the heading in any case, as the engine reads it: the tree's progress stands on it
+  local lower_file = root .. "/lib.nvim/ROADMAP/paths/lower.md"
+  H.write(lower_file, "---\ntitle: L\nstatus: doing\n---\n\n## lernpunkte\n\n- [x] Eins\n")
+  local lbuf = open(lower_file)
+  eq(learn.snapshot(lbuf).heading, 6)
+  local fenced_file = root .. "/lib.nvim/ROADMAP/paths/fenced.md"
+  H.write(
+    fenced_file,
+    "---\ntitle: F\nstatus: doing\n---\n\n## Lernpunkte\n\n## Notizen\n\n## Lernpunkte\n\n- [ ] A\n"
+  )
+  eq(learn.snapshot(open(fenced_file)).heading, 10, "the heading right above the tree")
 
   -- ── promote and take back ─────────────────────────────────────────────────
   eq({ learn.point_arg("lib.nvim/lua-lernen#cc") }, { "lib.nvim/lua-lernen", "cc" })
