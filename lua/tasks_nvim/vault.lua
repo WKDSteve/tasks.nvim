@@ -558,7 +558,38 @@ function M.resolve_plan(root, kind, area, slug)
   return nil, ("no such open %s: %s/%s"):format(kind, area, slug)
 end
 
----Whether an open plan file or project file of this slug is in the area, in either form (one id namespace).
+---`<area>/MEETINGS`: the meeting files of the area (optional). A meeting is a file of its own, not a task: it names the
+---tasks it belongs to (`tasks:`), and it stays where it is when it is done (`tasks_nvim.meetings`).
+---@param root string
+---@param area string
+---@return string
+function M.meetings_dir(root, area)
+  return root .. "/" .. area .. "/MEETINGS"
+end
+
+---Find a meeting file on disk, whichever form it has: `MEETINGS/<slug>.md`, or `MEETINGS/<slug>/<slug>.md` once
+---something was attached to it.
+---@param root string
+---@param area string
+---@param slug string
+---@return string|nil path
+---@return boolean|string folder  # true for the folder form, false for a plain file; the error when there is none
+function M.resolve_meeting(root, area, slug)
+  local dir = M.meetings_dir(root, area)
+  local file, folder = dir .. "/" .. slug .. ".md", dir .. "/" .. slug .. "/" .. slug .. ".md"
+  local has_file, has_folder = fsio.is_file(file), fsio.is_file(folder)
+  if has_file and has_folder then
+    return nil, ("meeting exists as file and as folder: %s/%s"):format(area, slug)
+  elseif has_file then
+    return file, false
+  elseif has_folder then
+    return folder, true
+  end
+  return nil, ("no such meeting: %s/%s"):format(area, slug)
+end
+
+---Whether an open plan file, a project file or a meeting of this slug is in the area, in either form (one id
+---namespace: a task, a plan, a project and a meeting never share an id).
 ---@param root string
 ---@param area string
 ---@param slug string
@@ -570,7 +601,9 @@ function M.has_plan_or_project(root, area, slug)
       return true
     end
   end
-  return false
+  local dir = M.meetings_dir(root, area)
+  return fsio.is_file(dir .. "/" .. slug .. ".md")
+    or fsio.is_file(dir .. "/" .. slug .. "/" .. slug .. ".md")
 end
 
 ---The plan or project files of one `ROADMAP/plans` (or `projects`) folder: `<slug>.md` and `<slug>/<slug>.md`.
