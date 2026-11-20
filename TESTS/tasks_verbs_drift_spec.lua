@@ -48,6 +48,10 @@ return function(H)
     "planfile",
     "point",
     "preview",
+    -- `xp` and `reward` work on the point (and the path) in the buffer under the cursor; tasks-ops/1 `node_set` (`xp`)
+    -- and `path_reward` are the headless way
+    "reward",
+    "xp",
   }
   local OPTIONS = {
     ["answer"] = { composer = {}, cli = { "no-index" } },
