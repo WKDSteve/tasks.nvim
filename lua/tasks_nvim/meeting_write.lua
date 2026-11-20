@@ -44,10 +44,13 @@ M.KEYS = {
   "tags",
   "recording",
   "summary",
+  "repeat",
+  "repeat_until",
+  "except",
 }
 
 ---The keys whose value is a list.
-local LIST_KEYS = { tasks = true, notify = true, notify_to = true, tags = true }
+local LIST_KEYS = { tasks = true, notify = true, notify_to = true, tags = true, except = true }
 
 ---The keys that cannot be removed.
 local REQUIRED = { title = true, status = true, date = true }
@@ -507,6 +510,135 @@ end
 ---@field body_before? string       # `capture`: the body before the line.
 ---@field was_present? boolean      # `attend`: the participant was present before.
 ---@field location? string          # `ops`: "meeting" (the task ops tell a meeting from a task by it).
+---@field created? boolean          # The first entry into an occurrence of a series made its file.
+
+---The first entry into an occurrence of a series that has no file yet (`meetings.find_any` named it `virtual`): its
+---text is made from the series file (`meetings.occurrence_text`, `created` and `updated` today), `transform` is
+---applied, and the file `<slug of the series>-<day>.md` is created in one step; a change that changes nothing writes
+---nothing (the occurrence stays computed), unless `opts.materialize` asks for the file. `if_match` is the version of
+---the series file (the version of the occurrence as it was read). A file made between the read and the write is a
+---`conflict`: the caller reads the occurrence again.
+---@param found Tasks.Meeting
+---@param transform fun(text: string, meeting: Tasks.Meeting): string|nil, string|nil, any
+---@param opts { root?: string, today?: string, if_match?: string, dry_run?: boolean, materialize?: boolean }
+---@return Tasks.MeetingEdit|nil result
+---@return string|nil err
+---@return table|nil info
+local function occurrence_edit(found, transform, opts)
+  local today = opts.today or model.today()
+  local series_text, rd_err = fsio.read(found.series_path)
+  if not series_text then
+    return nil, "cannot read the series " .. tostring(found.series) .. ": " .. tostring(rd_err)
+  end
+  local etag = fsio.etag(series_text)
+  local result = {
+    id = found.id,
+    area = found.area,
+    path = found.path,
+    changed = false,
+    etag_before = etag,
+    etag_after = etag,
+  }
+  if opts.if_match ~= nil and opts.if_match ~= etag then
+    return nil,
+      ("%s is not the version the change was made on (its series is %s, the change was made on %s)"):format(
+        found.id,
+        etag,
+        tostring(opts.if_match)
+      ),
+      { code = "conflict", id = found.id, expected = opts.if_match, actual = etag }
+  end
+  local series_area, series_slug = vault.parse_id(found.series)
+  local series = meetings.parse(series_text, {
+    path = found.series_path,
+    area = series_area --[[@as string]],
+    slug = series_slug,
+  })
+  if not series.valid or not series.repeat_every then
+    return nil, found.series .. " is no series any more", { code = "conflict", id = found.id }
+  end
+  local cur = meetings.occurrence_text(series_text, series, found.occurrence)
+  cur = cur and fm.update_text(cur, { { "created", today }, { "updated", today } })
+  if not cur then
+    return nil, "cannot build the occurrence " .. found.id
+  end
+  local ctx = { path = found.path, area = found.area, slug = found.slug, folder = false }
+  local before = meetings.parse(cur, ctx)
+  local text, terr, extra = transform(cur, before)
+  result.extra = extra
+  if not text then
+    return nil, terr or "the change cannot be made", { code = "invalid_argument" }
+  end
+  if text == cur and not opts.materialize then
+    return result, nil
+  end
+  local fault = new_fault(before, meetings.parse(text, ctx))
+  if fault then
+    return nil, fault, { code = "invalid_argument" }
+  end
+  result.changed = true
+  result.created = true
+  result.etag_after = fsio.etag(text)
+  if opts.dry_run then
+    return result, nil
+  end
+  local ok, cerr = fsio.create_exclusive(found.path, text)
+  if not ok then
+    if fsio.is_exists(cerr) then
+      return nil,
+        found.id .. " was written in the meantime: read it again",
+        { code = "conflict", id = found.id, expected = opts.if_match }
+    end
+    return nil, "cannot create " .. found.id .. ": " .. tostring(cerr)
+  end
+  return result, nil
+end
+
+---The file an occurrence of a series without a file would get, as `mutate.attach_target` names a target (for a dry
+---run: nothing is made); nil for any other id.
+---@param id string
+---@param root string
+---@return table|nil
+function M.occurrence_target(id, root)
+  local found = meetings.find_any(id, { root = root })
+  if not found or not found.virtual then
+    return nil
+  end
+  return {
+    id = found.id,
+    area = found.area,
+    slug = found.slug,
+    path = found.path,
+    folder = false,
+    file_kind = "meeting",
+    etag = found.etag,
+  }
+end
+
+---Give the occurrence `id` of a series its file when it has none yet (before something is attached to it). True when
+---the file was made, false when there was nothing to do (a meeting file, or no meeting at all: the caller says so).
+---@param id string
+---@param opts { root?: string, today?: string }
+---@return boolean|nil made
+---@return string|nil err
+---@return table|nil info
+function M.materialize(id, opts)
+  local root, rerr = vault.root(opts)
+  if not root then
+    return nil, rerr
+  end
+  local found = meetings.find_any(id, { root = root })
+  if not found or not found.virtual then
+    return false, nil
+  end
+  local r, err, info = occurrence_edit(found, function(text)
+    return text
+  end, { root = root, today = opts.today, materialize = true })
+  if not r then
+    return nil, err, info
+  end
+  return true, nil
+end
 
 ---Change a meeting file under its lock. `transform(text, meeting)` gives the new text (or nil and an error, and an
 ---extra value handed back in `extra`); `updated` is set when the text changed. The change is refused when the file is
@@ -522,9 +654,12 @@ function M.edit(id, transform, opts)
   if not root then
     return nil, rerr
   end
-  local found, ferr = meetings.find(id, { root = root })
+  local found, ferr = meetings.find_any(id, { root = root })
   if not found then
     return nil, ferr, { code = "not_found" }
+  end
+  if found.virtual then
+    return occurrence_edit(found, transform, opts)
   end
   if fsio.is_link(found.path) then
     return nil,
@@ -1029,7 +1164,7 @@ function M.followups(id, opts)
   if not root then
     return nil, rerr
   end
-  local meeting, ferr = meetings.find(id, { root = root })
+  local meeting, ferr = meetings.find_any(id, { root = root })
   if not meeting then
     return nil, ferr, { code = "not_found" }
   end
@@ -1323,7 +1458,19 @@ function M.board_save(id, opts)
         { code = "invalid_argument" }
     end
   end
-  local target, terr = mutate.attach_target(id, root)
+  -- an occurrence of a series gets its file first (in a dry run it is the file it would get)
+  local target, terr
+  if opts.dry_run then
+    target = M.occurrence_target(id, root)
+  else
+    local made, merr, minfo = M.materialize(id, { root = root, today = opts.today })
+    if made == nil then
+      return nil, merr, minfo
+    end
+  end
+  if not target then
+    target, terr = mutate.attach_target(id, root)
+  end
   if not target then
     return nil, terr, { code = "not_found" }
   end

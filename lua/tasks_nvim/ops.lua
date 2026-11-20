@@ -608,7 +608,9 @@ local function is_meeting(ctx, id)
   if not area or not slug or not vault.valid_area(area) or not vault.has_area(ctx.root, area) then
     return false
   end
+  -- an occurrence of a series without a file yet is a meeting too: the first change gives it its file
   return vault.resolve_meeting(ctx.root, area, slug) ~= nil
+    or require("tasks_nvim.meetings").occurrence(ctx.root, area, slug) ~= nil
 end
 
 ---Change the text of a task (`mutate.edit_text`) or of a meeting (`meeting_write.edit`, `meeting_transform` when
@@ -2451,8 +2453,21 @@ local function do_attach(op, ctx)
     )
   end
   local drafts = drafts_of(ctx)
+  -- an occurrence of a series gets its file before anything is attached (a dry run: the file it would get)
+  local task, ferr
+  if ctx.dry then
+    task = require("tasks_nvim.meeting_write").occurrence_target(op.id, ctx.root)
+  elseif is_meeting(ctx, op.id) then
+    local made, merr, minfo =
+      require("tasks_nvim.meeting_write").materialize(op.id, { root = ctx.root, today = ctx.today })
+    if made == nil then
+      return mutate_failure(ctx, merr, minfo)
+    end
+  end
   -- an open task, else an open plan or project file
-  local task, ferr = mutate.attach_target(op.id, ctx.root, drafts)
+  if not task then
+    task, ferr = mutate.attach_target(op.id, ctx.root, drafts)
+  end
   if not task then
     return mutate_failure(ctx, ferr)
   end
@@ -2574,6 +2589,8 @@ local function meeting_entry(ctx, r)
     etag_before = r.etag_before,
     etag_after = (not ctx.dry) and r.etag_after or nil,
     changed_ids = (r.changed and not ctx.dry) and { r.id } or {},
+    -- the first entry into an occurrence of a series made (would make) its file
+    created = r.created or nil,
   }
 end
 

@@ -96,6 +96,7 @@ return function(H)
     "icon",
     "if_match",
     "meeting_ops",
+    "meeting_series",
     "move_area",
     "move_area_preview",
     "node_note",

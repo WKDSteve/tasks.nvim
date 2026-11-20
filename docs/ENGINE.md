@@ -70,7 +70,7 @@ TESTS/              specs (run with scripts/test.sh, i.e. testing.nvim)
 | `tasks_nvim.moves` | Moving a task to another area, stage 1: `preview(id, to_area, { root })` answers whether the move could be made (the area exists, the slug is free there among open tasks, finished tasks and plans: otherwise `conflicts` with `slug-taken`) and what would dangle (`references`: the `blocked_by`, `after` and `refs` of other tasks, the `target` of a plan file, a configured document that names the id), with notes such as a plan that does not list the new area. Nothing is written; rewriting the references with a rollback is stage 2, until then the move itself is refused. | `preview` |
 | `tasks_nvim.steps` | The optional `## Plan` section of a task (`- [ ] 1. step -- Acceptance 1`): `parse` reads progress ("2/4") and the step texts, `tick_all` ticks the open steps byte-exactly (line endings kept; a step marked `(dropped)` / `(entfaellt)` is struck from the count and never ticked; code fences and other sections are not the plan), `uncovered_acceptance` names acceptance points no step refers to (a hint in `check`, never an error). A task without the section is complete: nothing is said about it. | `parse`, `tick_all`, `uncovered_acceptance`, `template_section` |
 | `tasks_nvim.plans` | Plan files, `<area>/ROADMAP/plans/<slug>.md` (or the folder form `<slug>/<slug>.md`, whose other files are assets: `assets` lists them): frontmatter `title`, `status` (planning / doing / parked / done), `areas`, `target`, `phase_order`, `gate` (`hard`), `links` (http/https), dates; no task list. `parse` / `from_file` always return a plan (a broken one carries errors), `area` / `all` / `find` read them, `members` picks the tasks that name one, `new` creates one (never overwrites), `close` finishes one like a task (moved to `Backlog/FEATURES/`, a README row, snapshot and rollback), `summary` says what a finished plan amounted to. | `parse`, `area`, `all`, `find`, `members`, `new`, `close`, `summary` |
-| `tasks_nvim.meetings` | Meeting files, `<area>/MEETINGS/<slug>.md` (or the folder form `<slug>/<slug>.md`), see [Meetings](#meetings-meetings): a meeting is no task and names its tasks (`tasks:`); `by_task` derives the meetings of a task. `parse` / `from_file` always return a meeting (a broken one carries errors; a parse cache by mtime and size), `area` / `all` / `find` read them, `online_service` tells the service of an address, `parse_duration`, `parse_notify`, `is_tz` read the fields. | `parse`, `from_file`, `area`, `all`, `find`, `by_task`, `less`, `online_service` |
+| `tasks_nvim.meetings` | Meeting files, `<area>/MEETINGS/<slug>.md` (or the folder form `<slug>/<slug>.md`), see [Meetings](#meetings-meetings): a meeting is no task and names its tasks (`tasks:`); `by_task` derives the meetings of a task. `parse` / `from_file` always return a meeting (a broken one carries errors; a parse cache by mtime and size), `area` / `all` / `find` read them, `online_service` tells the service of an address, `parse_duration`, `parse_notify`, `is_tz` read the fields; a series (`repeat`) is computed into its occurrences (`occurrence_days`, `expand`), `find_any` also reads an occurrence without a file. | `parse`, `from_file`, `area`, `all`, `find`, `find_any`, `by_task`, `less`, `online_service`, `occurrence_days`, `occurrence`, `expand` |
 | `tasks_nvim.meeting_write` | Writing meetings under the file lock, on the version read: `new`, `set`, `close`, `capture` (one line of the minutes), `attend`, `followups` (tasks of the follow-ups), `board_save` (a whiteboard, replaced only on the version read); `renames_for_move` and `tick_done` for `move_area` and `done`; pure body helpers (`capture_body`, `attend_body`, `tick_item`, `add_items`, `append_to_section`, `set_section`). | `new`, `set`, `close`, `capture`, `attend`, `followups`, `board_save`, `edit` |
 | `tasks_nvim.meeting_quick` | The quick capture of a meeting: one line (day, time, duration, all-day, address, `@place`, `#task`, `!notify`, the rest the title) read into a proposal of the fields of `meeting_new`, with what it assumed and the words it could not read. Pure. | `parse` |
 | `tasks_nvim.lernbaum` | The learning tree of `## Lernpunkte`, see [Learning paths](#learning-paths-roadmappaths): nodes with marks, keys, reasons, arrows, notes and images; the parent rule, progress counted apart, the problems of one file; `render` gives the text back byte for byte. Pure. | `parse`, `render`, `set_state`, `set_xp`, `set_task_xp`, `suggest_xp`, `to_xp`, `node`, `progress_text`, `promoted_ids` |
@@ -488,6 +488,27 @@ preview) and are the one asset that is replaced, only on the version read. A fol
 `refs: [<meeting>]` and its id behind the line (`-> <id>`); the `done` of that task ticks the line, a `move_area`
 rewrites it and `tasks:`. `tasks_nvim.meeting_quick` reads one line ("Mo 14:00-15:00 Sync @teams https://... #a/b
 !-15m") into a proposal of the fields, for the app, the CLI (`tasks meeting new --quick=`) and `:Tasks meeting new`.
+
+**Series.** A meeting with `repeat` is a series: `repeat` is an interval as the routines write it (`1w`, `2w`, `10d`,
+`1m`, `1y`) or a word (`daily`, `weekly`, `monthly`, `yearly`, read as `1d`, `1w`, `1m`, `1y`), `repeat_until` its last
+possible day, `except` the days without an occurrence (`except: [2026-12-24]`, at most 200). Its `date` is the first
+occurrence; weeks and days count calendar days, months and years keep the day of the month of the first day and stop
+at the end of a shorter month (a series of the 31st is on 28 February and on 31 March again). The series is the
+template: its occurrences are computed (`meetings.occurrence_days`, `meetings.expand`), and `meetings` lists them in
+place of the series (at most 500 of one series per window, the rest named in `incomplete`).
+
+An occurrence has the id `<area>/<slug of the series>-<day>` and no file until the first entry: a capture, a result, an
+attachment, a whiteboard, a cancellation (decision F10). Then it becomes the file `<slug of the series>-<day>.md` with
+`series: <id of the series>`, the frontmatter and body of the series (the agenda as a template), `date` the day and
+without `repeat`, `repeat_until` and `except`; the series stays as it was. Every write of the door takes the id of an
+occurrence without a file (`meeting_write.edit` makes the file in the same write as the change, `meeting_write
+.materialize` before an attachment); a change that changes nothing makes no file. `if_match` of such an occurrence is
+the version of the series file. An occurrence file keeps its place in the series by the day in its slug, so its `date`
+may move (a 1:1 a day later) without a computed one standing in for it. A series that is `cancelled` cancels the
+occurrences without a file. `check`: `meeting-bad-repeat`, `meeting-bad-repeat-until`, `meeting-bad-except`,
+`meeting-bad-series` (errors: `series:` beside `repeat`, or a file that is not `<slug of the series>-<day>` of the same
+area), `meeting-series-missing` (warning: the series is gone or no series any more), `meeting-series-off-day` (hint:
+the day of an occurrence file is no day of its series any more); a series takes no part in `meeting-overlap`.
 
 ### Learning paths (`ROADMAP/paths/`)
 

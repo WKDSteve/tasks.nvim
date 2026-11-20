@@ -27,6 +27,7 @@
     "meeting",
     "meeting_ops",
     "meeting_parse",
+    "meeting_series",
     "meetings",
     "move_area",
     "move_area_preview",

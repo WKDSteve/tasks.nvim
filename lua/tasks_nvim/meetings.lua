@@ -14,7 +14,11 @@
 --- none: all day), `end` (`HH:MM`) or `duration` (`45m`, `2h`, `1h30m`), `tz` (an IANA zone, only checked for its
 --- form: the clients convert), `location`, `online` (an http(s) address; the service is told from its host),
 --- `tasks`, `notify` (`-15m`, `-2h`, `-1d@18:00`), `notify_to`, `image`, `icon`, `tags`, `recording`, `summary`,
---- `created`, `updated`.
+--- `created`, `updated`; a series `repeat`, `repeat_until`, `except`, an occurrence of one `series`.
+---
+--- A series (`repeat`) is the template of its occurrences: the engine computes them (`occurrence_days`, `expand`), and
+--- an occurrence becomes the file `<slug of the series>-<day>.md` with `series:` only on its first entry
+--- (`meeting_write`); until then `find_any` reads it as a meeting without a file (`virtual`).
 ---
 --- The body is prose with a few sections the engine reads: `## Agenda` (checkboxes), `## Teilnehmer` /
 --- `## Participants` (`- [ ] Name <mail> (role)`, ticked = present), `## Unterlagen` / `## Documents` (links, paths),
@@ -52,6 +56,47 @@ M.MAX_DURATION_MIN = 7 * 24 * 60
 
 ---The most days a `-<n>d@HH:MM` notification lies before the meeting.
 M.MAX_NOTIFY_DAYS = 30
+
+---The most days `except` of a series names.
+M.MAX_EXCEPT = 200
+
+---The most occurrences of one series a window lists (`expand`); the rest is named in `incomplete`.
+M.MAX_OCCURRENCES = 500
+
+---The words of `repeat` besides the intervals of the routines (`2w`, `10d`, `1m`, `1y`).
+---@type table<string, string>
+M.REPEAT_WORDS = { daily = "1d", weekly = "1w", monthly = "1m", yearly = "1y" }
+
+---The interval of a series as the engine reads it: a word of `REPEAT_WORDS` or an interval of the routines
+---(`model.parse_repeat`); nil for anything else.
+---@param s any
+---@return string|nil
+function M.normalize_repeat(s)
+  if type(s) ~= "string" then
+    return nil
+  end
+  local word = M.REPEAT_WORDS[s:lower()]
+  if word then
+    return word
+  end
+  return model.is_repeat(s) and s or nil
+end
+
+---The series slug and the day of an occurrence slug (`weekly-sync-2026-12-01` -> `weekly-sync`, `2026-12-01`); nil
+---when the slug does not end in a calendar day after a slug.
+---@param slug any
+---@return string|nil base
+---@return string|nil day
+function M.split_occurrence(slug)
+  if type(slug) ~= "string" then
+    return nil, nil
+  end
+  local base, day = slug:match("^(.+)%-(%d%d%d%d%-%d%d%-%d%d)$")
+  if not base or not model.is_date(day) or not vault.valid_slug(base) then
+    return nil, nil
+  end
+  return base, day
+end
 
 ---The headings of the sections the engine reads, German and English.
 local HEADINGS = {
@@ -400,6 +445,13 @@ end
 ---@field participants Tasks.MeetingParticipant[]
 ---@field documents Tasks.MeetingDocument[]
 ---@field followups Tasks.MeetingItem[]
+---@field repeat_every? string     # A series: `repeat`, normalised (`weekly` -> `1w`).
+---@field repeat_until? string     # A series: its last possible day.
+---@field except string[]          # A series: the days without an occurrence, in order.
+---@field series? string           # An occurrence: the id of its series.
+---@field occurrence? string       # An occurrence: its day in the series (the day in its slug; `date` may differ).
+---@field virtual? boolean         # An occurrence without a file yet: computed from the series (`occurrence`).
+---@field series_path? string      # A virtual occurrence: the file of its series.
 ---@field has_result boolean
 ---@field has_decisions boolean
 ---@field has_protocol boolean
@@ -433,6 +485,7 @@ function M.parse(text, ctx)
     tasks = {},
     notify = {},
     notify_to = {},
+    except = {},
     tags = {},
     summary = "",
     body = "",
@@ -541,6 +594,82 @@ function M.parse(text, ctx)
       -- an all-day meeting of several days: a duration in whole days counts its days
       local days = m.duration_min and math.max(1, math.ceil(m.duration_min / 1440)) or 1
       m.ends = model.add_days(m.date, days - 1)
+    end
+  end
+
+  -- a series (`repeat`, `repeat_until`, `except`) is the template of its occurrences; an occurrence that got a file
+  -- names its series (`series:`) and is the file `<slug of the series>-<day>` of the same area
+  local rep = model.field_text(meta["repeat"], "repeat", bad)
+  if rep then
+    local every = M.normalize_repeat(rep)
+    if not every then
+      bad(
+        "meeting-bad-repeat",
+        ("repeat '%s' is none (weekly, monthly, 2w, 10d, 1y: a whole number of 1 to %d and d, w, m or y)"):format(
+          rep,
+          model.REPEAT_MAX
+        )
+      )
+    else
+      m.repeat_every = every
+    end
+  end
+  local until_text = model.field_text(meta.repeat_until, "repeat_until", bad)
+  if until_text then
+    if not model.is_date(until_text) then
+      bad(
+        "meeting-bad-repeat-until",
+        "repeat_until is no calendar day (YYYY-MM-DD): " .. until_text
+      )
+    elseif not rep then
+      bad("meeting-bad-repeat-until", "repeat_until needs repeat")
+    elseif m.date and until_text < m.date then
+      bad(
+        "meeting-bad-repeat-until",
+        ("repeat_until %s is before the first day %s"):format(until_text, m.date)
+      )
+    else
+      m.repeat_until = until_text
+    end
+  end
+  m.except = {}
+  local except_list = model.field_list(meta.except, "except", bad)
+  if #except_list > 0 and not rep then
+    bad("meeting-bad-except", "except needs repeat")
+  end
+  for _, day in ipairs(except_list) do
+    if not model.is_date(day) then
+      bad("meeting-bad-except", "except: no calendar day (YYYY-MM-DD): " .. day)
+    elseif #m.except >= M.MAX_EXCEPT then
+      bad("meeting-bad-except", ("except: at most %d days"):format(M.MAX_EXCEPT))
+      break
+    elseif not vim.tbl_contains(m.except, day) then
+      m.except[#m.except + 1] = day
+    end
+  end
+  table.sort(m.except)
+  local series = model.field_text(meta.series, "series", bad)
+  if series then
+    local series_area, series_slug = vault.parse_id(series)
+    local base, day = M.split_occurrence(slug)
+    if not series_area or not series_slug then
+      bad("meeting-bad-series", "series: not an id <area>/<slug>: " .. series)
+    elseif rep then
+      bad(
+        "meeting-bad-series",
+        "an occurrence (series:) is no series itself: keep one of repeat and series"
+      )
+    elseif series_area ~= ctx.area or base ~= series_slug then
+      bad(
+        "meeting-bad-series",
+        ("the occurrence of %s is the file %s-<YYYY-MM-DD> of its area, not %s"):format(
+          series,
+          series_slug,
+          slug
+        )
+      )
+    else
+      m.series, m.occurrence = series, day
     end
   end
 
@@ -800,6 +929,234 @@ function M.find(id, opts)
     return nil, folder --[[@as string]]
   end
   return M.from_file(path, { area = area, slug = slug, folder = folder == true }), nil
+end
+
+-- ── series ───────────────────────────────────────────────────────────────────
+
+---The day `k` intervals after the first day of a series: days and weeks count calendar days, months and years keep
+---the day of the month of the first day and stop at the end of a shorter month (each from the first day, so a
+---series of the 31st is on the 31st again after February).
+---@param first string
+---@param n integer
+---@param unit string
+---@param k integer
+---@return string
+local function nth_day(first, n, unit, k)
+  if unit == "d" or unit == "w" then
+    return model.add_days(first, k * n * (unit == "w" and 7 or 1)) --[[@as string]]
+  end
+  local y, mo, d = first:match("^(%d+)-(%d+)-(%d+)$")
+  local months = tonumber(y) * 12 + tonumber(mo) - 1 + k * n * (unit == "y" and 12 or 1)
+  local ny, nm = math.floor(months / 12), months % 12 + 1
+  return ("%04d-%02d-%02d"):format(ny, nm, math.min(tonumber(d), model.days_in_month(ny, nm)))
+end
+
+---The days of the occurrences of a series whose days touch the window `since`..`until_` (both included), in order:
+---from its first day (`date`) on by its interval, up to `repeat_until`, without the days of `except`. At most
+---`limit`; the second value says there were more. A meeting that is no series has none.
+---@param m Tasks.Meeting
+---@param since string
+---@param until_ string
+---@param limit integer
+---@return string[] days
+---@return boolean cut
+function M.occurrence_days(m, since, until_, limit)
+  local n, unit = model.parse_repeat(m.repeat_every)
+  if not n or not m.date or not model.is_date(since) or not model.is_date(until_) then
+    return {}, false
+  end
+  local start = model.day_number(m.date)
+  -- an occurrence of several days touches the window when it begins at most `span` days before `since`
+  local span = model.day_number((m.ends or m.date):sub(1, 10)) - start
+  local from = model.day_number(since) - span
+  local last_day = (m.repeat_until and m.repeat_until < until_) and m.repeat_until or until_
+  local last = model.day_number(last_day)
+  local skip = {}
+  for _, day in ipairs(m.except or {}) do
+    skip[day] = true
+  end
+  -- leap over the occurrences before the window (an old daily series is no long walk)
+  local k = 0
+  if from > start then
+    if unit == "d" or unit == "w" then
+      k = math.floor((from - start) / (n * (unit == "w" and 7 or 1)))
+    else
+      local fy, fmo = model.add_days(m.date, from - start):match("^(%d+)-(%d+)")
+      local y, mo = m.date:match("^(%d+)-(%d+)")
+      local diff = (tonumber(fy) * 12 + tonumber(fmo)) - (tonumber(y) * 12 + tonumber(mo))
+      k = math.max(0, math.floor(diff / (n * (unit == "y" and 12 or 1))) - 1)
+    end
+  end
+  local out = {}
+  while true do
+    local day = nth_day(m.date, n, unit, k)
+    local num = model.day_number(day)
+    if num > last then
+      break
+    end
+    if num >= from and not skip[day] then
+      if #out >= limit then
+        return out, true
+      end
+      out[#out + 1] = day
+    end
+    k = k + 1
+  end
+  return out, false
+end
+
+---Whether `day` is the day of an occurrence of the series `m` (an excepted day is none).
+---@param m Tasks.Meeting
+---@param day string
+---@return boolean
+function M.is_occurrence_day(m, day)
+  if not model.is_date(day) then
+    return false
+  end
+  for _, d in ipairs((M.occurrence_days(m, day, day, M.MAX_OCCURRENCES))) do
+    if d == day then
+      return true
+    end
+  end
+  return false
+end
+
+---The text an occurrence of a series has before anything is written into it: the series file with the day of the
+---occurrence as `date`, `series:` naming the series and without `repeat`, `repeat_until` and `except`. A series that
+---is cancelled cancels the occurrences without a file; any other is `planned` in them.
+---@param text string  The text of the series file.
+---@param series Tasks.Meeting
+---@param day string
+---@return string|nil
+function M.occurrence_text(text, series, day)
+  return fm.update_text(text, {
+    { "status", series.status == "cancelled" and "cancelled" or "planned" },
+    { "date", day },
+    { "repeat", fm.REMOVE },
+    { "repeat_until", fm.REMOVE },
+    { "except", fm.REMOVE },
+    { "series", series.id },
+  })
+end
+
+---The occurrence of `series` on `day` as a meeting without a file (`virtual`): read from `occurrence_text`, its
+---version (`etag`) the one of the series file, its `path` the file it gets on the first entry.
+---@param root string
+---@param series Tasks.Meeting
+---@param text string  The text of the series file.
+---@param day string
+---@return Tasks.Meeting|nil
+function M.virtual(root, series, text, day)
+  local occ_text = M.occurrence_text(text, series, day)
+  if not occ_text then
+    return nil
+  end
+  local slug = series.slug .. "-" .. day
+  local path = vault.meetings_dir(root, series.area) .. "/" .. slug .. ".md"
+  local m = M.parse(occ_text, { path = path, area = series.area, slug = slug })
+  m.virtual = true
+  m.etag = series.etag
+  m.series_path = series.path
+  return m
+end
+
+---The occurrence `<area>/<slug>` of a series that has no file yet: the slug is `<slug of the series>-<day>`, the series
+---a valid meeting with `repeat`, the day one of its occurrences, and no task, plan or project holds the id. Nil else.
+---@param root string
+---@param area string
+---@param slug string
+---@return Tasks.Meeting|nil
+function M.occurrence(root, area, slug)
+  local base, day = M.split_occurrence(slug)
+  if not base or not vault.has_area(root, area) then
+    return nil
+  end
+  if vault.resolve_meeting(root, area, slug) or vault.has_plan_or_project(root, area, slug) then
+    return nil
+  end
+  if
+    fsio.is_file(vault.task_path(root, area, slug)) or fsio.is_dir(vault.task_dir(root, area, slug))
+  then
+    return nil
+  end
+  local path, folder = vault.resolve_meeting(root, area, base)
+  if not path then
+    return nil
+  end
+  local series = M.from_file(path, { area = area, slug = base, folder = folder == true })
+  if not series.valid or not series.repeat_every or not M.is_occurrence_day(series, day) then
+    return nil
+  end
+  local text = fsio.read(path)
+  if not text then
+    return nil
+  end
+  series.etag = fsio.etag(text)
+  return M.virtual(root, series, text, day)
+end
+
+---A meeting by id, or the occurrence of a series of that id without a file yet (`virtual`, see `occurrence`).
+---@param id string
+---@param opts? { root?: string }
+---@return Tasks.Meeting|nil meeting
+---@return string|nil err
+function M.find_any(id, opts)
+  local m, err = M.find(id, opts)
+  if m then
+    return m, nil
+  end
+  local root = vault.root(opts or {})
+  local area, slug = vault.parse_id(id)
+  if root and area and slug and vault.valid_area(area) then
+    local occ = M.occurrence(root, area, slug)
+    if occ then
+      return occ, nil
+    end
+  end
+  return nil, err
+end
+
+---The meetings of a window as a calendar shows them: each series replaced by its occurrences that touch
+---`since`..`until_` (at most `MAX_OCCURRENCES` each), an occurrence that has a file (`series:`) by that file (it is in
+---`list` and keeps its own `date`, also when it was moved), the others computed (`virtual`). A series that is not valid
+---stays as it is, so its problems are seen. The second value names the series that had more occurrences.
+---@param root string
+---@param list Tasks.Meeting[]
+---@param since string
+---@param until_ string
+---@return Tasks.Meeting[] meetings
+---@return string[] notes
+function M.expand(root, list, since, until_)
+  local out, notes, taken = {}, {}, {}
+  for _, m in ipairs(list) do
+    if m.series and m.occurrence then
+      taken[m.series .. "\t" .. m.occurrence] = true
+    end
+  end
+  for _, m in ipairs(list) do
+    if m.repeat_every and m.valid then
+      local days, cut = M.occurrence_days(m, since, until_, M.MAX_OCCURRENCES)
+      if cut then
+        notes[#notes + 1] = ("%s: more than %d occurrences in the window (narrow since and until)"):format(
+          m.id,
+          M.MAX_OCCURRENCES
+        )
+      end
+      local text
+      for _, day in ipairs(days) do
+        if not taken[m.id .. "\t" .. day] then
+          text = text or fsio.read(m.path)
+          local occ = text and M.virtual(root, m, text, day)
+          if occ then
+            out[#out + 1] = occ
+          end
+        end
+      end
+    else
+      out[#out + 1] = m
+    end
+  end
+  return out, notes
 end
 
 ---Order of meetings: the earlier first (a meeting without a valid date last), then by id.

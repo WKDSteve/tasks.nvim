@@ -309,6 +309,35 @@
           },
           "additionalProperties": false
         },
+        "repeat": {
+          "description": "A series (capability `meeting_series`): its interval as the routines write it (`1w`, `2w`, `1m`; `daily`, `weekly`, `monthly`, `yearly` are read as `1d`, `1w`, `1m`, `1y`). A series is the template of its occurrences: `meetings` lists the occurrences, not the series.",
+          "type": "string",
+          "pattern": "^[1-9][0-9]{0,2}[dwmy]$"
+        },
+        "repeat_until": {
+          "description": "A series: its last possible day.",
+          "$ref": "#/$defs/Date"
+        },
+        "except": {
+          "description": "A series: the days without an occurrence, in order.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Date"
+          }
+        },
+        "series": {
+          "description": "An occurrence of a series: the id of the series.",
+          "type": "string",
+          "pattern": "^[^/]+/[^/]+$"
+        },
+        "occurrence": {
+          "description": "An occurrence of a series: its day in the series (the day in its slug `<slug of the series>-<day>`; `date` differs when it was moved).",
+          "$ref": "#/$defs/Date"
+        },
+        "virtual": {
+          "description": "An occurrence without a file yet, computed from the series: `etag` is the version of the series file, `file` the file it gets on the first entry (an operation on its id makes it).",
+          "const": true
+        },
         "has_result": {
           "type": "boolean"
         },
@@ -4314,7 +4343,7 @@
           "$ref": "#/$defs/Etag"
         },
         "created": {
-          "description": "`board_save`: true when the board was new, false when it replaced one.",
+          "description": "`board_save`: true when the board was new, false when it replaced one. A meeting operation on an occurrence of a series without a file: true when the operation made (a dry run: would make) its file (capability `meeting_series`).",
           "type": "boolean"
         },
         "ok": {

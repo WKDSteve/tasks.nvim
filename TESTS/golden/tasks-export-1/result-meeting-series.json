@@ -1,0 +1,73 @@
+{
+  "client_op_id": "golden-meeting-series",
+  "digest": "sha256:5f4864c41277847e",
+  "dry_run": false,
+  "engine": {
+    "git": "0000000",
+    "nvim": "0.0.0",
+    "version": "0.1.0-test"
+  },
+  "generated_at": "2026-01-01T00:00:00Z",
+  "kind": "tasks.result",
+  "ok": true,
+  "plugin": "tasks.nvim",
+  "results": [
+    {
+      "changed_ids": [
+        "lib.nvim/one-on-one-2026-01-05"
+      ],
+      "created": true,
+      "etag_after": "sha256:d87ac1f41ad2c9ec",
+      "etag_before": "sha256:0dbd22cb39baf830",
+      "file": "lib.nvim/MEETINGS/one-on-one-2026-01-05.md",
+      "id": "lib.nvim/one-on-one-2026-01-05",
+      "inverse": {
+        "body": "\n## Agenda\n- [ ] Blockers\n\n## Protokoll\n",
+        "id": "lib.nvim/one-on-one-2026-01-05",
+        "if_match": "sha256:d87ac1f41ad2c9ec",
+        "op": "set_body"
+      },
+      "n": 1,
+      "ok": true,
+      "op": "meeting_capture",
+      "outcome": "changed"
+    },
+    {
+      "changed_ids": [
+        "lib.nvim/one-on-one-2026-01-26"
+      ],
+      "created": true,
+      "etag_after": "sha256:4e8ad8ba1b7be042",
+      "etag_before": "sha256:0dbd22cb39baf830",
+      "file": "lib.nvim/MEETINGS/one-on-one-2026-01-26.md",
+      "id": "lib.nvim/one-on-one-2026-01-26",
+      "inverse": {
+        "id": "lib.nvim/one-on-one-2026-01-26",
+        "if_match": "sha256:4e8ad8ba1b7be042",
+        "op": "meeting_set",
+        "patch": {
+          "status": "planned"
+        }
+      },
+      "n": 2,
+      "ok": true,
+      "op": "meeting_set",
+      "outcome": "changed"
+    },
+    {
+      "changed_ids": [],
+      "etag_after": "sha256:0dbd22cb39baf830",
+      "etag_before": "sha256:0dbd22cb39baf830",
+      "file": "lib.nvim/MEETINGS/one-on-one-2026-02-02.md",
+      "id": "lib.nvim/one-on-one-2026-02-02",
+      "n": 3,
+      "ok": true,
+      "op": "meeting_set",
+      "outcome": "unchanged"
+    }
+  ],
+  "schema": 1,
+  "vault": {
+    "id": "vault"
+  }
+}

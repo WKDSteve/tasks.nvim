@@ -81,7 +81,10 @@
 ---    `meeting-done-in-future` (warnings): `tasks:` names a task that exists nowhere, `cover:` (or `image:`) or an icon
 ---    asset names a file that is not there, a meeting is done before its day; `meeting-image-alias`,
 ---    `meeting-done-without-result`, `meeting-overlap` (hints): `image:` is the old name of `cover:`, done without
----    `## Ergebnis` (allowed), two planned meetings of the area at the same time
+---    `## Ergebnis` (allowed), two planned meetings of the area at the same time; a series (`repeat`):
+---    `meeting-bad-repeat`, `meeting-bad-repeat-until`, `meeting-bad-except`, `meeting-bad-series` (errors),
+---    `meeting-series-missing` (warning: `series:` names no series of the area), `meeting-series-off-day` (hint: the
+---    day of an occurrence file is no day of its series any more)
 ---  - learning paths (`<area>/ROADMAP/paths/`, `tasks_nvim.paths`): a broken path file with the codes of a plan file
 ---    as `path-...` (and `path-no-stages`); `path-id-taken` (error); `path-reason-missing`, `path-duplicate-key`,
 ---    `path-bad-key`, `path-bad-mark`, `path-bad-arrow`, `path-image-outside`, `path-arrow-dangling`,
@@ -722,9 +725,35 @@ local function meeting_findings(findings, hints, open_ids, names, scan_opts, is_
       )
     end
     local timed = {}
+    local by_id = {}
+    for _, m in ipairs(list or {}) do
+      by_id[m.id] = m
+    end
     for _, m in ipairs(list or {}) do
       for i, msg in ipairs(m.errors) do
         add(findings, "error", m.error_codes[i] or "frontmatter-invalid", m, msg)
+      end
+      -- an occurrence with a file: its series is there and still a series, and its day is still one of the series
+      if m.series and m.occurrence then
+        local series = by_id[m.series]
+        if not series or not series.repeat_every then
+          add(
+            findings,
+            "warn",
+            "meeting-series-missing",
+            m,
+            "series: " .. m.series .. " is no series of the area (no meeting with repeat)"
+          )
+        elseif series.valid and not meetings.is_occurrence_day(series, m.occurrence) then
+          hint(
+            "meeting-series-off-day",
+            m,
+            ("%s is no day of the series %s any more (repeat, repeat_until or except changed)"):format(
+              m.occurrence,
+              m.series
+            )
+          )
+        end
       end
       -- ids are global: a finished task of the same id counts as much as an open one
       if
@@ -766,7 +795,8 @@ local function meeting_findings(findings, hints, open_ids, names, scan_opts, is_
       if m.status == "done" and not m.has_result then
         hint("meeting-done-without-result", m, "done without a result (## Ergebnis is empty)")
       end
-      if m.status == "planned" and m.time and m.start and m.ends then
+      -- a series is the template of its occurrences, not a meeting at its first day
+      if m.status == "planned" and m.time and m.start and m.ends and not m.repeat_every then
         timed[#timed + 1] = m
       end
     end

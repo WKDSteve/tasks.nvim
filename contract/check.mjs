@@ -175,6 +175,11 @@ mutate("a quick proposal that assumed something nobody defined", "meeting-parse-
 mutate("a meeting document of a kind of document nobody defined", "meeting", (d) => (d.documents[0].kind = "fax"));
 mutate("a participant without a name", "meeting", (d) => delete d.participants[0].name);
 mutate("a follow-up task that is no id", "meeting", (d) => (d.followups[0].task = "gamma"));
+mutate("an occurrence that says it is not virtual", "meetings-series", (d) => (d.items[0].virtual = false));
+mutate("an occurrence on no day", "meeting-occurrence", (d) => (d.meeting.occurrence = "Monday"));
+mutate("a series that is no id", "meeting-occurrence", (d) => (d.meeting.series = "one-on-one"));
+mutate("a repeat as a word, not normalised", "meeting-occurrence", (d) => (d.meeting.repeat = "weekly"));
+mutate("an except that is no list of days", "meeting-occurrence", (d) => (d.meeting.except = ["soon"]));
 mutate("a task entry with more than 20 meetings", "task-with-meetings", (d) => {
   d.task.meetings = Array.from({ length: 21 }, (_, i) => `lib.nvim/m${i}`);
 });

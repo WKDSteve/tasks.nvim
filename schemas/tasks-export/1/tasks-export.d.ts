@@ -1947,6 +1947,30 @@ export interface MeetingEntry {
     present?: number;
     ticked?: number;
   };
+  /**
+   * A series (capability `meeting_series`): its interval as the routines write it (`1w`, `2w`, `1m`; `daily`, `weekly`, `monthly`, `yearly` are read as `1d`, `1w`, `1m`, `1y`). A series is the template of its occurrences: `meetings` lists the occurrences, not the series.
+   */
+  repeat?: string;
+  /**
+   * A calendar day, YYYY-MM-DD.
+   */
+  repeat_until?: string;
+  /**
+   * A series: the days without an occurrence, in order.
+   */
+  except?: Date[];
+  /**
+   * An occurrence of a series: the id of the series.
+   */
+  series?: string;
+  /**
+   * A calendar day, YYYY-MM-DD.
+   */
+  occurrence?: string;
+  /**
+   * An occurrence without a file yet, computed from the series: `etag` is the version of the series file, `file` the file it gets on the first entry (an operation on its id makes it).
+   */
+  virtual?: true;
   has_result: boolean;
   has_decisions: boolean;
   has_protocol: boolean;
@@ -2255,7 +2279,7 @@ export interface ResultEntry {
    */
   etag?: string;
   /**
-   * `board_save`: true when the board was new, false when it replaced one.
+   * `board_save`: true when the board was new, false when it replaced one. A meeting operation on an occurrence of a series without a file: true when the operation made (a dry run: would make) its file (capability `meeting_series`).
    */
   created?: boolean;
   ok: boolean;

@@ -85,6 +85,7 @@ M.CAPABILITIES = {
   "meeting",
   "meeting_ops",
   "meeting_parse",
+  "meeting_series",
   "meetings",
   "move_area",
   "move_area_preview",
@@ -2964,6 +2965,13 @@ local function meeting_entry(root, m)
     participants = json.object({ total = #m.participants, present = present }),
     agenda = json.object({ total = #m.agenda, ticked = ticked_agenda }),
     followups = json.object({ total = #m.followups, ticked = ticked_followups }),
+    -- a series and its occurrences (capability `meeting_series`)
+    ["repeat"] = m.repeat_every,
+    repeat_until = m.repeat_until,
+    except = (m.except and #m.except > 0) and vim.list_slice(m.except, 1) or nil,
+    series = m.series,
+    occurrence = m.occurrence,
+    virtual = m.virtual or nil,
     has_result = m.has_result,
     has_decisions = m.has_decisions,
     has_protocol = m.has_protocol,
@@ -3066,8 +3074,10 @@ function M.meetings(params, opts)
       end
     end
     local all, errors = meetings.all({ root = root })
+    -- a series is shown as its occurrences in the window (capability `meeting_series`)
+    local expanded, notes = meetings.expand(root, all or {}, since, until_)
     local matching, undated = {}, 0
-    for _, m in ipairs(all or {}) do
+    for _, m in ipairs(expanded) do
       local wanted = (area_set == nil or area_set[m.area])
         and (statuses == nil or (m.status ~= nil and statuses[m.status]))
         and (params.task == nil or vim.tbl_contains(m.tasks, params.task))
@@ -3102,9 +3112,11 @@ function M.meetings(params, opts)
     if offset + limit < #matching then
       doc.next_offset = offset + limit
     end
+    local incomplete =
+      vim.list_extend(vim.list_slice(type(errors) == "table" and errors or {}, 1), notes)
     doc.incomplete = vim.tbl_map(function(e)
       return redact(root, tostring(e))
-    end, type(errors) == "table" and errors or {})
+    end, incomplete)
     return seal(doc, builder.rev_of(lines)), nil
   end)
 end
@@ -3125,7 +3137,8 @@ function M.meeting(id, opts)
     if not root then
       return nil, rerr
     end
-    local m, err = meetings.find(id, { root = root })
+    -- an occurrence of a series without a file yet is read as it is computed (`virtual`)
+    local m, err = meetings.find_any(id, { root = root })
     if not m then
       return nil, { code = "not_found", message = redact(root, tostring(err)), retryable = false }
     end

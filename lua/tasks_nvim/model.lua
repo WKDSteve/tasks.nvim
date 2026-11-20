@@ -752,6 +752,7 @@ local function days_in_month(y, m)
   end
   return (m == 4 or m == 6 or m == 9 or m == 11) and 30 or 31
 end
+M.days_in_month = days_in_month
 
 ---`YYYY-MM-DD` that is a real calendar date.
 ---@param s any
@@ -794,6 +795,7 @@ local function day_number(s)
   local doe = yoe * 365 + math.floor(yoe / 4) - math.floor(yoe / 100) + doy
   return era * 146097 + doe - 719468
 end
+M.day_number = day_number
 
 ---The date `n` days after (before, for a negative `n`) a valid `YYYY-MM-DD`.
 ---@param date string

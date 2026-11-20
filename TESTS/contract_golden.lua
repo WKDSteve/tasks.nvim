@@ -178,6 +178,61 @@ function G.write_meetings(root)
   write(dir .. "/someday.md", "---\ntitle: Someday\nstatus: planned\n---\n\nNo date yet.\n")
 end
 
+---Write a weekly series with an excepted day, an end and one occurrence that has its file (moved by a day) into
+---`root`: the golden cases `meetings-series`, `meeting-occurrence` and `result-meeting-series`.
+---@param root string
+function G.write_series(root)
+  local function write(path, text)
+    vim.fn.mkdir(vim.fs.dirname(path), "p")
+    local fh = assert(io.open(path, "wb"))
+    fh:write(text)
+    fh:close()
+  end
+  local dir = root .. "/lib.nvim/MEETINGS"
+  write(
+    dir .. "/one-on-one.md",
+    table.concat({
+      "---",
+      'title: "1:1 Rick"',
+      "status: planned",
+      "date: 2026-01-05",
+      'time: "10:00"',
+      "duration: 30m",
+      "tasks: [lib.nvim/alpha]",
+      "repeat: weekly",
+      "repeat_until: 2026-02-02",
+      "except: [2026-01-19]",
+      "created: 2026-01-02",
+      "---",
+      "",
+      "## Agenda",
+      "- [ ] Blockers",
+      "",
+      "## Protokoll",
+      "",
+    }, "\n")
+  )
+  write(
+    dir .. "/one-on-one-2026-01-12.md",
+    table.concat({
+      "---",
+      'title: "1:1 Rick"',
+      "status: done",
+      "date: 2026-01-13",
+      'time: "10:00"',
+      "duration: 30m",
+      "tasks: [lib.nvim/alpha]",
+      "series: lib.nvim/one-on-one",
+      "created: 2026-01-12",
+      "---",
+      "",
+      "## Ergebnis",
+      "Agreed.",
+      "",
+    }, "\n")
+  )
+end
+
 ---Each case: the file name (without `.json`), the method and the request text (`nil`: no request; a function builds it
 ---from the vault it runs on). `fresh`: the case WRITES, so it runs on a vault of its own and cannot change what the
 ---other cases see.
@@ -345,6 +400,27 @@ G.cases = {
     request = function(root)
       G.write_meetings(root)
       return '{"params":{"id":"lib.nvim/sync"}}'
+    end,
+  },
+  {
+    -- a series in a window (capability `meeting_series`): its occurrences computed (`virtual`), one with a file in place
+    -- of its day (moved a day), the excepted day and the days after `repeat_until` left out
+    name = "meetings-series",
+    method = "meetings",
+    fresh = true,
+    request = function(root)
+      G.write_series(root)
+      return '{"params":{"since":"2026-01-01","until":"2026-02-28"}}'
+    end,
+  },
+  {
+    -- an occurrence of a series without a file, read by its id (`<slug of the series>-<day>`)
+    name = "meeting-occurrence",
+    method = "meeting",
+    fresh = true,
+    request = function(root)
+      G.write_series(root)
+      return '{"params":{"id":"lib.nvim/one-on-one-2026-01-26"}}'
     end,
   },
   {
@@ -598,6 +674,36 @@ G.cases = {
           { op = "meeting_attend", id = id, n = 1 },
           { op = "meeting_followups", id = id },
           { op = "meeting_close", id = id, result = "Vereinbart." },
+        },
+      })
+    end,
+  },
+  {
+    -- the first entry into an occurrence of a series makes its file (`created`); a cancellation is an entry too; a
+    -- change that changes nothing leaves it computed
+    name = "result-meeting-series",
+    method = "ops",
+    fresh = true,
+    request = function(root)
+      G.write_series(root)
+      return encode({
+        client_op_id = "golden-meeting-series",
+        ops = {
+          {
+            op = "meeting_capture",
+            id = "lib.nvim/one-on-one-2026-01-05",
+            entry = { kind = "decision", text = "Ship it", at = "10:10" },
+          },
+          {
+            op = "meeting_set",
+            id = "lib.nvim/one-on-one-2026-01-26",
+            patch = { status = "cancelled" },
+          },
+          {
+            op = "meeting_set",
+            id = "lib.nvim/one-on-one-2026-02-02",
+            patch = { status = "planned" },
+          },
         },
       })
     end,
