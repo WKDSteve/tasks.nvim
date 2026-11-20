@@ -194,4 +194,37 @@ return function(H)
   eq(plain.task.id, "b/y")
   eq(plain.reason, "vault")
   eq(plain.freed, {})
+
+  -- ── not_category: the ready tasks of those categories are left out of the pick, the runners-up and the AI queue ──
+  local categorized = {
+    T("a/learn", { prio = "1", tags = "[learning]" }),
+    T("a/ai-learn", { prio = "1", actor = "cdx", tags = "[learning]" }),
+    T("a/work", { prio = "2" }),
+    T("a/fix", { prio = "3" }),
+  }
+  local all = next_pick.pick({ tasks = categorized })
+  eq(all.task.id, "a/learn", "without the filter the learning task is the best one")
+  eq(all.left_out, nil)
+  local without = next_pick.pick({ tasks = categorized, not_category = { "learning" } })
+  eq(without.task.id, "a/work", "the next task that is no learning task")
+  eq(ids(without.alternatives), { "a/fix" })
+  eq(ids(without.cdx), {}, "the AI queue leaves them out too")
+  eq(without.left_out, 2, "and says how many it left out")
+  eq(without.ready.vault, 2, "they are not counted as ready")
+  local nothing = next_pick.pick({
+    tasks = { T("a/learn", { tags = "[learning]" }) },
+    not_category = { "learning" },
+  })
+  eq(nothing.task, nil)
+  eq(nothing.left_out, 1, "an empty answer still says what it left out")
+
+  -- the contract checks the words: an unknown category is refused, not ignored
+  local contract = require("tasks_nvim.contract")
+  local doc, err = contract.next(
+    { not_category = { "learning", "no-such-category" } },
+    { root = H.tmpdir() }
+  )
+  eq(doc, nil)
+  eq(err and err.code, "invalid_argument")
+  ok(tostring(err and err.message):find("not_category", 1, true), "the message names the field")
 end

@@ -1,0 +1,64 @@
+{
+  "alternatives": [
+    {
+      "effort": "M",
+      "id": "lib.nvim/order-a",
+      "prio": 2,
+      "status": "open",
+      "title": "Größe 日本 😀"
+    },
+    {
+      "effort": "S",
+      "id": "cascade.nvim/eta",
+      "status": "open",
+      "title": "Eta tests"
+    },
+    {
+      "effort": "huge",
+      "id": "lib.nvim/broken",
+      "status": "open",
+      "title": "Broken task"
+    }
+  ],
+  "cdx": [
+    {
+      "effort": "S",
+      "id": "lib.nvim/alpha",
+      "prio": 1,
+      "status": "open",
+      "title": "Alpha \u003cscript>alert(1)\u003c/script> & \"quotes\" \\ slash"
+    }
+  ],
+  "digest": "sha256:92882080f5aeb4b9",
+  "engine": {
+    "git": "0000000",
+    "nvim": "0.0.0",
+    "version": "0.1.0-test"
+  },
+  "freed": [],
+  "generated_at": "2026-01-01T00:00:00Z",
+  "incomplete": [],
+  "kind": "tasks.next",
+  "left_out": 1,
+  "open": {
+    "area": 0,
+    "vault": 14
+  },
+  "plugin": "tasks.nvim",
+  "ready": {
+    "area": 0,
+    "vault": 5
+  },
+  "schema": 1,
+  "task": {
+    "effort": "S",
+    "id": "cascade.nvim/zeta",
+    "prio": 2,
+    "reason": "vault",
+    "status": "open",
+    "title": "Zeta builds"
+  },
+  "vault": {
+    "id": "vault"
+  }
+}

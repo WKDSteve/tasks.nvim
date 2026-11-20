@@ -65,6 +65,8 @@ function M.build(H)
   task(H, root, "lib.nvim", "alpha-twin", {
     { "prio", "1" },
     { "effort", "XS" },
+    -- a learning task: `next` with `not_category` leaves it out
+    { "category", "[learning]" },
     { "refs", "[docs/shared.md]" },
   }, "open", "Twin of alpha (same file)")
 

@@ -46,7 +46,7 @@
     "listed": 14,
     "unlisted": 2
   },
-  "digest": "sha256:888fee3ac9eabc4c",
+  "digest": "sha256:ccd06dc976d63c7c",
   "engine": {
     "git": "0000000",
     "nvim": "0.0.0",
@@ -207,7 +207,7 @@
       "title": "Old and done"
     }
   ],
-  "rev": "rev:bdf10a",
+  "rev": "rev:def89c",
   "schema": 1,
   "tasks": [
     {
@@ -318,11 +318,13 @@
       "after": [],
       "area": "lib.nvim",
       "blocked_by": [],
-      "category": [],
+      "category": [
+        "learning"
+      ],
       "created": "2026-01-01",
       "effort": "XS",
       "effort_days": 0.25,
-      "etag": "sha256:c337ac829c9ce237",
+      "etag": "sha256:632dd003aa86afa1",
       "file": "lib.nvim/ROADMAP/tasks/alpha-twin.md",
       "folder": false,
       "group": "open|1",

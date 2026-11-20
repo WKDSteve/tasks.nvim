@@ -1,6 +1,6 @@
 {
   "cycles": [],
-  "digest": "sha256:157a3c64007b324a",
+  "digest": "sha256:5e8b41701326d58b",
   "direction": "needs",
   "edges": [
     {
@@ -38,7 +38,7 @@
     }
   ],
   "plugin": "tasks.nvim",
-  "rev": "rev:bdf10a",
+  "rev": "rev:def89c",
   "schema": 1,
   "total": 2,
   "truncated": false,

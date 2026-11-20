@@ -32,6 +32,7 @@
     "move_area",
     "move_area_preview",
     "next",
+    "next_not_category",
     "node_note",
     "node_set",
     "ops",

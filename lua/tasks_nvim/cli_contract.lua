@@ -518,9 +518,9 @@ end
 ---@param count integer
 ---@param actor string|nil
 ---@return integer
-function M.next_json(ctx, area, count, actor)
+function M.next_json(ctx, area, count, actor, not_category)
   local doc, err = contract.next(
-    { area = area, actor = actor, n = count - 1 },
+    { area = area, actor = actor, n = count - 1, not_category = not_category },
     { root = ctx.eo.root }
   )
   return emit(ctx, doc, err)

@@ -42,6 +42,7 @@ local M = {}
 ---@field area? string                          # Area that ranks first (default: the finished task's).
 ---@field area_set? table<string, boolean>      # The areas `area` stands for when it is an area group.
 ---@field actor? string                         # `cdx`, `me`, `pair` or `none`: that queue instead of the human's.
+---@field not_category? string[]                # Ready tasks of one of these categories are left out (`model.categories`).
 ---@field n? integer                            # Runners-up to return (default 2).
 ---@field cdx? integer                          # Tasks for an AI session to list apart (default 3).
 ---@field unlisted? integer                     # Tasks of a status nobody knows (see `NextEmpty.unlisted`).
@@ -58,6 +59,7 @@ local M = {}
 ---@field open { area: integer, vault: integer }
 ---@field empty? Tasks.NextEmpty
 ---@field incomplete? string[]                  # Folders that could not be read: the answer may be incomplete.
+---@field left_out? integer                     # Ready tasks left out by `not_category`.
 ---@field later? integer                      # Ready tasks left out because their `start` day has not come.
 ---@field claimed? integer                    # Ready tasks left out because somebody else has claimed them (`foreign` of the options).
 ---@field reminders? { open: Tasks.Task[], done: integer }  # Reminders that are due: the open tasks (oldest date first) and how many finished tasks carry one (`pick_from_vault` with `reminders = true` only).
@@ -99,6 +101,22 @@ function M.pick(opts)
   local home_set = opts.area and opts.area_set or (home and { [home] = true }) or nil
 
   ---@type Tasks.NextPick
+  -- the categories asked to be left out (`not_category`), as a set
+  local excluded = {}
+  for _, c in ipairs(opts.not_category or {}) do
+    excluded[c] = true
+  end
+  ---@param task Tasks.Task
+  ---@return boolean
+  local function left_out(task)
+    for _, c in ipairs(model.categories(task)) do
+      if excluded[c] then
+        return true
+      end
+    end
+    return false
+  end
+
   local result = {
     alternatives = {},
     cdx = {},
@@ -159,6 +177,9 @@ function M.pick(opts)
     elseif opts.foreign and opts.foreign[id] then
       -- somebody is working on it: it stays a blocker for others, it is no candidate for this caller
       result.claimed = (result.claimed or 0) + 1
+    elseif left_out(node.task) then
+      -- of a category the caller does not want now (`not_category`): not offered, not in the AI queue, counted
+      result.left_out = (result.left_out or 0) + 1
     elseif wanted(node.task, opts.actor) then
       candidates[#candidates + 1] = node.task
       result.ready.vault = result.ready.vault + 1
@@ -297,7 +318,7 @@ function M.due_reminders(open, finished, today)
 end
 
 ---The same over the vault on disk: every open task, the finished ids looked up in the Backlogs when needed.
----@param opts { root?: string, by?: string, done?: { id: string, area: string }, area?: string, actor?: string, n?: integer, cdx?: integer, today?: string, reminders?: boolean }
+---@param opts { root?: string, by?: string, done?: { id: string, area: string }, area?: string, actor?: string, not_category?: string[], n?: integer, cdx?: integer, today?: string, reminders?: boolean }
 ---@return Tasks.NextPick|nil result
 ---@return string|nil err
 function M.pick_from_vault(opts)
@@ -342,6 +363,7 @@ function M.pick_from_vault(opts)
     area = opts.area,
     area_set = opts.area and scan.area_set(vault.root(opts) or "", opts.area) or nil,
     actor = opts.actor,
+    not_category = opts.not_category,
     n = opts.n,
     cdx = opts.cdx,
   })

@@ -606,6 +606,8 @@ What to start next: the best **ready** task and why, with a small dialog (`Not n
 The order is fixed: freed by the task you just finished, then the same area, then the vault; `doing` before `open`
 before `decision`; the effective prio; the earlier `due` date (undated after dated); the return on effort; the smaller effort; the id. Tasks written `cdx` are not
 "your next task": they are listed apart ("an AI session could take ..."); `--actor=cdx` asks for that queue instead.
+The headless `tasks next --not-category=learning` (and `not_category` of the contract) leaves the ready tasks of those
+categories out, from the pick, the alternatives and the `cdx` queue, and says how many (`left_out`).
 When there is nothing, the answer says which kind of nothing: **never** "all done" while work is only waiting
 ("Nothing can be started. Still open: 4 for you, 6 blocked, 3 parked."). Parked tasks that name what they wait for are
 broken down: "30 parked (25 waiting for mac, 3 for licence)".

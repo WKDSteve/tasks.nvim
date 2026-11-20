@@ -209,7 +209,8 @@ return function(H)
         "tz",
       },
     },
-    ["next"] = { composer = {}, cli = { "by", "format" } },
+    -- `--not-category` serves a client (the app hides learning tasks); the editor's `:Tasks next` is the human's own ask
+    ["next"] = { composer = {}, cli = { "by", "format", "not-category" } },
     ["plan"] = { composer = { "force", "list", "to" }, cli = { "stale-refs" } },
     ["quickwins"] = {
       composer = { "force", "phase", "to" },

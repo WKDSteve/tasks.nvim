@@ -90,6 +90,7 @@ M.CAPABILITIES = {
   "move_area",
   "move_area_preview",
   "next",
+  "next_not_category",
   "node_note",
   "node_set",
   "ops",
@@ -2094,8 +2095,8 @@ function M.intent(params, opts)
   return seal(doc, nil), nil
 end
 
----What to start next.
----@param params? { n?: integer, actor?: string, area?: string }
+---What to start next. `not_category` leaves the ready tasks of those categories out (capability `next_not_category`).
+---@param params? { n?: integer, actor?: string, area?: string, not_category?: string[] }
 ---@param opts? { root?: string }
 ---@return table|nil doc
 ---@return Tasks.ContractError|string|nil err
@@ -2120,6 +2121,23 @@ function M.next(params, opts)
         retryable = false,
       }
   end
+  if params.not_category ~= nil then
+    local list = params.not_category
+    local bad = type(list) ~= "table" or #list > #model.CATEGORIES
+    for _, c in ipairs(type(list) == "table" and list or {}) do
+      bad = bad or not model.is_category(c)
+    end
+    if bad then
+      return nil,
+        {
+          code = "invalid_argument",
+          message = "not_category must be a list of categories ("
+            .. table.concat(model.CATEGORIES, ", ")
+            .. ")",
+          retryable = false,
+        }
+    end
+  end
   local root, rerr = vault.root(opts)
   if not root then
     return nil, rerr
@@ -2132,6 +2150,7 @@ function M.next(params, opts)
     root = root,
     area = params.area,
     actor = params.actor,
+    not_category = params.not_category,
     n = params.n,
   })
   if not pick then
@@ -2152,6 +2171,8 @@ function M.next(params, opts)
   doc.claimed = (pick.claimed or 0) > 0 and pick.claimed or nil
   -- ready tasks whose `start` day has not come (not offered)
   doc.later = (pick.later or 0) > 0 and pick.later or nil
+  -- ready tasks left out by `not_category` (capability `next_not_category`)
+  doc.left_out = (pick.left_out or 0) > 0 and pick.left_out or nil
   if pick.empty then
     doc.empty = json.object({
       kind = pick.empty.kind,

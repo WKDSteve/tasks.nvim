@@ -141,7 +141,7 @@ local methods = {
     end,
   },
   next = {
-    params = { n = "integer", actor = "string", area = "string" },
+    params = { n = "integer", actor = "string", area = "string", not_category = "string_list" },
     run = function(params, opts)
       return contract.next(params, opts)
     end,

@@ -3110,6 +3110,11 @@
           "minimum": 1,
           "description": "Ready tasks left out because somebody else has claimed them (capability `claims`); absent when none."
         },
+        "left_out": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Ready tasks left out because they are of a category the request named in `not_category` (capability `next_not_category`); absent when none."
+        },
         "empty": {
           "description": "Present when there is no task to start: which kind of nothing it is. `all_done` is only said when nothing is open at all.",
           "type": "object",

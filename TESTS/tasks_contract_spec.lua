@@ -99,6 +99,7 @@ return function(H)
     "meeting_series",
     "move_area",
     "move_area_preview",
+    "next_not_category",
     "node_note",
     "node_set",
     "outcome",

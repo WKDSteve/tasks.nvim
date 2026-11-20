@@ -716,6 +716,10 @@ export type Next = Head & {
    */
   claimed?: number;
   /**
+   * Ready tasks left out because they are of a category the request named in `not_category` (capability `next_not_category`); absent when none.
+   */
+  left_out?: number;
+  /**
    * Present when there is no task to start: which kind of nothing it is. `all_done` is only said when nothing is open at all.
    */
   empty?: {

@@ -118,7 +118,8 @@ commands:
        [--write=<file> [--scope=<name>] [--check] ]   replace only the generated block of a document
                                           stages, ready tasks, decisions by leverage, critical path
                                           (--for: the task and everything that has to be finished before it)
-  next [<area>] [--n=3] [--actor=cdx|me|pair|none] [--format=text|json]   the best ready tasks, with the reason
+  next [<area>] [--n=3] [--actor=cdx|me|pair|none] [--not-category=a,b] [--format=text|json]   the best ready tasks, with the reason
+                                          (--not-category: leave the ready tasks of these categories out, e.g. learning)
   call <method> [--params=<json>|-] [--pretty]   the machine contract (tasks-export/1): hello, snapshot, list, task, next,
                                           areas, done_preview and ops (the write door); `-` reads the JSON from stdin; the document
                                           on stdout, a tasks.error on failure (exit 1, 2 for a bad request)
@@ -384,7 +385,7 @@ local SPECS = {
     },
     flag = { "blocked", "stale-refs", "unestimated", "by-actor", "paths" },
   },
-  next = { value = { "n", "actor", "format", "by" }, flag = {} },
+  next = { value = { "n", "actor", "format", "by", "not-category" }, flag = {} },
   ["plan-new"] = {
     value = {
       "areas",
@@ -1724,8 +1725,20 @@ commands["next"] = function(ctx)
     ctx.warn("error: --today must be YYYY-MM-DD, got '" .. tostring(ctx.eo.today) .. "'")
     return 2
   end
+  local not_category = nil
+  if ctx.args.opt["not-category"] then
+    not_category = {}
+    for word in tostring(ctx.args.opt["not-category"]):gmatch("[^,]+") do
+      local c = vim.trim(word)
+      if not model.is_category(c) then
+        ctx.warn("error: unknown category in --not-category: " .. c)
+        return 2
+      end
+      not_category[#not_category + 1] = c
+    end
+  end
   if format == "json" then
-    return contract_cli.next_json(ctx, area, count, actor)
+    return contract_cli.next_json(ctx, area, count, actor, not_category)
   end
   local pick, err = next_pick.pick_from_vault({
     root = ctx.eo.root,
@@ -1733,6 +1746,7 @@ commands["next"] = function(ctx)
     reminders = true,
     area = area,
     actor = actor,
+    not_category = not_category,
     n = count - 1,
     by = ctx.args.opt.by --[[@as string|nil]],
   })

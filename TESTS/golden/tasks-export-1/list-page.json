@@ -1,5 +1,5 @@
 {
-  "digest": "sha256:273f91ec1f84a54d",
+  "digest": "sha256:6a21281caaaa1802",
   "engine": {
     "git": "0000000",
     "nvim": "0.0.0",
@@ -116,11 +116,13 @@
       "after": [],
       "area": "lib.nvim",
       "blocked_by": [],
-      "category": [],
+      "category": [
+        "learning"
+      ],
       "created": "2026-01-01",
       "effort": "XS",
       "effort_days": 0.25,
-      "etag": "sha256:c337ac829c9ce237",
+      "etag": "sha256:632dd003aa86afa1",
       "file": "lib.nvim/ROADMAP/tasks/alpha-twin.md",
       "folder": false,
       "group": "open|1",
@@ -226,7 +228,7 @@
   "next_offset": 5,
   "offset": 0,
   "plugin": "tasks.nvim",
-  "rev": "rev:ab7f9f",
+  "rev": "rev:9e4e3e",
   "schema": 1,
   "total": 14,
   "vault": {

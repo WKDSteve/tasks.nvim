@@ -1,5 +1,5 @@
 {
-  "digest": "sha256:ed1e9eb792e94cb5",
+  "digest": "sha256:e24d1083acb39661",
   "engine": {
     "git": "0000000",
     "nvim": "0.0.0",
@@ -17,7 +17,7 @@
     {
       "body": "\nA summary line for alpha-twin.\n",
       "body_truncated": false,
-      "etag": "sha256:c337ac829c9ce237",
+      "etag": "sha256:632dd003aa86afa1",
       "id": "lib.nvim/alpha-twin"
     },
     {
@@ -32,7 +32,7 @@
   "next_offset": 4,
   "offset": 1,
   "plugin": "tasks.nvim",
-  "rev": "rev:bdf10a",
+  "rev": "rev:def89c",
   "schema": 1,
   "total": 14,
   "vault": {

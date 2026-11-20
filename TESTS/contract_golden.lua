@@ -458,6 +458,11 @@ G.cases = {
   { name = "planfor", method = "plan_for", request = '{"params":{"id":"cascade.nvim/iota"}}' },
   { name = "check", method = "check", request = '{"params":{"area":"lib.nvim"}}' },
   { name = "next", method = "next", request = '{"params":{"n":3}}' },
+  {
+    name = "next-not-category",
+    method = "next",
+    request = '{"params":{"n":3,"not_category":["learning"]}}',
+  },
   { name = "areas", method = "areas" },
   { name = "waits", method = "waits" },
   {
