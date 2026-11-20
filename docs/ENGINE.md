@@ -73,8 +73,9 @@ TESTS/              specs (run with scripts/test.sh, i.e. testing.nvim)
 | `tasks_nvim.meetings` | Meeting files, `<area>/MEETINGS/<slug>.md` (or the folder form `<slug>/<slug>.md`), see [Meetings](#meetings-meetings): a meeting is no task and names its tasks (`tasks:`); `by_task` derives the meetings of a task. `parse` / `from_file` always return a meeting (a broken one carries errors; a parse cache by mtime and size), `area` / `all` / `find` read them, `online_service` tells the service of an address, `parse_duration`, `parse_notify`, `is_tz` read the fields. | `parse`, `from_file`, `area`, `all`, `find`, `by_task`, `less`, `online_service` |
 | `tasks_nvim.meeting_write` | Writing meetings under the file lock, on the version read: `new`, `set`, `close`, `capture` (one line of the minutes), `attend`, `followups` (tasks of the follow-ups), `board_save` (a whiteboard, replaced only on the version read); `renames_for_move` and `tick_done` for `move_area` and `done`; pure body helpers (`capture_body`, `attend_body`, `tick_item`, `add_items`, `append_to_section`, `set_section`). | `new`, `set`, `close`, `capture`, `attend`, `followups`, `board_save`, `edit` |
 | `tasks_nvim.meeting_quick` | The quick capture of a meeting: one line (day, time, duration, all-day, address, `@place`, `#task`, `!notify`, the rest the title) read into a proposal of the fields of `meeting_new`, with what it assumed and the words it could not read. Pure. | `parse` |
-| `tasks_nvim.lernbaum` | The learning tree of `## Lernpunkte`, see [Learning paths](#learning-paths-roadmappaths): nodes with marks, keys, reasons, arrows, notes and images; the parent rule, progress counted apart, the problems of one file; `render` gives the text back byte for byte. Pure. | `parse`, `render`, `set_state`, `node`, `progress_text`, `promoted_ids` |
-| `tasks_nvim.paths` | Learning paths, `<area>/ROADMAP/paths/<slug>.md` (read by `plans` with `kind = "path"`): list, make, change, finish, and change one learning point on disk. | `from_file`, `area`, `all`, `find`, `new`, `set`, `close`, `point` |
+| `tasks_nvim.lernbaum` | The learning tree of `## Lernpunkte`, see [Learning paths](#learning-paths-roadmappaths): nodes with marks, keys, reasons, arrows, notes and images; the parent rule, progress counted apart, the problems of one file; `render` gives the text back byte for byte. Pure. | `parse`, `render`, `set_state`, `set_xp`, `set_task_xp`, `suggest_xp`, `to_xp`, `node`, `progress_text`, `promoted_ids` |
+| `tasks_nvim.lernlevel` | The levels of a learning path (`## Level`), see [XP, levels and rewards](#xp-levels-and-rewards-optional): thresholds in XP or percent, badges, rewards; the level reached, the next, the rewards not granted; `set_reward` writes back byte for byte. Pure. | `parse`, `evaluate`, `set_reward` |
+| `tasks_nvim.paths` | Learning paths, `<area>/ROADMAP/paths/<slug>.md` (read by `plans` with `kind = "path"`): list, make, change, finish, change one learning point on disk, give the promoted points the XP of their tasks and mark a reward granted. | `from_file`, `area`, `all`, `find`, `new`, `set`, `close`, `point`, `set_reward`, `task_xp`, `with_xp` |
 | `tasks_nvim.plan_scope` | The impure edge of the plan: one scan of the open tasks, finished ids looked up in the Backlogs when a blocker is not open, the scope cut like the commands do (area, `--for`, filters); `filter_readiness` serves `list --ready|--waiting`. `shared` is ONE pass over the vault (open tasks, finished ids, plan files, which file a ref means) that `load`, `filter_readiness` and the dashboard reuse. The marker blocks of documents: `refresh_document` (every block of a file, after a finish), `write_block` (`plan --write`), `marker_attrs`, `resolve_block`. | `shared`, `load`, `index`, `filter_readiness`, `refresh_document`, `write_block`, `marker_attrs`, `resolve_block` |
 | `tasks_nvim.plan_view` | A plan as Markdown (ready now, decisions by leverage, stages, critical path, warnings, the estimate line), `tsv` or `ids`; the `next` lines and the dialog text; the marker blocks of a document (`parse_blocks`, `replace_blocks`: fence-aware, per-line endings kept, the start marker carries attributes; `start_line`, `parse_start`). | `markdown`, `tsv`, `ids`, `next_lines`, `next_message`, `empty_text`, `parse_blocks`, `replace_blocks`, `replace_block`, `start_line`, `parse_start` |
 | `tasks_nvim.estimate` | Sums over tasks: effort days with how many tasks they are made of, a range (every size at its low and its high end), value, roi over the tasks with both numbers, quick wins, the split by actor, progress from finished tasks. A task without an estimate is missing, never 0. | `rollup`, `describe`, `fmt_days` |
@@ -520,6 +521,34 @@ on disk under the file's lock. A path is finished by hand with `paths.close`, li
 write: `path-reason-missing`, `path-duplicate-key`, `path-bad-key`, `path-bad-mark`, `path-bad-arrow`,
 `path-image-outside`, `path-arrow-dangling` (an arrow to no task), `path-image-missing` and `path-cycle` (promotions
 that run in a circle over the `## Lernpunkte` of the tasks they name).
+
+#### XP, levels and rewards (optional)
+
+A little play for a path, never a duty: a path without XP and without `## Level` works in full. A leaf carries XP as
+`{xp=N}` beside its key (a whole number from 0 to 100000, either order with `{#key}`); a promoted task carries its own
+as `xp:` in the frontmatter (`tasks new --xp=`, `set xp=`; `promote` takes the point's XP along) and they win over
+the point's. Learned counts in full, seen half (rounded down), dropped leaves the sum and the maximum (100 % stays
+reachable), open and blocked give 0; a parent sums its children (an `{xp=…}` on a parent is the warning
+`path-bad-xp`). `lernbaum.suggest_xp` proposes XP for a form from the effort (XS 10, S 25, M 50, L 100, XL 200, days
+×50) or the depth of a point; nothing of it is stored.
+
+```markdown
+## Level
+
+- [x] 50 XP · Badge assets/badges/stern.png · Belohnung: großes Eis kaufen
+- [ ] 50 % · Fortgeschritten · Badge assets/badges/mond.svg · Belohnung: Kino
+- [ ] Pfad fertig · Belohnung: ein Wochenende am See
+```
+
+One line per level, the parts apart by ` · ` (or ` | `): the threshold in XP or percent of the possible XP (a tree
+without XP counts its points: learned 1, seen one half), then in any order `Badge <file>` (a picture below
+`assets/badges/`, drawn as an image only), `Belohnung: <text>` (`Reward:`) and a name. `[x]` says the reward was
+granted (`paths.set_reward(id, level, given)`, the op `path_reward`; only the mark changes). `Pfad fertig` (`Path
+done`) is the line for the whole path, reached when every point is closed. `tasks_nvim.lernlevel` reads the section
+and evaluates it: the level is the run of levels reached from level 1 on, `next` names the first one not reached with
+the XP (or percent) missing, `open_rewards` the rewards reached but not granted. `check` reports `level-bad-line`,
+`level-bad-mark`, `level-order` (thresholds that do not rise), `level-badge-outside`, `level-badge-missing`
+(warnings) and, for a path with levels, the hint `xp-missing` (points without XP count nothing towards them).
 
 #### Promoting a learning point (`tasks_nvim.promote`)
 

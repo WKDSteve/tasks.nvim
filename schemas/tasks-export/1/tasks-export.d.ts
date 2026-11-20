@@ -1062,6 +1062,19 @@ export type PathDocument = Head & {
   body_truncated: boolean;
   nodes: PathNode[];
   progress: PathProgress;
+  xp?: PathXp2;
+  /**
+   * The lines of `## Level` in file order, the line of the whole path last; only when the file has the section. Capability `xp`.
+   */
+  levels?: PathLevel[];
+  /**
+   * The problems of `## Level` (`level-...` codes); with `levels`. Capability `xp`.
+   */
+  level_problems?: {
+    code: string;
+    line: number;
+    message: string;
+  }[];
   tree_problems: {
     code: string;
     line: number;
@@ -1365,6 +1378,10 @@ export interface TaskEntry {
    */
   outcome_reason?: string;
   point?: Point;
+  /**
+   * The XP of a learning task, as written; its learning point counts them after the outcome. Capability `xp`.
+   */
+  xp?: number;
   id: string;
   area: string;
   slug: string;
@@ -1665,6 +1682,10 @@ export interface FinishedItem {
    */
   outcome_reason?: string;
   point?: Point;
+  /**
+   * The XP of a learning task, as written; its learning point counts them after the outcome. Capability `xp`.
+   */
+  xp?: number;
   file: string;
 }
 /**
@@ -1961,6 +1982,8 @@ export interface PathEntry {
    */
   points: number;
   progress: PathProgress;
+  xp?: PathXp;
+  level?: PathLevelState;
   links?: string[];
   icon?: Icon;
   cover?: Cover;
@@ -1982,6 +2005,57 @@ export interface PathProgress {
   open: number;
   blocked: number;
   total: number;
+}
+/**
+ * The XP of the tree; only when a point carries XP. Capability `xp`.
+ */
+export interface PathXp {
+  earned: number;
+  /**
+   * Every leaf but the dropped ones.
+   */
+  possible: number;
+  /**
+   * The XP of the open and blocked leaves.
+   */
+  open: number;
+  /**
+   * Leaves (not dropped) with XP.
+   */
+  points: number;
+  /**
+   * Leaves (not dropped) without XP.
+   */
+  missing: number;
+}
+/**
+ * The level reached and what comes next; only when the file has levels. Capability `xp`.
+ */
+export interface PathLevelState {
+  level: number;
+  name?: string;
+  /**
+   * The badge of the level reached, a file below `assets/badges/`; a client draws it as an image only.
+   */
+  badge?: string;
+  /**
+   * Of the possible XP; a tree without XP counts its points (learned 1, seen one half).
+   */
+  percent: number;
+  /**
+   * Every point closed.
+   */
+  finished: boolean;
+  next?: {
+    number: number;
+    name?: string;
+    missing_xp?: number;
+    missing_percent?: number;
+  };
+  open_rewards: {
+    ref: string;
+    reward: string;
+  }[];
 }
 /**
  * One learning point of a tree. A parent has no mark of its own: its `derived` state comes from its leaves (learned, partial, open); `closed` when every leaf is.
@@ -2025,6 +2099,93 @@ export interface PathNode {
   image?: string;
   note?: string;
   progress: PathProgress;
+  /**
+   * The XP the leaf counts: its task's when it was promoted and the task has `xp`, else its own `{xp=N}`. Capability `xp`.
+   */
+  xp?: number;
+  /**
+   * Where `xp` comes from. Capability `xp`.
+   */
+  xp_from?: "point" | "task";
+  /**
+   * A leaf without XP: a suggestion to fill a form in beforehand (never stored). Capability `xp`.
+   */
+  xp_suggest?: number;
+  xp_progress?: PathXp1;
+}
+/**
+ * The XP below the point (its own for a leaf); only when the tree has XP. Capability `xp`.
+ */
+export interface PathXp1 {
+  earned: number;
+  /**
+   * Every leaf but the dropped ones.
+   */
+  possible: number;
+  /**
+   * The XP of the open and blocked leaves.
+   */
+  open: number;
+  /**
+   * Leaves (not dropped) with XP.
+   */
+  points: number;
+  /**
+   * Leaves (not dropped) without XP.
+   */
+  missing: number;
+}
+/**
+ * The XP of the tree; only when a point carries XP. Capability `xp`.
+ */
+export interface PathXp2 {
+  earned: number;
+  /**
+   * Every leaf but the dropped ones.
+   */
+  possible: number;
+  /**
+   * The XP of the open and blocked leaves.
+   */
+  open: number;
+  /**
+   * Leaves (not dropped) with XP.
+   */
+  points: number;
+  /**
+   * Leaves (not dropped) without XP.
+   */
+  missing: number;
+}
+/**
+ * One line of `## Level` (capability `xp`): a threshold in XP or percent, or the line of the whole path (`kind: done`, `ref: done`).
+ */
+export interface PathLevel {
+  /**
+   * What `path_reward` takes.
+   */
+  ref: string;
+  number?: number;
+  /**
+   * The line of the body it stands on.
+   */
+  line: number;
+  kind: "xp" | "percent" | "done";
+  threshold?: number;
+  name?: string;
+  /**
+   * As written; a file below `assets/badges/` (a client draws it as an image only).
+   */
+  badge?: string;
+  /**
+   * What one grants oneself, untrusted text.
+   */
+  reward?: string;
+  /**
+   * `[x]`: the reward was granted.
+   */
+  given: boolean;
+  reached: boolean;
 }
 /**
  * What happened to one operation of a request, in the order they were sent. A failed operation does not stop the others.
@@ -2068,7 +2229,8 @@ export interface ResultEntry {
     | "path_close"
     | "node_set"
     | "promote"
-    | "unpromote";
+    | "unpromote"
+    | "path_reward";
   id?: string;
   /**
    * `meeting_close`: the meeting has no `## Ergebnis` afterwards (allowed: a hint for the front end).
@@ -2125,8 +2287,20 @@ export interface ResultEntry {
     line: number;
     key?: string;
     state: "open" | "learned" | "seen" | "dropped" | "blocked";
+    /**
+     * `node_set` that wrote XP: the point's own XP now; absent when removed (capability `xp`).
+     */
+    xp?: number;
   };
   progress?: PathProgress1;
+  /**
+   * `path_reward`: the level as it is now (capability `path_reward`).
+   */
+  level?: {
+    ref: string;
+    line: number;
+    given: boolean;
+  };
   /**
    * The learning point a task was promoted from: `<container id>#<key>`, the container a learning path or a task with `## Lernpunkte` (capability `outcome`).
    */
@@ -2247,7 +2421,24 @@ export interface Inverse {
     | "meeting_attend"
     | "path_set"
     | "node_set"
-    | "unpromote";
+    | "unpromote"
+    | "path_reward";
+  /**
+   * `node_set` that wrote XP: the XP the point had (capability `xp`).
+   */
+  xp?: number;
+  /**
+   * `node_set` that wrote XP on a point that had none: remove them again (capability `xp`).
+   */
+  xp_clear?: true;
+  /**
+   * `path_reward`: the level, its number or `done` (capability `path_reward`).
+   */
+  level?: string;
+  /**
+   * `path_reward`: whether the reward was granted before.
+   */
+  given?: boolean;
   /**
    * `unpromote`: the path or task the learning point is in.
    */

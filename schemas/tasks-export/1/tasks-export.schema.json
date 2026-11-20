@@ -452,6 +452,26 @@
         "body_truncated": { "type": "boolean" },
         "nodes": { "type": "array", "items": { "$ref": "#/$defs/PathNode" } },
         "progress": { "$ref": "#/$defs/PathProgress" },
+        "xp": { "$ref": "#/$defs/PathXp", "description": "The XP of the tree; only when a point carries XP. Capability `xp`." },
+        "levels": {
+          "description": "The lines of `## Level` in file order, the line of the whole path last; only when the file has the section. Capability `xp`.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/PathLevel" }
+        },
+        "level_problems": {
+          "description": "The problems of `## Level` (`level-...` codes); with `levels`. Capability `xp`.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["code", "line", "message"],
+            "properties": {
+              "code": { "type": "string", "pattern": "^level-" },
+              "line": { "type": "integer", "minimum": 1 },
+              "message": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        },
         "tree_problems": {
           "type": "array",
           "items": {
@@ -488,6 +508,8 @@
         "has_tree": { "type": "boolean", "description": "The file has a `## Lernpunkte` section." },
         "points": { "type": "integer", "minimum": 0, "description": "The learning points of the tree, parents included." },
         "progress": { "$ref": "#/$defs/PathProgress" },
+        "xp": { "$ref": "#/$defs/PathXp", "description": "The XP of the tree; only when a point carries XP. Capability `xp`." },
+        "level": { "$ref": "#/$defs/PathLevelState", "description": "The level reached and what comes next; only when the file has levels. Capability `xp`." },
         "links": { "type": "array", "items": { "type": "string", "pattern": "^[Hh][Tt][Tt][Pp][Ss]?://" } },
         "icon": { "$ref": "#/$defs/Icon" },
         "cover": { "$ref": "#/$defs/Cover" },
@@ -536,7 +558,78 @@
         "link": { "type": "string" },
         "image": { "type": "string", "description": "A file below `assets/` of the path; a client draws it as an image only." },
         "note": { "type": "string" },
-        "progress": { "$ref": "#/$defs/PathProgress" }
+        "progress": { "$ref": "#/$defs/PathProgress" },
+        "xp": { "type": "integer", "minimum": 0, "maximum": 100000, "description": "The XP the leaf counts: its task's when it was promoted and the task has `xp`, else its own `{xp=N}`. Capability `xp`." },
+        "xp_from": { "enum": ["point", "task"], "description": "Where `xp` comes from. Capability `xp`." },
+        "xp_suggest": { "type": "integer", "minimum": 0, "maximum": 100000, "description": "A leaf without XP: a suggestion to fill a form in beforehand (never stored). Capability `xp`." },
+        "xp_progress": { "$ref": "#/$defs/PathXp", "description": "The XP below the point (its own for a leaf); only when the tree has XP. Capability `xp`." }
+      },
+      "additionalProperties": false
+    },
+    "PathXp": {
+      "description": "XP of a tree or a point (capability `xp`): learned counts in full, seen half (rounded down), dropped leaves sum and maximum.",
+      "type": "object",
+      "required": ["earned", "possible", "open", "points", "missing"],
+      "properties": {
+        "earned": { "type": "integer", "minimum": 0 },
+        "possible": { "type": "integer", "minimum": 0, "description": "Every leaf but the dropped ones." },
+        "open": { "type": "integer", "minimum": 0, "description": "The XP of the open and blocked leaves." },
+        "points": { "type": "integer", "minimum": 0, "description": "Leaves (not dropped) with XP." },
+        "missing": { "type": "integer", "minimum": 0, "description": "Leaves (not dropped) without XP." }
+      },
+      "additionalProperties": false
+    },
+    "PathLevelState": {
+      "description": "The levels of a path against its tree (capability `xp`): the highest level reached (0: none), the next one with what is missing, the rewards reached but not granted yet.",
+      "type": "object",
+      "required": ["level", "percent", "finished", "open_rewards"],
+      "properties": {
+        "level": { "type": "integer", "minimum": 0 },
+        "name": { "type": "string" },
+        "badge": { "type": "string", "description": "The badge of the level reached, a file below `assets/badges/`; a client draws it as an image only." },
+        "percent": { "type": "integer", "minimum": 0, "maximum": 100, "description": "Of the possible XP; a tree without XP counts its points (learned 1, seen one half)." },
+        "finished": { "type": "boolean", "description": "Every point closed." },
+        "next": {
+          "type": "object",
+          "required": ["number"],
+          "properties": {
+            "number": { "type": "integer", "minimum": 1 },
+            "name": { "type": "string" },
+            "missing_xp": { "type": "integer", "minimum": 0 },
+            "missing_percent": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": false
+        },
+        "open_rewards": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["ref", "reward"],
+            "properties": {
+              "ref": { "type": "string", "pattern": "^([1-9][0-9]*|done)$" },
+              "reward": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "PathLevel": {
+      "description": "One line of `## Level` (capability `xp`): a threshold in XP or percent, or the line of the whole path (`kind: done`, `ref: done`).",
+      "type": "object",
+      "required": ["ref", "line", "kind", "given", "reached"],
+      "properties": {
+        "ref": { "type": "string", "pattern": "^([1-9][0-9]*|done)$", "description": "What `path_reward` takes." },
+        "number": { "type": "integer", "minimum": 1 },
+        "line": { "type": "integer", "minimum": 1, "description": "The line of the body it stands on." },
+        "kind": { "enum": ["xp", "percent", "done"] },
+        "threshold": { "type": "integer", "minimum": 0 },
+        "name": { "type": "string" },
+        "badge": { "type": "string", "description": "As written; a file below `assets/badges/` (a client draws it as an image only)." },
+        "reward": { "type": "string", "description": "What one grants oneself, untrusted text." },
+        "given": { "type": "boolean", "description": "`[x]`: the reward was granted." },
+        "reached": { "type": "boolean" }
       },
       "additionalProperties": false
     },
@@ -1013,6 +1106,7 @@
         "outcome": { "$ref": "#/$defs/Outcome" },
         "outcome_reason": { "type": "string", "description": "Why it ended so (required by the engine for `seen` and `not-applicable`). Capability `outcome`." },
         "point": { "$ref": "#/$defs/Point" },
+        "xp": { "type": "integer", "minimum": 0, "maximum": 100000, "description": "The XP of a learning task, as written; its learning point counts them after the outcome. Capability `xp`." },
         "id": {
           "type": "string",
           "pattern": "^[^/]+/[^/]+$"
@@ -3213,6 +3307,7 @@
         "outcome": { "$ref": "#/$defs/Outcome" },
         "outcome_reason": { "type": "string", "description": "Why it ended so (required by the engine for `seen` and `not-applicable`). Capability `outcome`." },
         "point": { "$ref": "#/$defs/Point" },
+        "xp": { "type": "integer", "minimum": 0, "maximum": 100000, "description": "The XP of a learning task, as written; its learning point counts them after the outcome. Capability `xp`." },
         "file": { "type": "string" }
       },
       "additionalProperties": false
@@ -3964,7 +4059,25 @@
       "required": ["op", "id"],
       "properties": {
         "op": {
-          "enum": ["set", "reorder", "tick_step", "answer", "set_body", "set_section", "move_area", "view_save", "view_delete", "plan_set", "project_set", "meeting_set", "meeting_attend", "path_set", "node_set", "unpromote"]
+          "enum": ["set", "reorder", "tick_step", "answer", "set_body", "set_section", "move_area", "view_save", "view_delete", "plan_set", "project_set", "meeting_set", "meeting_attend", "path_set", "node_set", "unpromote", "path_reward"]
+        },
+        "xp": {
+          "description": "`node_set` that wrote XP: the XP the point had (capability `xp`).",
+          "type": "integer",
+          "minimum": 0
+        },
+        "xp_clear": {
+          "description": "`node_set` that wrote XP on a point that had none: remove them again (capability `xp`).",
+          "const": true
+        },
+        "level": {
+          "description": "`path_reward`: the level, its number or `done` (capability `path_reward`).",
+          "type": "string",
+          "pattern": "^([1-9][0-9]*|done)$"
+        },
+        "given": {
+          "description": "`path_reward`: whether the reward was granted before.",
+          "type": "boolean"
         },
         "container": {
           "description": "`unpromote`: the path or task the learning point is in.",
@@ -4156,7 +4269,7 @@
           "minimum": 1
         },
         "op": {
-          "enum": ["set", "new", "reorder", "done", "move_area", "plan_new", "plan_set", "plan_close", "project_new", "project_set", "project_close", "tick_step", "add_steps", "answer", "append_note", "reopen", "set_body", "set_section", "view_save", "view_delete", "attach", "claim", "release", "history_record", "meeting_new", "meeting_set", "meeting_close", "meeting_capture", "meeting_attend", "meeting_followups", "board_save", "path_new", "path_set", "path_close", "node_set", "promote", "unpromote"]
+          "enum": ["set", "new", "reorder", "done", "move_area", "plan_new", "plan_set", "plan_close", "project_new", "project_set", "project_close", "tick_step", "add_steps", "answer", "append_note", "reopen", "set_body", "set_section", "view_save", "view_delete", "attach", "claim", "release", "history_record", "meeting_new", "meeting_set", "meeting_close", "meeting_capture", "meeting_attend", "meeting_followups", "board_save", "path_new", "path_set", "path_close", "node_set", "promote", "unpromote", "path_reward"]
         },
         "id": {
           "type": "string"
@@ -4236,13 +4349,25 @@
           "properties": {
             "line": { "type": "integer", "minimum": 1 },
             "key": { "type": "string" },
-            "state": { "enum": ["open", "learned", "seen", "dropped", "blocked"] }
+            "state": { "enum": ["open", "learned", "seen", "dropped", "blocked"] },
+            "xp": { "type": "integer", "minimum": 0, "description": "`node_set` that wrote XP: the point's own XP now; absent when removed (capability `xp`)." }
           },
           "additionalProperties": false
         },
         "progress": {
           "description": "`node_set`: the progress of the path after the change.",
           "$ref": "#/$defs/PathProgress"
+        },
+        "level": {
+          "description": "`path_reward`: the level as it is now (capability `path_reward`).",
+          "type": "object",
+          "required": ["ref", "line", "given"],
+          "properties": {
+            "ref": { "type": "string", "pattern": "^([1-9][0-9]*|done)$" },
+            "line": { "type": "integer", "minimum": 1 },
+            "given": { "type": "boolean" }
+          },
+          "additionalProperties": false
         },
         "promoted_from": {
           "description": "`promote`: the learning point the new task came from, `<container>#<key>` (capability `promote`).",

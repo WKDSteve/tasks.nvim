@@ -1,7 +1,7 @@
 {
   "body": "\nPlugins schreiben können.\n\n## Lernpunkte\n\n- [ ] Lua lernen {#lua}\n  - [ ] Syntax {#syntax}\n    - [x] [Manual](https://www.lua.org/manual/5.4/)\n      > Notiz: Rangfolge von `..` und `^`.\n    - [~] Programming in Lua – Grund: nur Kapitel 1\n  - [ ] C-Compiler → lib.nvim/c-compiler {#cc}\n  - [-] JIT – Grund: nicht nötig\n  - [!] Profiler {#prof}\n  - [~] Ohne Grund\n",
   "body_truncated": false,
-  "digest": "sha256:e30ab3307be288d6",
+  "digest": "sha256:41593ad3b105d6f4",
   "engine": {
     "git": "0000000",
     "nvim": "0.0.0",
@@ -71,7 +71,8 @@
         "seen": 0,
         "total": 1
       },
-      "state": "learned"
+      "state": "learned",
+      "xp_suggest": 10
     },
     {
       "children": 0,
@@ -92,7 +93,8 @@
         "total": 1
       },
       "reason": "nur Kapitel 1",
-      "state": "seen"
+      "state": "seen",
+      "xp_suggest": 10
     },
     {
       "children": 0,
@@ -114,7 +116,8 @@
         "total": 1
       },
       "promoted": "lib.nvim/c-compiler",
-      "state": "open"
+      "state": "open",
+      "xp_suggest": 15
     },
     {
       "children": 0,
@@ -135,7 +138,8 @@
         "total": 1
       },
       "reason": "nicht nötig",
-      "state": "dropped"
+      "state": "dropped",
+      "xp_suggest": 15
     },
     {
       "children": 0,
@@ -156,7 +160,8 @@
         "seen": 0,
         "total": 1
       },
-      "state": "blocked"
+      "state": "blocked",
+      "xp_suggest": 15
     },
     {
       "children": 0,
@@ -176,7 +181,8 @@
         "seen": 1,
         "total": 1
       },
-      "state": "seen"
+      "state": "seen",
+      "xp_suggest": 15
     }
   ],
   "path": {

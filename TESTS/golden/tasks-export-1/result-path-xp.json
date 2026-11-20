@@ -1,0 +1,136 @@
+{
+  "client_op_id": "golden-path-xp",
+  "digest": "sha256:019f58f56e2a124a",
+  "dry_run": false,
+  "engine": {
+    "git": "0000000",
+    "nvim": "0.0.0",
+    "version": "0.1.0-test"
+  },
+  "generated_at": "2026-01-01T00:00:00Z",
+  "kind": "tasks.result",
+  "ok": false,
+  "plugin": "tasks.nvim",
+  "results": [
+    {
+      "changed_ids": [
+        "lib.nvim/rust-lernen"
+      ],
+      "etag_after": "sha256:4a621d7eadbbf811",
+      "etag_before": "sha256:8ec6f3239a19a8ca",
+      "file": "lib.nvim/ROADMAP/paths/rust-lernen.md",
+      "id": "lib.nvim/rust-lernen",
+      "inverse": {
+        "id": "lib.nvim/rust-lernen",
+        "if_match": "sha256:4a621d7eadbbf811",
+        "op": "node_set",
+        "point": "plain",
+        "xp_clear": true
+      },
+      "n": 1,
+      "node": {
+        "key": "plain",
+        "line": 9,
+        "state": "open",
+        "xp": 15
+      },
+      "ok": true,
+      "op": "node_set",
+      "outcome": "changed",
+      "progress": {
+        "blocked": 0,
+        "dropped": 1,
+        "learned": 1,
+        "open": 2,
+        "seen": 1,
+        "total": 5
+      }
+    },
+    {
+      "changed_ids": [
+        "lib.nvim/rust-lernen"
+      ],
+      "etag_after": "sha256:0a3da0fe8887dca8",
+      "etag_before": "sha256:4a621d7eadbbf811",
+      "file": "lib.nvim/ROADMAP/paths/rust-lernen.md",
+      "id": "lib.nvim/rust-lernen",
+      "inverse": {
+        "id": "lib.nvim/rust-lernen",
+        "if_match": "sha256:0a3da0fe8887dca8",
+        "op": "node_set",
+        "point": "book",
+        "xp": 30
+      },
+      "n": 2,
+      "node": {
+        "key": "book",
+        "line": 5,
+        "state": "learned"
+      },
+      "ok": true,
+      "op": "node_set",
+      "outcome": "changed",
+      "progress": {
+        "blocked": 0,
+        "dropped": 1,
+        "learned": 1,
+        "open": 2,
+        "seen": 1,
+        "total": 5
+      }
+    },
+    {
+      "changed_ids": [
+        "lib.nvim/rust-lernen"
+      ],
+      "etag_after": "sha256:4c1994a21d05696a",
+      "etag_before": "sha256:0a3da0fe8887dca8",
+      "file": "lib.nvim/ROADMAP/paths/rust-lernen.md",
+      "id": "lib.nvim/rust-lernen",
+      "inverse": {
+        "given": false,
+        "id": "lib.nvim/rust-lernen",
+        "if_match": "sha256:4c1994a21d05696a",
+        "level": "2",
+        "op": "path_reward"
+      },
+      "level": {
+        "given": true,
+        "line": 14,
+        "ref": "2"
+      },
+      "n": 3,
+      "ok": true,
+      "op": "path_reward",
+      "outcome": "changed"
+    },
+    {
+      "changed_ids": [],
+      "error": {
+        "code": "invalid_argument",
+        "message": "level 4 has no reward (Belohnung: …)",
+        "retryable": false
+      },
+      "n": 4,
+      "ok": false,
+      "op": "path_reward",
+      "outcome": "failed"
+    },
+    {
+      "changed_ids": [],
+      "error": {
+        "code": "invalid_argument",
+        "message": "node_set takes xp or xp_clear, not both",
+        "retryable": false
+      },
+      "n": 5,
+      "ok": false,
+      "op": "node_set",
+      "outcome": "failed"
+    }
+  ],
+  "schema": 1,
+  "vault": {
+    "id": "vault"
+  }
+}

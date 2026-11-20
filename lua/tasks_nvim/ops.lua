@@ -171,6 +171,7 @@ M.OPS = {
   "node_set",
   "promote",
   "unpromote",
+  "path_reward",
 }
 
 ---Longest `client_op_id`.
@@ -314,8 +315,11 @@ local FIELDS = {
     state = "string",
     reason = "string",
     note = "string",
+    xp = "integer",
+    xp_clear = "boolean",
     if_match = "string",
   },
+  path_reward = { id = "string", level = "string", given = "boolean", if_match = "string" },
   promote = {
     container = "string",
     point = "string",
@@ -1969,15 +1973,20 @@ local function point_ref(point)
   return n and tonumber(n) or point:gsub("^#", "")
 end
 
----Change one learning point of an open path: its state and reason and/or its note (`paths.point`); the answer carries
----the progress after it and an `inverse` (what the op touched, as it was before; a note the point did not have is "").
+---Change one learning point of an open path: its state and reason, its XP (`xp`, or `xp_clear` to remove them) and/or
+---its note (`paths.point`); the answer carries the progress after it and an `inverse` (what the op touched, as it was
+---before; a note the point did not have is "", XP it did not have are `xp_clear`).
 ---@param op table
 ---@param ctx Tasks.OpsCtx
 ---@return table entry
 local function do_node_set(op, ctx)
   local ref = point_ref(op.point)
-  if op.id == nil or ref == nil or (op.state == nil and op.note == nil) then
-    return refuse("invalid_argument", "node_set needs id, point and a state or a note")
+  local touches_xp = op.xp ~= nil or op.xp_clear == true
+  if op.id == nil or ref == nil or (op.state == nil and op.note == nil and not touches_xp) then
+    return refuse("invalid_argument", "node_set needs id, point and a state, a note or xp")
+  end
+  if op.xp ~= nil and op.xp_clear == true then
+    return refuse("invalid_argument", "node_set takes xp or xp_clear, not both")
   end
   if has_control(op.reason) then
     return refuse("invalid_argument", "reason contains a control character")
@@ -1990,7 +1999,13 @@ local function do_node_set(op, ctx)
   local old
   if before and before.tree then
     local n = require("tasks_nvim.lernbaum").node(before.tree, ref)
-    old = n and { state = n.state, reason = n.reason, note = n.note } or nil
+    old = n and { state = n.state, reason = n.reason, note = n.note, xp = n.xp_own } or nil
+  end
+  local xp
+  if op.xp ~= nil then
+    xp = op.xp
+  elseif op.xp_clear == true then
+    xp = ""
   end
   local r, err, info = paths.point(op.id, ref, op.state, op.reason, {
     root = ctx.root,
@@ -1998,6 +2013,7 @@ local function do_node_set(op, ctx)
     if_match = op.if_match,
     dry_run = ctx.dry,
     note = op.note,
+    xp = xp,
   })
   if not r then
     if info and (info.code == "invalid_argument" or info.code == "not_found") then
@@ -2012,7 +2028,12 @@ local function do_node_set(op, ctx)
     file = rel(ctx, r.path),
     etag_before = r.etag_before,
     etag_after = (not ctx.dry) and r.etag_after or nil,
-    node = json.object({ line = r.node.line, key = r.node.key, state = r.node.state }),
+    node = json.object({
+      line = r.node.line,
+      key = r.node.key,
+      state = r.node.state,
+      xp = touches_xp and r.node.xp or nil,
+    }),
     progress = json.object(r.progress),
     changed_ids = (r.changed and not ctx.dry) and { r.id } or {},
   }
@@ -2025,6 +2046,54 @@ local function do_node_set(op, ctx)
       state = op.state ~= nil and old.state or nil,
       reason = op.state ~= nil and old.reason or nil,
       note = op.note ~= nil and (old.note or "") or nil,
+      xp = touches_xp and old.xp or nil,
+      xp_clear = (touches_xp and old.xp == nil) or nil,
+      if_match = r.etag_after,
+    })
+  end
+  return entry
+end
+
+---Mark the reward of a level of a path granted or not (`paths.set_reward`): `level` is the number of the level (`"1"`)
+---or `"done"` for the whole path. The inverse gives the mark back.
+---@param op table
+---@param ctx Tasks.OpsCtx
+---@return table entry
+local function do_path_reward(op, ctx)
+  if op.id == nil or op.level == nil or op.given == nil then
+    return refuse("invalid_argument", "path_reward needs id, level and given")
+  end
+  if has_control(op.level) then
+    return refuse("invalid_argument", "level contains a control character")
+  end
+  local r, err, info = require("tasks_nvim.paths").set_reward(op.id, op.level, op.given, {
+    root = ctx.root,
+    today = ctx.today,
+    if_match = op.if_match,
+    dry_run = ctx.dry,
+  })
+  if not r then
+    if info and (info.code == "invalid_argument" or info.code == "not_found") then
+      return refuse(info.code, contract.redact(ctx.root, tostring(err)))
+    end
+    return mutate_failure(ctx, err, info)
+  end
+  local entry = {
+    ok = true,
+    id = r.id,
+    outcome = r.changed and (ctx.dry and "would_change" or "changed") or "unchanged",
+    file = rel(ctx, r.path),
+    etag_before = r.etag_before,
+    etag_after = (not ctx.dry) and r.etag_after or nil,
+    level = json.object({ ref = r.level.ref, line = r.level.line, given = r.level.given }),
+    changed_ids = (r.changed and not ctx.dry) and { r.id } or {},
+  }
+  if r.changed and not ctx.dry then
+    entry.inverse = json.object({
+      op = "path_reward",
+      id = r.id,
+      level = r.level.ref,
+      given = r.level.before,
       if_match = r.etag_after,
     })
   end
@@ -2863,6 +2932,7 @@ local HANDLERS = {
   path_set = do_path_set,
   path_close = do_path_close,
   node_set = do_node_set,
+  path_reward = do_path_reward,
   promote = do_promote,
   unpromote = do_unpromote,
   plan_close = do_plan_close,

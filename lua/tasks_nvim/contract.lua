@@ -97,6 +97,7 @@ M.CAPABILITIES = {
   "path",
   "path_close",
   "path_new",
+  "path_reward",
   "path_set",
   "paths",
   "plan_assets",
@@ -128,6 +129,7 @@ M.CAPABILITIES = {
   "views",
   "waits",
   "waits_for",
+  "xp",
 }
 
 ---Sizes the contract promises to keep.
@@ -393,6 +395,8 @@ local function task_entry(root, task, node, rank, meeting_ids)
     outcome = model.is_outcome(task.outcome) and task.outcome or nil,
     outcome_reason = task.outcome_reason,
     point = task.point,
+    -- the XP of a learning task; only when the file has them (capability `xp`)
+    xp = task.xp,
     summary = clip(task.summary or "", M.LIMITS.summary),
     -- the meetings that name the task (`tasks:` of a meeting file), the earliest first; only when there are some, so a
     -- document without meetings reads as before
@@ -2431,6 +2435,7 @@ function M.finished(params, opts)
       outcome = model.is_outcome(t.outcome) and t.outcome or nil,
       outcome_reason = t.outcome_reason,
       point = t.point,
+      xp = t.xp,
       file = relative(root, t.path) or vim.fs.basename(t.path),
     })
   end
@@ -3227,8 +3232,61 @@ local function progress_entry(p)
   })
 end
 
+---The XP of a tree or a node (`lernbaum`): earned, possible, open, the points with XP and those without.
+---@param x Tasks.LernXp
+---@return table
+local function xp_entry(x)
+  return json.object({
+    earned = x.earned,
+    possible = x.possible,
+    open = x.open,
+    points = x.points,
+    missing = x.missing,
+  })
+end
+
+---The level state of a path (`lernlevel.evaluate`): the level reached, the next one with what is missing, the
+---rewards reached but not granted. nil for a path without levels.
+---@param st? Tasks.LevelState
+---@return table|nil
+local function level_state_entry(st)
+  if not (st and st.has_levels) then
+    return nil
+  end
+  return json.object({
+    level = st.level,
+    name = st.level_name,
+    badge = st.badge,
+    percent = math.max(0, math.min(100, st.percent)),
+    finished = st.finished,
+    next = st.next and json.object({
+      number = st.next.number,
+      name = st.next.name,
+      missing_xp = st.next.missing_xp and math.max(0, st.next.missing_xp) or nil,
+      missing_percent = st.next.missing_percent and math.max(0, st.next.missing_percent) or nil,
+    }) or nil,
+    open_rewards = vim.tbl_map(function(r)
+      return json.object({ ref = r.ref, reward = r.reward })
+    end, st.open_rewards),
+  })
+end
+
+---The lines a path's `rev` takes from outside its file: the XP of the tasks its promoted points name (they count in the
+---document), so that a task's `xp:` changed gives a new `rev`.
+---@param f Tasks.PlanFile
+---@return string[]
+local function task_xp_lines(f)
+  local out = {}
+  for _, n in ipairs(f.tree and f.tree.nodes or {}) do
+    if n.promoted and n.xp_from == "task" then
+      out[#out + 1] = "xp:" .. n.promoted .. "\t" .. tostring(n.xp)
+    end
+  end
+  return out
+end
+
 ---A learning path as the documents carry it (`tasks.paths` items, `tasks.path`): the head of its file, its progress and
----its version; no tree (that is `tasks.path`).
+---its version, its XP (when the tree has any) and its level state (when it has levels); no tree (that is `tasks.path`).
 ---@param root string
 ---@param f Tasks.PlanFile
 ---@param text? string  # The file as read (its `etag`).
@@ -3236,6 +3294,9 @@ end
 local function path_entry(root, f, text)
   local tree = f.tree or require("tasks_nvim.lernbaum").parse("")
   return with_links_and_assets({
+    -- capability `xp`: only when there is something to say, so a path without XP and levels reads as before
+    xp = tree.has_xp and xp_entry(tree.xp) or nil,
+    level = level_state_entry(f.level_state),
     id = f.id,
     area = f.area,
     slug = f.slug,
@@ -3302,6 +3363,7 @@ function M.paths(params, opts)
         local entry = path_entry(root, f, text)
         items[#items + 1] = json.object(entry)
         lines[#lines + 1] = f.id .. "\t" .. (entry.etag or "")
+        vim.list_extend(lines, task_xp_lines(f))
       end
     end
     local doc = M.head("tasks.paths", root)
@@ -3339,13 +3401,21 @@ function M.path(id, opts)
     if truncated then
       body = body:sub(1, M.LIMITS.body_bytes)
     end
-    local tree = f.tree or require("tasks_nvim.lernbaum").parse("")
+    local lernbaum = require("tasks_nvim.lernbaum")
+    local tree = f.tree or lernbaum.parse("")
     local doc = M.head("tasks.path", root)
     doc.path = json.object(path_entry(root, f, text))
     doc.body = body
     doc.body_truncated = truncated
     doc.nodes = vim.tbl_map(function(n)
+      local leaf = #n.children == 0
       return json.object({
+        -- capability `xp`: a leaf's XP and where they come from, a suggestion for one without; the XP of every node
+        -- when the tree has any
+        xp = n.xp,
+        xp_from = n.xp_from,
+        xp_suggest = (leaf and not n.xp) and lernbaum.suggest_xp({ depth = n.depth }) or nil,
+        xp_progress = tree.has_xp and xp_entry(n.xp_progress) or nil,
         index = n.index,
         line = n.line,
         depth = n.depth,
@@ -3369,7 +3439,35 @@ function M.path(id, opts)
     doc.tree_problems = vim.tbl_map(function(p)
       return json.object({ code = p.code, line = p.line, key = p.key, message = p.message })
     end, tree.problems)
-    return seal(doc, builder.rev_of({ f.id .. "\t" .. fsio.etag(text) })), nil
+    doc.xp = tree.has_xp and xp_entry(tree.xp) or nil
+    -- the lines of `## Level` (capability `xp`), only when the file has the section
+    local lv = f.levels
+    if lv and lv.has_section then
+      local st = f.level_state or {}
+      local all = vim.list_slice(lv.levels, 1)
+      all[#all + 1] = lv.final
+      doc.levels = vim.tbl_map(function(l)
+        return json.object({
+          ref = l.ref,
+          number = l.number,
+          line = l.line,
+          kind = l.kind,
+          threshold = l.threshold,
+          name = l.name,
+          badge = l.badge,
+          reward = l.reward,
+          given = l.given,
+          reached = (st.reached or {})[l.ref] == true,
+        })
+      end, all)
+      local problems = vim.list_extend(vim.list_slice(lv.problems, 1), st.problems or {})
+      doc.level_problems = vim.tbl_map(function(p)
+        return json.object({ code = p.code, line = p.line, message = p.message })
+      end, problems)
+    end
+    local rev_lines = { f.id .. "\t" .. fsio.etag(text) }
+    vim.list_extend(rev_lines, task_xp_lines(f))
+    return seal(doc, builder.rev_of(rev_lines)), nil
   end)
 end
 

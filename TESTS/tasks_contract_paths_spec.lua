@@ -78,4 +78,35 @@ return function(H)
   ok(after.rev ~= rev, "a changed path file is a new rev")
   eq(after.progress.learned, 2)
   ok(call("paths", { area = "lib.nvim" }).rev ~= lib.rev, "and a new rev of the list")
+
+  -- ── XP (capability `xp`): a path without XP and levels carries none of the new fields ──
+  ok(vim.tbl_contains(hello.capabilities, "xp"))
+  ok(vim.tbl_contains(hello.capabilities, "path_reward"))
+  eq({ after.xp, after.levels, after.path.xp, after.path.level }, {})
+  -- the XP of a promoted task count, and the rev follows them though the path file stays
+  local mutate = require("tasks_nvim.mutate")
+  local o = { root = root, today = F.TODAY }
+  local task =
+    assert(mutate.new("lib.nvim", vim.tbl_extend("force", o, { title = "Borrow", xp = 30 })))
+  H.write(
+    file,
+    "---\ntitle: Rust\nstatus: doing\n---\n\n## Lernpunkte\n\n- [ ] Borrow → "
+      .. task.id
+      .. " {xp=10} {#borrow}\n- [x] Cargo {xp=5}\n\n## Level\n\n- [ ] 5 XP · Belohnung: Eis\n"
+  )
+  local with = call("path", { id = "lib.nvim/rust" })
+  eq(with.xp, { earned = 5, possible = 35, open = 30, points = 2, missing = 0 })
+  eq(with.nodes[1].xp, 30)
+  eq(with.nodes[1].xp_from, "task")
+  eq(with.path.level.open_rewards, { { ref = "1", reward = "Eis" } })
+  eq(with.levels[1].reached, true)
+  local listed = call("paths", { area = "lib.nvim" })
+  assert(mutate.set(task.id, { xp = "50" }, o))
+  local changed = call("path", { id = "lib.nvim/rust" })
+  eq(changed.nodes[1].xp, 50)
+  ok(changed.rev ~= with.rev, "a task's xp changed is a new rev of the path")
+  ok(call("paths", { area = "lib.nvim" }).rev ~= listed.rev, "and of the list")
+  -- the task entry carries its xp
+  local t = call("task", { id = task.id })
+  eq(t.task.xp, 50)
 end

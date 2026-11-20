@@ -68,6 +68,52 @@ local function write_learning_paths(root)
   )
 end
 
+---A learning path with XP and levels, and the promoted task it names with its own `xp:`, for the golden cases
+---`path-xp` and `result-path-xp`.
+---@param root string
+local function write_xp_path(root)
+  local function put(path, text)
+    vim.fn.mkdir(vim.fs.dirname(path), "p")
+    local fh = assert(io.open(path, "wb"))
+    fh:write(text)
+    fh:close()
+  end
+  put(
+    root .. "/lib.nvim/ROADMAP/tasks/c-compiler.md",
+    "---\ntitle: C-Compiler\nstatus: open\nxp: 60\npoint: lib.nvim/rust-lernen#cc\n"
+      .. "created: 2026-01-01\nupdated: 2026-01-01\n---\n\nThe compiler.\n"
+  )
+  put(
+    root .. "/lib.nvim/ROADMAP/paths/rust-lernen.md",
+    table.concat({
+      "---",
+      "title: Rust lernen",
+      "status: doing",
+      "created: 2026-01-01",
+      "updated: 2026-01-05",
+      "---",
+      "",
+      "## Lernpunkte",
+      "",
+      "- [ ] Rust lernen {#rust}",
+      "  - [x] Das Buch {xp=30} {#book}",
+      "  - [~] Rustlings \226\128\147 Grund: nur die Hälfte {xp=20}",
+      "  - [ ] C-Compiler \226\134\146 lib.nvim/c-compiler {xp=40} {#cc}",
+      "  - [-] Embedded \226\128\147 Grund: nicht nötig {xp=50}",
+      "  - [ ] Ohne XP {#plain}",
+      "",
+      "## Level",
+      "",
+      "- [x] 30 XP \194\183 Einsteiger \194\183 Badge assets/badges/stern.png \194\183 Belohnung: großes Eis",
+      "- [ ] 50 % \194\183 Badge assets/badges/mond.svg \194\183 Belohnung: Kino",
+      "- [ ] 100 XP \194\183 Belohnung: ein Buch",
+      "- [ ] 20 XP",
+      "- [ ] Pfad fertig \194\183 Belohnung: Wochenende am See",
+      "",
+    }, "\n")
+  )
+end
+
 ---Write the meetings of the golden cases `meetings`, `meeting` and `task-with-meetings` into `root`.
 ---@param root string
 function G.write_meetings(root)
@@ -232,6 +278,39 @@ G.cases = {
     request = function(root)
       write_learning_paths(root)
       return '{"params":{"id":"lib.nvim/lua-lernen"}}'
+    end,
+  },
+  {
+    -- XP and levels of a path (capability `xp`): the XP of a promoted task win over the point's, seen counts half,
+    -- dropped not at all, a leaf without XP gets a suggestion; the levels with the one reached, the next with the XP
+    -- missing, the rewards not granted yet, and a threshold that does not rise
+    name = "path-xp",
+    method = "path",
+    fresh = true,
+    request = function(root)
+      write_xp_path(root)
+      return '{"params":{"id":"lib.nvim/rust-lernen"}}'
+    end,
+  },
+  {
+    -- the XP of a point and the reward of a level written (capabilities `xp`, `path_reward`), each with its inverse;
+    -- a level without a reward and both xp and xp_clear refused
+    name = "result-path-xp",
+    method = "ops",
+    fresh = true,
+    request = function(root)
+      write_xp_path(root)
+      local P = "lib.nvim/rust-lernen"
+      return encode({
+        client_op_id = "golden-path-xp",
+        ops = {
+          { op = "node_set", id = P, point = "plain", xp = 15 },
+          { op = "node_set", id = P, point = "book", xp_clear = true },
+          { op = "path_reward", id = P, level = "2", given = true },
+          { op = "path_reward", id = P, level = "4", given = true },
+          { op = "node_set", id = P, point = "plain", xp = 5, xp_clear = true },
+        },
+      })
     end,
   },
   {

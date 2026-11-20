@@ -39,6 +39,7 @@
     "path",
     "path_close",
     "path_new",
+    "path_reward",
     "path_set",
     "paths",
     "plan_assets",
@@ -69,7 +70,8 @@
     "view_save",
     "views",
     "waits",
-    "waits_for"
+    "waits_for",
+    "xp"
   ],
   "engine": {
     "git": "0000000",

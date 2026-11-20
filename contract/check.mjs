@@ -257,6 +257,15 @@ mutate(
   "snapshot",
   (d) => (d.counts.by_status = []),
 );
+mutate("negative XP of a point", "path-xp", (d) => (d.nodes[1].xp = -5));
+mutate("XP from a source nobody defined", "path-xp", (d) => (d.nodes[1].xp_from = "ai"));
+mutate("XP of a tree without its maximum", "path-xp", (d) => delete d.xp.possible);
+mutate("a level of a kind nobody defined", "path-xp", (d) => (d.levels[0].kind = "stars"));
+mutate("a level ref that is neither a number nor done", "path-xp", (d) => (d.levels[0].ref = "first"));
+mutate("a level state above 100 percent", "path-xp", (d) => (d.path.level.percent = 140));
+mutate("a level problem without its code prefix", "path-xp", (d) => (d.level_problems[0].code = "order"));
+mutate("an inverse reward without its level", "result-path-xp", (d) => (d.results[2].inverse.level = "zwei"));
+mutate("an xp_clear that is false", "result-path-xp", (d) => (d.results[0].inverse.xp_clear = false));
 
 // ---- 3. what a reader does with a document (the rules of the contract)
 const SUPPORTED = 1;

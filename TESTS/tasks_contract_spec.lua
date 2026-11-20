@@ -97,6 +97,7 @@ return function(H)
     "outcome",
     "path_close",
     "path_new",
+    "path_reward",
     "path_set",
     "plan_assets",
     "plan_close",
@@ -121,6 +122,7 @@ return function(H)
     "view_delete",
     "view_save",
     "waits_for",
+    "xp",
   }) do
     table.insert(expected_caps, feature)
   end
