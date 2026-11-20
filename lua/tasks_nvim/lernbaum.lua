@@ -16,13 +16,20 @@
 --- none closed: open; else partial), and it is closed when every leaf is. Progress is always counted apart: learned,
 --- seen, dropped, open (blocked ones counted as open and once more as blocked).
 ---
---- A node line reads `<label>[ → <id>][ – Grund: <reason>][ {#key}]`; the key comes last, the reason after the label
---- (also `Reason:`, and `—` or `-` as the dash), the arrow names the task the node was promoted to. A `> ` line indented
+--- A node line reads `<label>[ → <id>][ – Grund: <reason>][ {xp=N}][ {#key}]`; key and XP come last (in either
+--- order), the reason after the label (also `Reason:`, and `—` or `-` as the dash), the arrow names the task the node
+--- was promoted to. A `> ` line indented
 --- below a node is its note. Every other line of the section (prose, blank lines, comments, code fences) is kept as it
 --- is: `render` gives back the text byte for byte, only the nodes changed with `set_state` are written anew.
 ---
+--- XP (optional): a leaf carries `{xp=N}` (a whole number, 0 to `MAX_XP`). Learned counts it in full, seen half
+--- (rounded down), dropped leaves it out of the sum and the maximum (100 % stays reachable), open and blocked give 0.
+--- A promoted leaf counts the `xp:` of its task when the caller gives it (`set_task_xp`), else its own. A parent sums
+--- its children; an `{xp=N}` on a parent is a problem (`path-bad-xp`) and counts nothing. A tree without any XP works
+--- as before (`has_xp = false`).
+---
 --- Pure Lua, no I/O. Not its job: whether an arrow names a task that exists, cycles over files, images on disk
---- (`check`); the path file itself (`tasks_nvim.paths`).
+--- (`check`); the path file itself (`tasks_nvim.paths`); levels and rewards (`tasks_nvim.lernlevel`).
 
 local M = {}
 
@@ -49,6 +56,39 @@ local CLOSED = { learned = true, seen = true, dropped = true }
 
 ---The states that need a reason.
 M.NEEDS_REASON = { seen = true, dropped = true }
+
+---The largest XP of one point or task (a document must be able to carry every sum).
+M.MAX_XP = 100000
+
+---The XP a value stands for: a whole number from 0 to `MAX_XP` (a number or its digits), else nil.
+---@param v any
+---@return integer|nil
+function M.to_xp(v)
+  if type(v) == "number" then
+    if v ~= v or v ~= math.floor(v) then
+      return nil
+    end
+    v = ("%d"):format(v)
+  end
+  if type(v) ~= "string" or not v:match("^%d+$") or #v > 6 then
+    return nil
+  end
+  local n = tonumber(v)
+  return (n and n <= M.MAX_XP) and n or nil
+end
+
+---The share of its XP a leaf earns in a state: learned 1, seen one half, the rest 0; dropped counts nowhere.
+---@param state string
+---@param xp integer
+---@return integer
+function M.earned_xp(state, xp)
+  if state == "learned" then
+    return xp
+  elseif state == "seen" then
+    return math.floor(xp / 2)
+  end
+  return 0
+end
 
 local ARROW = "\226\134\146" -- U+2192
 local EN_DASH = "\226\128\147" -- U+2013
@@ -81,6 +121,11 @@ end
 ---@field derived string         # The state shown: a leaf's own (unknown mark: open); a parent's learned, partial or open.
 ---@field closed boolean
 ---@field progress Tasks.LernProgress
+---@field xp? integer            # The XP the leaf counts: its task's (`set_task_xp`), else its own; nil: none.
+---@field xp_own? integer        # The `{xp=N}` of its line.
+---@field xp_raw? string         # The text of an `{xp=…}` that is no XP (kept as written).
+---@field xp_from? "point"|"task"
+---@field xp_progress Tasks.LernXp
 ---@field dirty? boolean         # Changed by `set_state`: `render` writes the line anew.
 ---@field prefix string          # The text before the mark: indent and bullet, as written.
 ---@field cr string              # `"\r"` when the line ended with CRLF.
@@ -92,6 +137,13 @@ end
 ---@field open integer           # Open and blocked leaves (and leaves with an unknown mark).
 ---@field blocked integer
 ---@field total integer
+
+---@class Tasks.LernXp
+---@field earned integer         # Learned in full, seen half (rounded down).
+---@field possible integer       # Every leaf but the dropped ones.
+---@field open integer           # The XP of the open and blocked leaves.
+---@field points integer         # Leaves (not dropped) that carry XP.
+---@field missing integer        # Leaves (not dropped) without XP.
 
 ---@class Tasks.LernProblem
 ---@field code string
@@ -105,6 +157,8 @@ end
 ---@field nodes Tasks.LernNode[]   # Every node in document order.
 ---@field by_key table<string, Tasks.LernNode>  # The first node of each key.
 ---@field progress Tasks.LernProgress
+---@field xp Tasks.LernXp
+---@field has_xp boolean          # Some leaf carries XP.
 ---@field problems Tasks.LernProblem[]
 ---@field lines string[]           # The body split at `\n` (a CR stays on its line).
 
@@ -152,13 +206,25 @@ end
 
 ---Split the text after the mark into label, arrow, reason and key.
 ---@param text string
----@return { label: string, key?: string, reason?: string, promoted?: string, arrow_bad?: string }
+---@return { label: string, key?: string, xp?: integer, xp_raw?: string, reason?: string, promoted?: string, arrow_bad?: string }
 function M.split(text)
   local rest = text:gsub("%s+$", "")
   local out = {}
-  local before, key = rest:match("^(.-)%s*{#([^{}%s]+)}$")
-  if before then
-    rest, out.key = before, key
+  -- the key and the XP at the end, in either order, each once
+  for _ = 1, 2 do
+    local before, key = rest:match("^(.-)%s*{#([^{}%s]+)}$")
+    if before and not out.key then
+      rest, out.key = before, key
+    else
+      local b2, raw = rest:match("^(.-)%s*{xp=([^{}]*)}$")
+      if b2 and out.xp == nil and out.xp_raw == nil then
+        rest = b2
+        out.xp = M.to_xp(raw)
+        if out.xp == nil then
+          out.xp_raw = raw
+        end
+      end
+    end
   end
   local at, sep
   for _, s in ipairs(REASON_SEPARATORS) do
@@ -207,8 +273,13 @@ local function zero()
   return { learned = 0, seen = 0, dropped = 0, open = 0, blocked = 0, total = 0 }
 end
 
----@param into Tasks.LernProgress
----@param from Tasks.LernProgress
+---@return Tasks.LernXp
+local function zero_xp()
+  return { earned = 0, possible = 0, open = 0, points = 0, missing = 0 }
+end
+
+---@param into table<string, integer>
+---@param from table<string, integer>
 local function add_progress(into, from)
   for k, v in pairs(from) do
     into[k] = into[k] + v
@@ -219,9 +290,21 @@ end
 ---@param node Tasks.LernNode
 local function derive(node)
   local p = zero()
+  local x = zero_xp()
   if #node.children == 0 then
     local s = node.state or "open"
     p.total = 1
+    if s ~= "dropped" then
+      if node.xp then
+        x.points, x.possible = 1, node.xp
+        x.earned = M.earned_xp(s, node.xp)
+        if not CLOSED[s] then
+          x.open = node.xp
+        end
+      else
+        x.missing = 1
+      end
+    end
     if s == "blocked" then
       p.open, p.blocked = 1, 1
     elseif CLOSED[s] then
@@ -235,6 +318,7 @@ local function derive(node)
     for _, c in ipairs(node.children) do
       derive(c)
       add_progress(p, c.progress)
+      add_progress(x, c.xp_progress)
     end
     node.closed = p.open == 0
     if p.learned == p.total then
@@ -246,6 +330,19 @@ local function derive(node)
     end
   end
   node.progress = p
+  node.xp_progress = x
+end
+
+---Derive every root anew and sum the tree's progress and XP.
+---@param tree Tasks.LernTree
+local function derive_tree(tree)
+  tree.progress, tree.xp = zero(), zero_xp()
+  for _, root in ipairs(tree.roots) do
+    derive(root)
+    add_progress(tree.progress, root.progress)
+    add_progress(tree.xp, root.xp_progress)
+  end
+  tree.has_xp = tree.xp.points > 0
 end
 
 ---Read the learning tree of a body (the text below the frontmatter). Without a `## Lernpunkte` section the tree is
@@ -261,6 +358,8 @@ function M.parse(body)
     nodes = {},
     by_key = {},
     progress = zero(),
+    xp = zero_xp(),
+    has_xp = false,
     problems = {},
     lines = lines,
   }
@@ -316,6 +415,11 @@ function M.parse(body)
             derived = "open",
             closed = false,
             progress = zero(),
+            xp = parts.xp,
+            xp_own = parts.xp,
+            xp_raw = parts.xp_raw,
+            xp_from = parts.xp and "point" or nil,
+            xp_progress = zero_xp(),
             prefix = ws .. bullet .. " ",
             cr = raw:sub(-1) == "\r" and "\r" or "",
           }
@@ -353,6 +457,14 @@ function M.parse(body)
               tree.by_key[parts.key] = node
             end
           end
+          if parts.xp_raw then
+            problem(
+              "path-bad-xp",
+              i,
+              ("{xp=%s} is no XP (a whole number from 0 to %d)"):format(parts.xp_raw, M.MAX_XP),
+              parts.key
+            )
+          end
           if parts.arrow_bad then
             problem(
               "path-bad-arrow",
@@ -386,10 +498,19 @@ function M.parse(body)
       end
     end
   end
-  for _, root in ipairs(tree.roots) do
-    derive(root)
-    add_progress(tree.progress, root.progress)
+  -- a parent sums its children: XP of its own count nothing
+  for _, node in ipairs(tree.nodes) do
+    if #node.children > 0 and (node.xp_own or node.xp_raw) then
+      node.xp, node.xp_from = nil, nil
+      problem(
+        "path-bad-xp",
+        node.line,
+        "a learning point with children sums the XP of its children: put {xp=…} on them",
+        node.key
+      )
+    end
   end
+  derive_tree(tree)
   -- a leaf seen or dropped needs its reason; a parent has no mark of its own, so none of its own
   for _, node in ipairs(tree.nodes) do
     if #node.children == 0 and M.NEEDS_REASON[node.state or ""] and not node.reason then
@@ -415,11 +536,65 @@ local function line_of(node)
   if node.reason then
     parts[#parts + 1] = " " .. EN_DASH .. " Grund: " .. node.reason
   end
+  if node.xp_own then
+    parts[#parts + 1] = " {xp=" .. node.xp_own .. "}"
+  elseif node.xp_raw then
+    parts[#parts + 1] = " {xp=" .. node.xp_raw .. "}"
+  end
   if node.key then
     parts[#parts + 1] = " {#" .. node.key .. "}"
   end
   parts[#parts + 1] = node.cr
   return table.concat(parts)
+end
+
+---Give the promoted leaves the XP of their tasks: `xp_of[id]` is the `xp:` of the task an arrow names (nil: the task
+---has none, the leaf keeps its own `{xp=N}`). The tree is derived anew; nothing is written.
+---@param tree Tasks.LernTree
+---@param xp_of table<string, integer|false>
+function M.set_task_xp(tree, xp_of)
+  for _, node in ipairs(tree.nodes) do
+    if #node.children == 0 and node.promoted then
+      local x = xp_of[node.promoted]
+      if x then
+        node.xp, node.xp_from = x, "task"
+      else
+        node.xp, node.xp_from = node.xp_own, node.xp_own and "point" or nil
+      end
+    end
+  end
+  derive_tree(tree)
+end
+
+---Change the XP of a leaf: a whole number writes `{xp=N}` into its line, nil (or "") removes it. A parent sums its
+---children and has none of its own. The tree is derived anew; `render` writes the line.
+---@param tree Tasks.LernTree
+---@param ref string|integer
+---@param xp integer|string|nil
+---@return Tasks.LernNode|nil node
+---@return string|nil err
+function M.set_xp(tree, ref, xp)
+  local node = M.node(tree, ref)
+  if not node then
+    return nil, "no such learning point: " .. tostring(ref)
+  end
+  if #node.children > 0 then
+    return nil, "a learning point with children sums the XP of its children: change theirs"
+  end
+  local n
+  if xp ~= nil and xp ~= "" then
+    n = M.to_xp(xp)
+    if not n then
+      return nil, ("xp must be a whole number from 0 to %d, got %s"):format(M.MAX_XP, tostring(xp))
+    end
+  end
+  node.xp_own, node.xp_raw = n, nil
+  if node.xp_from ~= "task" then
+    node.xp, node.xp_from = n, n and "point" or nil
+  end
+  node.dirty = true
+  derive_tree(tree)
+  return node, nil
 end
 
 ---The body text of a tree: the lines as they were, the changed nodes written anew.
@@ -486,11 +661,7 @@ function M.set_state(tree, ref, state, reason)
     node.reason = reason
   end
   node.dirty = true
-  tree.progress = zero()
-  for _, root in ipairs(tree.roots) do
-    derive(root)
-    add_progress(tree.progress, root.progress)
-  end
+  derive_tree(tree)
   return node, nil
 end
 
