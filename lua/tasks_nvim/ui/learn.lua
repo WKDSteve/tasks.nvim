@@ -24,6 +24,7 @@ local notify = require("lib.nvim.notify").create("[tasks]")
 
 local fsio = require("tasks_nvim.fsio")
 local lernbaum = require("tasks_nvim.lernbaum")
+local lernlevel = require("tasks_nvim.lernlevel")
 local soft = require("tasks_nvim.soft")
 local vault = require("tasks_nvim.vault")
 
@@ -42,12 +43,15 @@ M.NEXT = { open = "learned", learned = "seen", seen = "dropped", dropped = "open
 ---The states `set_point` takes.
 M.STATES = { "open", "learned", "seen", "dropped", "blocked" }
 
+local MIDDOT = "\194\183" -- U+00B7
+
 ---@class Tasks.LearnState
 ---@field tick integer                        # The changedtick the folds were computed for.
 ---@field starts table<integer, integer>      # Buffer row -> fold level a parent starts.
 ---@field levels table<integer, integer>      # Buffer row -> fold level of the line.
 ---@field wins table<integer, table>          # Window -> its fold options before the view set them.
 ---@field keys string[]                       # The keys mapped in the buffer.
+---@field level? integer                      # The highest level seen since the view was put on (said once).
 
 ---The buffers the view is attached to.
 ---@type table<integer, Tasks.LearnState>
@@ -116,6 +120,7 @@ end
 ---@field tree Tasks.LernTree
 ---@field offset integer       # Buffer row of body line n is `offset + n`.
 ---@field heading? integer     # Buffer row of the `## Lernpunkte` heading.
+---@field body string          # The text below the frontmatter (what `lernbaum` and `lernlevel` read).
 
 ---The tree of a buffer as it is now (unsaved changes included).
 ---@param buf integer
@@ -147,7 +152,7 @@ function M.snapshot(buf)
       end
     end
   end
-  return { tree = tree, offset = offset, heading = heading }
+  return { tree = tree, offset = offset, heading = heading, body = body }
 end
 
 ---Whether a buffer holds the text of a file (CRLF or LF, a byte order mark and the final newline aside).
@@ -236,6 +241,38 @@ local function reload_path(path)
       end
     end
   end
+end
+
+---The `xp:` of the promoted tasks per buffer, read once per set of arrows and again after a read or a write of the
+---buffer (not on every change of its text: that would scan the vault per key).
+---@type table<integer, { key: string, xp: table<string, integer|false> }>
+local task_xp_cache = {}
+
+---Give the promoted leaves of a snapshot the XP of their tasks (a buffer outside the vault keeps the points' own).
+---@param buf integer
+---@param snap Tasks.LearnSnapshot
+local function with_task_xp(buf, snap)
+  local ids = lernbaum.promoted_ids(snap.tree)
+  if #ids == 0 then
+    return
+  end
+  local key = table.concat(ids, ",")
+  local hit = task_xp_cache[buf]
+  if not (hit and hit.key == key) then
+    local loc = M.locate(buf)
+    if not loc then
+      return
+    end
+    hit = { key = key, xp = require("tasks_nvim.paths").task_xp(snap.tree, loc.root) }
+    task_xp_cache[buf] = hit
+  end
+  lernbaum.set_task_xp(snap.tree, hit.xp)
+end
+
+---Forget the task XP of a buffer (read again on the next draw).
+---@param buf integer
+function M.forget_task_xp(buf)
+  task_xp_cache[buf] = nil
 end
 
 -- ── the mark of a point ──────────────────────────────────────────────────────
@@ -361,6 +398,130 @@ function M.cycle(win)
   M.set_point_asking(buf, row, M.NEXT[node.state or ""] or "open")
 end
 
+-- ── XP and rewards ───────────────────────────────────────────────────────────
+
+---Set the XP of the point on `row` (`{xp=N}` in its line; nil or "" removes it), written like `set_point`: a path
+---buffer without unsaved changes through `paths.point` on disk, else in the buffer. A parent sums its children; a point
+---whose task carries `xp:` takes the task's (change it there).
+---@param buf integer
+---@param row integer
+---@param xp integer|string|nil
+---@return Tasks.LernNode|nil node
+---@return string|nil err
+function M.set_xp(buf, row, xp)
+  local snap = M.snapshot(buf)
+  local node = M.node_at(snap, row)
+  if not node then
+    return nil, "no learning point on this line"
+  end
+  if #node.children > 0 then
+    return nil, "a learning point with children sums the XP of its children: change theirs"
+  end
+  if xp ~= nil and xp ~= "" and not lernbaum.to_xp(xp) then
+    return nil,
+      ("xp must be a whole number from 0 to %d, got %s"):format(lernbaum.MAX_XP, tostring(xp))
+  end
+  with_task_xp(buf, snap)
+  if node.xp_from == "task" then
+    return nil, ("the XP of this point is the xp: of %s: change it there"):format(node.promoted)
+  end
+  local loc = M.locate(buf)
+  if loc and loc.kind == "path" and not vim.bo[buf].modified then
+    local disk, rerr = fsio.read(loc.path)
+    if not disk then
+      return nil, "cannot read " .. loc.path .. ": " .. tostring(rerr)
+    end
+    if not M.same_text(buf, disk) then
+      return nil, loc.id .. " changed on disk: reload the buffer (:edit) first"
+    end
+    local res, err = require("tasks_nvim.paths").point(loc.id, node.index, nil, nil, {
+      root = loc.root,
+      if_match = fsio.etag(disk),
+      xp = xp == nil and "" or xp,
+    })
+    if not res then
+      return nil, err
+    end
+    reload(buf)
+    return M.node_at(M.snapshot(buf), M.snapshot(buf).offset + node.line), nil
+  end
+  local changed, err = lernbaum.set_xp(snap.tree, node.index, xp)
+  if not changed then
+    return nil, err
+  end
+  local lines = vim.split(lernbaum.render(snap.tree), "\n", { plain = true })
+  local line = (lines[changed.line] or ""):gsub("\r$", "")
+  vim.api.nvim_buf_set_lines(buf, row - 1, row, false, { line })
+  if attached[buf] then
+    M.refresh(buf)
+  end
+  return changed, nil
+end
+
+---Ask for the XP of the point on `row` (filled in with its own, else the engine's suggestion; empty removes it), then
+---set it. `done(node|nil, err|nil)` at the end; a cancelled question calls it with neither.
+---@param buf integer
+---@param row integer
+---@param done? fun(node: Tasks.LernNode|nil, err: string|nil)
+function M.set_xp_asking(buf, row, done)
+  done = done or function(_, err)
+    if err then
+      notify.error(err)
+    end
+  end
+  local node = M.node_at(M.snapshot(buf), row)
+  if not node then
+    return done(nil, "no learning point on this line")
+  end
+  local default = node.xp_own or lernbaum.suggest_xp({ depth = node.depth })
+  vim.ui.input({ prompt = "XP (leer: keine): ", default = tostring(default) }, function(answer)
+    if answer == nil then
+      return done(nil, nil)
+    end
+    if not vim.api.nvim_buf_is_valid(buf) then
+      return done(nil, "the buffer is gone")
+    end
+    answer = vim.trim(answer)
+    done(M.set_xp(buf, row, answer))
+  end)
+end
+
+---Mark the reward of a level of the path in `buf` granted (`given`, "gegönnt") or not, on disk through
+---`paths.set_reward` (the buffer must be the file, without unsaved changes), then reload it.
+---@param buf integer
+---@param ref string|integer   # The level number, or `done` for the line of the whole path.
+---@param given boolean
+---@return { ref: string, line: integer, given: boolean, before: boolean }|nil level
+---@return string|nil err
+function M.set_reward(buf, ref, given)
+  local loc, lerr = M.locate(buf)
+  if not loc then
+    return nil, lerr
+  end
+  if loc.kind ~= "path" then
+    return nil, "levels and rewards belong to a learning path (## Level), not to a task"
+  end
+  if vim.bo[buf].modified then
+    return nil, "write the buffer first: the reward is marked in the file on disk"
+  end
+  local disk, rerr = fsio.read(loc.path)
+  if not disk then
+    return nil, "cannot read " .. loc.path .. ": " .. tostring(rerr)
+  end
+  if not M.same_text(buf, disk) then
+    return nil, loc.id .. " changed on disk: reload the buffer (:edit) first"
+  end
+  local res, err = require("tasks_nvim.paths").set_reward(loc.id, ref, given, {
+    root = loc.root,
+    if_match = fsio.etag(disk),
+  })
+  if not res then
+    return nil, err
+  end
+  reload(buf)
+  return res.level, nil
+end
+
 -- ── the view ─────────────────────────────────────────────────────────────────
 
 ---Where an image of a point is on disk: below the folder of the file, under `assets/` (nil for anything else).
@@ -395,6 +556,45 @@ local function compute_folds(buf, snap)
   st.tick = vim.api.nvim_buf_get_changedtick(buf)
 end
 
+---Whether the view shows XP, level and rewards (`setup({ gamification = false })` hides them).
+---@return boolean
+function M.gamified()
+  return require("tasks_nvim.config").get().gamification ~= false
+end
+
+---Say once, in one quiet line (no popup), that a level was reached.
+---@param text string
+function M.say(text)
+  vim.api.nvim_echo({ { "[tasks] " .. text, "Comment" } }, true, {})
+end
+
+---The heading's text after the progress: `120 / 300 XP · Level 2 (Einsteiger) · Belohnung offen: Kino`.
+---@param tree Tasks.LernTree
+---@param ls? Tasks.LevelState
+---@return string
+function M.xp_text(tree, ls)
+  local parts = {}
+  local sep = " " .. MIDDOT .. " "
+  if tree.has_xp then
+    parts[#parts + 1] = ("%d / %d XP"):format(tree.xp.earned, tree.xp.possible)
+  end
+  if ls and ls.has_levels then
+    if ls.level > 0 then
+      parts[#parts + 1] = "Level "
+        .. ls.level
+        .. (ls.level_name and (" (" .. ls.level_name .. ")") or "")
+    end
+    local rewards = {}
+    for _, r in ipairs(ls.open_rewards) do
+      rewards[#rewards + 1] = r.reward
+    end
+    if #rewards > 0 then
+      parts[#parts + 1] = "Belohnung offen: " .. table.concat(rewards, ", ")
+    end
+  end
+  return table.concat(parts, sep)
+end
+
 ---Draw the progress and the image placeholders anew (and the folds of an attached buffer).
 ---@param buf integer
 function M.refresh(buf)
@@ -410,9 +610,33 @@ function M.refresh(buf)
       pcall(vim.api.nvim_buf_set_extmark, buf, M.ns, row - 1, 0, opts)
     end
   end
+  local game = M.gamified() and #snap.tree.nodes > 0
+  local ls
+  if game then
+    with_task_xp(buf, snap)
+    local lv = lernlevel.parse(snap.body)
+    if #lv.levels > 0 or lv.final then
+      ls = lernlevel.evaluate(lv, snap.tree)
+    end
+    local st = attached[buf]
+    if st and ls then
+      -- a level reached while the view is on says so once; the level the buffer opened with does not
+      if st.level and ls.level > st.level then
+        M.say(
+          ("Level %d erreicht%s"):format(ls.level, ls.level_name and (": " .. ls.level_name) or "")
+        )
+      end
+      st.level = math.max(st.level or 0, ls.level)
+    end
+  end
   if snap.heading and #snap.tree.nodes > 0 then
+    local text = lernbaum.progress_text(snap.tree.progress)
+    local extra = game and M.xp_text(snap.tree, ls) or ""
+    if extra ~= "" then
+      text = text .. " " .. MIDDOT .. " " .. extra
+    end
     mark(snap.heading, {
-      virt_text = { { "  " .. lernbaum.progress_text(snap.tree.progress), "Comment" } },
+      virt_text = { { "  " .. text, "Comment" } },
       virt_text_pos = "eol",
     })
   end
@@ -423,6 +647,8 @@ function M.refresh(buf)
         virt_text = { { "  " .. lernbaum.progress_text(node.progress), "Comment" } },
         virt_text_pos = "eol",
       })
+    elseif game and node.xp then
+      mark(row, { virt_text = { { "  " .. node.xp .. " XP", "Comment" } }, virt_text_pos = "eol" })
     end
     if node.image then
       local abs = file ~= "" and M.image_path(fsio.norm(file), node.image) or nil
@@ -524,6 +750,13 @@ M.ACTIONS = {
       M.follow()
     end,
   },
+  xp = {
+    desc = "Learning point: set its XP",
+    run = function()
+      local buf, row = cursor()
+      M.set_xp_asking(buf, row)
+    end,
+  },
 }
 
 ---Attach the view to a buffer: progress, image placeholders, folds, buffer-local autocommands and keys. Again on an
@@ -545,6 +778,10 @@ function M.attach(buf)
     buffer = buf,
     desc = "tasks.nvim: redraw the learning tree",
     callback = function(ev)
+      if ev.event == "BufReadPost" or ev.event == "BufWritePost" then
+        -- the tasks may have changed meanwhile: their XP is read again
+        task_xp_cache[ev.buf] = nil
+      end
       M.refresh(ev.buf)
     end,
   })
@@ -562,6 +799,7 @@ function M.attach(buf)
     desc = "tasks.nvim: forget the learning tree view",
     callback = function(ev)
       attached[ev.buf] = nil
+      task_xp_cache[ev.buf] = nil
     end,
   })
   local keys = require("tasks_nvim.config").get().keys.learning or {}
@@ -908,6 +1146,41 @@ function M.cmd_point(ctx)
     return
   end
   M.set_point_asking(buf, row, state, reason)
+end
+
+---`:Tasks xp [<n>|clear]`: the XP of the point under the cursor; without a value a question, filled in with its own or
+---the engine's suggestion.
+---@param ctx table
+function M.cmd_xp(ctx)
+  if not no_rest(ctx) then
+    return
+  end
+  local buf, row = cursor()
+  local value = ctx.args.value
+  if value == nil then
+    M.set_xp_asking(buf, row)
+    return
+  end
+  local node, err = M.set_xp(buf, row, value == "clear" and "" or value)
+  if not node then
+    notify.error(tostring(err))
+  end
+end
+
+---`:Tasks reward <n|done> [--undo]`: the reward of a level of the path in this buffer granted ("gegönnt"), or not.
+---@param ctx table
+function M.cmd_reward(ctx)
+  if not no_rest(ctx) then
+    return
+  end
+  local undo = ctx.flags.undo == true
+  local level, err = M.set_reward(vim.api.nvim_get_current_buf(), ctx.args.level, not undo)
+  if not level then
+    notify.error(tostring(err))
+    return
+  end
+  local label = level.ref == "done" and "Pfad fertig" or ("Level " .. level.ref)
+  notify.info(("%s: Belohnung %s"):format(label, undo and "wieder offen" or "gegönnt"))
 end
 
 ---`:Tasks promote [<area>/<slug>#<key|n>] [--area= --title= --actor= --dry-run --no-index]`

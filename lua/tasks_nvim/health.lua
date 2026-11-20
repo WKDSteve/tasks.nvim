@@ -270,6 +270,15 @@ function M.check()
       "images.nvim not found -- an image of a learning point stays a placeholder line (mdview.nvim shows it in the browser)"
     )
   end
+  if require("tasks_nvim.config").get().gamification ~= false then
+    ok(
+      "gamification on -- XP, level and open rewards in the learning tree (`setup({ gamification = false })` hides them)"
+    )
+  else
+    info(
+      "gamification off -- the learning tree shows no XP, level or rewards (`gamification = false`)"
+    )
+  end
   if pcall(require, "emojis") then
     ok("emojis.nvim -- an icon for `icon:` of a path or task (`:Emoji`)")
   else

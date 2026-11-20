@@ -53,7 +53,7 @@
 ---@field dashboard Tasks.KeyMap        Keys in the dashboard list window.
 ---@field dashboard_input Tasks.KeyMap  Keys in the dashboard input window (normal and insert mode).
 ---@field form Tasks.KeyMap             Buffer-local keys of the `:Tasks new` form.
----@field learning Tasks.KeyMap         Buffer-local keys of the learning tree view (`:Tasks learn`): `cycle`, `promote`, `unpromote`, `image`, `follow`. None by default.
+---@field learning Tasks.KeyMap         Buffer-local keys of the learning tree view (`:Tasks learn`): `cycle`, `promote`, `unpromote`, `image`, `follow`, `xp`. None by default.
 
 ---@class Tasks.Opts
 ---@field vault string|nil          Vault folder (one folder per area). `nil`: `$TASKS_VAULT` is read.
@@ -78,6 +78,7 @@
 ---@field keys Tasks.KeysConfig
 ---@field form Tasks.FormConfig
 ---@field learning Tasks.LearningConfig
+---@field gamification boolean  XP per learning point, the level reached and the open rewards in the learning tree view (`:Tasks learn`), and the one quiet line when a level is reached. `false` hides all of it; the tree and its progress stay. `:Tasks xp` and `:Tasks reward` still write when called.
 ---@field tree boolean|Tasks.Tree.Opts  The vault in a tree view that reads `lib.nvim.tree.registry` (the own tree of filetree.nvim): a count of open tasks on the area folders, a view `tasks`, and the actions "finish" and "claim" on a task. `true`: registered, the actions in the tree's menu; `{ keys = { done = "<key>", claim = "<key>" } }`: on those keys in the tree buffer as well; `false`: nothing is registered.
 ---@field ai boolean|"auto"  The AI functions of the ai family (handing a task to an agent of ai-desktop or ai.nvim): `false` none at all (no command, no key, no menu entry), `true` always offered, `"auto"` only where ai.nvim or ai-desktop is found on this machine. AI does not push itself forward; `:checkhealth tasks_nvim` says what is found. See `tasks_nvim.ai`.
 
@@ -110,6 +111,7 @@ return {
   completion = { finished = true },
   form = { mode = "float" },
   learning = { auto = false },
+  gamification = true,
   tree = true,
   ai = "auto",
   keys = {
@@ -164,6 +166,13 @@ return {
       help = "g?",
       icon = "<C-e>",
     },
-    learning = { cycle = false, promote = false, unpromote = false, image = false, follow = false },
+    learning = {
+      cycle = false,
+      promote = false,
+      unpromote = false,
+      image = false,
+      follow = false,
+      xp = false,
+    },
   },
 }

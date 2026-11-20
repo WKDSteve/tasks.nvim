@@ -44,6 +44,7 @@ return function(H)
       "task promote",
       "task quickwins",
       "task release",
+      "task reward",
       "task set",
       "task sheet-ai",
       "task sheet-run",
@@ -51,10 +52,11 @@ return function(H)
       "task unclaim",
       "task unpromote",
       "task waits",
+      "task xp",
       "tasks",
       "tasks index",
     },
-    "the nested grammar (`:MyPlugins`): the old paths are unchanged, plan / next / estimate / quickwins / learn / point / promote / unpromote are new"
+    "the nested grammar (`:MyPlugins`): the old paths are unchanged, plan / next / estimate / quickwins / learn / point / promote / unpromote / xp / reward are new"
   )
   eq(paths(routes.routes({ flat = true })), {
     "agent",
@@ -85,6 +87,7 @@ return function(H)
     "promote",
     "quickwins",
     "release",
+    "reward",
     "set",
     "sheet-ai",
     "sheet-run",
@@ -92,6 +95,7 @@ return function(H)
     "unclaim",
     "unpromote",
     "waits",
+    "xp",
   }, "the flat grammar of `:Tasks`: no two routes share a path")
   eq(#routes.routes({ flat = true }), #routes.routes(), "same number of routes")
 

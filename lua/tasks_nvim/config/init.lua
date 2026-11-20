@@ -43,6 +43,7 @@ local SCHEMA = {
   completion = { finished = "finished_window" },
   form = { mode = "form_mode" },
   learning = { auto = "boolean" },
+  gamification = "boolean",
   tree = "tree",
   ai = "ai",
   keys = { dashboard = "keymap", dashboard_input = "keymap", form = "keymap", learning = "keymap" },

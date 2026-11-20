@@ -911,6 +911,17 @@ They work on a buffer that holds a learning path (`<area>/ROADMAP/paths/<slug>.m
   task, the point's line becomes `… → <id>`, the container's buffers are reloaded and the new task opens.
   `:Tasks unpromote [<area>/<slug>#<key|n>] [--dry-run --no-index]` takes it back while the task holds no work of its
   own. The same rules as the CLI's `promote` / `unpromote` ([ENGINE.md](ENGINE.md), "Promoting a learning point").
+- XP, level and rewards ([ENGINE.md](ENGINE.md), "XP, levels and rewards") are drawn quietly: `25 XP` at the end of
+  each leaf that has XP (a promoted one shows the `xp:` of its task, read again when the buffer is read or written),
+  and on the heading after the progress `120 / 300 XP · Level 2 (Einsteiger) · Belohnung offen: Kino`. A level
+  reached while the view is on says so once, in one line (`[tasks] Level 2 erreicht: Profi`), no popup.
+  `setup({ gamification = false })` hides all of it; the progress stays.
+- `:Tasks xp [<n>|clear]` sets the XP of the point under the cursor (`{xp=N}` in its line; `clear` removes it). Without
+  a value it asks, filled in with the point's own XP or the engine's suggestion. It is written like `:Tasks point`. A
+  parent sums its children, and a point whose task carries `xp:` is changed in the task.
+- `:Tasks reward <n|done> [--undo]` marks the reward of level `n` (or of the line for the whole path) in `## Level` as
+  granted, "gegönnt" (`[x]`), or open again. It works only in a path buffer without unsaved changes
+  (`paths.set_reward`, under the file's lock).
 
 No key is bound unless `keys.learning` names one ([BINDINGS.md](BINDINGS.md)).
 

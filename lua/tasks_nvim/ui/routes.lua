@@ -1536,6 +1536,40 @@ local function nested_routes()
     },
 
     {
+      path = { "task", "xp" },
+      args = {
+        {
+          name = "value",
+          type = "STRING",
+          optional = true,
+          desc = "A whole number from 0 to 100000, or clear (default: ask)",
+        },
+      },
+      desc = "Set the XP of the learning point under the cursor ({xp=N} in its line); a parent sums its children",
+      run = function(ctx)
+        learn().cmd_xp(ctx)
+      end,
+    },
+
+    {
+      path = { "task", "reward" },
+      args = {
+        {
+          name = "level",
+          type = "STRING",
+          desc = "The number of the level in ## Level, or done for the line of the whole path",
+        },
+      },
+      flags = {
+        { name = "undo", bool = true, desc = "Mark the reward as not granted again" },
+      },
+      desc = "Mark the reward of a level of the learning path in this buffer as granted (gegönnt): [x] in ## Level",
+      run = function(ctx)
+        learn().cmd_reward(ctx)
+      end,
+    },
+
+    {
       path = { "task", "promote" },
       args = {
         {

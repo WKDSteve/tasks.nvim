@@ -158,6 +158,7 @@ require("tasks_nvim").setup({
   tree = true,                                                                  -- the vault in a tree view: true, false or { keys = { done = "<key>", claim = "<key>" } }
   ai = "auto",                                                                  -- AI functions: false (none), true, or "auto" (only where ai.nvim or ai-desktop is found)
   learning = { auto = false },                                                  -- the learning tree view (:Tasks learn) by itself on paths and learning tasks
+  gamification = true,                                                          -- XP, level and rewards in the learning tree view; false hides them
 })
 ```
 

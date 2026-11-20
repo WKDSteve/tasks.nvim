@@ -67,7 +67,7 @@ require("tasks_nvim").setup({
 
 An action that is not named keeps its default. Dashboard actions: `status prio done filter sort export rescan
 backlog roadmap preview view assign move_down move_up help`, and while the AI functions are on `agent agent_run` (`gh` / `gH`:
-the task under the cursor to `:Tasks agent`, prefill / run). Form actions: `tick_space tick_enter submit cancel cancel_ctrl help icon`. Learning tree actions: `cycle promote unpromote image follow`. An unknown
+the task under the cursor to `:Tasks agent`, prefill / run). Form actions: `tick_space tick_enter submit cancel cancel_ctrl help icon`. Learning tree actions: `cycle promote unpromote image follow xp`. An unknown
 action name is reported (and listed in `:checkhealth`), never bound. The help (`g?`) lists the default keys.
 
 ## Learning tree (`:Tasks learn`, buffer-local, none by default)
@@ -81,6 +81,7 @@ The view maps no key unless `keys.learning` names one; then the key is buffer-lo
 | `unpromote` | take its promotion back (`:Tasks unpromote`) |
 | `image` | show its image: images.nvim, else mdview.nvim's browser preview, else the path |
 | `follow` | open the task it was promoted to |
+| `xp` | set its XP (`:Tasks xp`): a question filled in with its own XP or a suggestion |
 
 ```lua
 require("tasks_nvim").setup({
