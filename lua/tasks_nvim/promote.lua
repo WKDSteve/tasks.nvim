@@ -263,6 +263,8 @@ function M.promote(container, ref, opts)
       category = "learning",
       actor = opts.actor,
       point = point,
+      -- the XP of the point go along: the task counts them from now on
+      xp = node.xp_own,
       today = today,
       slug = probe.slug,
       body = task_body(c.id, key, node, moved.subtree),

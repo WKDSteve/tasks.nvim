@@ -152,7 +152,7 @@ commands:
                                           of the vault's repository (rows marked src: git; the repository is not touched)
   migrate-actor [<area>] [--write]        propose actor=me for tasks that wait for you (status decision, tag
                                           needs-user) and leave every other task EMPTY; dry run unless --write
-  new <area>[,<area>...] <title> [--kind=k] [--prio=1..3] [--effort=XS..XL|0.5d] [--value=1..5] [--actor=cdx|me|pair] [--after=id,id] [--order=2.5] [--plan=id|--project=id] [--phase=word] [--created=YYYY-MM-DD] [--tags=a,b]
+  new <area>[,<area>...] <title> [--kind=k] [--prio=1..3] [--effort=XS..XL|0.5d] [--value=1..5] [--xp=N] [--actor=cdx|me|pair] [--after=id,id] [--order=2.5] [--plan=id|--project=id] [--phase=word] [--created=YYYY-MM-DD] [--tags=a,b]
        [--category=c,d] [--scope=a,b] [--severity=low|medium|high|critical] [--due=YYYY-MM-DD] [--start=YYYY-MM-DD] [--repeat=8w] [--repeat-from=done|due] [--refs=path,repo@sha] [--links=https://...,...]
        [--summary=text] [--slug=slug] [--status=s] [--waits-for=key] [--outcome=learned|seen|not-applicable] [--reason=text]
        [--icon=<emoji|assets/x.svg|word>] [--cover=assets/x.png]
@@ -444,6 +444,7 @@ local SPECS = {
       "scope",
       "severity",
       "value",
+      "xp",
       "actor",
       "after",
       "order",
@@ -1814,6 +1815,7 @@ function commands.new(ctx)
     outcome = opt.outcome --[[@as string|nil]],
     outcome_reason = opt.reason --[[@as string|nil]],
     value = opt.value --[[@as string|nil]],
+    xp = opt.xp --[[@as string|nil]],
     actor = opt.actor --[[@as string|nil]],
     after = opt.after --[[@as string|nil]],
     order = opt.order --[[@as string|nil]],

@@ -19,6 +19,7 @@
 
 local fm = require("lib.nvim.markdown.frontmatter")
 local fsio = require("tasks_nvim.fsio")
+local lernbaum = require("tasks_nvim.lernbaum")
 local questions = require("tasks_nvim.questions")
 local sheets = require("tasks_nvim.sheets")
 local steps = require("tasks_nvim.steps")
@@ -1343,6 +1344,22 @@ function M.parse_text(text, ctx)
         task.value = value
       else
         bad("bad-value", "value must be 1, 2, 3, 4 or 5, got " .. vim.inspect(meta.value))
+      end
+    end
+
+    -- the XP of a learning task (`tasks_nvim.lernbaum`): its learning point counts it after the outcome
+    if meta.xp ~= nil then
+      local xp = lernbaum.to_xp(meta.xp)
+      if xp then
+        task.xp = xp
+      else
+        bad(
+          "bad-xp",
+          ("xp must be a whole number from 0 to %d, got %s"):format(
+            lernbaum.MAX_XP,
+            vim.inspect(meta.xp)
+          )
+        )
       end
     end
 

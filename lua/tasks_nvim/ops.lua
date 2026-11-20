@@ -393,6 +393,7 @@ local NEW_FIELDS = {
   severity = true,
   waits_for = true,
   value = true,
+  xp = true,
   actor = true,
   summary = true,
   refs = true,

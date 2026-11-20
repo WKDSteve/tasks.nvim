@@ -29,6 +29,7 @@ local claims = require("tasks_nvim.claims")
 local fsio = require("tasks_nvim.fsio")
 local gitbusy = require("tasks_nvim.gitbusy")
 local index = require("tasks_nvim.index")
+local lernbaum = require("tasks_nvim.lernbaum")
 local model = require("tasks_nvim.model")
 local scan = require("tasks_nvim.scan")
 local steps = require("tasks_nvim.steps")
@@ -360,7 +361,7 @@ local function check_lang(lang)
 end
 
 ---Frontmatter keys in the order concept section 3 shows them.
----@param meta { title: string, status: string, kind?: string, prio?: integer|string, effort?: string, value?: integer|string, actor?: string, after?: string[], order?: number|string, plan?: string, project?: string, phase?: string, tags?: string[], category?: string[], scope?: string[], severity?: string, outcome?: string, outcome_reason?: string, point?: string, waits_for?: string, due?: string, start?: string, refs?: string[], links?: string[], created: string, updated: string }
+---@param meta { title: string, status: string, kind?: string, prio?: integer|string, effort?: string, value?: integer|string, xp?: integer, actor?: string, after?: string[], order?: number|string, plan?: string, project?: string, phase?: string, tags?: string[], category?: string[], scope?: string[], severity?: string, outcome?: string, outcome_reason?: string, point?: string, waits_for?: string, due?: string, start?: string, refs?: string[], links?: string[], created: string, updated: string }
 ---@return table[] pairs
 local function meta_pairs(meta)
   local pairs_ = {
@@ -382,6 +383,9 @@ local function meta_pairs(meta)
   end
   if meta.value then
     pairs_[#pairs_ + 1] = { "value", tostring(meta.value) }
+  end
+  if meta.xp then
+    pairs_[#pairs_ + 1] = { "xp", tostring(meta.xp) }
   end
   if meta.actor then
     pairs_[#pairs_ + 1] = { "actor", meta.actor }
@@ -761,6 +765,7 @@ local SETTABLE = {
   "scope",
   "severity",
   "value",
+  "xp",
   "actor",
   "summary",
   "blocked_by",
@@ -949,6 +954,14 @@ local FIELD_NORMALIZERS = {
     local v = model.to_value(value)
     if not v then
       return nil, "value must be 1, 2, 3, 4 or 5, got " .. tostring(value)
+    end
+    return tostring(v)
+  end,
+  xp = function(value)
+    local v = lernbaum.to_xp(value)
+    if not v then
+      return nil,
+        ("xp must be a whole number from 0 to %d, got %s"):format(lernbaum.MAX_XP, tostring(value))
     end
     return tostring(v)
   end,
@@ -1321,6 +1334,17 @@ function M.new(area, opts)
       return nil, "value must be 1, 2, 3, 4 or 5, got " .. tostring(opts.value)
     end
   end
+  local xp
+  if opts.xp ~= nil and opts.xp ~= "" then
+    xp = lernbaum.to_xp(opts.xp)
+    if not xp then
+      return nil,
+        ("xp must be a whole number from 0 to %d, got %s"):format(
+          lernbaum.MAX_XP,
+          tostring(opts.xp)
+        )
+    end
+  end
   if opts.actor ~= nil and not model.is_actor(opts.actor) then
     return nil,
       ("unknown actor '%s' (expected %s)"):format(
@@ -1556,6 +1580,7 @@ function M.new(area, opts)
       prio = prio,
       effort = opts.effort,
       value = value,
+      xp = xp,
       actor = opts.actor,
       after = after,
       order = order,

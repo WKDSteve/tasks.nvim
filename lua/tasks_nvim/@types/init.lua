@@ -23,6 +23,7 @@
 ---@field kind? string
 ---@field prio? integer               # 1..3; nil when absent or invalid.
 ---@field value? integer              # 1..5, the expected benefit; nil when absent or invalid (`bad-value`).
+---@field xp? integer                 # The XP of a learning task (0..`lernbaum.MAX_XP`); nil when absent or invalid (`bad-xp`).
 ---@field actor? string               # `cdx|me|pair` as written (may be an unknown word, see `errors`); `model.actor` adds the derived value.
 ---@field effort? string
 ---@field tags string[]
@@ -136,6 +137,7 @@
 ---@field outcome_reason? string      # Why it will end so.
 ---@field waits_for? string           # What the task waits for from outside (`model.is_waits_for`); the task is created `parked`.
 ---@field value? integer|string       # 1..5, the expected benefit.
+---@field xp? integer|string          # The XP of a learning task, a whole number from 0.
 ---@field after? string[]|string     # Task ids that should come first (soft).
 ---@field order? number|string        # Sort hint inside a stage.
 ---@field plan? string                # The plan (`<area>/<slug>`, or a wikilink to it) the task belongs to.

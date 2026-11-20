@@ -670,6 +670,7 @@ local FIELD_DESC = {
   point = "Learning point it was promoted from (area/slug#key); set by promote",
   waits_for = "What the task waits for from outside (one word, e.g. mac); parks the task",
   value = "Expected benefit from 1 (little) to 5 (a lot)",
+  xp = "XP of a learning task (a whole number), counted after its outcome",
   actor = "Who can take the task on: an AI session, you or both",
   after = "Tasks it should come after, without waiting (ids)",
   order = "Tie-breaker within a stage; 2.5 sorts between 2 and 3",
