@@ -385,6 +385,7 @@ end
 ---@field online_service? string
 ---@field tasks string[]
 ---@field notify Tasks.MeetingNotify[]
+---@field notify_set? boolean       # The file names `notify`: `notify: []` is "no notice", not "the vault's default".
 ---@field notify_to string[]
 ---@field cover? string             # `cover:`, else the old name `image:`: a picture below `assets/`.
 ---@field image_alias? boolean      # The file writes `image:` (the old name of `cover:`).
@@ -577,6 +578,11 @@ function M.parse(text, ctx)
     m.tasks = vim.list_slice(m.tasks, 1, M.MAX_TASKS)
   end
 
+  -- A file that names `notify` decides for itself, an empty list included; one without it takes the default of the
+  -- vault (the hub's scheduler tells the two apart by `notify_set`).
+  if meta.notify ~= nil and meta.notify ~= vim.NIL then
+    m.notify_set = true
+  end
   for _, spec in ipairs(model.field_list(meta.notify, "notify", bad)) do
     local n = M.parse_notify(spec)
     if not n then

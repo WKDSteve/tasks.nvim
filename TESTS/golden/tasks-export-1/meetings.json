@@ -1,5 +1,5 @@
 {
-  "digest": "sha256:49c9b34f6ca389ab",
+  "digest": "sha256:99c1e91f14cba315",
   "engine": {
     "git": "0000000",
     "nvim": "0.0.0",
@@ -93,6 +93,7 @@
           "spec": "-1d@18:00"
         }
       ],
+      "notify_set": true,
       "notify_to": [
         "me@example.org"
       ],

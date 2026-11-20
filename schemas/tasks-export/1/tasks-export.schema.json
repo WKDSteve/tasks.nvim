@@ -214,6 +214,10 @@
             "additionalProperties": false
           }
         },
+        "notify_set": {
+          "description": "Only when the file names `notify`: then an empty `notify` means no notice; without it the vault's default applies.",
+          "const": true
+        },
         "notify_to": {
           "type": "array",
           "maxItems": 10,

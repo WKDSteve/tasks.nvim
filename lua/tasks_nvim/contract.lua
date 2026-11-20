@@ -2944,6 +2944,8 @@ local function meeting_entry(root, m)
         at = n.at,
       })
     end, m.notify),
+    -- only when the file names `notify`: then an empty `notify` means no notice (capability `meetings`)
+    notify_set = m.notify_set or nil,
     notify_to = #m.notify_to > 0 and vim.list_slice(m.notify_to, 1) or nil,
     -- `image` is the old name of `cover`, kept for the readers of before (capability `icon`)
     image = m.cover,

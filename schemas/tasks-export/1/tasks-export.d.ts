@@ -1882,6 +1882,10 @@ export interface MeetingEntry {
     at?: string;
   }[];
   /**
+   * Only when the file names `notify`: then an empty `notify` means no notice; without it the vault's default applies.
+   */
+  notify_set?: true;
+  /**
    * @maxItems 10
    */
   notify_to?:

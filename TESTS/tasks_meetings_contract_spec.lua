@@ -78,10 +78,13 @@ return function(H)
     }, "\n")
   )
   H.write(dir .. "/sync/assets/cover.png", "png")
-  meeting(
-    dir .. "/kickoff.md",
-    { "title: Kickoff", "status: done", "date: 2026-09-20", "tasks: [lib.nvim/install]" }
-  )
+  meeting(dir .. "/kickoff.md", {
+    "title: Kickoff",
+    "status: done",
+    "date: 2026-09-20",
+    "tasks: [lib.nvim/install]",
+    "notify: []",
+  })
   meeting(dir .. "/far.md", { "title: Far", "status: planned", "date: 2027-06-01" })
   meeting(dir .. "/nodate.md", { "title: No date", "status: planned" })
   meeting(
@@ -139,6 +142,13 @@ return function(H)
     { spec = "-15m", before_min = 15 },
     { spec = "-1d@18:00", days_before = 1, at = "18:00" },
   })
+  -- `notify_set`: the file names `notify`; an empty one is "no notice", a missing one the vault's default
+  eq(sync.notify_set, true)
+  eq(doc.items[1].id, "lib.nvim/kickoff")
+  eq(doc.items[1].notify, {}, "notify: [] is an empty list")
+  eq(doc.items[1].notify_set, true, "and says the file named it")
+  eq(doc.items[2].notify, {})
+  eq(doc.items[2].notify_set, nil, "a meeting without notify says nothing")
   eq(sync.participants, { total = 2, present = 1 })
   eq(sync.followups, { total = 1, ticked = 0 })
   eq(sync.folder, true)

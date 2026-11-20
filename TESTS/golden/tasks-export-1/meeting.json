@@ -13,7 +13,7 @@
   ],
   "body": "\nWhere alpha stands.\n\n## Agenda\n- [x] State\n- [ ] Next steps\n\n## Teilnehmer\n- [x] Rick \u003crick@example.org> (Organisator)\n- [ ] Stefan (Ich)\n\n## Unterlagen\n- [Slides](assets/slides.pdf)\n- https://example.org/wiki\n\n## Folgeaufgaben\n- [ ] Write it down -> lib.nvim/gamma\n- [x] Ask Rick\n",
   "body_truncated": false,
-  "digest": "sha256:fb1b01664bb8d177",
+  "digest": "sha256:45e90dc39f05aaa7",
   "documents": [
     {
       "href": "assets/slides.pdf",
@@ -92,6 +92,7 @@
         "spec": "-1d@18:00"
       }
     ],
+    "notify_set": true,
     "notify_to": [
       "me@example.org"
     ],
