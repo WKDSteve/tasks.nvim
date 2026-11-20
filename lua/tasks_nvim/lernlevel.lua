@@ -218,7 +218,7 @@ end
 ---@class Tasks.LevelState
 ---@field has_levels boolean
 ---@field percent integer        # The progress in percent (of the XP, or of the points without XP), rounded down.
----@field level integer          # The highest level reached; 0: none.
+---@field level integer          # The last of the levels reached in a row from level 1; 0: none.
 ---@field level_name? string
 ---@field badge? string          # The badge of that level.
 ---@field next? { number: integer, name?: string, missing_xp?: integer, missing_percent?: integer }
@@ -277,9 +277,11 @@ function M.evaluate(lv, tree)
       reached = unit_possible > 0 and percent >= l.threshold
     end
     st.reached[l.ref] = reached
-    if reached then
+    -- the level is the run of levels reached from the first on: one reached behind a gap (thresholds that do not
+    -- rise, `level-order`) does not count
+    if reached and not st.next then
       st.level, st.level_name, st.badge = l.number, l.name, l.badge
-    elseif not st.next then
+    elseif not reached and not st.next then
       local nx = { number = l.number, name = l.name }
       if l.kind == "xp" then
         nx.missing_xp = l.threshold - x.earned

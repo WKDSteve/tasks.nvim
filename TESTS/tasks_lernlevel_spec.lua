@@ -140,6 +140,16 @@ return function(H)
   eq(mst.problems[1].code, "level-order")
   eq(mst.problems[1].line, 3)
 
+  -- a level reached behind a gap does not count: the level is the run from level 1 on
+  local gap = ll.evaluate(
+    ll.parse("## Level\n- [ ] 20 XP\n- [ ] 90 XP\n- [ ] 10 XP · Belohnung: Eis\n"),
+    lb.parse(BODY)
+  )
+  eq(gap.level, 1)
+  eq(gap.next, { number = 2, missing_xp = 60 })
+  eq(gap.reached["3"], true)
+  eq(gap.open_rewards, { { ref = "3", reward = "Eis" } }, "its reward is reached all the same")
+
   -- ── a tree without XP: percent levels count the points, XP levels are not reached ──
   local plain =
     lb.parse("## Lernpunkte\n- [x] a\n- [~] b – Grund: c\n- [ ] d\n- [-] e – Grund: f\n")
