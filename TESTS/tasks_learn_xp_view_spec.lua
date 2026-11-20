@@ -162,6 +162,21 @@ return function(H)
   assert(mutate.set(proj.id, { xp = 40 }, { root = root }))
   vim.cmd("silent edit!")
 
+  -- a path without `updated:` gets it on the first write: the cursor follows the point, as with :Tasks point
+  local fresh_file = root .. "/" .. A .. "/ROADMAP/paths/xp-fresh.md"
+  H.write(
+    fresh_file,
+    "---\ntitle: Fresh\nstatus: doing\n---\n\n## Lernpunkte\n\n- [ ] Eins\n- [ ] Zwei\n"
+  )
+  open(fresh_file)
+  at(9)
+  learn.cmd_xp(ctx({ value = "7" }))
+  has(H.read(fresh_file), "updated: ")
+  has(H.read(fresh_file), "- [ ] Zwei {xp=7}\n")
+  eq(vim.api.nvim_win_get_cursor(0)[1], 10, "the cursor stays on the point it changed")
+  eq(vim.api.nvim_get_current_line(), "- [ ] Zwei {xp=7}")
+  buf = open(path_file)
+
   -- in a buffer with unsaved changes: changed in the buffer, not on disk
   vim.api.nvim_buf_set_lines(buf, 19, 20, false, { "- [ ] 200 XP · Meister ·" })
   local disk = H.read(path_file)

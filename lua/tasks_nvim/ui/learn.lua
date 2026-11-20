@@ -275,6 +275,30 @@ function M.forget_task_xp(buf)
   task_xp_cache[buf] = nil
 end
 
+---Reload a path buffer the engine wrote on disk; the windows whose cursor was on `row` follow the point, not the row
+---(the frontmatter can grow: `updated:` written the first time).
+---@param buf integer
+---@param row integer
+---@param node Tasks.LernNode   # The point as it was before the write.
+---@return Tasks.LernNode|nil node   # The point as it is now.
+local function reload_following(buf, row, node)
+  local wins = {}
+  for _, win in ipairs(vim.fn.win_findbuf(buf)) do
+    if vim.api.nvim_win_get_cursor(win)[1] == row then
+      wins[#wins + 1] = win
+    end
+  end
+  reload(buf)
+  local after = M.snapshot(buf)
+  local new_row = after.offset + node.line
+  for _, win in ipairs(wins) do
+    if vim.api.nvim_win_is_valid(win) then
+      pcall(vim.api.nvim_win_set_cursor, win, { new_row, vim.api.nvim_win_get_cursor(win)[2] })
+    end
+  end
+  return M.node_at(after, new_row)
+end
+
 -- ── the mark of a point ──────────────────────────────────────────────────────
 
 ---Set the state of the point on `row` of `buf`. See the module head for where it is written.
@@ -315,22 +339,7 @@ function M.set_point(buf, row, state, reason)
     if not res then
       return nil, err
     end
-    local wins = {}
-    for _, win in ipairs(vim.fn.win_findbuf(buf)) do
-      if vim.api.nvim_win_get_cursor(win)[1] == row then
-        wins[#wins + 1] = win
-      end
-    end
-    reload(buf)
-    -- the frontmatter can grow (`updated:` written the first time): the cursor follows the point, not the row
-    local after = M.snapshot(buf)
-    local new_row = after.offset + node.line
-    for _, win in ipairs(wins) do
-      if vim.api.nvim_win_is_valid(win) then
-        pcall(vim.api.nvim_win_set_cursor, win, { new_row, vim.api.nvim_win_get_cursor(win)[2] })
-      end
-    end
-    return M.node_at(after, new_row), nil
+    return reload_following(buf, row, node), nil
   end
   local changed, err = lernbaum.set_state(snap.tree, node.index, state, reason)
   if not changed then
@@ -442,8 +451,7 @@ function M.set_xp(buf, row, xp)
     if not res then
       return nil, err
     end
-    reload(buf)
-    return M.node_at(M.snapshot(buf), M.snapshot(buf).offset + node.line), nil
+    return reload_following(buf, row, node), nil
   end
   local changed, err = lernbaum.set_xp(snap.tree, node.index, xp)
   if not changed then
