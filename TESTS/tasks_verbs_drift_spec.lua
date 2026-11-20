@@ -167,6 +167,9 @@ return function(H)
         "value",
         -- `waits_for=<key>` in the editor, as every field of `new` there
         "waits-for",
+        -- the XP of a learning task: the command line, `set` and `promote` for now; the editor gets the field with
+        -- `tasks.nvim/lernpfad-xp-im-editor`
+        "xp",
       },
     },
     -- `:Tasks meeting` picks, opens at a section and makes a meeting from one line; the CLI sets every field (the
