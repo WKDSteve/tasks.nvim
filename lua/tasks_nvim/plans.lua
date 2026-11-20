@@ -48,6 +48,8 @@ M.STATUSES = { "planning", "doing", "parked", "done" }
 ---@field link_problems? Tasks.LinkProblem[]  # A bare `[[slug]]` target that names no id or several (`check`: `wikilink-dangling`, `wikilink-ambiguous`); `target` is nil then.
 ---@field kind "plan"|"project"|"path"  # Which kind of file this is (a project file and a learning path are read by the same parser).
 ---@field tree? Tasks.LernTree        # A learning path only: the tree of `## Lernpunkte` (`tasks_nvim.lernbaum`).
+---@field levels? Tasks.Levels        # A learning path only: the section `## Level` (`tasks_nvim.lernlevel`).
+---@field level_state? Tasks.LevelState  # A learning path only: the levels against the tree (`paths` sets it).
 ---@field project? string             # A plan only: the project it belongs to (an id; a wikilink in the file is read as its id).
 ---@field project_raw? string         # `project` as the file writes it (an id or a wikilink).
 ---@field phase? string               # A plan only: its stage in the project's `phase_order`.
@@ -281,10 +283,14 @@ function M.parse(text, ctx)
     if file_kind == "path" then
       -- the problems of the tree are `check`'s findings, never a fault of the file (R3: nothing refuses a write)
       plan.tree = require("tasks_nvim.lernbaum").parse(parsed.body or "")
+      plan.levels = require("tasks_nvim.lernlevel").parse(parsed.body or "")
     end
   end
   if file_kind == "path" and not plan.tree then
     plan.tree = require("tasks_nvim.lernbaum").parse("")
+  end
+  if file_kind == "path" and not plan.levels then
+    plan.levels = require("tasks_nvim.lernlevel").parse("")
   end
   plan.valid = #errors == 0
   return plan

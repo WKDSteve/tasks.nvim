@@ -85,7 +85,10 @@
 ---  - learning paths (`<area>/ROADMAP/paths/`, `tasks_nvim.paths`): a broken path file with the codes of a plan file
 ---    as `path-...` (and `path-no-stages`); `path-id-taken` (error); `path-reason-missing`, `path-duplicate-key`,
 ---    `path-bad-key`, `path-bad-mark`, `path-bad-arrow`, `path-image-outside`, `path-arrow-dangling`,
----    `path-image-missing`, `path-cycle` (warnings): the tree of `## Lernpunkte`
+---    `path-image-missing`, `path-cycle`, `path-bad-xp` (warnings): the tree of `## Lernpunkte`; `level-bad-line`,
+---    `level-bad-mark`, `level-order`, `level-badge-outside`, `level-badge-missing` (warnings): the levels of
+---    `## Level`; `xp-missing` (a hint): points without XP in a path with levels
+---  - `bad-xp`: the `xp:` of a task is no whole number from 0 to `lernbaum.MAX_XP`
 ---  - promoted learning points (`tasks_nvim.promote`, warnings): `promote-point-dangling` (a task's `point:` names no
 ---    open path or task, or no point there whose arrow names the task), `promote-state-drift` (the mark of the point
 ---    says something else than the task: closed while it is open, `[!]` against an open task or `[ ]` against a
@@ -797,14 +800,18 @@ end
 ---file with its codes (errors), an id another file of the area has (error), and as warnings the problems of the tree
 ---(`path-reason-missing`, `path-duplicate-key`, `path-bad-key`, `path-bad-mark`, `path-bad-arrow`,
 ---`path-image-outside`), an arrow to a task that exists nowhere (`path-arrow-dangling`), an image that is not there
----(`path-image-missing`) and a cycle of promotions over paths and the `## Lernpunkte` of tasks (`path-cycle`). None of
----them refuses a write (R3).
+---(`path-image-missing`) and a cycle of promotions over paths and the `## Lernpunkte` of tasks (`path-cycle`). The
+---levels of `## Level` (`tasks_nvim.lernlevel`): their problems (`level-bad-line`, `level-bad-mark`, `level-order`,
+---`level-badge-outside`) and a badge that is not there (`level-badge-missing`) as warnings, an `{xp=…}` that is no XP
+---(`path-bad-xp`, a problem of the tree), and as a hint (`xp-missing`) the points without XP of a path with levels.
+---None of them refuses a write (R3).
 ---@param findings Tasks.Finding[]
 ---@param open_ids table<string, Tasks.Task>
 ---@param names string[]
 ---@param scan_opts table
 ---@param is_finished fun(id: string): boolean
-local function path_findings(findings, open_ids, names, scan_opts, is_finished)
+---@param hints Tasks.Finding[]
+local function path_findings(findings, open_ids, names, scan_opts, is_finished, hints)
   local paths_mod = require("tasks_nvim.paths")
   for _, name in ipairs(names) do
     local list, errs = paths_mod.area(name, scan_opts)
@@ -843,6 +850,52 @@ local function path_findings(findings, open_ids, names, scan_opts, is_finished)
         add(findings, "warn", pr.code, p, ("line %d: %s"):format(pr.line, pr.message))
       end
       local dir = fsio.dirname(p.path)
+      local lv = p.levels
+      if lv and lv.has_section then
+        local level_problems = vim.list_extend(
+          vim.list_slice(lv.problems, 1),
+          p.level_state and p.level_state.problems or {}
+        )
+        for _, pr in ipairs(level_problems) do
+          add(findings, "warn", pr.code, p, ("line %d: %s"):format(pr.line, pr.message))
+        end
+        for _, l in ipairs(vim.list_extend(vim.list_slice(lv.levels, 1), { lv.final })) do
+          if
+            l.badge
+            and l.badge:match("^assets/badges/")
+            and not l.badge:find("..", 1, true)
+            and not (p.folder and fsio.is_file(dir .. "/" .. l.badge))
+          then
+            add(
+              findings,
+              "warn",
+              "level-badge-missing",
+              p,
+              ("line %d: the badge %s is not there"):format(l.line, l.badge)
+            )
+          end
+        end
+        -- a path with levels counts XP: a point without any is worth a word, never a warning
+        if #lv.levels > 0 and tree.xp.missing > 0 then
+          local lines = {}
+          for _, node in ipairs(tree.nodes) do
+            if #node.children == 0 and node.state ~= "dropped" and not node.xp then
+              lines[#lines + 1] = tostring(node.line)
+            end
+          end
+          hints[#hints + 1] = {
+            code = "xp-missing",
+            severity = "info",
+            area = p.area,
+            path = p.path,
+            id = p.id,
+            message = ("%d learning point(s) without XP (line %s): they count nothing towards the levels"):format(
+              #lines,
+              table.concat(lines, ", ", 1, math.min(#lines, 8)) .. (#lines > 8 and ", …" or "")
+            ),
+          }
+        end
+      end
       for _, node in ipairs(tree.nodes) do
         if node.promoted and not open_ids[node.promoted] and not is_finished(node.promoted) then
           add(
@@ -1594,7 +1647,7 @@ function M.run(opts)
   plan_file_findings(findings, open_ids, names, scan_opts, is_finished)
   project_findings(findings, open_ids, names, scan_opts, is_finished)
   meeting_findings(findings, hints, open_ids, names, scan_opts, is_finished, today)
-  path_findings(findings, open_ids, names, scan_opts, is_finished)
+  path_findings(findings, open_ids, names, scan_opts, is_finished, hints)
   promote_findings(findings, open_ids, names, scan_opts, is_finished, finished_by_area)
   view_findings(findings, root, names)
   if not opts.area then
