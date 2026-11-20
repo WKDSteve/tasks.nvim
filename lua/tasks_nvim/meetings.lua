@@ -1071,6 +1071,10 @@ function M.occurrence(root, area, slug)
   if not base or not vault.has_area(root, area) then
     return nil
   end
+  -- a meeting folder that leaves the vault is read and written through by nobody (as `find` refuses it)
+  if vault.leaves(root, vault.meetings_dir(root, area)) then
+    return nil
+  end
   if vault.resolve_meeting(root, area, slug) or vault.has_plan_or_project(root, area, slug) then
     return nil
   end

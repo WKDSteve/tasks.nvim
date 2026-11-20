@@ -946,6 +946,8 @@ function M.new(area, opts)
       or vault.has_plan_or_project(root, area, slug)
       or fsio.is_dir(dir .. "/" .. slug)
       or fsio.is_file(path)
+      -- an occurrence of a series without a file holds its id as well
+      or meetings.occurrence(root, area, slug) ~= nil
     if held and opts.slug then
       return nil, ("the id %s/%s is taken"):format(area, slug), { code = "exists" }
     end

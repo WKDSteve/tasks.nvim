@@ -339,6 +339,38 @@ return function(H)
     "every second week, the 16th left out"
   )
 
+  -- a new meeting never takes the id of an occurrence without a file
+  local clash = run({
+    op = "meeting_new",
+    area = "lib.nvim",
+    title = "Jour fixe 2026-11-02",
+    fields = { date = "2026-11-30" },
+  })
+  eq(clash.outcome, "created", vim.inspect(clash))
+  eq(clash.id, "lib.nvim/jour-fixe-2026-11-02-2026-11-30-2", "the occurrence holds its id")
+
+  -- a meeting folder that leaves the vault (a junction): its series is no source of occurrences
+  local outside = H.tmpdir() .. "/outside-meetings"
+  vim.fn.mkdir(outside, "p")
+  H.write(
+    outside .. "/ext.md",
+    "---\ntitle: Ext\nstatus: planned\ndate: 2026-10-05\nrepeat: weekly\n---\n\nX.\n"
+  )
+  if vim.uv.fs_symlink(outside, root .. "/cascade.nvim/MEETINGS", { junction = true }) then
+    meetings.reset_cache()
+    eq(meetings.find_any("cascade.nvim/ext-2026-10-12", { root = root }), nil)
+    local through = run({
+      op = "meeting_capture",
+      id = "cascade.nvim/ext-2026-10-12",
+      entry = { kind = "text", text = "x", at = "10:00" },
+    })
+    ok(through.error, vim.inspect(through))
+    ok(not vim.uv.fs_stat(outside .. "/ext-2026-10-12.md"), "nothing is written outside the vault")
+    vim.uv.fs_unlink(root .. "/cascade.nvim/MEETINGS")
+  else
+    print("n/a  no junction on this machine")
+  end
+
   -- the window now has the files in place of the computed occurrences; a moved one keeps its own day
   local moved = H.read(occ_file):gsub("date: 2026%-10%-05", "date: 2026-10-07")
   H.write(occ_file, moved)
