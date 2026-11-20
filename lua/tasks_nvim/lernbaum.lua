@@ -77,6 +77,29 @@ function M.to_xp(v)
   return (n and n <= M.MAX_XP) and n or nil
 end
 
+---The XP a suggestion gives per effort size.
+M.XP_OF_EFFORT = { XS = 10, S = 25, M = 50, L = 100, XL = 200 }
+
+---A suggestion of XP for a form to fill in beforehand (never stored, never a scheme in the file): from the effort of
+---a task or point when it has one (`XS` 10 … `XL` 200, days ×50, at least 5), else from the depth of a point (a
+---root 20, one level down 15, deeper 10).
+---@param subject { effort?: string, depth?: integer }
+---@return integer
+function M.suggest_xp(subject)
+  local effort = subject and subject.effort
+  if type(effort) == "string" then
+    if M.XP_OF_EFFORT[effort] then
+      return M.XP_OF_EFFORT[effort]
+    end
+    local days = tonumber(effort:match("^(%d*%.?%d+)d$") or "")
+    if days then
+      return math.min(M.MAX_XP, math.max(5, math.floor(days * 50 + 0.5)))
+    end
+  end
+  local depth = subject and subject.depth or 0
+  return depth <= 0 and 20 or depth == 1 and 15 or 10
+end
+
 ---The share of its XP a leaf earns in a state: learned 1, seen one half, the rest 0; dropped counts nowhere.
 ---@param state string
 ---@param xp integer
