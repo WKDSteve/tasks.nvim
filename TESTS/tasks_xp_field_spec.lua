@@ -52,6 +52,19 @@ return function(H)
   eq(scan.find(made.id, { root = root }).xp, nil)
   ok(vim.tbl_contains(mutate.SETTABLE, "xp"))
 
+  -- ── the write door: `new` takes xp in its fields, a bad one is refused ──
+  local api = require("tasks_nvim.api")
+  local function ops(list)
+    return vim.json.decode(
+      (api.call("ops", vim.json.encode({ ops = list }), { root = root, today = TODAY }))
+    )
+  end
+  local res = ops({ { op = "new", area = "lib.nvim", title = "Go lernen", fields = { xp = 45 } } })
+  eq(res.results[1].ok, true, vim.inspect(res.results[1]))
+  eq(scan.find(res.results[1].id, { root = root }).xp, 45)
+  local refused = ops({ { op = "new", area = "lib.nvim", title = "Zig", fields = { xp = -2 } } })
+  eq(refused.results[1].ok, false)
+
   -- ── the command line ──
   local function run(argv)
     local out, err = {}, {}
@@ -72,6 +85,9 @@ return function(H)
   eq(scan.find("lib.nvim/rust-lernen", { root = root }).xp, 80)
   eq(run({ "set", "lib.nvim/rust-lernen", "xp=90", "--no-index" }).code, 0)
   eq(scan.find("lib.nvim/rust-lernen", { root = root }).xp, 90)
+  local shown = run({ "show", "lib.nvim/rust-lernen" })
+  eq(shown.code, 0, shown.err)
+  has(shown.out, "xp: 90")
 
   -- ── promote takes the XP of the point along ──
   H.write(

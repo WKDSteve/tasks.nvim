@@ -65,10 +65,11 @@ M.MAX_XP = 100000
 ---@return integer|nil
 function M.to_xp(v)
   if type(v) == "number" then
-    if v ~= v or v ~= math.floor(v) then
+    -- the range first: `%d` of a number beyond 2^63 has no meaning
+    if v ~= v or v < 0 or v > M.MAX_XP or v ~= math.floor(v) then
       return nil
     end
-    v = ("%d"):format(v)
+    return v
   end
   if type(v) ~= "string" or not v:match("^%d+$") or #v > 6 then
     return nil

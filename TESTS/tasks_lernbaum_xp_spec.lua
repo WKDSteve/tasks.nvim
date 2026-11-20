@@ -108,6 +108,10 @@ return function(H)
   eq(lb.to_xp("1e3"), nil)
   eq(lb.to_xp(" 5"), nil)
   eq(lb.to_xp(math.huge), nil)
+  eq(lb.to_xp(1e20), nil, "a number far beyond the range")
+  eq(lb.to_xp(-1e20), nil)
+  eq(lb.to_xp(-3), nil)
+  eq(lb.to_xp(100000), 100000)
 
   -- ── a tree without XP works as before ──
   local plain = lb.parse("## Lernpunkte\n- [x] a\n- [ ] b\n")
