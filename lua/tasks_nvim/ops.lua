@@ -93,6 +93,7 @@ local errors = require("lib.nvim.contract.errors")
 local contract_ops = require("lib.nvim.contract.ops")
 local fm = require("lib.nvim.markdown.frontmatter")
 local fsio = require("tasks_nvim.fsio")
+local gitbusy = require("tasks_nvim.gitbusy")
 local history = require("tasks_nvim.history")
 local index = require("tasks_nvim.index")
 local json = require("lib.nvim.json.canonical")
@@ -2893,6 +2894,18 @@ for _, name in ipairs(M.OPS) do
   ops[name] = {
     fields = FIELDS[name],
     run = function(op, ctx)
+      -- While git rewrites the tree (a pull with an autostash of another session) a file holds HEAD's text and the
+      -- change this write makes is lost or collides when the autostash comes back: wait for git, or write nothing.
+      -- One place for every operation; a dry run writes nothing and does not wait. `done` waits again itself (it
+      -- also looks after the finish), which costs one look at the git directory.
+      if not ctx.dry then
+        local what, where =
+          gitbusy.wait(ctx.root, ctx.git_wait_ms and { git_wait_ms = ctx.git_wait_ms } or nil)
+        if what then
+          ---@cast where string
+          return fail(ctx, gitbusy.message(what, where), { code = "locked", retryable = true })
+        end
+      end
       return claims.with_identity(
         { by = op.by, force = op.force, note = op.note },
         handler,
@@ -2931,6 +2944,7 @@ door = contract_ops.make({
       created = {},
       drafts = {},
       attach = opts.attach,
+      git_wait_ms = opts.git_wait_ms,
     }
   end,
   ---The index of every area that changed, once.

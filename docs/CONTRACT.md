@@ -391,7 +391,7 @@ A `tasks.error` document: `code`, `message`, `retryable` and, when there is more
 | `forbidden` | a task file that is a link is not written through |
 | `unsupported_schema` | the request asks for a higher `schema` than this engine speaks (judged first: a request of a newer schema may carry fields this engine does not know, and that is version skew, not a typo) |
 | `payload_too_large` | a request over 256 KiB, a document over 8 MiB, more than 100 operations, a value over the limits |
-| `locked` | another writer holds the file right now, or git rewrites the vault's tree (a rebase or a pull with an autostash, a merge, a command holding `index.lock`: `done` waits up to 3 s for it, then refuses) (`retryable: true`) |
+| `locked` | another writer holds the file right now, or git rewrites the vault's tree (a rebase or a pull with an autostash, a merge, a command holding `index.lock`: every writing operation waits up to 3 s for it, then refuses and writes nothing; a dry run and the reads do not wait) (`retryable: true`) |
 | `lock_stuck` | a lock nobody will release (older than the takeover age and not deletable, or a folder where the lock file should be): the message names the lock to remove by hand |
 | `rollback_incomplete` | a failed write could not be fully undone; the message names the files |
 | `io` | something could not be listed, read or written |
