@@ -1289,6 +1289,49 @@ local function nested_routes()
     },
 
     {
+      path = { "task", "path-new" },
+      args = {
+        { name = "area", type = "TASK_AREA", desc = "Area to create the learning path in" },
+      },
+      flags = {
+        { name = "title", type = "STRING", desc = "Title (default: the words after the area)" },
+        { name = "areas", type = "STRING", desc = "Areas the path draws on (comma list)" },
+        {
+          name = "target",
+          type = "TASK_ID",
+          desc = "The task that means the path is done (area/slug)",
+        },
+        { name = "project", type = "STRING", desc = "The project the path belongs to (area/slug)" },
+        {
+          name = "status",
+          type = "STRING",
+          enum = { "planning", "doing", "parked" },
+          desc = "Status the new path starts in (default: planning)",
+        },
+        { name = "summary", type = "STRING", desc = "One line above the sections" },
+        {
+          name = "slug",
+          type = "STRING",
+          desc = "File name to use instead of one made of the title",
+        },
+        { name = "links", type = "STRING", desc = "Web addresses for links: (comma list)" },
+        { name = "icon", type = "STRING", desc = FIELD_DESC.icon },
+        { name = "cover", type = "STRING", desc = FIELD_DESC.cover },
+        {
+          name = "template",
+          type = "STRING",
+          enum = { "learning" },
+          desc = "Write the sections of a learning path",
+          enum_desc = { learning = "the sections of a learning path (concept 5)" },
+        },
+      },
+      desc = "Create a learning path ROADMAP/paths/<slug>.md in an area (the words after the area are the title) and open it: a tree of learning points in ## Lernpunkte, no stages",
+      run = function(ctx)
+        cmd().path_new(ctx)
+      end,
+    },
+
+    {
       path = { "task", "plan-close" },
       args = {
         { name = "id", type = "TASK_PLAN", desc = "Id of the plan to finish, as area/slug" },

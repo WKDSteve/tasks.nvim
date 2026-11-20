@@ -35,6 +35,7 @@ return function(H)
       "task new",
       "task next",
       "task open",
+      "task path-new",
       "task plan",
       "task plan-close",
       "task planfile",
@@ -56,7 +57,7 @@ return function(H)
       "tasks",
       "tasks index",
     },
-    "the nested grammar (`:MyPlugins`): the old paths are unchanged, plan / next / estimate / quickwins / learn / point / promote / unpromote / xp / reward are new"
+    "the nested grammar (`:MyPlugins`): the old paths are unchanged, plan / next / estimate / quickwins / learn / point / promote / unpromote / xp / reward / path-new are new"
   )
   eq(paths(routes.routes({ flat = true })), {
     "agent",
@@ -78,6 +79,7 @@ return function(H)
     "new",
     "next",
     "open",
+    "path-new",
     "plan",
     "plan-close",
     "planfile",

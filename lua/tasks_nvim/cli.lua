@@ -94,6 +94,9 @@ commands:
         --claimed: own: a valid claim of this name (`claim`), foreign: of somebody else, none: free or expired)
   plan-new <area> <title> [--areas=a,b] [--target=<id>] [--phases=a,b,c] [--gate=hard] [--summary=text] [--links=url,url] [--icon=<emoji|assets/x.svg|word>] [--cover=assets/x.png] [--template=learning]
                                           create ROADMAP/plans/<slug>.md; tasks join it with plan=<id> phase=<word>
+  path-new <area> <title> [--areas=a,b] [--target=<id>] [--project=<id>] [--status=planning|doing|parked] [--summary=text] [--links=url,url] [--icon=...] [--cover=assets/x.png] [--template=learning]
+                                          create the learning path ROADMAP/paths/<slug>.md (no stages; its tree goes
+                                          into ## Lernpunkte); --template=learning writes the sections of a learning path
   meeting new <area> <title> --date=YYYY-MM-DD [--time=HH:MM] [--end=HH:MM|--duration=45m] [--location=]
               [--online=url] [--tasks=a/b,c/d] [--notify=-15m,-1d@18:00] [--tags=] [--quick="<line>"] [--dry-run]
                                           make <area>/MEETINGS/<slug>.md (slug: title and date); --quick reads one
@@ -395,6 +398,22 @@ local SPECS = {
       "links",
       "icon",
       "cover",
+      "template",
+    },
+    flag = {},
+  },
+  ["path-new"] = {
+    value = {
+      "areas",
+      "target",
+      "status",
+      "summary",
+      "slug",
+      "title",
+      "links",
+      "icon",
+      "cover",
+      "project",
       "template",
     },
     flag = {},
@@ -1290,6 +1309,42 @@ commands["plan-new"] = function(ctx)
     web_links = args.opt.links --[[@as string|nil]],
     icon = args.opt.icon --[[@as string|nil]],
     cover = args.opt.cover --[[@as string|nil]],
+    template = args.opt.template --[[@as "learning"|nil]],
+  })
+  if not res then
+    ctx.warn("error: " .. tostring(err))
+    return 1
+  end
+  ctx.say(("created\t%s\t%s"):format(res.id, res.path))
+  if res.ambiguous then
+    ctx.warn("warn: " .. require("tasks_nvim.wikilinks").ambiguity_message(res.ambiguous))
+  end
+  return 0
+end
+
+commands["path-new"] = function(ctx)
+  local args, eo = ctx.args, ctx.eo
+  local area = args.pos[1]
+  local title = args.pos[2] or args.opt.title
+  if not area or not title or #args.pos > 2 then
+    ctx.warn(
+      'error: usage: path-new <area> "<title>" [--areas=a,b] [--target=id] [--project=id] [--template=learning]'
+    )
+    return 2
+  end
+  local res, err = require("tasks_nvim.paths").new(area, {
+    root = eo.root,
+    today = eo.today,
+    title = title,
+    areas = args.opt.areas --[[@as string|nil]],
+    target = args.opt.target --[[@as string|nil]],
+    status = args.opt.status --[[@as string|nil]],
+    summary = args.opt.summary --[[@as string|nil]],
+    slug = args.opt.slug --[[@as string|nil]],
+    web_links = args.opt.links --[[@as string|nil]],
+    icon = args.opt.icon --[[@as string|nil]],
+    cover = args.opt.cover --[[@as string|nil]],
+    project = args.opt.project --[[@as string|nil]],
     template = args.opt.template --[[@as "learning"|nil]],
   })
   if not res then

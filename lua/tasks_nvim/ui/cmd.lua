@@ -646,6 +646,39 @@ function M.planfile(ctx)
   open_file(res.path)
 end
 
+---`:Tasks path-new <area> <title...>`: create a learning path (`paths.new`) and open it.
+---@param ctx table
+function M.path_new(ctx)
+  local flags = ctx.flags
+  local title = flags.title or unquote(table.concat(ctx.rest, " "))
+  if title == "" then
+    notify.error("a learning path needs a title: :Tasks path-new <area> <title...>")
+    return
+  end
+  local res, err = require("tasks_nvim.paths").new(ctx.args.area, {
+    title = title,
+    areas = flags.areas,
+    target = flags.target,
+    project = flags.project,
+    status = flags.status,
+    summary = flags.summary,
+    slug = flags.slug,
+    web_links = flags.links,
+    icon = flags.icon,
+    cover = flags.cover,
+    template = flags.template,
+  })
+  if not res then
+    notify.error(tostring(err))
+    return
+  end
+  notify.info(("created learning path %s"):format(res.id))
+  if res.ambiguous then
+    notify.warn(require("tasks_nvim.wikilinks").ambiguity_message(res.ambiguous))
+  end
+  open_file(res.path)
+end
+
 ---Walk the tasks that miss an effort or a value and ask for them one by one; everything given is written in ONE
 ---batch at the end (an index write per area). `Skip` leaves a field out, `Stop` ends the walk and keeps what was given.
 ---@param tasks Tasks.Task[]

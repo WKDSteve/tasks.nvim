@@ -577,6 +577,15 @@ all see it), `--target` the task that means "done". When the last member task is
 or project takes assets like a task: `attach <plan id> <file>` (or `folderize`) turns it into its folder form
 `plans/<slug>/<slug>.md` with `assets/` beside the file, and finishing it moves the folder to the Backlog.
 
+### `:Tasks path-new <area> <title...> [--areas=a,b] [--target=<id>] [--project=<id>] [--status=] [--template=learning]`
+
+Creates the learning path `<area>/ROADMAP/paths/<slug>.md` and opens it: the frontmatter of a plan without stages and
+the sections `## Warum`, `## Lernpunkte` (the tree, [ENGINE.md](ENGINE.md), "Learning paths") and `## Notizen`;
+`--template=learning` writes the sections of a learning path instead (goal and competence level, access, schedule,
+sources, `## Lernpunkte`, self-check, open questions). `--summary`, `--slug`, `--links`, `--icon` and `--cover` as for a
+plan; `--title=` names it when no words follow the area. A taken slug gets `-2`. Headless: `path-new` with the same
+options. Then `:Tasks learn` shows the tree, and `:Tasks point` and `:Tasks promote` work on its points.
+
 Headless `plan-close <area>/<slug>` finishes a plan by hand (refused while a member task is open: the message names them)
 and `project-close <area>/<slug>` a project (refused while a task of its own or a plan that is not parked is open). A
 project is also finished by `done`: when the finish closes its last plan, or is its last own task, and no other plan
