@@ -43,12 +43,18 @@ return function(H)
     return vim.json.decode(text), text, code
   end
 
+  ---The cases compared so far: the sweep at the end compares every case of `contract_golden.lua` not in here.
+  ---@type table<string, true>
+  local goldens_compared = {}
+
   ---@param name string  # a case of `contract_golden.lua`
-  local function golden(name)
+  ---@param vault? string  # the vault a case that does not write reads (default: the spec's fixture vault)
+  local function golden(name, vault)
+    goldens_compared[name] = true
     local path = golden_files.dir .. "/" .. name .. ".json"
     ok(H.exists(path), "golden file " .. name .. " exists (TESTS/golden/regenerate.lua writes it)")
     eq(
-      golden_files.render(root, golden_files.case(name), function()
+      golden_files.render(vault or root, golden_files.case(name), function()
         return fixture.build(H)
       end),
       H.read(path),
@@ -1224,6 +1230,28 @@ return function(H)
   vim.env.TASKS_MARKER_DOCS = marker_env
   ok(ok_run, "result-run is its golden with $TASKS_MARKER_DOCS set: " .. tostring(err_run))
   eq(after, marker_doc, "...and the variable is back after the render")
+
+  -- ── every case of contract_golden.lua is compared with the engine, and every golden file has its case ──
+  -- A case only regenerate.lua wrote went stale silently when the contract changed (meeting.json, meetings.json at
+  -- 8db9c6d). The cases not compared above run here, on a vault fresh from the fixture like regenerate.lua's.
+  local sweep_root = fixture.build(H)
+  local cases = {}
+  for _, case in ipairs(golden_files.cases) do
+    ok(cases[case.name] == nil, "the golden case " .. case.name .. " is defined once")
+    cases[case.name] = true
+    if not goldens_compared[case.name] then
+      golden(case.name, sweep_root)
+    end
+  end
+  for name in pairs(goldens_compared) do
+    ok(cases[name], "the compared golden " .. name .. " is a case of contract_golden.lua")
+  end
+  for file, kind in vim.fs.dir(golden_files.dir) do
+    if kind == "file" then
+      local name = file:match("^(.+)%.json$")
+      ok(name and cases[name], "the golden file " .. file .. " has a case in contract_golden.lua")
+    end
+  end
   -- and no golden names a path of a machine (a drive, a home or temp folder)
   for name, kind in vim.fs.dir(golden_files.dir) do
     if kind == "file" then
