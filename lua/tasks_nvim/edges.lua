@@ -46,7 +46,9 @@ local M = {}
 ---A plan or project an earlier `plan_new`/`project_new` of the same dry-run request would create.
 ---@class Tasks.PendingFile
 ---@field id string
----@field kind "plan"|"project"
+---@field kind "plan"|"project"|"path"
+---@field slug string
+---@field path string        # Vault path of its file, without `.md` (as a wikilink resolver names it).
 ---@field phase_order string[]
 
 ---@class Tasks.EdgeProblem

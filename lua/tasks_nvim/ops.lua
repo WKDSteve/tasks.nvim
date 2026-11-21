@@ -602,7 +602,7 @@ end
 ---@param ctx Tasks.OpsCtx
 ---@return Tasks.LinkResolver|nil
 local function link_resolver(ctx)
-  if not ctx.dry or next(ctx.created) == nil then
+  if not ctx.dry or (next(ctx.created) == nil and next(ctx.files) == nil) then
     return nil
   end
   local disk = wikilinks.resolver(ctx.root)
@@ -610,16 +610,18 @@ local function link_resolver(ctx)
     root = disk.root,
     candidates = function(slug)
       local ids = vim.list_extend({}, disk.candidates(slug))
-      for id, node in pairs(ctx.created) do
-        if node.slug == slug and not vim.tbl_contains(ids, id) then
-          ids[#ids + 1] = id
+      for _, pending in ipairs({ ctx.created, ctx.files }) do
+        for id, node in pairs(pending) do
+          if node.slug == slug and not vim.tbl_contains(ids, id) then
+            ids[#ids + 1] = id
+          end
         end
       end
       table.sort(ids)
       return ids
     end,
     path = function(id)
-      local node = ctx.created[id]
+      local node = ctx.created[id] or ctx.files[id]
       return node and node.path or disk.path(id)
     end,
   }
@@ -1762,6 +1764,7 @@ local function new_file(op, ctx, kind)
     template = op.template,
     dry_run = ctx.dry,
     pending_files = ctx.dry and ctx.files or nil,
+    link_resolver = link_resolver(ctx),
   })
   if not r then
     if info and info.code == "invalid_argument" then
@@ -1771,7 +1774,14 @@ local function new_file(op, ctx, kind)
   end
   if ctx.dry then
     -- the real run has the file on disk before the next operation: a later `plan`, `project` or `phase` may name it
-    ctx.files[r.id] = { id = r.id, kind = kind, phase_order = r.phase_order or {} }
+    local folder = kind == "project" and "projects" or (kind == "path" and "paths" or "plans")
+    ctx.files[r.id] = {
+      id = r.id,
+      kind = kind,
+      slug = r.slug,
+      path = op.area .. "/ROADMAP/" .. folder .. "/" .. r.slug,
+      phase_order = r.phase_order or {},
+    }
   end
   return {
     ok = true,

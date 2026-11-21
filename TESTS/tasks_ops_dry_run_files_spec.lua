@@ -124,4 +124,25 @@ return function(H)
   })
   eq(dry[2].ok, false)
   has(dry[2].error.message, "is no plan file")
+
+  -- a bare [[slug]] names the pending plan or project as the real run's link index does
+  dry = same("wikilinks to pending files", {
+    { op = "project_new", area = "lib.nvim", title = "Linked program", phases = { "x" } },
+    {
+      op = "plan_new",
+      area = "lib.nvim",
+      title = "Linked plan",
+      phases = { "p" },
+      project = "[[linked-program]]",
+      phase = "x",
+    },
+    {
+      op = "new",
+      area = "lib.nvim",
+      title = "Linked task",
+      fields = { plan = "[[linked-plan]]", phase = "p" },
+    },
+  })
+  eq(dry[2].ok, true, vim.inspect(dry[2]))
+  eq(dry[3].ok, true, vim.inspect(dry[3]))
 end
