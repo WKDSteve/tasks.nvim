@@ -247,7 +247,13 @@ end
 ---@field has_optional boolean    # Some node is optional.
 ---@field problems Tasks.LernProblem[]
 ---@field hints Tasks.LernProblem[]   # Worth a word, never a fault: an arrow before a word that looks like an id but is none.
+---@field stray Tasks.LernStray[]   # Lines of the section that are no point, no note below one and not empty (`path-stray-line`).
 ---@field lines string[]           # The body split at `\n` (a CR stays on its line).
+
+---@class Tasks.LernStray
+---@field line integer
+---@field text string
+---@field marks string[]           # The marks on the line (`{xp=…}`, `{#…}`): they count for nothing there.
 
 ---@param s string
 ---@return string
@@ -289,6 +295,36 @@ end
 local function is_id(id)
   local area, slug = id:match("^([^/%s]+)/([^/%s]+)$")
   return area ~= nil and slug:match("^[a-z0-9][a-z0-9%-]*$") ~= nil
+end
+
+---The start of the paragraph below the literature that names the books missing from the stock (LP-11): text, no
+---stray line.
+M.SHELF_STARTS = { "Fehlt im Bestand", "Missing from the stock" }
+
+---@param line string
+---@return boolean
+local function is_shelf_line(line)
+  local text = line:gsub("^%s+", "")
+  for _, s in ipairs(M.SHELF_STARTS) do
+    if text:sub(1, #s) == s then
+      return true
+    end
+  end
+  return false
+end
+
+---The marks `{xp=…}` and `{#…}` on a line, as written.
+---@param line string
+---@return string[]
+local function stray_marks(line)
+  local out = {}
+  for m in line:gmatch("{xp=[^{}]*}") do
+    out[#out + 1] = m
+  end
+  for m in line:gmatch("{#[^{}%s]+}") do
+    out[#out + 1] = m
+  end
+  return out
 end
 
 ---Split the text after the mark into label, arrow, reason and key.
@@ -496,6 +532,7 @@ function M.parse(body)
     has_optional = false,
     problems = {},
     hints = {},
+    stray = {},
     lines = lines,
   }
   local function problem(code, line, msg, key)
@@ -504,8 +541,33 @@ function M.parse(body)
   local inside, fence = false, nil
   local stack = {}
   local last
+  -- a line of the section that is no point, no note below one and not empty is lost to the tree (`stray`); comments,
+  -- sub-headings and the paragraph `Fehlt im Bestand: …` that LP-11 asks for below the literature are text on purpose
+  local comment, shelf = false, false
+  local function stray_line(i, line)
+    if comment then
+      comment = not line:find("-->", 1, true)
+      return
+    end
+    local open = line:match("^%s*<!%-%-()")
+    if open then
+      comment = not line:find("-->", open, true)
+      return
+    end
+    if line:match("^###") then
+      return
+    end
+    if shelf or is_shelf_line(line) then
+      shelf = true
+      return
+    end
+    tree.stray[#tree.stray + 1] = { line = i, text = line, marks = stray_marks(line) }
+  end
   for i, raw in ipairs(lines) do
     local line = raw:gsub("\r$", "")
+    if not line:match("%S") then
+      shelf = false
+    end
     if fence then
       if line:match("^%s*" .. fence) then
         fence = nil
@@ -665,6 +727,7 @@ function M.parse(body)
             end
           elseif line:match("%S") then
             last = nil
+            stray_line(i, line)
           end
         end
       end

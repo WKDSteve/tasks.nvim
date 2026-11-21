@@ -92,7 +92,8 @@
 ---  - learning paths (`<area>/ROADMAP/paths/`, `tasks_nvim.paths`): a broken path file with the codes of a plan file
 ---    as `path-...` (and `path-no-stages`); `path-id-taken` (error); `path-reason-missing`, `path-duplicate-key`,
 ---    `path-bad-key`, `path-bad-mark`, `path-image-outside`, `path-arrow-dangling`, `path-image-missing`, `path-cycle`,
----    `path-bad-xp`, `path-bad-hours` (warnings): the tree of `## Lernpunkte`; `path-bad-arrow` (a hint): an arrow before a word that
+---    `path-bad-xp`, `path-bad-hours`, `path-stray-line` (warnings, the last also for a task's own tree): the tree of
+---    `## Lernpunkte` (`path-stray-line`: a line that is no point, no note and not empty); `path-bad-arrow` (a hint): an arrow before a word that
 ---    looks like an id but is none, read as text; `path-link-missing`
 ---    (warning): a relative link of the path that leads to no file (as `link-missing`); `level-bad-line`,
 ---    `level-bad-mark`, `level-order`, `level-badge-outside`, `level-badge-missing` (warnings): the levels of
@@ -989,6 +990,45 @@ local function task_arrows(task_path)
   return lernbaum.promoted_ids(lernbaum.parse(body))
 end
 
+---The longest part of a stray line a message quotes.
+local STRAY_QUOTE = 60
+
+---Whether a text has a heading `## Lernpunkte` (any of `lernbaum.HEADINGS`): only then is its tree worth reading.
+---@param text string
+---@return boolean
+local function has_tree_heading(text)
+  local lower = ("\n" .. text):lower()
+  for _, h in ipairs(lernbaum.HEADINGS) do
+    if lower:find("\n##%s+" .. vim.pesc(h:lower())) then
+      return true
+    end
+  end
+  return false
+end
+
+---`path-stray-line` (warnings): a line of `## Lernpunkte` that is no point, no note below one and not empty, lost to
+---the tree (a link label broken across two lines, say); the marks on it are named, they count for nothing there.
+---@param findings Tasks.Finding[]
+---@param item { area: string, path: string, id?: string }
+---@param tree Tasks.LernTree
+---@param off integer  # The lines before the body.
+local function stray_findings(findings, item, tree, off)
+  for _, s in ipairs(tree.stray or {}) do
+    local text = vim.trim(s.text)
+    if vim.fn.strchars(text) > STRAY_QUOTE then
+      text = vim.fn.strcharpart(text, 0, STRAY_QUOTE) .. "…"
+    end
+    local msg = ("line %d: not a point, a note or empty, so the tree skips it: %s"):format(
+      s.line + off,
+      text
+    )
+    if #s.marks > 0 then
+      msg = msg .. (" (%s count for nothing here)"):format(table.concat(s.marks, " "))
+    end
+    add(findings, "warn", "path-stray-line", item, msg)
+  end
+end
+
 ---A message of the tree or the levels names other lines of the body ("already on line 4"): the file's lines instead.
 ---@param message string
 ---@param off integer
@@ -1043,6 +1083,7 @@ function M.path_file_findings(findings, hints, p, c)
     )
   end
   local tree = p.tree or lernbaum.parse("")
+  stray_findings(findings, p, tree, off)
   for _, pr in ipairs(tree.problems) do
     add(
       findings,
@@ -1800,9 +1841,17 @@ function M.run(opts)
       end
       seen_slug[t.id] = t.path
       -- a folder task's own `assets/` links are `asset-dangling`'s
+      local text = fsio.read(t.path)
       link_findings(findings, t, "link-missing", function(l)
         return t.folder == true and mdlinks.is_asset(l.target)
-      end)
+      end, text)
+      -- a task's own `## Lernpunkte` (category learning or a tree promoted into it)
+      if text and has_tree_heading(text) then
+        local parsed = require("lib.nvim.markdown.frontmatter").parse(text)
+        local body = parsed and parsed.body or text
+        local off = select(2, text:sub(1, #text - #body):gsub("\n", ""))
+        stray_findings(findings, t, lernbaum.parse(body), off)
+      end
       if t.folder then
         for _, target in ipairs(dangling_assets(t)) do
           add(findings, "warn", "asset-dangling", t, "linked asset is missing: " .. target)

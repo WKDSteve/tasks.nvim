@@ -569,7 +569,11 @@ write: `path-reason-missing`, `path-duplicate-key`, `path-bad-key`, `path-bad-ma
 that run in a circle over the `## Lernpunkte` of the tasks they name) and `path-link-missing` (a relative link, to a
 book or file next to the vault say, that leads to nothing; the same exceptions as `link-missing`, and the images and
 badges the two findings above already cover). An arrow before a word that has the form of an id but is none
-(`→ tasks/Großschreibung`) is a hint, `path-bad-arrow`: the arrow is read as text.
+(`→ tasks/Großschreibung`) is a hint, `path-bad-arrow`: the arrow is read as text. `path-stray-line` (a warning, also
+for the `## Lernpunkte` of a task) names a line of the section that is no point, no `> ` note below one and not empty,
+with the `{xp=…}` / `{#…}` on it: the tree skips it, so a point whose link label broke across two lines loses its
+second half without it. Not stray: HTML comments, headings `###` and deeper, fenced code, and the paragraph
+`Fehlt im Bestand: …` (LP-11) up to its blank line.
 
 #### XP, levels and rewards (optional)
 
