@@ -348,6 +348,7 @@ local FIELDS = {
     note = "string",
     xp = "integer",
     xp_clear = "boolean",
+    ack = "boolean",
     if_match = "string",
   },
   path_reward = { id = "string", level = "string", given = "boolean", if_match = "string" },
@@ -2136,6 +2137,17 @@ local function do_node_set(op, ctx)
   if before and before.tree then
     local n = require("tasks_nvim.lernbaum").node(before.tree, ref)
     old = n and { state = n.state, reason = n.reason, note = n.note, xp = n.xp_own } or nil
+    -- a point under `{safety}` is closed only by someone who says they read the warning (`ack`)
+    local danger = n and n.safety_eff
+    if danger and (op.state == "learned" or op.state == "seen") and op.ack ~= true then
+      return refuse(
+        "invalid_argument",
+        ("the point is under a {safety} mark (line %d: %s): read it and send ack: true to close it"):format(
+          danger.line,
+          danger.label
+        )
+      )
+    end
   end
   local xp
   if op.xp ~= nil then

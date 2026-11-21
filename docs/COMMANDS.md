@@ -629,6 +629,8 @@ path without any). `without-xp` lines name the points that carry no XP. `--forma
 (`points`, `xp`, `optional`, `stages`, `levels` with `at { index, line, key, label, stage }`, `without_xp`). Optional
 points (`{optional}`) stand apart in a line `optional` and count in none of the other lines.
 
+`path <area>/<slug> --machine=private|workstation|wsl|env` lists only what may be practised on that machine (`todo` lines, `hidden N` for the points of other machines; `env` reads `NVIM_MACHINE_ROLE`). `{safety}` points (`safety` lines) always come first. See [ENGINE.md](ENGINE.md#machine-and-safety-marks).
+
 `path <area>/<slug> --schedule` prints the table of `## Zeitplan` made from the tree, for a path with a fixed rhythm:
 each point (one level below a stage, or a stage itself) with planned hours `{h=8}` or `{h=8-10}` is a row, with the
 hours it took when it carries `{done_h=9}`, its result (the text of its first child `Nachweis:`, `Aufgabe:` or

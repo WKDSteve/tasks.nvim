@@ -632,6 +632,23 @@ and marks a stage that is optional as a whole; `:Tasks learn` adds `optional n/m
   - [ ] [Ein Buch](../../Literatur/buch.pdf): das Kapitel zur Frage {xp=5} {#lit-buch}
 ```
 
+#### Machine and safety marks
+
+`{machine=private}`, `{machine=workstation}` and `{machine=wsl}` (several with a comma, `{machine=private,wsl}`) say on
+which machine a point may be practised (`MASCHINE-01`: `workstation` is the Tricentis workstation, `private` the
+other computer, `wsl` a shell in it); a point without the mark goes everywhere. The mark of a parent holds for its
+subtree unless a child names its own. An unknown word is the warning `path-bad-machine`. `{safety}` marks a point
+where a mistake is dangerous (mains voltage, soldering, chemistry); it holds for the subtree. `check` warns
+(`path-safety-unmarked`) when a point's text says `Sicherheit` and neither it nor a parent carries `{safety}`.
+
+`tasks path <id>` prints every `{safety}` point first (`safety` lines, before `points`). `--machine=<private|workstation|wsl|env>`
+(`env` reads `NVIM_MACHINE_ROLE`: empty or `default` is `private`) adds a line `machine <role> hidden N open here M`
+and one `todo` line per open point that may be practised there (a point under `{safety}` carries `safety` and the text
+of the parent, `under: ...`); points of other machines leave the `without-xp` lines. Progress, levels and `Pfad
+fertig` stay as they are: a point that does not go here is closed with `[~]` and its reason (`LP-04`). The operation
+`node_set` refuses to close (`learned`, `seen`) a point under `{safety}` unless the request carries `ack: true`
+("read").
+
 #### Promoting a learning point (`tasks_nvim.promote`)
 
 `tasks promote <area>/<slug>#<key|n>` (Lua: `promote.promote(container, ref, opts)`) makes a task of a learning point

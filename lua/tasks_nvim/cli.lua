@@ -111,11 +111,14 @@ commands:
                                           marks, XP, arrows, links, levels, images), written only when nothing is
                                           wrong; every finding names the draft's line and its code (exit 1, nothing
                                           written); --dry-run says what would be made and writes nothing
-  path <area>/<slug> [--format=text|json]  the XP overview of a learning path: points (all, open, without XP), XP in
+  path <area>/<slug> [--machine=private|workstation|wsl|env] [--format=text|json]  the XP overview of a learning path: points (all, open, without XP), XP in
                                           all and per stage (a root of ## Lernpunkte), and for each level the point
                                           at which it is reached when the points are learned in their order; the
                                           optional points ({optional} on a node) apart: they count for no level in
                                           percent and not for the path being done, their XP once earned do
+                                          {safety} points come first (`safety` lines); --machine lists only the open
+                                          points that may be practised on that machine (`todo`) and says how many
+                                          are hidden (`hidden`); `env` reads NVIM_MACHINE_ROLE (empty/default: private)
   path <area>/<slug> --schedule [--write]
                                           the table of ## Zeitplan made from the tree: each point with planned hours
                                           ({h=8} or {h=8-10}; {done_h=9} the hours it took), its result (the child
@@ -495,7 +498,7 @@ local SPECS = {
     },
     flag = {},
   },
-  path = { value = { "format" }, flag = { "schedule", "write" } },
+  path = { value = { "format", "machine" }, flag = { "schedule", "write" } },
   paths = { value = { "project", "format" }, flag = {} },
   ["path-new"] = {
     value = {
@@ -1536,7 +1539,7 @@ commands["path-new"] = function(ctx)
   return new_file_command(ctx, "path")
 end
 
----`path <area>/<slug> [--format=text|json]`: the XP overview of an open learning path (`path_stats`).
+---`path <area>/<slug> [--machine=m] [--format=text|json]`: the XP overview of an open learning path (`path_stats`).
 ---`--schedule [--write]`: the table of `## Zeitplan` made from the tree (`path_schedule`), shown or written.
 ---@param ctx Tasks.CliCtx
 ---@return integer code
@@ -1550,12 +1553,22 @@ commands.path = function(ctx)
     or #args.pos > 1
     or (format ~= "text" and format ~= "json")
     or (write and not schedule)
-    or (schedule and args.opt.format ~= nil)
+    or (schedule and (args.opt.format ~= nil or args.opt.machine ~= nil))
   then
     ctx.warn(
-      "error: usage: path <area>/<slug> [--format=text|json]  |  path <area>/<slug> --schedule [--write]"
+      "error: usage: path <area>/<slug> [--machine=private|workstation|wsl|env] [--format=text|json]  |  path <area>/<slug> --schedule [--write]"
     )
     return 2
+  end
+  local lern = require("tasks_nvim.lernbaum")
+  local machine
+  if args.opt.machine ~= nil then
+    local m = tostring(args.opt.machine)
+    machine = lern.machine_of_role(m == "env" and (os.getenv("NVIM_MACHINE_ROLE") or "") or m)
+    if not machine then
+      ctx.warn("error: --machine takes private, workstation, wsl or env, not '" .. m .. "'")
+      return 2
+    end
   end
   if schedule then
     local sched = require("tasks_nvim.path_schedule")
@@ -1597,8 +1610,11 @@ commands.path = function(ctx)
   end
   local tree = file.tree or require("tasks_nvim.lernbaum").parse("")
   local st = require("tasks_nvim.path_stats").compute(tree, file.levels, file.level_state)
+  local marks = require("tasks_nvim.path_stats").marks(tree, machine)
   if format == "json" then
     ctx.say(vim.json.encode({
+      safety = marks.safety,
+      machine = machine and { role = machine, hidden = marks.hidden, todo = marks.todo } or nil,
       id = file.id,
       title = file.title,
       status = file.status,
@@ -1627,6 +1643,16 @@ commands.path = function(ctx)
   ctx.say(
     ("path\t%s\t%s\t%s"):format(file.id, tostring(file.status or "-"), clean(file.title or ""))
   )
+  -- the safety points come first: a reader (or an AI) goes past none of them
+  for _, sp in ipairs(marks.safety) do
+    ctx.say(
+      ("safety\t%s\t%s\t(line %d)"):format(
+        sp.key and ("#" .. sp.key) or "-",
+        clean(sp.label),
+        sp.line
+      )
+    )
+  end
   ctx.say(
     ("points\t%d\topen %d\tlearned %d\tseen %d\tdropped %d\twithout xp %d"):format(
       p.total,
@@ -1666,6 +1692,20 @@ commands.path = function(ctx)
       )
     )
   end
+  if machine then
+    ctx.say(("machine\t%s\thidden %d\topen here %d"):format(machine, marks.hidden, #marks.todo))
+    for _, t in ipairs(marks.todo) do
+      ctx.say(
+        ("todo\t%s\t%s\t(line %d)%s%s"):format(
+          t.key and ("#" .. t.key) or "-",
+          clean(t.label),
+          t.line,
+          t.safety and "\tsafety" or "",
+          t.under and ("\tunder: " .. clean(t.under.label)) or ""
+        )
+      )
+    end
+  end
   local counted = p.counted
   for _, l in ipairs(st.levels) do
     local what
@@ -1695,8 +1735,16 @@ commands.path = function(ctx)
       )
     )
   end
+  local by_line = {}
+  for _, n in ipairs(tree.nodes) do
+    by_line[n.line] = n
+  end
   for _, pt in ipairs(st.without_xp) do
-    ctx.say(("without-xp\tstage %d\t%s"):format(pt.stage, name(pt)))
+    -- with --machine a point that does not go here is not shown (it is counted in `hidden`)
+    local node = by_line[pt.line]
+    if not (machine and node and not lern.on_machine(node, machine)) then
+      ctx.say(("without-xp\tstage %d\t%s"):format(pt.stage, name(pt)))
+    end
   end
   return 0
 end

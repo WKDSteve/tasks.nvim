@@ -2259,6 +2259,16 @@ export interface PathNode {
    */
   optional?: true;
   /**
+   * The machines the point may be practised on (`{machine=a,b}` on it, else on the nearest parent that has one); absent: every machine. Capability `path_marks`.
+   *
+   * @minItems 1
+   */
+  machine?: ["private" | "workstation" | "wsl", ...("private" | "workstation" | "wsl")[]];
+  /**
+   * The point is `{safety}` or below one: closing it needs `ack` (it was read). Capability `path_marks`.
+   */
+  safety?: true;
+  /**
    * The XP the leaf counts: its task's when it was promoted and the task has `xp`, else its own `{xp=N}`. Capability `xp`.
    */
   xp?: number;

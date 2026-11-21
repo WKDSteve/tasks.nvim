@@ -107,6 +107,7 @@ M.CAPABILITIES = {
   "path",
   "path_close",
   "path_levels",
+  "path_marks",
   "path_new",
   "path_reward",
   "path_set",
@@ -3544,6 +3545,10 @@ function M.path(id, opts)
         progress = progress_entry(n.progress),
         -- capability `optional_points`: the point is `{optional}`, or below one
         optional = n.in_optional or nil,
+        -- capability `path_marks`: the machines the point is for (its own or its parent's), and `{safety}` on it or
+        -- above it
+        machine = n.machine_eff and vim.list_slice(n.machine_eff, 1) or nil,
+        safety = n.safety_eff and true or nil,
       })
     end, tree.nodes)
     doc.progress = progress_entry(tree.progress)

@@ -1,6 +1,6 @@
 {
   "client_op_id": "golden-path-xp",
-  "digest": "sha256:e371500a56a1450c",
+  "digest": "sha256:e929e129bef4bdba",
   "dry_run": false,
   "engine": {
     "git": "0000000",
@@ -16,13 +16,13 @@
       "changed_ids": [
         "lib.nvim/rust-lernen"
       ],
-      "etag_after": "sha256:c72fddcc7ca9536a",
-      "etag_before": "sha256:76ca721af329df22",
+      "etag_after": "sha256:3d282595a74aad4b",
+      "etag_before": "sha256:1f19cac4332d7165",
       "file": "lib.nvim/ROADMAP/paths/rust-lernen.md",
       "id": "lib.nvim/rust-lernen",
       "inverse": {
         "id": "lib.nvim/rust-lernen",
-        "if_match": "sha256:c72fddcc7ca9536a",
+        "if_match": "sha256:3d282595a74aad4b",
         "op": "node_set",
         "point": "plain",
         "xp_clear": true
@@ -50,13 +50,13 @@
       "changed_ids": [
         "lib.nvim/rust-lernen"
       ],
-      "etag_after": "sha256:d61c9b257e8504cf",
-      "etag_before": "sha256:c72fddcc7ca9536a",
+      "etag_after": "sha256:f184b2c930b315aa",
+      "etag_before": "sha256:3d282595a74aad4b",
       "file": "lib.nvim/ROADMAP/paths/rust-lernen.md",
       "id": "lib.nvim/rust-lernen",
       "inverse": {
         "id": "lib.nvim/rust-lernen",
-        "if_match": "sha256:d61c9b257e8504cf",
+        "if_match": "sha256:f184b2c930b315aa",
         "op": "node_set",
         "point": "book",
         "xp": 30
@@ -83,14 +83,14 @@
       "changed_ids": [
         "lib.nvim/rust-lernen"
       ],
-      "etag_after": "sha256:27b64884b8c11e34",
-      "etag_before": "sha256:d61c9b257e8504cf",
+      "etag_after": "sha256:14d437a0c2b2c269",
+      "etag_before": "sha256:f184b2c930b315aa",
       "file": "lib.nvim/ROADMAP/paths/rust-lernen.md",
       "id": "lib.nvim/rust-lernen",
       "inverse": {
         "given": false,
         "id": "lib.nvim/rust-lernen",
-        "if_match": "sha256:27b64884b8c11e34",
+        "if_match": "sha256:14d437a0c2b2c269",
         "level": "2",
         "op": "path_reward"
       },
@@ -132,8 +132,8 @@
       "changed_ids": [
         "lib.nvim/rust-lernen"
       ],
-      "etag_after": "sha256:7aee06511e030755",
-      "etag_before": "sha256:27b64884b8c11e34",
+      "etag_after": "sha256:6f782db2d568b11a",
+      "etag_before": "sha256:14d437a0c2b2c269",
       "file": "lib.nvim/ROADMAP/paths/rust-lernen.md",
       "id": "lib.nvim/rust-lernen",
       "n": 6,
@@ -157,13 +157,13 @@
       "changed_ids": [
         "lib.nvim/rust-lernen"
       ],
-      "etag_after": "sha256:18e69c81749294bd",
-      "etag_before": "sha256:7aee06511e030755",
+      "etag_after": "sha256:983de58cfd77b63d",
+      "etag_before": "sha256:6f782db2d568b11a",
       "file": "lib.nvim/ROADMAP/paths/rust-lernen.md",
       "id": "lib.nvim/rust-lernen",
       "inverse": {
         "id": "lib.nvim/rust-lernen",
-        "if_match": "sha256:18e69c81749294bd",
+        "if_match": "sha256:983de58cfd77b63d",
         "levels": {
           "done": {
             "reward": "Kino"

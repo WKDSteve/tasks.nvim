@@ -1,7 +1,7 @@
 {
-  "body": "\n## Lernpunkte\n\n- [ ] Rust lernen {#rust}\n  - [x] Das Buch {xp=30} {#book}\n  - [~] Rustlings – Grund: nur die Hälfte {xp=20}\n  - [ ] C-Compiler → lib.nvim/c-compiler {xp=40} {#cc}\n  - [-] Embedded – Grund: nicht nötig {xp=50}\n  - [ ] Ohne XP {#plain}\n- [ ] Literatur {optional} {#lit}\n  - [x] Ein Buch {xp=10} {#lit-a}\n  - [ ] Noch ein Buch {xp=10}\n\n## Level\n\n- [x] 30 XP · Einsteiger · Badge assets/badges/stern.png · Belohnung: großes Eis\n- [ ] 50 % · Badge assets/badges/mond.svg · Belohnung: Kino\n- [ ] 100 XP · Belohnung: ein Buch\n- [ ] 20 XP\n- [ ] Pfad fertig · Belohnung: Wochenende am See\n",
+  "body": "\n## Lernpunkte\n\n- [ ] Rust lernen {#rust}\n  - [x] Das Buch {xp=30} {#book}\n  - [~] Rustlings – Grund: nur die Hälfte {xp=20}\n  - [ ] C-Compiler → lib.nvim/c-compiler {xp=40} {#cc}\n  - [-] Embedded – Grund: nicht nötig {xp=50}\n  - [ ] Ohne XP {machine=wsl} {#plain}\n- [ ] Literatur {optional} {#lit}\n  - [x] Ein Buch {xp=10} {#lit-a}\n  - [ ] Noch ein Buch {xp=10} {safety}\n\n## Level\n\n- [x] 30 XP · Einsteiger · Badge assets/badges/stern.png · Belohnung: großes Eis\n- [ ] 50 % · Badge assets/badges/mond.svg · Belohnung: Kino\n- [ ] 100 XP · Belohnung: ein Buch\n- [ ] 20 XP\n- [ ] Pfad fertig · Belohnung: Wochenende am See\n",
   "body_truncated": false,
-  "digest": "sha256:87c0db718461852f",
+  "digest": "sha256:b5cd84bc4c034c8b",
   "engine": {
     "git": "0000000",
     "nvim": "0.0.0",
@@ -226,6 +226,9 @@
       "key": "plain",
       "label": "Ohne XP",
       "line": 9,
+      "machine": [
+        "wsl"
+      ],
       "mark": " ",
       "parent": 1,
       "progress": {
@@ -324,6 +327,7 @@
         "seen": 0,
         "total": 1
       },
+      "safety": true,
       "state": "open",
       "xp": 10,
       "xp_from": "point",
@@ -340,7 +344,7 @@
     "area": "lib.nvim",
     "areas": [],
     "created": "2026-01-01",
-    "etag": "sha256:76ca721af329df22",
+    "etag": "sha256:1f19cac4332d7165",
     "file": "lib.nvim/ROADMAP/paths/rust-lernen.md",
     "has_tree": true,
     "id": "lib.nvim/rust-lernen",
@@ -406,7 +410,7 @@
     "seen": 1,
     "total": 5
   },
-  "rev": "rev:17b539",
+  "rev": "rev:9b5356",
   "schema": 1,
   "tree_problems": [],
   "vault": {

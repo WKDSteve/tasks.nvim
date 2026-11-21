@@ -230,4 +230,43 @@ function M.compute(tree, lv, state)
   return out
 end
 
+---@class Tasks.PathMarks
+---@field safety { line: integer, key?: string, label: string, state?: string }[]
+---@field machine? string
+---@field hidden integer            # The points (leaves) that may not be practised on `machine`.
+---@field todo { line: integer, key?: string, label: string, safety: boolean, under?: { line: integer, key?: string, label: string } }[]  # Open leaves that may; `under` is the `{safety}` parent whose text goes with it.
+
+---The `{safety}` points of a tree (every node that carries the mark, parents included) and, for a machine, what may
+---be practised on it: the open leaves that fit, and how many leaves are hidden. A point under a `{safety}` parent shows
+---the parent's text with it (`under`). Counts of the path (`compute`) stay as they are: a point that does not go here is
+---`[~]` with its reason (`LP-04`).
+---@param tree Tasks.LernTree
+---@param machine? string  # `private`, `workstation` or `wsl`; nil: no filter.
+---@return Tasks.PathMarks
+function M.marks(tree, machine)
+  local out = { safety = {}, machine = machine, hidden = 0, todo = {} }
+  for _, n in ipairs(tree.nodes) do
+    if n.safety then
+      out.safety[#out.safety + 1] = { line = n.line, key = n.key, label = n.label, state = n.state }
+    end
+    if #n.children == 0 and machine then
+      if not require("tasks_nvim.lernbaum").on_machine(n, machine) then
+        if n.derived == "open" or n.derived == "blocked" then
+          out.hidden = out.hidden + 1
+        end
+      elseif n.derived == "open" or n.derived == "blocked" then
+        local d = n.safety_eff
+        out.todo[#out.todo + 1] = {
+          line = n.line,
+          key = n.key,
+          label = n.label,
+          safety = d ~= nil,
+          under = (d and d ~= n) and { line = d.line, key = d.key, label = d.label } or nil,
+        }
+      end
+    end
+  end
+  return out
+end
+
 return M

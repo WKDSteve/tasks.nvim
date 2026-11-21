@@ -16,12 +16,16 @@
 --- none closed: open; else partial), and it is closed when every leaf is. Progress is always counted apart: learned,
 --- seen, dropped, open (blocked ones counted as open and once more as blocked).
 ---
---- A node line reads `<label>[ → <id>][ – Grund: <reason>][ {xp=N}][ {h=N}][ {done_h=N}][ {optional}][ {#key}]`;
+--- A node line reads `<label>[ → <id>][ – Grund: <reason>][ {xp=N}][ {h=N}][ {done_h=N}][ {optional}][ {machine=a,b}][ {safety}][ {#key}]`;
 --- the marks in braces come last (in any order), the reason after the label (also `Reason:`, and `—` or `-` as the
 --- dash), the arrow names the task the node was promoted to. An arrow is a reference only when an id `<area>/<slug>` follows it and nothing but the marks after
 --- that; any other arrow (`Test rot → grün`) is text of the label. A `> ` line indented
 --- below a node is its note. Every other line of the section (prose, blank lines, comments, code fences) is kept as it
 --- is: `render` gives back the text byte for byte, only the nodes changed with `set_state` are written anew.
+---
+--- Machine (optional): `{machine=private}`, `{machine=workstation}`, `{machine=wsl}` (several with a comma) say where the point
+--- may be practised; none means everywhere. A parent's mark holds for its subtree unless a child names its own. Safety:
+--- `{safety}` marks a point where a mistake is dangerous; it holds for the subtree and `path` shows it first.
 ---
 --- XP (optional): a leaf carries `{xp=N}` (a whole number, 0 to `MAX_XP`). Learned counts it in full, seen half
 --- (rounded down), dropped leaves it out of the sum and the maximum (100 % stays reachable), open and blocked give 0.
@@ -207,6 +211,11 @@ end
 ---@field done_h_raw? string     # The text of `{done_h=…}` as written.
 ---@field done_h? number         # The hours it took.
 ---@field optional? boolean      # `{optional}` on its own line.
+---@field safety? boolean        # `{safety}`: a danger the reader must have read; holds for the subtree.
+---@field machine_raw? string    # The text of `{machine=…}` as written.
+---@field machine? string[]      # Its machines (`private`, `workstation`, `wsl`); nil: no mark or a bad one.
+---@field machine_eff? string[]  # The machines that count for it: its own, else the nearest parent's; nil: every machine.
+---@field safety_eff? Tasks.LernNode  # The node whose `{safety}` holds for it (itself or the nearest parent); nil: none.
 ---@field in_optional boolean     # It, or a node above it, is optional.
 ---@field opt_progress Tasks.LernProgress  # The part of `progress` that is optional.
 ---@field opt_xp Tasks.LernXp              # The part of `xp_progress` that is optional.
@@ -313,6 +322,48 @@ local function is_shelf_line(line)
   return false
 end
 
+---The machines a `{machine=…}` mark may name (`MASCHINE-01`: `workstation`, `private` is the rest, `wsl` a shell in it).
+M.MACHINES = { "private", "workstation", "wsl" }
+
+---Split the value of `{machine=a,b}` into its machines; nil when it is empty or names an unknown one.
+---@param raw string
+---@return string[]|nil
+function M.to_machines(raw)
+  local out, seen = {}, {}
+  for part in (raw .. ","):gmatch("([^,]*),") do
+    part = trim(part):lower()
+    if not vim.tbl_contains(M.MACHINES, part) then
+      return nil
+    end
+    if not seen[part] then
+      seen[part] = true
+      out[#out + 1] = part
+    end
+  end
+  return #out > 0 and out or nil
+end
+
+---Whether a node may be practised on a machine (`private`, `workstation`, `wsl`): it carries no `{machine=…}` (its own
+---or a parent's) or the machine is among them.
+---@param node Tasks.LernNode
+---@param machine string
+---@return boolean
+function M.on_machine(node, machine)
+  return node.machine_eff == nil or vim.tbl_contains(node.machine_eff, machine)
+end
+
+---The role a machine name stands for: `workstation` and `wsl` as they are, an empty name or `default` the private
+---machine; nil for any other value.
+---@param role? string
+---@return string|nil
+function M.machine_of_role(role)
+  role = trim((role or ""):lower())
+  if role == "" or role == "default" then
+    return "private"
+  end
+  return vim.tbl_contains(M.MACHINES, role) and role or nil
+end
+
 ---The marks `{xp=…}` and `{#…}` on a line, as written.
 ---@param line string
 ---@return string[]
@@ -329,13 +380,15 @@ end
 
 ---Split the text after the mark into label, arrow, reason and key.
 ---@param text string
----@return { label: string, key?: string, xp?: integer, xp_raw?: string, h_raw?: string, done_h_raw?: string, optional?: boolean, reason?: string, promoted?: string, arrow_bad?: string }
+---@return { label: string, safety?: boolean, machine_raw?: string, key?: string, xp?: integer, xp_raw?: string, h_raw?: string, done_h_raw?: string, optional?: boolean, reason?: string, promoted?: string, arrow_bad?: string }
 function M.split(text)
   local rest = text:gsub("%s+$", "")
   local out = {}
   -- the key, the XP, the hours and the optional mark at the end, in any order, each once
-  for _ = 1, 5 do
+  for _ = 1, 7 do
     local before, key = rest:match("^(.-)%s*{#([^{}%s]+)}$")
+    local b6, mach = rest:match("^(.-)%s*{machine=([^{}]*)}$")
+    local b7 = rest:match("^(.-)%s*{safety}$")
     local b3 = rest:match("^(.-)%s*{optional}$")
     local b4, h = rest:match("^(.-)%s*{h=([^{}]*)}$")
     local b5, dh = rest:match("^(.-)%s*{done_h=([^{}]*)}$")
@@ -343,6 +396,10 @@ function M.split(text)
       rest, out.key = before, key
     elseif b3 and not out.optional then
       rest, out.optional = b3, true
+    elseif b6 and not out.machine_raw then
+      rest, out.machine_raw = b6, mach
+    elseif b7 and not out.safety then
+      rest, out.safety = b7, true
     elseif b4 and not out.h_raw then
       rest, out.h_raw = b4, h
     elseif b5 and not out.done_h_raw then
@@ -618,6 +675,9 @@ function M.parse(body)
             xp_from = parts.xp and "point" or nil,
             xp_progress = zero_xp(),
             optional = parts.optional,
+            safety = parts.safety,
+            machine_raw = parts.machine_raw,
+            machine = parts.machine_raw and M.to_machines(parts.machine_raw) or nil,
             h_raw = parts.h_raw,
             done_h_raw = parts.done_h_raw,
             in_optional = false,
@@ -745,6 +805,7 @@ function M.parse(body)
       )
     end
   end
+  M.mark_inherited(tree)
   derive_tree(tree)
   -- a leaf seen or dropped needs its reason; a parent has no mark of its own, so none of its own
   for _, node in ipairs(tree.nodes) do
@@ -758,6 +819,36 @@ function M.parse(body)
     end
   end
   return tree
+end
+
+---Resolve `{machine=…}` and `{safety}` down the tree (a parent's mark holds for the subtree unless a child names its
+---own machines) and name the faults of the marks (`path-bad-machine`, `path-safety-unmarked`).
+---@param tree Tasks.LernTree
+function M.mark_inherited(tree)
+  for _, node in ipairs(tree.nodes) do
+    local parent = node.parent
+    node.machine_eff = node.machine or (parent and parent.machine_eff) or nil
+    node.safety_eff = node.safety and node or (parent and parent.safety_eff) or nil
+    if node.machine_raw and not node.machine then
+      tree.problems[#tree.problems + 1] = {
+        code = "path-bad-machine",
+        line = node.line,
+        key = node.key,
+        message = ("{machine=%s} names no machine (%s, several with a comma)"):format(
+          node.machine_raw,
+          table.concat(M.MACHINES, ", ")
+        ),
+      }
+    end
+    if not node.safety_eff and node.label:find("Sicherheit", 1, true) then
+      tree.problems[#tree.problems + 1] = {
+        code = "path-safety-unmarked",
+        line = node.line,
+        key = node.key,
+        message = "the text speaks of safety but the point has no {safety} mark (nor a parent with one)",
+      }
+    end
+  end
 end
 
 ---The line of a node as `render` writes it after a change.
@@ -784,6 +875,12 @@ local function line_of(node)
   end
   if node.optional then
     parts[#parts + 1] = " {optional}"
+  end
+  if node.machine_raw then
+    parts[#parts + 1] = " {machine=" .. node.machine_raw .. "}"
+  end
+  if node.safety then
+    parts[#parts + 1] = " {safety}"
   end
   if node.key then
     parts[#parts + 1] = " {#" .. node.key .. "}"
