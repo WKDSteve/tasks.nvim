@@ -555,18 +555,21 @@ learning points in `## Lernpunkte` (or `## Learning points`). `tasks_nvim.plans`
 `[ ]` open, `[x]` learned, `[~]` seen and `[-]` dropped (both with a reason, `– Grund:` or `Reason:`), `[!]` blocked.
 A node with children has no mark of its own: it is closed when all its leaves are, and shown as learned (all
 learned), open (none closed) or partial. Progress is counted apart: learned, seen, dropped, open (blocked ones among
-the open and once more as blocked). `{#key}` names a node, `→ <id>` the task it was promoted to, a `> ` line below it
+the open and once more as blocked). `{#key}` names a node, `→ <id>` the task it was promoted to (an arrow is a
+reference only when an id `<area>/<slug>` follows it and nothing but `{xp=…}`, `{#…}` or the reason after that; any
+other arrow, `Test rot → grün`, is text), a `> ` line below it
 is its note, `![](assets/...)` an image (only below the path's `assets/`). `tasks_nvim.lernbaum` reads the tree and
 writes it back byte for byte (only a node changed by `set_state` is written anew); `paths.point` changes one point
 on disk under the file's lock. A path is finished by hand with `paths.close`, like a plan: moved to
 `Backlog/FEATURES/` with `closed_kind: path`.
 
 `check` reports the file's faults as errors (`path-...`, `path-id-taken`) and the tree's as warnings, never refusing a
-write: `path-reason-missing`, `path-duplicate-key`, `path-bad-key`, `path-bad-mark`, `path-bad-arrow`,
+write: `path-reason-missing`, `path-duplicate-key`, `path-bad-key`, `path-bad-mark`,
 `path-image-outside`, `path-arrow-dangling` (an arrow to no task), `path-image-missing`, `path-cycle` (promotions
 that run in a circle over the `## Lernpunkte` of the tasks they name) and `path-link-missing` (a relative link, to a
 book or file next to the vault say, that leads to nothing; the same exceptions as `link-missing`, and the images and
-badges the two findings above already cover).
+badges the two findings above already cover). An arrow before a word that has the form of an id but is none
+(`→ tasks/Großschreibung`) is a hint, `path-bad-arrow`: the arrow is read as text.
 
 #### XP, levels and rewards (optional)
 

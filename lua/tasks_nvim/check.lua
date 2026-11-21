@@ -89,8 +89,9 @@
 ---    day of an occurrence file is no day of its series any more)
 ---  - learning paths (`<area>/ROADMAP/paths/`, `tasks_nvim.paths`): a broken path file with the codes of a plan file
 ---    as `path-...` (and `path-no-stages`); `path-id-taken` (error); `path-reason-missing`, `path-duplicate-key`,
----    `path-bad-key`, `path-bad-mark`, `path-bad-arrow`, `path-image-outside`, `path-arrow-dangling`,
----    `path-image-missing`, `path-cycle`, `path-bad-xp` (warnings): the tree of `## Lernpunkte`; `path-link-missing`
+---    `path-bad-key`, `path-bad-mark`, `path-image-outside`, `path-arrow-dangling`, `path-image-missing`, `path-cycle`,
+---    `path-bad-xp` (warnings): the tree of `## Lernpunkte`; `path-bad-arrow` (a hint): an arrow before a word that
+---    looks like an id but is none, read as text; `path-link-missing`
 ---    (warning): a relative link of the path that leads to no file (as `link-missing`); `level-bad-line`,
 ---    `level-bad-mark`, `level-order`, `level-badge-outside`, `level-badge-missing` (warnings): the levels of
 ---    `## Level`; `xp-missing` (a hint): points without XP in a path with levels
@@ -987,8 +988,8 @@ end
 
 ---The findings of the learning paths of the areas checked (`<area>/ROADMAP/paths/`, `tasks_nvim.paths`): a broken
 ---file with its codes (errors), an id another file of the area has (error), and as warnings the problems of the tree
----(`path-reason-missing`, `path-duplicate-key`, `path-bad-key`, `path-bad-mark`, `path-bad-arrow`,
----`path-image-outside`), an arrow to a task that exists nowhere (`path-arrow-dangling`), an image that is not there
+---(`path-reason-missing`, `path-duplicate-key`, `path-bad-key`, `path-bad-mark`, `path-image-outside`), as a hint an
+---arrow before a word that looks like an id but is none (`path-bad-arrow`: the arrow is text), an arrow to a task that exists nowhere (`path-arrow-dangling`), an image that is not there
 ---(`path-image-missing`) and a cycle of promotions over paths and the `## Lernpunkte` of tasks (`path-cycle`). The
 ---levels of `## Level` (`tasks_nvim.lernlevel`): their problems (`level-bad-line`, `level-bad-mark`, `level-order`,
 ---`level-badge-outside`) and a badge that is not there (`level-badge-missing`) as warnings, an `{xp=…}` that is no XP
@@ -1037,6 +1038,16 @@ local function path_findings(findings, open_ids, names, scan_opts, is_finished, 
       local tree = p.tree or lernbaum.parse("")
       for _, pr in ipairs(tree.problems) do
         add(findings, "warn", pr.code, p, ("line %d: %s"):format(pr.line, pr.message))
+      end
+      for _, h in ipairs(tree.hints or {}) do
+        hints[#hints + 1] = {
+          code = h.code,
+          severity = "info",
+          area = p.area,
+          path = p.path,
+          id = p.id,
+          message = ("line %d: %s"):format(h.line, h.message),
+        }
       end
       local dir = fsio.dirname(p.path)
       local lv = p.levels

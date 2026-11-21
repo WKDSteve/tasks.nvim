@@ -177,13 +177,25 @@ return function(H)
     "- [ ] zweimal {#a}",
     "- [ ] Pfeil ins Leere → lib.nvim/gibt-es-nicht",
     "- [ ] ![Bild](assets/fehlt.svg)",
+    "- [ ] je Punkt ein Test rot → grün",
+    "- [ ] Siehe → lib.nvim/Fast_Eine_Id",
     "",
   }, "\n"))
-  local found = codes_of(assert(check.run(opts)))
+  local run = assert(check.run(opts))
+  local found = codes_of(run)
   eq(found["path-reason-missing"], { broken.id })
   eq(found["path-duplicate-key"], { broken.id })
   eq(found["path-arrow-dangling"], { broken.id })
   eq(found["path-image-missing"], { broken.id })
+  -- an arrow in the text is no finding; one before a word that looks like an id is a hint, never a warning
+  eq(found["path-bad-arrow"], nil)
+  local arrow_hints = {}
+  for _, h in ipairs(run.hints) do
+    if h.code == "path-bad-arrow" then
+      arrow_hints[#arrow_hints + 1] = h.id .. " " .. h.message:match("^line %d+")
+    end
+  end
+  eq(arrow_hints, { broken.id .. " line 9" })
   os.remove(broken.path)
 
   -- a cycle: the path names c-compiler, c-compiler's points name back the path (through a second task)

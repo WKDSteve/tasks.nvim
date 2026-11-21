@@ -18,7 +18,8 @@
 ---
 --- A node line reads `<label>[ → <id>][ – Grund: <reason>][ {xp=N}][ {#key}]`; key and XP come last (in either
 --- order), the reason after the label (also `Reason:`, and `—` or `-` as the dash), the arrow names the task the node
---- was promoted to. A `> ` line indented
+--- was promoted to. An arrow is a reference only when an id `<area>/<slug>` follows it and nothing but the marks after
+--- that; any other arrow (`Test rot → grün`) is text of the label. A `> ` line indented
 --- below a node is its note. Every other line of the section (prose, blank lines, comments, code fences) is kept as it
 --- is: `render` gives back the text byte for byte, only the nodes changed with `set_state` are written anew.
 ---
@@ -184,6 +185,7 @@ end
 ---@field xp Tasks.LernXp
 ---@field has_xp boolean          # Some leaf carries XP.
 ---@field problems Tasks.LernProblem[]
+---@field hints Tasks.LernProblem[]   # Worth a word, never a fault: an arrow before a word that looks like an id but is none.
 ---@field lines string[]           # The body split at `\n` (a CR stays on its line).
 
 ---@param s string
@@ -264,17 +266,17 @@ function M.split(text)
     end
     rest = rest:sub(1, at - 1)
   end
+  -- an arrow is a reference only when an id `<area>/<slug>` follows it and nothing but the marks after that (key, XP
+  -- and reason were taken off above): "Test rot → grün" and "Klick → Route" are text. A `→` before a word that has the
+  -- form of an id but is none (`area/Slug`) stays text as well, and is named (`arrow_bad`, a hint of `check`).
   for _, arrow in ipairs({ ARROW, "->" }) do
     local head, target = rest:match("^(.-)%s+" .. arrow:gsub("%-", "%%-") .. "%s*(%S*)$")
-    -- `->` is an arrow only before an id ("Lua -> C" is text); `→` is always one, and a bad target is named
-    if head and (arrow == ARROW or is_id(target)) then
-      if is_id(target) then
-        out.promoted = target
-      else
-        out.arrow_bad = target
-      end
+    if head and is_id(target) then
+      out.promoted = target
       rest = head
       break
+    elseif head and arrow == ARROW and target:match("^[^/%s]+/[^/%s]+$") then
+      out.arrow_bad = target
     end
   end
   out.label = rest
@@ -385,6 +387,7 @@ function M.parse(body)
     xp = zero_xp(),
     has_xp = false,
     problems = {},
+    hints = {},
     lines = lines,
   }
   local function problem(code, line, msg, key)
@@ -490,12 +493,15 @@ function M.parse(body)
             )
           end
           if parts.arrow_bad then
-            problem(
-              "path-bad-arrow",
-              i,
-              ("the arrow names no id <area>/<slug>: '%s'"):format(parts.arrow_bad),
-              parts.key
-            )
+            -- a hint, not a problem: the arrow is read as text
+            tree.hints[#tree.hints + 1] = {
+              code = "path-bad-arrow",
+              line = i,
+              key = parts.key,
+              message = ("the arrow is text: '%s' has the form of an id <area>/<slug> but is none"):format(
+                parts.arrow_bad
+              ),
+            }
           end
           if
             node.image and (node.image:find("..", 1, true) or not node.image:match("^assets/"))

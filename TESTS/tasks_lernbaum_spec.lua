@@ -126,8 +126,40 @@ return function(H)
   eq(text_arrow.nodes[1].label, "Lua -> C lernen")
   eq(text_arrow.nodes[2].promoted, nil)
 
-  -- the problems one file can tell: no reason, a key twice, a bad key, an unknown mark, an arrow to no id, an image
-  -- outside assets/
+  -- an arrow is a reference only before an id and the marks: "rot → grün" and "Klick → Route → Engine" are text, no
+  -- problem; an id followed by key, XP and reason is the promotion
+  local prose = lb.parse(table.concat({
+    "## Lernpunkte",
+    "- [ ] je Punkt ein Test rot → grün",
+    "- [ ] Klick → Route → Engine {#fluss}",
+    "- [ ] rot → grün und dann weiter {xp=5}",
+    "- [ ] Befördert → lib.nvim/lua-lernen {xp=3} {#bef}",
+    "- [~] Befördert mit Grund → lib.nvim/lua-c – Grund: nur Kapitel 1",
+  }, "\n"))
+  eq(prose.problems, {})
+  eq(prose.hints, {})
+  eq(prose.nodes[1].label, "je Punkt ein Test rot → grün")
+  eq(prose.nodes[1].promoted, nil)
+  eq(prose.nodes[2].label, "Klick → Route → Engine")
+  eq(prose.nodes[2].key, "fluss")
+  eq(prose.nodes[3].label, "rot → grün und dann weiter")
+  eq(prose.nodes[4].promoted, "lib.nvim/lua-lernen")
+  eq(prose.nodes[4].label, "Befördert")
+  eq(prose.nodes[4].xp, 3)
+  eq(prose.nodes[5].promoted, "lib.nvim/lua-c")
+  eq(prose.nodes[5].reason, "nur Kapitel 1")
+
+  -- a word after the arrow that has the form of an id but is none: text, and a hint (never a problem)
+  local almost = lb.parse("## Lernpunkte\n- [ ] Siehe → lib.nvim/Lua_Lernen {#s}\n")
+  eq(almost.problems, {})
+  eq(almost.nodes[1].label, "Siehe → lib.nvim/Lua_Lernen")
+  eq(almost.nodes[1].promoted, nil)
+  eq(#almost.hints, 1)
+  eq(almost.hints[1].code, "path-bad-arrow")
+  eq(almost.hints[1].line, 2)
+  eq(almost.hints[1].key, "s")
+
+  -- the problems one file can tell: no reason, a key twice, a bad key, an unknown mark, an image outside assets/
   local bad = lb.parse(table.concat({
     "## Lernpunkte",
     "- [~] angeschaut ohne Grund {#a}",
@@ -144,7 +176,6 @@ return function(H)
   end
   table.sort(codes)
   eq(codes, {
-    "path-bad-arrow@7",
     "path-bad-key@5",
     "path-bad-mark@6",
     "path-duplicate-key@4",
