@@ -207,6 +207,14 @@ function M.engine_info()
   return base_engine_info()
 end
 
+---Ask git for the commit of the engine (`engine.git` in every head) in the background, so that no later document waits
+---for it: the editor calls it once after start (`setup`). A document made while the lookup runs says "unknown" for this
+---one time. The CLI and `tasks-host` never call it: there the wait does not hurt, and a process still running at the
+---end of a CLI run would be a leftover. Does nothing when the answer is known or a lookup runs already.
+function M.prewarm()
+  builder.prewarm()
+end
+
 ---The head every document starts with.
 ---@type fun(kind: string, root?: string): table
 M.head = builder.head
