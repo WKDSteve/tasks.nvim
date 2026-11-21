@@ -21,6 +21,8 @@ return function(H)
     "call",
     "check",
     "ci",
+    -- `commit` is for the shared vault in a shell (agents, scripts); the editor has git plugins of its own
+    "commit",
     "export",
     -- `history` reads and writes the series of the figures for a hub, a script or a chart of tasks-desktop; the
     -- editor has no view of it

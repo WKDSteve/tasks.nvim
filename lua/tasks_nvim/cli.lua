@@ -182,6 +182,12 @@ commands:
                                           staging area with a conflict; notes when the tree keeps another index file (do not `git add` that one)
                                           index without an area also writes down the figures of today when the vault
                                           keeps a series (_Telemetry/history exists); --no-history leaves that out
+  commit <path>... --message=<text> [--dry-run]
+                                          commit only these paths of the vault (files or folders, deletions and the
+                                          moves of done included) with the TASKS.md and Backlog README of the areas
+                                          they touch, generated from that commit, from a staging area of its own:
+                                          another session's staged files stay staged and out; signed when
+                                          commit.gpgsign is set; runs no hooks; does not push
   hook install|status                     the vault's pre-commit hook (<git-common-dir>/hooks/pre-commit): refuses a
                                           commit whose staged TASKS.md is stale (index --staged --check); never
                                           overwrites another pre-commit hook
@@ -544,6 +550,7 @@ local SPECS = {
   meetings = { value = { "since", "until", "task", "format" }, flag = {} },
   index = { value = {}, flag = { "check", "all", "staged", "no-history" } },
   hook = { value = {}, flag = {} },
+  commit = { value = { "message" }, flag = { "dry-run" } },
   new = {
     value = {
       "created",
@@ -1688,6 +1695,55 @@ commands.path = function(ctx)
   return 0
 end
 
+---`commit <path>... --message=<text> [--dry-run]`: commit only these paths of the vault, with the generated index and
+---Backlog README of the areas they touch, from a staging area of its own (`tasks_nvim.vault_commit`). Prints
+---`committed`, then one `path` line per changed file, `index` per area, and a note for generated files whose copy in
+---the tree differs from the committed one.
+---@param ctx Tasks.CliCtx
+---@return integer code
+commands.commit = function(ctx)
+  local args = ctx.args
+  if #args.pos == 0 or not args.opt.message then
+    ctx.warn("error: commit takes paths of the vault and --message=<text>")
+    return 2
+  end
+  local dry = args.opt["dry-run"] == true
+  local res, err = require("tasks_nvim.vault_commit").commit(args.pos, {
+    root = ctx.eo.root,
+    message = args.opt.message --[[@as string]],
+    dry_run = dry,
+  })
+  if not res then
+    ctx.warn("error: " .. tostring(err))
+    return 1
+  end
+  if dry then
+    ctx.say(("would-commit\t%d path(s)"):format(#res.paths))
+  else
+    ctx.say(("committed\t%s\t%d path(s)"):format(res.commit:sub(1, 9), #res.paths))
+  end
+  for _, p in ipairs(res.paths) do
+    ctx.say("path\t" .. p)
+  end
+  for _, r in ipairs(res.indexes) do
+    ctx.say(("index\t%s\t%s\t%d open"):format(r.area, r.action, r.open))
+  end
+  for _, p in ipairs(res.tree_differs) do
+    ctx.warn(
+      ("note: the tree's %s is not the committed one (it counts every session's files); leave it, or"):format(
+        p
+      ) .. (" `git checkout -- %s` in a checkout of your own"):format(p)
+    )
+  end
+  if res.settle_error then
+    ctx.warn(
+      "warn: the shared staging area still holds the old version of the committed paths: "
+        .. res.settle_error
+    )
+  end
+  return 0
+end
+
 ---`hook install|status`: the vault's pre-commit hook (`tasks_nvim.vault_hook`). `status` prints the state
 ---(`installed`, `outdated`, `absent`, `foreign`) and the file, exit 1 unless installed; `install` writes it, exit 1
 ---when another pre-commit hook is in the way.
@@ -1710,7 +1766,7 @@ commands.hook = function(ctx)
     ctx.warn("error: " .. tostring(err))
     return 1
   end
-  local state = res.state
+  local state = res.state --[[@as string]]
   if sub == "install" then
     state = res.state == "installed" and "unchanged"
       or (res.state == "outdated" and "updated" or "installed")
@@ -2404,6 +2460,10 @@ local function staged_check(ctx, area)
   ctx.warn(
     "  then commit the staging area as it is (`git commit -m ...`, no paths: `git commit -- <paths>` takes the"
       .. " tree's TASKS.md, not the staged one)"
+  )
+  ctx.warn(
+    "  or, in a vault shared by several sessions: `tasks commit <your paths>... --message=<text>`"
+      .. " (commits them with an index generated from that commit)"
   )
   return 1
 end

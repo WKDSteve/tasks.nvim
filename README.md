@@ -51,7 +51,9 @@ sessions that run without an editor. Nothing is stored anywhere but in the files
 - **A vault of areas**: `<area>/ROADMAP/tasks/<slug>.md` for open tasks, `<area>/Backlog/` for finished ones,
   `<area>/ROADMAP/TASKS.md` generated (never edited, never overwritten when it is your own file). In a vault kept in
   git, `tasks hook install` adds a pre-commit hook that refuses a commit whose staged `TASKS.md` does not match its
-  staged tasks (`tasks index --staged --check`).
+  staged tasks (`tasks index --staged --check`), and `tasks commit <path>... --message=<text>` commits only your
+  own paths with the generated files that go with them, whatever else is staged in a checkout shared by several
+  sessions.
 - **Plan and next**: stages, what is ready, which decision unlocks most, the critical path (`:Tasks plan`); the best
   next task with the reason and an honest empty answer (`:Tasks next`, and a dialog after `done`); sums that say what
   is missing (`:Tasks estimate`)
