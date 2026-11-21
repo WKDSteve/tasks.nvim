@@ -313,6 +313,33 @@ G.cases = {
   { name = "views", method = "views" },
   { name = "task-alpha", method = "task", request = '{"params":{"id":"lib.nvim/alpha"}}' },
   {
+    -- a task whose hard blocker is due after it starts and whose soft one is not (capability `late_blockers`)
+    name = "task-late-blocker",
+    method = "task",
+    fresh = true,
+    request = function(root)
+      local function write(slug, extra)
+        local path = root .. "/lib.nvim/ROADMAP/tasks/" .. slug .. ".md"
+        vim.fn.mkdir(vim.fs.dirname(path), "p")
+        local fh = assert(io.open(path, "wb"))
+        fh:write(
+          ("---\ntitle: %s\nstatus: open\n%screated: 2026-01-01\nupdated: 2026-01-01\n---\n\nLate.\n"):format(
+            slug,
+            extra
+          )
+        )
+        fh:close()
+      end
+      write("late-blocker", "due: 2026-03-10\n")
+      write("early-blocker", "due: 2026-02-20\n")
+      write(
+        "waits-on-late",
+        "start: 2026-03-01\ndue: 2026-03-20\nblocked_by: [lib.nvim/late-blocker]\nafter: [lib.nvim/early-blocker]\n"
+      )
+      return '{"params":{"id":"lib.nvim/waits-on-late"}}'
+    end,
+  },
+  {
     -- a routine with its finished rounds (capability `rounds`): two earlier rounds of the same stem, newest first; a
     -- finished task of that stem without `repeat` and a routine of another stem are no rounds of it
     name = "task-routine",

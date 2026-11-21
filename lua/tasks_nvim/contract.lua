@@ -81,6 +81,7 @@ M.CAPABILITIES = {
   "icon",
   "if_match",
   "intent",
+  "late_blockers",
   "links",
   "list",
   "lists",
@@ -329,8 +330,9 @@ end
 ---@param node? Tasks.PlanNode
 ---@param rank? integer
 ---@param meeting_ids? string[]  # The meetings that name the task (`meetings.by_task`), the earliest first.
+---@param late? Tasks.LateBlocker[]  # Its blockers due after it begins (`tasks_nvim.late`).
 ---@return table
-local function task_entry(root, task, node, rank, meeting_ids)
+local function task_entry(root, task, node, rank, meeting_ids, late)
   local days = model.effort_days(task.effort)
   local roi = model.roi(task)
   local entry = {
@@ -393,6 +395,10 @@ local function task_entry(root, task, node, rank, meeting_ids)
     end)(),
     blocked_by = vim.list_slice(task.blocked_by or {}, 1),
     after = vim.list_slice(task.after or {}, 1),
+    -- the blockers (hard and soft) due after the task begins; only when there are some (capability `late_blockers`)
+    late_blockers = (late and #late > 0) and vim.tbl_map(function(l)
+      return { id = l.id, kind = l.kind, due = l.due, against = l.against }
+    end, late) or nil,
     refs = vim.tbl_map(function(r)
       return safe_path(root, r)
     end, task.refs or {}),
@@ -512,6 +518,7 @@ end
 ---@field all Tasks.Task[]
 ---@field shared Tasks.PlanShared           # What `plan_scope` read: the readiness filters ask it again.
 ---@field file_etags? table<string, string|false> # The version tags of plan and project files read so far (`file_etag`).
+---@field late table<string, Tasks.LateBlocker[]> # The blockers due after a task begins, by task id (`tasks_nvim.late`).
 
 ---Scan the vault once and compute the plan once.
 ---@param opts? { root?: string }
@@ -585,6 +592,7 @@ function M.build_view(opts)
     shared = shared,
     meetings = meeting_files,
     meetings_by_task = meetings.by_task(meeting_files),
+    late = require("tasks_nvim.late").of_open(shared.open),
   },
     nil
 end
@@ -890,8 +898,14 @@ function M.build_snapshot(opts)
     return (view.rank[a.id] or math.huge) < (view.rank[b.id] or math.huge)
   end)
   for _, t in ipairs(ordered) do
-    entries[#entries + 1] =
-      task_entry(view.root, t, view.plan.nodes[t.id], view.rank[t.id], view.meetings_by_task[t.id])
+    entries[#entries + 1] = task_entry(
+      view.root,
+      t,
+      view.plan.nodes[t.id],
+      view.rank[t.id],
+      view.meetings_by_task[t.id],
+      view.late[t.id]
+    )
     statuses[#statuses + 1] = t.status
   end
   local doc = M.head("tasks.snapshot", view.root)
@@ -1085,8 +1099,14 @@ function M.list(params, opts)
   local items = {}
   for i = offset + 1, math.min(offset + limit, #matching) do
     local t = matching[i]
-    items[#items + 1] =
-      task_entry(view.root, t, view.plan.nodes[t.id], view.rank[t.id], view.meetings_by_task[t.id])
+    items[#items + 1] = task_entry(
+      view.root,
+      t,
+      view.plan.nodes[t.id],
+      view.rank[t.id],
+      view.meetings_by_task[t.id],
+      view.late[t.id]
+    )
   end
   local doc = M.head("tasks.list", view.root)
   doc.total = #matching
@@ -1319,7 +1339,8 @@ function M.task(id, opts)
       found,
       view.plan.nodes[found.id],
       view.rank[found.id],
-      view.meetings_by_task[found.id]
+      view.meetings_by_task[found.id],
+      view.late[found.id]
     )
   end
   doc.body = body

@@ -46,6 +46,8 @@
 ---  - `blocked-by-cycle` (error): the hard edges form a circle, the members are named
 ---  - `doing-while-blocked`, `blocked-without-blocker`, `blocker-freed`, `blocked-by-parked` (warnings): the status
 ---    runs behind what the blockers say (`tasks_nvim.plan` is the one definition of "blocked")
+---  - `blocker-late` (hint): an open `blocked_by` or `after` is due after the task begins (its `start`, else its
+---    `due`); both ids are named (`tasks_nvim.late`)
 ---  - `plan-unknown` (error): `plan:` names no plan file; `bad-plan`, `bad-phase` (errors): a malformed `plan:` /
 ---    `phase:`; `plan-area`, `plan-phase`, `plan-target-unknown` (warnings): outside the plan's areas, a stage the
 ---    plan does not list, a target that exists nowhere; a broken plan file is reported with its own codes
@@ -1887,6 +1889,17 @@ function M.run(opts)
   for _, name in ipairs(names) do
     for _, t in ipairs(by_area[name] and by_area[name].tasks or {}) do
       ui_findings(findings, hints, t, words)
+      -- a blocker due after this task begins: a hint (the plan may still work out; capability `late_blockers`)
+      for _, late in ipairs(require("tasks_nvim.late").blockers(t, open_ids)) do
+        hints[#hints + 1] = {
+          code = "blocker-late",
+          severity = "info",
+          area = t.area,
+          path = t.path,
+          id = t.id,
+          message = require("tasks_nvim.late").message(t, late),
+        }
+      end
       repeat_after_findings(findings, root, t, today)
       if t.status ~= "parked" and model.is_date(t.due) and t.due < today then
         add(findings, "warn", "overdue", t, ("due %s is before today (%s)"):format(t.due, today))

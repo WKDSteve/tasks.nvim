@@ -134,6 +134,7 @@ return function(H)
     "vault_marker",
     "view_delete",
     "view_save",
+    "late_blockers",
     "waits_for",
     "xp",
   }) do

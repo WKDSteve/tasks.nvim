@@ -1560,6 +1560,25 @@ export interface TaskEntry {
   blocked_by: string[];
   after: string[];
   /**
+   * The open blockers (`blocked_by` hard, `after` soft) due after the task begins: after its `start`, else after its `due` (`against` says which). Only when there are some (capability `late_blockers`); a parked task has none.
+   *
+   * @minItems 1
+   */
+  late_blockers?: [
+    {
+      id: string;
+      kind: "blocked_by" | "after";
+      due: Date;
+      against: "start" | "due";
+    },
+    ...{
+      id: string;
+      kind: "blocked_by" | "after";
+      due: Date;
+      against: "start" | "due";
+    }[]
+  ];
+  /**
    * As written, but a path of the machine shows as `<external>/<name>`.
    */
   refs: string[];

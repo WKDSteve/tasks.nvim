@@ -1410,6 +1410,22 @@
             "type": "string"
           }
         },
+        "late_blockers": {
+          "description": "The open blockers (`blocked_by` hard, `after` soft) due after the task begins: after its `start`, else after its `due` (`against` says which). Only when there are some (capability `late_blockers`); a parked task has none.",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["id", "kind", "due", "against"],
+            "additionalProperties": false,
+            "properties": {
+              "id": { "type": "string" },
+              "kind": { "enum": ["blocked_by", "after"] },
+              "due": { "$ref": "#/$defs/Date" },
+              "against": { "enum": ["start", "due"] }
+            }
+          }
+        },
         "refs": {
           "description": "As written, but a path of the machine shows as `<external>/<name>`.",
           "type": "array",

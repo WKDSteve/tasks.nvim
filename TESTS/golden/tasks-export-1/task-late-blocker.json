@@ -1,0 +1,64 @@
+{
+  "body": "\nLate.\n",
+  "body_truncated": false,
+  "digest": "sha256:9fcc7b8affbc491c",
+  "engine": {
+    "git": "0000000",
+    "nvim": "0.0.0",
+    "version": "0.1.0-test"
+  },
+  "generated_at": "2026-01-01T00:00:00Z",
+  "kind": "tasks.task",
+  "plugin": "tasks.nvim",
+  "questions": [],
+  "rev": "rev:bf568e",
+  "schema": 1,
+  "steps": [],
+  "task": {
+    "after": [
+      "lib.nvim/early-blocker"
+    ],
+    "area": "lib.nvim",
+    "blocked_by": [
+      "lib.nvim/late-blocker"
+    ],
+    "category": [],
+    "created": "2026-01-01",
+    "due": "2026-03-20",
+    "etag": "sha256:cd5a9af50e827792",
+    "file": "lib.nvim/ROADMAP/tasks/waits-on-late.md",
+    "folder": false,
+    "group": "open|-",
+    "id": "lib.nvim/waits-on-late",
+    "late_blockers": [
+      {
+        "against": "start",
+        "due": "2026-03-10",
+        "id": "lib.nvim/late-blocker",
+        "kind": "blocked_by"
+      }
+    ],
+    "problems": [],
+    "readiness": {
+      "leverage": 0,
+      "open_blockers": [
+        "lib.nvim/late-blocker"
+      ],
+      "rank": 14,
+      "stage": 1,
+      "state": "waiting"
+    },
+    "refs": [],
+    "slug": "waits-on-late",
+    "start": "2026-03-01",
+    "status": "open",
+    "summary": "Late.",
+    "tags": [],
+    "title": "waits-on-late",
+    "updated": "2026-01-01",
+    "valid": true
+  },
+  "vault": {
+    "id": "vault"
+  }
+}
