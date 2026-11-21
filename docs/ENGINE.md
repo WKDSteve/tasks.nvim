@@ -931,11 +931,13 @@ mtime. Uncommitted edits are not seen.
 Cost: one `git log` per repo and 100 paths, never one per task; a file is looked up once however
 many tasks name it; at most `staleness.MAX_REFS` (1000) distinct files are checked per run (the
 rest is reported). All git calls of a run share a time budget (`staleness.budget_ms` of `setup()`, 30 s):
-once it is used up the remaining files are dated by their mtime. In the editor (`:Tasks list`, the dashboard) the
+once it is used up the remaining files are dated by their mtime. In the editor (`:Tasks list`, the dashboard, `plan`, `estimate`, `quickwins`) the
 check never makes Neovim wait: it runs in the background (`staleness.compute_async`, every git call a `vim.system`
 callback), the dashboard first shows the list the last answer kept (before the first: every task the other filters
 keep, `(checking refs ...)` in the title) and redraws when the answer comes; `--to=`/`--format=` deliver once it is
-there. The headless `list` stays synchronous. A missing repo, file or git only
+there. `:Tasks plan`, `:Tasks estimate` and `:Tasks quickwins` take the same way: every other criterion first, the
+refs of what is left in the background, then the scope again with the dated refs; a newer command of the same name
+cancels the delivery of the older one. The headless commands stay synchronous. A missing repo, file or git only
 produces a note on stderr / a notification, never an error. Two semantics worth knowing: a task with neither
 `updated` nor `created` has no date to compare with, so any dated change counts (the same way `--stale=<days>`
 counts an undated task as stale); and when the check itself fails, `model.filter` keeps the tasks that carry refs

@@ -380,26 +380,39 @@ local function filter_options(flags)
   }
 end
 
----The scope of `plan` and `estimate` from the command: area (or `all`), `--for=<id>`, the filters.
+---`--stale=refs` commands (`list`, `plan`, `estimate`, `quickwins`) waiting for their background check.
+local ref_checks = 0
+
+---The background checks of `load_scope` by command name: a newer `:Tasks plan` cancels the check of the older one,
+---whose late answer then delivers nothing.
+---@type table<string, { job: Tasks.StalenessJob|nil }>
+local scope_checks = {}
+
+---The scope of `plan`, `estimate` and `quickwins` from the command: area (or `all`), `--for=<id>`, the filters.
+---`--stale=refs` never makes the editor wait for git: every other criterion first, the refs of what is left in the
+---background (`staleness.compute_async`), then the scope again with the dated refs. `cb(scope)` runs once the scope
+---is known (at once without `--stale=refs`); an error is told and `cb` is not called.
 ---@param ctx table
----@return Tasks.PlanScope|nil scope
-local function load_scope(ctx)
+---@param name string  # the command: a newer one of the same name cancels the background check of the older one
+---@param cb fun(scope: Tasks.PlanScope)
+local function load_scope(ctx, name, cb)
   local flags = ctx.flags
   local filter, ferr = filter_opts.parse(filter_options(flags))
   if not filter then
     notify.error(tostring(ferr))
-    return nil
+    return
   end
   local root = vault_root()
   if not root then
-    return nil
+    return
   end
   filter.ref_opts = { root = root }
   local area = ctx.args.area
   if area == "all" then
     area = nil
   end
-  local scope, err = require("tasks_nvim.plan_scope").load({
+  local plan_scope = require("tasks_nvim.plan_scope")
+  local opts = {
     root = root,
     area = area,
     for_id = flags["for"],
@@ -408,15 +421,63 @@ local function load_scope(ctx)
         and flags.project
       or nil,
     filter = filter,
-  })
-  if not scope then
-    notify.error(tostring(err))
-    return nil
+  }
+  ---@param scope Tasks.PlanScope|nil
+  ---@param err string|nil
+  local function finish(scope, err)
+    if not scope then
+      notify.error(tostring(err))
+      return
+    end
+    if #scope.errors > 0 then
+      notify.warn("cannot read directory " .. table.concat(scope.errors, ", "))
+    end
+    cb(scope)
   end
-  if #scope.errors > 0 then
-    notify.warn("cannot read directory " .. table.concat(scope.errors, ", "))
+
+  local older = scope_checks[name]
+  if older then
+    scope_checks[name] = nil
+    ref_checks = ref_checks - 1
+    if older.job then
+      older.job.cancel()
+    end
   end
-  return scope
+  if not filter.stale_refs then
+    finish(plan_scope.load(opts))
+    return
+  end
+  -- one pass over the vault for both loads: the refs are dated for exactly the tasks the second load filters
+  local shared, serr = plan_scope.shared(root)
+  if not shared then
+    finish(nil, serr)
+    return
+  end
+  local rest = vim.tbl_extend("force", {}, filter)
+  rest.stale_refs, rest.ref_stale = nil, nil
+  local pre, perr = plan_scope.load(vim.tbl_extend("force", opts, { filter = rest }), shared)
+  if not pre then
+    finish(nil, perr)
+    return
+  end
+  notify.info(
+    ("--stale=refs: checking the refs of %d task(s) in the background ..."):format(#pre.tasks)
+  )
+  local pending = {}
+  scope_checks[name] = pending
+  ref_checks = ref_checks + 1
+  pending.job = staleness.compute_async(pre.tasks, filter.ref_opts, function(rep)
+    if scope_checks[name] ~= pending then
+      return
+    end
+    scope_checks[name] = nil
+    ref_checks = ref_checks - 1
+    for _, n in ipairs(rep.notes) do
+      notify.warn(n)
+    end
+    filter.ref_stale = rep.stale
+    finish(plan_scope.load(opts, shared))
+  end)
 end
 
 ---`:Tasks plan [<area>|all] [--for=<id>] [filters] [--ready] [--format=md|tsv|ids] [--to=] [--force]`
@@ -439,48 +500,46 @@ function M.plan(ctx)
     notify.error("--format must be md, tsv or ids")
     return
   end
-  local scope = load_scope(ctx)
-  if not scope then
-    return
-  end
-  local plan_view = require("tasks_nvim.plan_view")
-  if flags.write then
-    return M.write_plan_block(ctx, scope)
-  end
-  if flags.check then
-    notify.error("--check goes with --write=<file>")
-    return
-  end
-  local text
-  if format == "md" then
-    text = plan_view.markdown(scope.plan, {
-      title = scope.title,
-      today = model.today(),
-      done = scope.done,
-      ready_only = flags.ready == true,
-      with_steps = flags["with-steps"] == true,
-      plan_file = scope.plan_file,
-    })
-  elseif format == "tsv" then
-    text = table.concat(plan_view.tsv(scope.plan, { ready_only = flags.ready == true }), "\n")
-      .. "\n"
-  else
-    text = table.concat(plan_view.ids(scope.plan, { ready_only = flags.ready == true }), "\n")
-      .. "\n"
-  end
-  unless_overwrite_refused(target, flags.force, function(force)
-    local ok, err = view.deliver_text(text, target, {
-      force = force,
-      title = "tasks/plan/" .. scope.title:gsub("[^%w._-]+", "-"),
-      filetype = format == "md" and "markdown" or "text",
-    })
-    if not ok then
-      notify.error(tostring(err))
+  load_scope(ctx, "plan", function(scope)
+    local plan_view = require("tasks_nvim.plan_view")
+    if flags.write then
+      return M.write_plan_block(ctx, scope)
+    end
+    if flags.check then
+      notify.error("--check goes with --write=<file>")
       return
     end
-    notify.info(
-      ("plan of %s: %d task(s), %d ready"):format(scope.title, #scope.tasks, #scope.plan.ready)
-    )
+    local text
+    if format == "md" then
+      text = plan_view.markdown(scope.plan, {
+        title = scope.title,
+        today = model.today(),
+        done = scope.done,
+        ready_only = flags.ready == true,
+        with_steps = flags["with-steps"] == true,
+        plan_file = scope.plan_file,
+      })
+    elseif format == "tsv" then
+      text = table.concat(plan_view.tsv(scope.plan, { ready_only = flags.ready == true }), "\n")
+        .. "\n"
+    else
+      text = table.concat(plan_view.ids(scope.plan, { ready_only = flags.ready == true }), "\n")
+        .. "\n"
+    end
+    unless_overwrite_refused(target, flags.force, function(force)
+      local ok, err = view.deliver_text(text, target, {
+        force = force,
+        title = "tasks/plan/" .. scope.title:gsub("[^%w._-]+", "-"),
+        filetype = format == "md" and "markdown" or "text",
+      })
+      if not ok then
+        notify.error(tostring(err))
+        return
+      end
+      notify.info(
+        ("plan of %s: %d task(s), %d ready"):format(scope.title, #scope.tasks, #scope.plan.ready)
+      )
+    end)
   end)
 end
 
@@ -531,44 +590,42 @@ function M.quickwins(ctx)
     -- `--waits-for` asks for parked tasks: the default would hide them
     flags.status = "open,doing,decision"
   end
-  local scope = load_scope(ctx)
-  if not scope then
-    return
-  end
-  local qw = require("tasks_nvim.quick_wins")
-  local result = qw.build(scope.tasks)
-  local text_opts =
-    { title = scope.title, by_actor = flags["by-actor"] == true, paths = flags.paths == true }
-  if flags.report then
-    local ok, where = qw.write(tostring(flags.report), qw.markdown(result, text_opts))
-    if not ok then
-      notify.error(where)
+  load_scope(ctx, "quickwins", function(scope)
+    local qw = require("tasks_nvim.quick_wins")
+    local result = qw.build(scope.tasks)
+    local text_opts =
+      { title = scope.title, by_actor = flags["by-actor"] == true, paths = flags.paths == true }
+    if flags.report then
+      local ok, where = qw.write(tostring(flags.report), qw.markdown(result, text_opts))
+      if not ok then
+        notify.error(where)
+        return
+      end
+      notify.info(("quick wins: %d written to %s"):format(#result.wins, where))
       return
     end
-    notify.info(("quick wins: %d written to %s"):format(#result.wins, where))
-    return
-  end
-  local text
-  if format == "md" then
-    text = qw.markdown(result, text_opts)
-  elseif format == "tsv" then
-    text = table.concat(qw.tsv(result), "\n") .. "\n"
-  else
-    text = table.concat(qw.ids(result), "\n") .. "\n"
-  end
-  unless_overwrite_refused(target, flags.force, function(force)
-    local ok, err = view.deliver_text(text, target, {
-      force = force,
-      title = "tasks/quickwins/" .. scope.title:gsub("[^%w._-]+", "-"),
-      filetype = format == "md" and "markdown" or "text",
-    })
-    if not ok then
-      notify.error(tostring(err))
-      return
+    local text
+    if format == "md" then
+      text = qw.markdown(result, text_opts)
+    elseif format == "tsv" then
+      text = table.concat(qw.tsv(result), "\n") .. "\n"
+    else
+      text = table.concat(qw.ids(result), "\n") .. "\n"
     end
-    notify.info(
-      ("quick wins of %s: %d (of %d task(s))"):format(scope.title, #result.wins, result.n)
-    )
+    unless_overwrite_refused(target, flags.force, function(force)
+      local ok, err = view.deliver_text(text, target, {
+        force = force,
+        title = "tasks/quickwins/" .. scope.title:gsub("[^%w._-]+", "-"),
+        filetype = format == "md" and "markdown" or "text",
+      })
+      if not ok then
+        notify.error(tostring(err))
+        return
+      end
+      notify.info(
+        ("quick wins of %s: %d (of %d task(s))"):format(scope.title, #result.wins, result.n)
+      )
+    end)
   end)
 end
 
@@ -787,25 +844,23 @@ function M.estimate(ctx)
   if not apply_list(ctx, { "ready", "waiting", "reminders", "overdue" }) then
     return
   end
-  local scope = load_scope(ctx)
-  if not scope then
-    return
-  end
-  local estimate = require("tasks_nvim.estimate")
-  local sums = estimate.rollup(scope.tasks, { done = scope.done })
-  local lines = { scope.title .. ": " .. estimate.describe(sums) }
-  if #sums.quick_wins > 0 then
-    lines[#lines + 1] = "Quick wins: " .. table.concat(sums.quick_wins, ", ")
-  end
-  if #sums.unestimated > 0 then
-    lines[#lines + 1] = ("%d task(s) miss an effort or a value (:Tasks estimate --walk goes through them)"):format(
-      #sums.unestimated
-    )
-  end
-  notify.info(table.concat(lines, "\n"))
-  if ctx.flags.walk then
-    walk_estimates(scope.tasks)
-  end
+  load_scope(ctx, "estimate", function(scope)
+    local estimate = require("tasks_nvim.estimate")
+    local sums = estimate.rollup(scope.tasks, { done = scope.done })
+    local lines = { scope.title .. ": " .. estimate.describe(sums) }
+    if #sums.quick_wins > 0 then
+      lines[#lines + 1] = "Quick wins: " .. table.concat(sums.quick_wins, ", ")
+    end
+    if #sums.unestimated > 0 then
+      lines[#lines + 1] = ("%d task(s) miss an effort or a value (:Tasks estimate --walk goes through them)"):format(
+        #sums.unestimated
+      )
+    end
+    notify.info(table.concat(lines, "\n"))
+    if ctx.flags.walk then
+      walk_estimates(scope.tasks)
+    end
+  end)
 end
 
 ---`:Tasks next [<area>|all] [--n=3] [--actor=]`
@@ -970,9 +1025,6 @@ function M.release(ctx, confirm_fn)
     end
   )
 end
-
----`:Tasks list --stale=refs` deliveries waiting for their background check.
-local ref_checks = 0
 
 ---`:Tasks list [<area>|all] [filters] [--to=] [--format=]`
 ---@param ctx table  composer context
@@ -1177,7 +1229,8 @@ function M.list(ctx)
   end)
 end
 
----How many `:Tasks list --stale=refs` deliveries still wait for their background check (specs wait for 0).
+---How many `--stale=refs` deliveries (`list`, `plan`, `estimate`, `quickwins`) still wait for their background check
+---(specs and sheets wait for 0).
 ---@return integer
 function M.pending_ref_checks()
   return ref_checks

@@ -1,6 +1,7 @@
 -- `--stale=refs`: which open tasks name a file (`refs:`) that changed since the task's `updated`. It asks git for the
--- dates, the real git: `:Tasks list` in the background (`staleness.git_dates_async`, one `vim.system` callback per
--- chunk), `:Tasks plan` while the command runs (`staleness.git_dates`, one blocking `git log` per chunk). A second repo
+-- dates, the real git, always in the background (`staleness.git_dates_async`, one `vim.system` callback per chunk):
+-- `:Tasks list` and `:Tasks plan` alike; the plan first narrows by every other criterion, then dates the refs of what is
+-- left and is delivered once git answered (the editor never waits for git). A second repo
 -- without a commit makes git refuse the `log`: the chunk is not halved for nothing, one `git log -1` asks whether the
 -- repository answers at all (`repo_answers`).
 -- A fixture vault and two fixture repos in a temp folder (never a real vault); the repos are made by the sheet (its
@@ -8,7 +9,7 @@
 return {
   id = "tasks.stale-refs",
   feature = "tasks.stale-refs",
-  title = "tasks.nvim: :Tasks list --stale=refs and :Tasks plan --stale=refs date the refs of the tasks with git",
+  title = "tasks.nvim: :Tasks list --stale=refs and :Tasks plan --stale=refs date the refs of the tasks with git in the background",
   engine = "rpc",
   sizes = { { rows = 30, cols = 140 } },
   steps = {
@@ -85,13 +86,13 @@ return {
       note = "a task without refs is no stale task",
     },
 
-    -- while the command runs
+    -- the plan: in the background as well
     { keys = ":bwipeout!<CR>" },
     { keys = ":Tasks plan lib.nvim --stale=refs<CR>" },
     {
-      wait = [[_G.buf_has("Docs drifted")]],
+      wait = [[require("tasks_nvim.ui.cmd").pending_ref_checks() == 0 and _G.buf_has("Docs drifted")]],
       timeout = 10000,
-      note = "the plan of the stale task",
+      note = "the plan of the stale task, once git answered",
     },
     { expect = [[not _G.buf_has("No refs at all")]], note = "the plan keeps only the stale task" },
 
@@ -102,7 +103,7 @@ return {
       note = "a repository without a commit: no error message",
     },
     {
-      wait = [[_G.buf_has("Fresh repo")]],
+      wait = [[require("tasks_nvim.ui.cmd").pending_ref_checks() == 0 and _G.buf_has("Fresh repo")]],
       timeout = 10000,
       note = "the task whose refs git could not date stays in the plan (an unreadable signal is never 'not stale')",
     },
