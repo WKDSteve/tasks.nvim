@@ -639,8 +639,9 @@ which machine a point may be practised (`MASCHINE-01`: `workstation` is the Tric
 other computer, `wsl` a shell in it); a point without the mark goes everywhere. The mark of a parent holds for its
 subtree unless a child names its own. The private machine has WSL: a `wsl` point is for `private` too, a
 `workstation` has no WSL, and `--machine=wsl` stays strict (only points that name `wsl`). An unknown word is the warning `path-bad-machine`. `{safety}` marks a point
-where a mistake is dangerous (mains voltage, soldering, chemistry); it holds for the subtree. `check` warns
-(`path-safety-unmarked`) when a point's text says `Sicherheit` and neither it nor a parent carries `{safety}`.
+where a mistake is dangerous (mains voltage, soldering, chemistry); it holds for the subtree. `check` gives the hint
+(`path-safety-unmarked`, never a warning) when a point's text starts with `Sicherheit:` and neither it nor a parent carries `{safety}`;
+the word elsewhere in a text (IT security) is left alone.
 
 `tasks path <id>` prints every `{safety}` point first (`safety` lines, before `points`). `--machine=<private|workstation|wsl|env>`
 (`env` reads `NVIM_MACHINE_ROLE`: empty or `default` is `private`) adds a line `machine <role> hidden N open here M`

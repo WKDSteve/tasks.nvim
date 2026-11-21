@@ -827,7 +827,7 @@ function M.parse(body)
 end
 
 ---Resolve `{machine=…}` and `{safety}` down the tree (a parent's mark holds for the subtree unless a child names its
----own machines) and name the faults of the marks (`path-bad-machine`, `path-safety-unmarked`).
+---own machines) and name the faults of the marks (`path-bad-machine`; the hint `path-safety-unmarked`).
 ---@param tree Tasks.LernTree
 function M.mark_inherited(tree)
   for _, node in ipairs(tree.nodes) do
@@ -845,12 +845,14 @@ function M.mark_inherited(tree)
         ),
       }
     end
-    if not node.safety_eff and node.label:find("Sicherheit", 1, true) then
-      tree.problems[#tree.problems + 1] = {
+    -- a hint, never a warning: only a text that starts with `Sicherheit:` (the convention for a danger) is named, since
+    -- the word alone also stands for IT security
+    if not node.safety_eff and node.label:match("^%s*Sicherheit%s*:") then
+      tree.hints[#tree.hints + 1] = {
         code = "path-safety-unmarked",
         line = node.line,
         key = node.key,
-        message = "the text speaks of safety but the point has no {safety} mark (nor a parent with one)",
+        message = "the text starts with 'Sicherheit:' but the point has no {safety} mark (nor a parent with one); mark it if it is a danger",
       }
     end
   end

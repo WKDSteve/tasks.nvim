@@ -87,7 +87,9 @@ return function(H)
     "- [ ] Sicherheit: Steckdose {#s1}",
     "- [ ] Sicherheit: Steckdose {safety} {#s2}",
     "- [ ] Block {safety} {#blk}",
-    "  - [ ] Sicherheit beachten {#s3}",
+    "  - [ ] Sicherheit: im Block {#s3}",
+    "- [ ] IT-Sicherheit: TLS {#s4}",
+    "- [ ] Sicherheit des Netzes {#s5}",
     "",
   }, "\n"))
   local codes = {}
@@ -95,7 +97,20 @@ return function(H)
     codes[#codes + 1] = p.code .. ":" .. tostring(p.key)
   end
   table.sort(codes)
-  eq(codes, { "path-bad-machine:a", "path-bad-machine:b", "path-safety-unmarked:s1" })
+  eq(
+    codes,
+    { "path-bad-machine:a", "path-bad-machine:b" },
+    "the unmarked safety text is no warning"
+  )
+  local hints = {}
+  for _, h in ipairs(bad.hints) do
+    hints[#hints + 1] = h.code .. ":" .. tostring(h.key)
+  end
+  eq(
+    hints,
+    { "path-safety-unmarked:s1" },
+    "a hint for 'Sicherheit:' only: not under {safety}, not IT-Sicherheit, not a bare word"
+  )
 
   -- ── stats.marks ──
   local m = stats.marks(tree, nil)
