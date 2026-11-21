@@ -84,7 +84,8 @@
 ---  - **the shape is checked first**, for the whole request: an unknown operation or field, a wrong type, too many
 ---    operations is `invalid_argument` and nothing runs. After that every operation runs on its own: one that fails
 ---    does not stop the others (this is NOT all-or-nothing, and the answer never says "ok" for a part);
----  - **`dry_run`** checks everything - the patch, the version, the relations, the slug - and writes nothing;
+---  - **`dry_run`** checks everything - the patch, the version, the relations, the slug - and writes nothing; the
+---    tasks, plans and projects earlier operations of the request would create count as the real run has them;
 ---  - **limits are kept on writing** (title 300, summary 1000, lists of 100, 300 characters an entry), and a `refs`
 ---    entry that is new must be a plain relative path (no `..`, no drive or network prefix, no colon but a line
 ---    suffix); entries the task already has stay as they are;
@@ -561,6 +562,7 @@ end
 ---@field claimed table<string, string>   # A dry run: the new id an earlier `move_area` of the request takes -> its old id.
 ---@field created table<string, Tasks.PendingTask>   # A dry run: the tasks earlier `new` operations would create.
 ---@field drafts table<string, Tasks.DraftTask>   # A dry run: the files of those tasks, for later operations on them.
+---@field files table<string, Tasks.PendingFile>   # A dry run: the plans and projects earlier `plan_new`/`project_new` would create.
 ---@field attach? Tasks.AttachSourceOpts   # Specs: a fake clipboard; the folders of `attach_dirs` (`api`), never of an operation.
 
 ---A failure from `mutate` whose reason has no code: its validation messages are all about the request.
@@ -777,8 +779,11 @@ local function do_set(op, ctx)
   end
   local proposal = proposal_of(pairs_)
   if next(proposal) ~= nil then
-    local problems, eerr =
-      edges.validate(task.id, proposal, { root = ctx.root, pending = ctx.created })
+    local problems, eerr = edges.validate(
+      task.id,
+      proposal,
+      { root = ctx.root, pending = ctx.created, pending_files = ctx.files }
+    )
     if not problems then
       return fail(ctx, eerr)
     end
@@ -1350,8 +1355,12 @@ local function do_new(op, ctx)
     if not would then
       return mutate_failure(ctx, werr, winfo)
     end
-    local problems, eerr =
-      edges.validate(would.id, proposal, { root = ctx.root, new = true, pending = ctx.created })
+    local problems, eerr = edges.validate(would.id, proposal, {
+      root = ctx.root,
+      new = true,
+      pending = ctx.created,
+      pending_files = ctx.files,
+    })
     if not problems then
       return fail(ctx, eerr)
     end
@@ -1752,12 +1761,17 @@ local function new_file(op, ctx, kind)
     cover = op.cover,
     template = op.template,
     dry_run = ctx.dry,
+    pending_files = ctx.dry and ctx.files or nil,
   })
   if not r then
     if info and info.code == "invalid_argument" then
       return refuse("invalid_argument", tostring(err), info.details)
     end
     return mutate_failure(ctx, err, info)
+  end
+  if ctx.dry then
+    -- the real run has the file on disk before the next operation: a later `plan`, `project` or `phase` may name it
+    ctx.files[r.id] = { id = r.id, kind = kind, phase_order = r.phase_order or {} }
   end
   return {
     ok = true,
@@ -3229,6 +3243,7 @@ door = contract_ops.make({
       claimed = {},
       created = {},
       drafts = {},
+      files = {},
       attach = opts.attach,
       git_wait_ms = opts.git_wait_ms,
     }

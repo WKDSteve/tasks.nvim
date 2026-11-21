@@ -711,6 +711,11 @@ function M.new(area, opts)
       return nil, perr2, { code = "invalid_argument" }
     end
     local project_file = require("tasks_nvim.projects").find(pid, { root = root })
+    -- a dry run: a project an earlier `project_new` of the same request would create
+    local pending = opts.pending_files and opts.pending_files[pid]
+    if not project_file and pending and pending.kind == "project" then
+      project_file = pending
+    end
     if not project_file then
       return nil, "no such open project: " .. pid, { code = "invalid_argument" }
     end
@@ -871,7 +876,14 @@ function M.new(area, opts)
       or fsio.is_dir(dir_of(root, area) .. "/" .. slug)
       or (opts.dry_run and (fsio.is_file(path) or fsio.is_dir(path)))
     if not held and opts.dry_run then
-      return { id = area .. "/" .. slug, path = path, slug = slug, renamed = n > 1 }, nil
+      return {
+        id = area .. "/" .. slug,
+        path = path,
+        slug = slug,
+        renamed = n > 1,
+        phase_order = phases,
+      },
+        nil
     end
     if not held then
       local ok, err = fsio.create_exclusive(path, text)

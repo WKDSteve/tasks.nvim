@@ -5,6 +5,10 @@ the version is not tagged yet (the repository is not published).
 
 ## [Unreleased]
 
+### Fixed
+
+- A dry run of `tasks-ops/1` sees the plans and projects an earlier `plan_new`/`project_new` of the same request would create: `[plan_new, new{fields.plan, phase}]` (and `project_new` with `fields.project`, `set` with `plan`/`project`/`phase`, `plan_new` with `project`) answers as the real run does instead of "is no plan file". A stage the new plan does not have is still refused.
+
 ### Changed
 
 - `reminders.on_start` is opt-in now: the one line at startup about due reminders no longer shows unless `setup({ reminders = { on_start = true } })` asks for it.

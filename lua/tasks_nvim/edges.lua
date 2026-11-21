@@ -43,6 +43,12 @@ local M = {}
 ---@field plan? string
 ---@field phase? string
 
+---A plan or project an earlier `plan_new`/`project_new` of the same dry-run request would create.
+---@class Tasks.PendingFile
+---@field id string
+---@field kind "plan"|"project"
+---@field phase_order string[]
+
 ---@class Tasks.EdgeProblem
 ---@field code string        # The `check` code of the same fault.
 ---@field key string         # `blocked_by`, `after`, `plan`, `project` or `phase`.
@@ -63,10 +69,11 @@ end
 ---the circle. Without an `id` the circle is not looked for. `opts.pending` names ids that do not exist on disk yet but
 ---will before the change is written: the tasks earlier `new` operations of the same dry-run request would create (the
 ---real run makes them one after the other, so a relation to one of them is not dangling there either, and their own
----relations are edges a circle can run along).
+---relations are edges a circle can run along). `opts.pending_files` does the same for the plans and projects earlier
+---`plan_new`/`project_new` operations of that request would create.
 ---@param id string|nil
 ---@param proposal Tasks.EdgeProposal
----@param opts { root: string, shared?: Tasks.PlanShared, new?: boolean, pending?: table<string, Tasks.PendingTask> }
+---@param opts { root: string, shared?: Tasks.PlanShared, new?: boolean, pending?: table<string, Tasks.PendingTask>, pending_files?: table<string, Tasks.PendingFile> }
 ---@return Tasks.EdgeProblem[]|nil problems  # empty: the change breaks nothing
 ---@return string|nil err
 function M.validate(id, proposal, opts)
@@ -128,6 +135,10 @@ function M.validate(id, proposal, opts)
         break
       end
     end
+    local pending_file = (opts.pending_files or {})[plan_id]
+    if not file and pending_file and pending_file.kind == "plan" then
+      file = pending_file
+    end
     if not file and not index.is_done(plan_id) then
       if proposal.plan ~= nil then
         problems[#problems + 1] = {
@@ -180,6 +191,10 @@ function M.validate(id, proposal, opts)
         project_file = f
       end
     end
+    local pending_file = (opts.pending_files or {})[project_id]
+    if not project_file and pending_file and pending_file.kind == "project" then
+      project_file = pending_file
+    end
     if not project_file and not index.is_done(project_id) then
       problems[#problems + 1] = {
         code = "project-unknown",
@@ -195,7 +210,12 @@ function M.validate(id, proposal, opts)
     and phase
     and (proposal.project ~= nil or proposal.phase ~= nil)
   then
-    for _, f in ipairs(shared.projects or {}) do
+    local candidates = vim.list_extend({}, shared.projects or {})
+    local pending_file = (opts.pending_files or {})[project_id]
+    if pending_file and pending_file.kind == "project" then
+      candidates[#candidates + 1] = pending_file
+    end
+    for _, f in ipairs(candidates) do
       if f.id == project_id and #f.phase_order > 0 and not has(f.phase_order, phase) then
         problems[#problems + 1] = {
           code = "project-phase",

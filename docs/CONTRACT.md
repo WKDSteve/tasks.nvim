@@ -183,7 +183,9 @@ characters of letters, digits and `. _ : -`) is echoed in the answer, for a clie
 `dry_run` checks everything and writes nothing. A task an earlier `new` of the same request would create counts, as
 in the real run, for the `after` and `blocked_by` relations of later operations (as an id or a bare
 `[[slug]]`; not `after-dangling`, its relations are edges of the `blocked-by-cycle` check) and its slug is taken (a
-repeated title gets `-2`). An operation on such a task (`set`, `done`, `tick_step`, `answer`, `append_note`,
+repeated title gets `-2`). A plan or project an earlier `plan_new` or `project_new` of the same request would create
+counts, too: a later `new` or `set` may name it in `plan`, `project` and `phase` (its `phases` are the stages), and a
+later `plan_new` may name such a project. An operation on such a task (`set`, `done`, `tick_step`, `answer`, `append_note`,
 `add_steps`, `set_body`, `reopen`, `attach`, `reorder`, `move_area`) works on the file that `new` would write, and a
 `set` or a text change (`tick_step`, `answer`, `append_note`, `add_steps`, `set_body`) carries that file on, so a later
 operation of the request finds the task as the real run leaves it and names the same `etag_before`. (`done`, `reopen`
