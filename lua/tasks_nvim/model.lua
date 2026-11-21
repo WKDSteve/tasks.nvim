@@ -982,16 +982,44 @@ end
 
 local trim = fsio.trim
 
+---@type table<string, true>|nil  # the headings of the data sections, lower case (built at the first use)
+local data_sections
+
 ---The first paragraph of a body: consecutive text lines, skipping blank lines,
 ---headings, single-line HTML comments and fenced code. Whitespace is collapsed.
+---The sections `## Lernpunkte` and `## Level` (any heading of `tasks_nvim.lernbaum` and `tasks_nvim.lernlevel`, as
+---they read them: a level-2 heading, up to the next heading of level 1 or 2) are data, not prose: they are skipped, so
+---a path or a task that starts with its learning points has no summary made of checkbox lines.
 ---@param body string
 ---@return string
 function M.first_paragraph(body)
+  if not data_sections then
+    data_sections = {}
+    for _, h in ipairs(require("tasks_nvim.lernbaum").HEADINGS) do
+      data_sections[h:lower()] = true
+    end
+    for _, h in ipairs(require("tasks_nvim.lernlevel").HEADINGS) do
+      data_sections[h:lower()] = true
+    end
+  end
   local para = {}
   local in_fence = false
+  local skipping = false -- inside a data section
   for line in (body .. "\n"):gmatch("([^\n]*)\n") do
     local t = trim(line)
-    if t:match("^```") or t:match("^~~~") then
+    local hashes, name = t:match("^(#+)%s+(.-)%s*$")
+    if hashes and not in_fence and #hashes <= 2 then
+      skipping = #hashes == 2 and data_sections[name:lower()] == true
+      if skipping and #para > 0 then
+        break
+      end
+    end
+    if skipping then
+      -- inside a data section: skipped, its fences only counted (a `#` line in one is no heading)
+      if t:match("^```") or t:match("^~~~") then
+        in_fence = not in_fence
+      end
+    elseif t:match("^```") or t:match("^~~~") then
       in_fence = not in_fence
       if #para > 0 then
         break

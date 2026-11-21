@@ -121,6 +121,41 @@ return function(H)
     "comment-only body"
   )
   eq(model.first_paragraph("a   b\n  c\n\nd"), "a b c", "whitespace collapsed")
+  -- the learning points and the levels are data, never the summary (a path that starts with its tree)
+  eq(
+    model.first_paragraph("## Lernpunkte\n\n- [ ] Root {#root}\n  - [x] First {xp=60} {#first}\n"),
+    "",
+    "a body of learning points only has no summary"
+  )
+  eq(
+    model.first_paragraph(
+      "## Learning points\n- [ ] A {#a}\n\n## Level\n\n1. Novice: 50 XP\n\n## Ziel\n\nThe goal.\n"
+    ),
+    "The goal.",
+    "learning points and levels are skipped up to the next section"
+  )
+  eq(
+    model.first_paragraph(
+      "## Lernpunkte\n\n```\n# not a heading\nkept out\n```\n- [ ] A\n\n## Notes\n\nText.\n"
+    ),
+    "Text.",
+    "a fenced line in the learning points ends nothing"
+  )
+  eq(
+    model.first_paragraph("## Lernpunkte\n\n- [ ] A\n\n### Sub\n\nstill in it\n\n## Next\n\nOut.\n"),
+    "Out.",
+    "a deeper heading stays inside the skipped section"
+  )
+  eq(
+    model.first_paragraph("### Level\n\nA level-3 heading is no data section.\n"),
+    "A level-3 heading is no data section.",
+    "only a level-2 heading starts a data section, as lernbaum and lernlevel read it"
+  )
+  eq(
+    parse(F.text(F.meta("T", "open"), "\nIntro.\n\n## Lernpunkte\n\n- [ ] A\n")).summary,
+    "Intro.",
+    "text before the learning points is still the summary"
+  )
 
   -- ── defaults and soft fields ────────────────────────────────────────────
   local minimal = parse(F.text(F.meta("Just a title", "open")))
