@@ -241,6 +241,25 @@ return function(H)
   eq(H.exists(marker), false, "nothing written while building the brief")
   local loop = repo("loop", { [".testing.lua"] = "while true do end\n" })
   eq(brief.checks(loop).land, false, "the instruction budget ends an endless loop")
+  -- the budget ends only the loading: a file that finishes just under it never lets the hook fire in the caller (a
+  -- small budget and every length of a loop around it: one of them ends right at the edge)
+  local saved_budget, hook_before = brief.LOAD_BUDGET, debug.gethook()
+  brief.LOAD_BUDGET = 60
+  local escaped = {}
+  for n = 1, 80 do
+    local edge = repo("edge-" .. n, {
+      [".testing.lua"] = ("local i = 0\nwhile i < %d do i = i + 1 end\nreturn { ci = { workflow = { land = true } } }\n"):format(
+        n
+      ),
+    })
+    local called, res = pcall(brief.checks, edge)
+    if not called then
+      escaped[#escaped + 1] = n .. ": " .. tostring(res)
+    end
+  end
+  brief.LOAD_BUDGET = saved_budget
+  eq(escaped, {}, "the budget never fires outside the load")
+  eq(debug.gethook(), hook_before, "the hook of the caller is back afterwards")
   local loop_land =
     repo("loop-land", { [".testing.lua"] = "local c = { land = true }\nwhile true do end\n" })
   eq(brief.checks(loop_land).land, true, "a file that does not load falls back to its text")
@@ -294,6 +313,29 @@ return function(H)
     brief.claude_md_commands("## Before every commit\n\n```\nmake check\n```\n"),
     { "make check" },
     "English heading"
+  )
+
+  -- a `#` line inside a code block is a shell comment, not a heading: it opens no section, anywhere in the file
+  eq(
+    brief.claude_md_commands(
+      "# demo\n\n```bash\n# Vor jedem Commit: lint\nmake lint\n```\n\n## Git\n\ngit push --force\n\n```\nrm -rf build\n```\n"
+    ),
+    {},
+    "a comment in a code block before any section"
+  )
+  eq(
+    brief.claude_md_commands(
+      "```\n# Before every commit\n```\n\n## Before every commit\n\n```\n# lint\nmake check\n```\n\n## Git\n\n```\ngit push\n```\n"
+    ),
+    { "make check" },
+    "the real heading after such a block"
+  )
+  eq(
+    brief.claude_md_commands(
+      "## Vor jedem Commit\n\n```\na\n```\n\n### Vor jedem Commit, Lua\n\n```\nb\n```\n\n### Rust\n\n```\nc\n```\n\n## Git\n\n```\nd\n```\n"
+    ),
+    { "a", "b", "c" },
+    "a sub-heading of the same name keeps the section's level"
   )
 
   local none = repo("none", { ["CLAUDE.md"] = "# demo\n\n## Git\n\n```\ngit status\n```\n" })

@@ -55,7 +55,7 @@ end
 
 ---How many VM instructions loading a `.testing.lua` may take before it counts as unreadable (a table literal takes a
 ---few thousand).
-local LOAD_BUDGET = 1000000
+M.LOAD_BUDGET = 1000000
 
 ---A larger `.testing.lua` or `CLAUDE.md` is not read: no project's file comes near it.
 local MAX_FILE_BYTES = 1024 * 1024
@@ -118,10 +118,21 @@ local function load_sandboxed(text)
     assert = assert,
   })
   local hook, mask, count = debug.gethook()
+  -- The hook may fire on any instruction until it is taken away again, also right after the chunk returned: it
+  -- raises only while the chunk runs, and the flag is cleared inside the protected call, so nothing escapes it.
+  local running = false
   debug.sethook(function()
-    error("instruction budget exceeded")
-  end, "", LOAD_BUDGET)
-  local ok, value = pcall(chunk)
+    if running then
+      error("instruction budget exceeded")
+    end
+  end, "", M.LOAD_BUDGET)
+  local ok, value = pcall(function()
+    running = true
+    local result = chunk()
+    running = false
+    return result
+  end)
+  running = false
   debug.sethook(hook, mask, count)
   if ok and type(value) == "table" then
     return value
@@ -162,11 +173,12 @@ function M.claude_md_commands(text)
       end
       local lower = title:lower()
       for _, heading in ipairs(M.CLAUDE_MD_HEADINGS) do
-        if lower:find(heading, 1, true) == 1 then
+        if not level and lower:find(heading, 1, true) == 1 then
           level = #hashes
         end
       end
-    elseif level and line:match("^%s*```") then
+    elseif line:match("^%s*```") then
+      -- fences count everywhere: a `#` line inside a code block is a comment, never a heading
       fenced = not fenced
     elseif level and fenced then
       local cmd = vim.trim((line:gsub("%s+#.*$", "")))
