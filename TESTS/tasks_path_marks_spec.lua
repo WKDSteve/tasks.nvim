@@ -48,7 +48,12 @@ return function(H)
   eq(by.eigen.machine_eff, { "private" }, "a child's own mark wins")
   eq(by.messen.xp_own, 5, "the other marks still parse beside them")
   ok(lernbaum.on_machine(by.lesen, "workstation"), "unmarked: everywhere")
-  ok(not lernbaum.on_machine(by.dienste, "private"), "wsl-only")
+  ok(lernbaum.on_machine(by.dienste, "private"), "the private machine has WSL")
+  ok(not lernbaum.on_machine(by.dienste, "workstation"), "the workstation has none")
+  ok(
+    not lernbaum.on_machine(by.netz, "wsl"),
+    "wsl stays strict: a private-only point is not for it"
+  )
   ok(lernbaum.on_machine(by.netz, "workstation"), "listed")
   eq(lernbaum.machine_of_role(""), "private")
   eq(lernbaum.machine_of_role("Default"), "private")
@@ -107,7 +112,7 @@ return function(H)
   eq(m.todo[3].under.label, "Strom", "a point under {safety} names the parent")
   eq(m.todo[3].safety, true)
   m = stats.marks(tree, "private")
-  eq(m.hidden, 3, "dienste, messen, erbt")
+  eq(m.hidden, 1, "only messen (workstation): the wsl points go on the private machine")
   -- progress is untouched by the filter
   eq(stats.compute(tree, nil).points.open, 7)
 
@@ -152,6 +157,15 @@ return function(H)
   eq(doc.machine.role, "wsl")
   eq(doc.machine.hidden, 3)
   eq(doc.safety[1].key, "strom")
+  code, out = run({ "path", ID, "--machine=private", "--format=json" })
+  eq(code, 0)
+  doc = vim.json.decode(out)
+  eq(doc.machine.hidden, 1, "only the workstation point is hidden on the private machine")
+  local shown = {}
+  for _, t in ipairs(doc.machine.todo) do
+    shown[#shown + 1] = t.key
+  end
+  ok(vim.tbl_contains(shown, "dienste"), "a wsl point is shown on the private machine")
   local _
   code, _, err = run({ "path", ID, "--machine=mars" })
   eq(code, 2)

@@ -344,12 +344,17 @@ function M.to_machines(raw)
 end
 
 ---Whether a node may be practised on a machine (`private`, `workstation`, `wsl`): it carries no `{machine=…}` (its own
----or a parent's) or the machine is among them.
+---or a parent's) or the machine is among them. The private machine also has WSL, so a `wsl` point goes there too; the
+---workstation does not, and `wsl` itself stays strict (only points that name it).
 ---@param node Tasks.LernNode
 ---@param machine string
 ---@return boolean
 function M.on_machine(node, machine)
-  return node.machine_eff == nil or vim.tbl_contains(node.machine_eff, machine)
+  local eff = node.machine_eff
+  if eff == nil or vim.tbl_contains(eff, machine) then
+    return true
+  end
+  return machine == "private" and vim.tbl_contains(eff, "wsl")
 end
 
 ---The role a machine name stands for: `workstation` and `wsl` as they are, an empty name or `default` the private
