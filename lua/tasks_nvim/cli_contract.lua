@@ -438,7 +438,9 @@ local function write_overview(ctx)
     ctx.warn("error: " .. tostring(serr))
     return 1
   end
-  local made = plan_scope.overview_body(id, root, shared)
+  local doc = fsio.doc_path(write_to)
+  local lang = require("tasks_nvim.projects").lang_for(fsio.read(doc), root)
+  local made = plan_scope.overview_body(id, root, shared, lang)
   if not made.body then
     ctx.warn("error: " .. tostring(made.skip))
     return 1
@@ -449,7 +451,7 @@ local function write_overview(ctx)
     ctx.warn("error: the project id cannot be recorded in a marker line")
     return 2
   end
-  local res, err = plan_scope.write_text_block(fsio.doc_path(write_to), made.body, {
+  local res, err = plan_scope.write_text_block(doc, made.body, {
     key = key,
     attrs = attrs,
     check = opt.check == true,

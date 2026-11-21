@@ -126,7 +126,7 @@ return function(H)
   local doc_path = root .. "/overview.md"
   H.write(
     doc_path,
-    "# Rust\n\n<!-- GENERATED:plan scope=rust-stack overview="
+    "# Rust\n\nThe plans and the paths of the project.\n\n<!-- GENERATED:plan scope=rust-stack overview="
       .. project.id
       .. " start -->\n<!-- GENERATED:plan end -->\n"
   )

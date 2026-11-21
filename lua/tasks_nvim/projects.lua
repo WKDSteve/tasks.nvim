@@ -390,15 +390,102 @@ local function cell(text)
   return (fsio.clean(tostring(text or "")):gsub("|", "/"))
 end
 
+---The words of the generated overview, by language (the reader of the level lines does the same, `lernlevel.WORDS`).
+---@type table<"de"|"en", table<string, string>>
+M.WORDS = {
+  de = {
+    stages = "Etappen",
+    done_when = "Fertig, wenn",
+    head_plans = "| Etappe | Plan | Status | Offen | Tage |",
+    no_plans_row = "| - | noch keine Pläne | - | 0 | - |",
+    none = "Noch keine Pläne und keine Lernpfade.",
+    head_paths = "| Lernpfad | Status | Punkte | Offen | Fortschritt |",
+    own = "Eigene Tasks des Projekts: %d offen.",
+  },
+  en = {
+    stages = "Stages",
+    done_when = "Done when",
+    head_plans = "| Stage | Plan | Status | Open | Days |",
+    no_plans_row = "| - | no plans yet | - | 0 | - |",
+    none = "No plans and no learning paths yet.",
+    head_paths = "| Learning path | Status | Points | Open | Progress |",
+    own = "Own tasks of the project: %d open.",
+  },
+}
+
+---Words that are German or English and (almost) never both; `lang_of` counts them.
+local MARKS = {
+  de = "und der die das ist nicht mit für ein eine wenn oder den dem von auf sind wird alle je ziel abgrenzung "
+    .. "lernpfade lernpfad takt entscheidungen notizen offen noch keine",
+  en = "and the is not with for an when or to are will all per goal scope decisions notes open yet no",
+}
+local MARK_SETS = {}
+for lang, list in pairs(MARKS) do
+  MARK_SETS[lang] = {}
+  for w in list:gmatch("%S+") do
+    MARK_SETS[lang][w] = true
+  end
+end
+
+---The language of a hand-written document: German or English by the words of its text outside the generated blocks
+---(an umlaut counts for German); nil when it says neither (or both equally).
+---@param text string
+---@return "de"|"en"|nil
+function M.lang_of(text)
+  local kept, inside = {}, false
+  for line in (text or ""):gmatch("[^\n]*") do
+    if line:find("<!-- GENERATED:plan scope=", 1, true) then
+      inside = true
+    elseif line:find("<!-- GENERATED:plan end -->", 1, true) then
+      inside = false
+    elseif not inside then
+      kept[#kept + 1] = line
+    end
+  end
+  local body = table.concat(kept, " "):lower()
+  local score = { de = 0, en = 0 }
+  for _ in body:gmatch("[äöüß]") do
+    score.de = score.de + 1
+  end
+  for w in body:gmatch("%a+") do
+    for lang, set in pairs(MARK_SETS) do
+      if set[w] then
+        score[lang] = score[lang] + 1
+      end
+    end
+  end
+  if score.de > score.en then
+    return "de"
+  elseif score.en > score.de then
+    return "en"
+  end
+  return nil
+end
+
+---The language of the generated words for a document: its own (`lang_of`), else the vault's marker file (`lang`), else
+---German.
+---@param text? string  # The document the block stands in.
+---@param root? string
+---@return "de"|"en"
+function M.lang_for(text, root)
+  local own = text and M.lang_of(text)
+  if own then
+    return own
+  end
+  local marker = root and require("tasks_nvim.vault_marker").read(root)
+  return marker and marker.lang or "de"
+end
+
 ---The overview of a project as the body of a marker block: its plans in the order of its stages (a plan of no listed
 ---stage last), each with status and what is open, then its learning paths (`ctx.paths`, the open path files: points,
 ---open ones, progress; finished ones at 100 %), then the tasks of the project itself. Open plans come from the plan
 ---files, finished ones from the Backlogs. A project with paths and no plans shows no table of plans. Pure given its
----inputs.
+---inputs. The words are `ctx.lang`'s (`WORDS`; English without one: pass `lang_for`).
 ---@param project Tasks.PlanFile
----@param ctx { plans: Tasks.PlanFile[], open: Tasks.Task[], finished?: Tasks.Task[], root?: string, paths?: Tasks.PlanFile[] }
+---@param ctx { plans: Tasks.PlanFile[], open: Tasks.Task[], finished?: Tasks.Task[], root?: string, paths?: Tasks.PlanFile[], lang?: "de"|"en" }
 ---@return string
 function M.overview(project, ctx)
+  local w = M.WORDS[ctx.lang or "en"] or M.WORDS.en
   local finished = ctx.finished or M.finished_items({ root = ctx.root })
   local rows = {}
   for _, f in ipairs(M.plans_of(project.id, ctx.plans)) do
@@ -446,21 +533,18 @@ function M.overview(project, ctx)
   local lines = { ("**%s** (%s)"):format(cell(project.title), project.status or "?") }
   if #(project.phase_order or {}) > 0 then
     lines[#lines + 1] = ""
-    lines[#lines + 1] = "Stages: " .. table.concat(project.phase_order, " > ")
+    lines[#lines + 1] = w.stages .. ": " .. table.concat(project.phase_order, " > ")
   end
   if project.target then
     lines[#lines + 1] = ""
-    lines[#lines + 1] = "Done when: " .. cell(project.target)
+    lines[#lines + 1] = w.done_when .. ": " .. cell(project.target)
   end
   local path_rows = ctx.paths and M.path_rows(project.id, ctx.paths, finished) or {}
   if #rows == 0 and #path_rows == 0 and ctx.paths then
     -- the paths were looked for too: neither a table of plans nor one of paths
-    vim.list_extend(lines, { "", "No plans and no learning paths yet." })
+    vim.list_extend(lines, { "", w.none })
   elseif #rows > 0 or #path_rows == 0 then
-    vim.list_extend(
-      lines,
-      { "", "| Stage | Plan | Status | Open | Days |", "|---|---|---|---|---|" }
-    )
+    vim.list_extend(lines, { "", w.head_plans, "|---|---|---|---|---|" })
     for _, r in ipairs(rows) do
       lines[#lines + 1] = ("| %s | `%s` %s | %s | %d | %s |"):format(
         cell(r.phase or "-"),
@@ -476,10 +560,7 @@ function M.overview(project, ctx)
     end
   end
   if #path_rows > 0 then
-    vim.list_extend(
-      lines,
-      { "", "| Learning path | Status | Points | Open | Progress |", "|---|---|---|---|---|" }
-    )
+    vim.list_extend(lines, { "", w.head_paths, "|---|---|---|---|---|" })
     for _, r in ipairs(path_rows) do
       lines[#lines + 1] = ("| `%s` %s | %s | %s | %s | %d %% |"):format(
         cell(r.id),
@@ -493,7 +574,7 @@ function M.overview(project, ctx)
   end
   local own = M.members(project.id, ctx.open)
   lines[#lines + 1] = ""
-  lines[#lines + 1] = ("Own tasks of the project: %d open."):format(#own)
+  lines[#lines + 1] = w.own:format(#own)
   return table.concat(lines, string.char(10)) .. string.char(10)
 end
 

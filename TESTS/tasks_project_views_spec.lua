@@ -201,7 +201,7 @@ return function(H)
     table.concat({
       "# Mobile",
       "",
-      "before",
+      "before the team reads the plans and the notes",
       "",
       "<!-- GENERATED:plan scope=mobile start -->",
       "old",

@@ -59,7 +59,7 @@ return function(H)
   end
   has(text, "<!-- GENERATED:plan scope=rust-stack overview=" .. id .. " start -->\n")
   has(text, "\n<!-- GENERATED:plan end -->\n")
-  has(text, "No plans and no learning paths yet.")
+  has(text, "Noch keine Pläne und keine Lernpfade.")
   lacks(text, plans.OVERVIEW_SLOT, "the slot line is never written")
   lacks(text, "phase_order", "a curriculum proposes no stages")
   local proj = assert(projects.find(id, o))
@@ -80,7 +80,7 @@ return function(H)
   has(out, "written")
   text = H.read(file)
   has(text, "| `" .. A .. "/a-rust-kern` A Rust-Kern | planning | 0 | 0 | 0 % |")
-  lacks(text, "No plans and no learning paths yet.")
+  lacks(text, "Noch keine Pläne und keine Lernpfade.")
   has(text, "## Takt", "the hand-written sections stay")
 
   -- ── a taken slug: the block names the id the file got ──

@@ -624,7 +624,7 @@ local function overview_block(id, slug, project)
   local start, finish = plan_view.block_markers(slug, { overview = id })
   local body = require("tasks_nvim.projects").overview(
     vim.tbl_extend("force", project, { id = id }),
-    { plans = {}, open = {}, finished = {}, paths = {} }
+    { plans = {}, open = {}, finished = {}, paths = {}, lang = "de" } -- the template is German
   )
   return start .. "\n" .. body .. finish
 end

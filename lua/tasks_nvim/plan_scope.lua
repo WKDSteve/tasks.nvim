@@ -425,8 +425,9 @@ end
 ---@param id string
 ---@param root string
 ---@param sh Tasks.PlanShared
+---@param lang? "de"|"en"  # The words of the block (`projects.lang_for` of the document); English without one.
 ---@return { body?: string, skip?: string }
-function M.overview_body(id, root, sh)
+function M.overview_body(id, root, sh, lang)
   local projects = require("tasks_nvim.projects")
   local project, err = projects.find(id, { root = root })
   if not project then
@@ -443,7 +444,7 @@ function M.overview_body(id, root, sh)
   return {
     body = projects.overview(
       project,
-      { plans = sh.files, open = sh.open, root = root, paths = path_files }
+      { plans = sh.files, open = sh.open, root = root, paths = path_files, lang = lang }
     ),
   }
 end
@@ -557,7 +558,8 @@ function M.refresh_document(path, root, closed)
       return { skip = "its recorded filter is invalid: " .. tostring(ferr) }
     end
     if scope_opts.overview_id then
-      return M.overview_body(scope_opts.overview_id, root, sh)
+      local lang = require("tasks_nvim.projects").lang_for(text, root)
+      return M.overview_body(scope_opts.overview_id, root, sh, lang)
     end
     scope_opts.filter = filter
     local scope, lerr = M.load(scope_opts, sh)
