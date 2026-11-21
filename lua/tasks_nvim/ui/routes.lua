@@ -1345,7 +1345,7 @@ local function nested_routes()
         {
           name = "tags",
           type = "STRING",
-          desc = "Tags (comma list); on-/not-on-workstation go to every task promoted from the path",
+          desc = "Tags (comma list); on-/not-on-workstation go to the tasks promoted from it",
         },
         {
           name = "status",
