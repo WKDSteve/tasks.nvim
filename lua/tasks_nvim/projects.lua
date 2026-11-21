@@ -453,7 +453,10 @@ function M.overview(project, ctx)
     lines[#lines + 1] = "Done when: " .. cell(project.target)
   end
   local path_rows = ctx.paths and M.path_rows(project.id, ctx.paths, finished) or {}
-  if #rows > 0 or #path_rows == 0 then
+  if #rows == 0 and #path_rows == 0 and ctx.paths then
+    -- the paths were looked for too: neither a table of plans nor one of paths
+    vim.list_extend(lines, { "", "No plans and no learning paths yet." })
+  elseif #rows > 0 or #path_rows == 0 then
     vim.list_extend(
       lines,
       { "", "| Stage | Plan | Status | Open | Days |", "|---|---|---|---|---|" }

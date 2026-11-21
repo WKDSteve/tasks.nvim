@@ -492,6 +492,10 @@ end
 ---The longest slug of a plan (the file name has room for `-NN` and `.md`).
 M.MAX_SLUG = 200
 
+---The line of a template that stands for the generated overview of a project (`overview_block`): replaced when the
+---file is written, never written itself.
+M.OVERVIEW_SLOT = "<!-- tasks-nvim:overview-slot -->"
+
 ---The stages a learning plan proposes (`template = "learning"`); free to change.
 ---@type string[]
 M.LEARNING_PHASES = { "orientieren", "grundlagen", "vertiefen", "anwenden", "festigen" }
@@ -570,20 +574,54 @@ M.TEMPLATES = {
       "## Notizen",
       "",
     },
+    -- a curriculum of several learning paths (LP-01): the paths hang in it with `project:`, their table is generated
     project = {
-      "## Ziel und Kompetenzstufe",
+      "## Ziel und Abgrenzung",
       "",
-      "<!-- Was das Lernvorhaben als Ganzes erreichen soll. -->",
+      "<!-- Was das Lernvorhaben als Ganzes erreichen soll, in einem Satz; was nicht dazugehört. -->",
+      "<!-- Kompetenzziel: Zeile der Kompetenzmatrix, heute → Ziel (T/P-Stufe); Abschlussprojekt oder Ergebnis-Artefakt. -->",
+      "",
+      "## Lernpfade",
+      "",
+      '<!-- Ein Pfad hängt mit project: am Projekt (tasks path-new <area> "<Titel>" --project=<id> --template=learning, oder tasks set <pfad> project=<id>). Die Tabelle erzeugt tasks projects --of=<id> --write=<diese Datei> neu; tasks paths --project=<id> zeigt sie in der Shell. -->',
+      M.OVERVIEW_SLOT,
+      "",
+      "## Takt",
+      "",
+      "<!-- Stunden pro Woche; je Woche Lesen (Primärquelle), Code lesen, Selbst bauen, Nachweis; Mindestweg und voller Weg. -->",
       "",
       "## Definition of done",
       "",
-      "<!-- Wann ist es fertig? -->",
+      "<!-- - [ ] Alle Pfade mit Selbstcheck bestanden (LP-13), Wiederholungen eingeplant (LP-14) -->",
+      "<!-- - [ ] Abschlussprojekt fertig und gegen die Regeln geprüft -->",
+      "<!-- - [ ] Kompetenzmatrix mit Nachweisen neu eingestuft -->",
+      "",
+      "## Entscheidungen",
+      "",
+      "<!-- Verweise auf decision-Tasks, nicht kopieren. -->",
       "",
       "## Notizen",
       "",
     },
   },
 }
+
+---Make the generated overview block of a new project (the slot of the learning template): the marker pair with the
+---project's id (`overview=<id>`, scope its slug, the name `projects --of` takes by default) around the overview of an
+---empty project, so the first `projects --of=<id> --write=<file>` finds the block. Pure.
+---@param id string
+---@param slug string
+---@param project { title: string, status: string, phase_order: string[], target?: string }
+---@return string
+local function overview_block(id, slug, project)
+  local plan_view = require("tasks_nvim.plan_view")
+  local start, finish = plan_view.block_markers(slug, { overview = id })
+  local body = require("tasks_nvim.projects").overview(
+    vim.tbl_extend("force", project, { id = id }),
+    { plans = {}, open = {}, finished = {}, paths = {} }
+  )
+  return start .. "\n" .. body .. finish
+end
 
 ---@class Tasks.NewPlanOpts
 ---@field root? string
@@ -893,6 +931,19 @@ function M.new(area, opts)
   while n < 1000 do
     local slug = n == 1 and base or (base .. "-" .. n)
     local path = path_of(root, area, slug)
+    -- the learning template of a project carries its own overview block: it names the id this slug gives
+    local file_text = text
+    local slot = file_text:find(M.OVERVIEW_SLOT, 1, true)
+    if slot then
+      file_text = file_text:sub(1, slot - 1)
+        .. overview_block(area .. "/" .. slug, slug, {
+          title = title,
+          status = status,
+          phase_order = phases,
+          target = target_text,
+        })
+        .. file_text:sub(slot + #M.OVERVIEW_SLOT)
+    end
     -- plans, projects and tasks share one id namespace
     local held = backlog_taken[slug] ~= nil
       or fsio.is_file(vault.task_path(root, area, slug))
@@ -912,7 +963,7 @@ function M.new(area, opts)
         nil
     end
     if not held then
-      local ok, err = fsio.create_exclusive(path, text)
+      local ok, err = fsio.create_exclusive(path, file_text)
       if ok then
         local id = area .. "/" .. slug
         -- The link index holds the plan files too: a slug another area has makes its `[[slug]]` links ambiguous.

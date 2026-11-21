@@ -96,7 +96,11 @@ commands:
                                           create ROADMAP/plans/<slug>.md; tasks join it with plan=<id> phase=<word>;
                                           without --slug the slug is the title, cut at a word boundary
   project-new <area> <title> [--slug=s] [options as plan-new]
-                                          create ROADMAP/projects/<slug>.md; plans join it with project=<id>
+                                          create ROADMAP/projects/<slug>.md; plans join it with project=<id>, learning
+                                          paths with path-new --project=<id>; --template=learning writes a
+                                          curriculum: goal and competence target, ## Lernpfade with the generated
+                                          table of its paths (refreshed by projects --of=<id> --write=<file>), ## Takt,
+                                          definition of done (no stages are proposed)
   path-new <area> <title> [--slug=s] [--areas=a,b] [--target=<id>] [--project=<id>] [--tags=a,b] [--status=planning|doing|parked] [--summary=text] [--links=url,url] [--icon=...] [--cover=assets/x.png] [--template=learning] [--no-index]
                                           create the learning path ROADMAP/paths/<slug>.md (no stages; its tree goes
                                           into ## Lernpunkte); --template=learning writes the sections of a learning path;

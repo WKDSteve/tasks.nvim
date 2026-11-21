@@ -643,6 +643,23 @@ told like the one of `done` (the plan, and the project it was the last open plan
 finish by itself: `plan-no-open-task` (a plan in `doing` with no open task left) and `project-no-open-work` (a project
 in `doing` with no open plan that is not parked and no open task of its own), both warnings with the verb to run.
 
+**A project, headless.** `project-new <area> "<title>" [--slug=s] [--areas=a,b] [--target=<id>] [--phases=a,b,c]
+[--gate=hard] [--status=] [--summary=text] [--links=url,url] [--icon=] [--cover=] [--template=learning]` makes
+`ROADMAP/projects/<slug>.md` (the write door: `project_new`). Plans join it with `project=<id>`, learning paths with
+`path-new … --project=<id>` or `set <path> project=<id>`. `--template=learning` writes a curriculum of learning paths
+(`LP-01`): `## Ziel und Abgrenzung` with the competence target, `## Lernpfade` with the generated overview block of the
+project already in place (`<!-- GENERATED:plan scope=<slug> overview=<id> start -->`; `projects --of=<id>
+--write=<the project file>` fills it with the table of its paths), `## Takt`, `## Definition of done` and
+`## Entscheidungen`. It proposes no stages (a curriculum is ordered by its paths); `--phases` still sets some.
+
+```sh
+tasks project-new tasks-desktop "Rust-Stack der App-Familie" --template=learning --areas=tasks-desktop,appkit
+tasks path-new tasks-desktop "A · Rust-Kern" --project=tasks-desktop/rust-stack-der-app-familie --template=learning
+tasks projects --of=tasks-desktop/rust-stack-der-app-familie --write="$VAULT/tasks-desktop/ROADMAP/projects/rust-stack-der-app-familie.md"
+```
+
+`--write=` is a path of this machine (relative to the working directory), not of the vault.
+
 **Projects, headless.** `projects [<area>]` lists the project files, one TSV line each: id, status, location, title, `plans <finished>/<all>`, `tasks <finished>/<all>`, `<n> d open` and `paths <finished>/<all> <n> %` (its learning paths, `project:` in the path file, finished ones from the Backlogs; the mean progress, a finished path at 100 %) (a project is listed in an area when it lives there or one of its plans does). `plans [<area>] --tree` puts the plans under their project, indented and with `stage <phase>`, projects first, the plans of no project after them; plain `plans` is unchanged. The filter **`--project=<id>[,<id>]`** of `list`, `plan`, `estimate` and `quickwins` keeps the tasks of those projects: in one of their plans, or their own (`project:`); it narrows together with the other filters. `new --project=<id>` makes a task of the project itself (instead of `--plan=`). `:Tasks list|plan|estimate|quickwins ... --project=<id>` take the same filter, and the dashboard shows it as the chip `[project: <id>]`. With ONE project, `plan` and `estimate` draw it like a plan file: the head (title, status, goal, stages from its `phase_order`) above the tasks of its plans and its own (`# Plan: project <id>`); an unknown project is an error there, an empty answer in `list`. A block written with `plan --write` records the filter only, without the head. **`projects --of=<id> --write=<file> [--scope=<name>] [--check]`** puts the plans of one project into the marker block `<!-- GENERATED:plan scope=<name> overview=<id> start -->` of a hand-written document: a table with stage, plan, status, open tasks and open days, in the order of the project's `phase_order`, finished plans included, then a table of its learning paths (path, status, points, open points, progress; finished ones at 100 %; a project with paths and no plans shows no table of plans), plus the count of the project's own open tasks. The marker records `overview=<id>`, so the refresh after a finish (`done`) keeps the table current like any other block, once the document is named in `chain.marker_docs` (or `$TASKS_MARKER_DOCS`); without that, run the command again; `--check` writes nothing and answers `stale` (exit 1) or `current`.
 
 ### `:Tasks next [<area>|all] [--n=3] [--actor=cdx|me|pair|none]`

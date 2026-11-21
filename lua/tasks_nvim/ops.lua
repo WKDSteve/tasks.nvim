@@ -42,8 +42,9 @@
 ---  - `plan_new` { area, title, areas?, target?, phases?, gate?, status?, summary?, slug?, project?, phase? }: make a plan file
 ---    (`project` and `phase` put it into a project and a stage of it); a dry run names the id it would get and whether the
 ---    slug had to be changed (`plans.new`)
----  - `project_new` { area, title, areas?, target?, phases?, gate?, status?, summary?, slug? }: make a project file under
----    `ROADMAP/projects/` (the same as `plan_new`, without `project` and `phase`)
+---  - `project_new` { area, title, areas?, target?, phases?, gate?, status?, summary?, slug?, template? }: make a project
+---    file under `ROADMAP/projects/` (the same as `plan_new`, without `project` and `phase`; `template: "learning"`
+---    writes a curriculum of learning paths with the generated block of its paths)
 ---  - `plan_set` / `project_set` { id, patch, if_match? }: change the frontmatter of an open plan or project file (`title`,
 ---    `status`, `areas`, `target`, `phase_order`, `gate`; a plan also `project`, `phase`); `null` or an empty value removes a
 ---    key; the change is judged as the file would read afterwards, a fault it brings refuses it with `problems`; the answer
@@ -316,6 +317,7 @@ local FIELDS = {
     links = "strings",
     icon = "string",
     cover = "string",
+    template = "string",
   },
   plan_set = { id = "string", patch = "object", if_match = "string" },
   project_set = { id = "string", patch = "object", if_match = "string" },
