@@ -632,7 +632,8 @@ tasks-desktop/rust-stack-b-async-...  planning  points 41  open 41  0 %   B · A
 ```
 
 Headless `plan-close <area>/<slug>` finishes a plan by hand (refused while a member task is open: the message names them)
-and `project-close <area>/<slug>` a project (refused while a task of its own or a plan that is not parked is open). A
+and `project-close <area>/<slug>` a project (refused while a task of its own, or a plan or learning path that is not
+parked, is open). A
 project is also finished by `done`: when the finish closes its last plan, or is its last own task, and no other plan
 (a parked one does not count) is open, the project is finished too (`project-closed` line; the parked plans stay and are
 named). Closing a finished plan or project again prints `already`.
@@ -641,7 +642,8 @@ In the editor the same verbs are **`:Tasks plan-close <id>`** and **`:Tasks proj
 first (a dry run), a refusal names what holds it open and asks nothing, else a question (`--yes` skips it); the finish is
 told like the one of `done` (the plan, and the project it was the last open plan of). `check` names what does not
 finish by itself: `plan-no-open-task` (a plan in `doing` with no open task left) and `project-no-open-work` (a project
-in `doing` with no open plan that is not parked and no open task of its own), both warnings with the verb to run.
+in `doing` with no open plan or learning path that is not parked and no open task of its own), both warnings with the
+verb to run.
 
 **A project, headless.** `project-new <area> "<title>" [--slug=s] [--areas=a,b] [--target=<id>] [--phases=a,b,c]
 [--gate=hard] [--status=] [--summary=text] [--links=url,url] [--icon=] [--cover=] [--template=learning]` makes

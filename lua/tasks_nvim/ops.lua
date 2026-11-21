@@ -52,8 +52,8 @@
 ---  - `path_set` { id, patch, if_match? }: the same for a learning path (`title`, `status`, `areas`, `target`, `project`,
 ---    `links`, `icon`, `cover`, `tags`)
 ---  - `plan_close` / `project_close` { id }: finish a plan or project by hand: refused (`invalid_argument`, the holders are in
----    `details.holding`) while a task of the plan, or a task of its own or a plan other than a parked one of the project, is
----    open; `plan_close` goes on to the project when the plan was its last; no `inverse`
+---    `details.holding`) while a task of the plan, or a task of its own or a plan or learning path other than a parked
+---    one of the project, is open; `plan_close` goes on to the project when the plan was its last; no `inverse`
 ---
 ---  - `view_save` { id | area (slug?), view, if_match? }: make or replace a saved view of the tasks (`tasks_nvim.views`: a small
 ---    file at `<area>/ROADMAP/views/<slug>.md`). `view` is `{ title, display, group_by, group_by2?, collapsed?, select? }`; with
@@ -1972,9 +1972,10 @@ local function close_file(op, ctx, kind)
       if holding then
         return refuse(
           "invalid_argument",
-          ("%s still has %d open task%s or plan%s"):format(
+          ("%s still has %d open task%s, plan%s or learning path%s"):format(
             op.id,
             #holding,
+            #holding == 1 and "" or "s",
             #holding == 1 and "" or "s",
             #holding == 1 and "" or "s"
           ),

@@ -1332,9 +1332,14 @@ local function project_findings(findings, open_ids, names, scan_opts, is_finishe
   end
   local project_files = projects.all(scan_opts) or {}
   local plan_files = plans.all(scan_opts) or {}
-  -- what keeps a project busy: an open plan that names it, an open task of its own
+  -- what keeps a project busy: an open plan or learning path that names it, an open task of its own
   local busy = {}
   for _, p in ipairs(plan_files) do
+    if p.project and p.status ~= "parked" then
+      busy[p.project] = true
+    end
+  end
+  for _, p in ipairs(require("tasks_nvim.paths").all(scan_opts) or {}) do
     if p.project and p.status ~= "parked" then
       busy[p.project] = true
     end
@@ -1371,7 +1376,7 @@ local function project_findings(findings, open_ids, names, scan_opts, is_finishe
           "warn",
           "project-no-open-work",
           file,
-          ("no open plan and no open task of its own left: finish it by hand (project-close %s)"):format(
+          ("no open plan, learning path or task of its own left: finish it by hand (project-close %s)"):format(
             file.id
           )
         )

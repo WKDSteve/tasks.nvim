@@ -132,8 +132,8 @@ commands:
                                           the meetings of a window (default: 30 days back, 90 ahead)
   plan-close <area>/<slug>                finish a plan by hand (refused while a member task is open); the project it
                                           belongs to is finished after it when nothing else holds it open
-  project-close <area>/<slug>             finish a project by hand (refused while an own task or an open plan that is
-                                          not parked is left)
+  project-close <area>/<slug>             finish a project by hand (refused while an own task, or an open plan or
+                                          learning path that is not parked, is left)
   plan [<area>] [--for=<id>|--plan=<id>] [--project=<id>] [filters as for list] [--ready] [--with-steps] [--format=md|tsv|ids]
        [--write=<file> [--scope=<name>] [--check] ]   replace only the generated block of a document
                                           stages, ready tasks, decisions by leverage, critical path
@@ -1996,7 +1996,8 @@ local function close_by_hand(ctx, kind)
   if res.holding then
     local n = #res.holding
     local s = n == 1 and "" or "s"
-    local what = kind == "plan" and ("task" .. s) or ("task" .. s .. " or plan" .. s)
+    local what = kind == "plan" and ("task" .. s)
+      or ("task" .. s .. ", plan" .. s .. " or learning path" .. s)
     ctx.warn(
       ("error: %s still has %d open %s: %s"):format(id, n, what, table.concat(res.holding, ", "))
     )

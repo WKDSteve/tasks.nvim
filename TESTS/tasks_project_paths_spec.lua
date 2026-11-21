@@ -15,6 +15,7 @@ return function(H)
   local lernlevel = require("tasks_nvim.lernlevel")
   local paths = require("tasks_nvim.paths")
   local plans = require("tasks_nvim.plans")
+  local projects_mod = require("tasks_nvim.projects")
 
   -- ── lernlevel.percent: of the XP when there is any, else of the points (seen counts half) ──
   local no_xp = lernbaum.parse(
@@ -148,4 +149,49 @@ return function(H)
   local plans_at = text:find("| Stage | Plan |", 1, true)
   local paths_at = text:find("| Learning path |", 1, true)
   ok(plans_at and paths_at and plans_at < paths_at, text)
+
+  -- ── an open learning path is open work of its project: check and project-close see it ──
+  local curriculum = assert(plans.new(
+    A,
+    vim.tbl_extend("force", o, {
+      kind = "project",
+      title = "Lehrplan",
+      status = "doing",
+    })
+  ))
+  local lesson = path("Lektion", { "- [ ] eins" }, false)
+  code, _, err = run({ "set", lesson, "project=" .. curriculum.id, "status=doing" })
+  eq(code, 0, err)
+  ---@return string[]
+  local function project_codes()
+    local res = assert(require("tasks_nvim.check").run(o))
+    local found = {}
+    for _, f in ipairs(res.findings) do
+      if f.id == curriculum.id then
+        found[#found + 1] = f.code
+      end
+    end
+    return found
+  end
+  ok(
+    not vim.tbl_contains(project_codes(), "project-no-open-work"),
+    "a project with an open path has open work"
+  )
+  code, _, err = run({ "project-close", curriculum.id })
+  eq(code, 1)
+  has(err, curriculum.id .. " still has 1 open task, plan or learning path: " .. lesson)
+  local door = assert(require("tasks_nvim.ops").run({
+    ops = { { op = "project_close", id = curriculum.id } },
+  }, o)).results[1]
+  eq(door.ok, false, vim.inspect(door))
+  eq(door.error.details.holding, { lesson })
+  ok(assert(projects_mod.find(curriculum.id, o)), "the project is still open")
+
+  -- a parked path holds it no more than a parked plan does
+  code, _, err = run({ "set", lesson, "status=parked" })
+  eq(code, 0, err)
+  ok(vim.tbl_contains(project_codes(), "project-no-open-work"), "only a parked path is left")
+  code, _, err = run({ "project-close", curriculum.id })
+  eq(code, 0, err)
+  eq(projects_mod.find(curriculum.id, o), nil, "closed")
 end

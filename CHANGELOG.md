@@ -7,6 +7,8 @@ the version is not tagged yet (the repository is not published).
 
 ### Fixed
 
+- An open learning path of a project (`project:` in the path file, status other than `parked`) is open work of it: `check` no longer calls a curriculum of open paths `project-no-open-work`, and `project-close` / `project_close` refuse while such a path is open (it is named in the message and in `details.holding`), as for an open plan. A finish by `done` does not close such a project either.
+
 - `folderize` and `attach` no longer break the relative links of a task, plan, project, learning path or meeting they turn into its folder form: every relative Markdown link and image (not `http(s):`/`mailto:`/`#anchor`, not `assets/`, not inside code) gains a `../`, so `../../Literatur/buch.md` still names the book one folder deeper; a failed `attach` puts the file back with its text as it was. New module `tasks_nvim.mdlinks`.
 - A dry run of `tasks-ops/1` sees the plans and projects an earlier `plan_new`/`project_new` of the same request would create: `[plan_new, new{fields.plan, phase}]` (and `project_new` with `fields.project`, `set` with `plan`/`project`/`phase`, `plan_new` with `project`) answers as the real run does instead of "is no plan file". A stage the new plan does not have is still refused.
 

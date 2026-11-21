@@ -368,9 +368,9 @@ end
 ---@field refused table<string, string[]>        # Project id -> the open tasks and plans that hold it open.
 ---@field notes string[]                         # Projects that could not be closed, or whose state could not be judged.
 
----The step after `close_plans`: finish every project of `project_ids` that has no open task of its own and no open plan
----left. A parked plan does not hold a project open (it is named in the summary); a plan or task of any other status
----does. A project that nothing finished is never asked about: an empty project does not close by itself. The scan
+---The step after `close_plans`: finish every project of `project_ids` that has no open task of its own, no open plan
+---and no open learning path left. A parked plan or path does not hold a project open (a parked plan is named in the
+---summary); a plan, path or task of any other status does. A project that nothing finished is never asked about: an empty project does not close by itself. The scan
 ---guards are those of `close_plans`: an incomplete scan closes nothing.
 ---`opts.dry_run` names what would be closed and writes nothing.
 ---@param project_ids string[]
@@ -419,6 +419,7 @@ function M.close_projects(project_ids, opts)
     end
   end
   local open_plans = plans.all({ root = opts.root }) or {}
+  local open_paths = require("tasks_nvim.paths").all({ root = opts.root }) or {}
   local open_tasks = {}
   for _, t in ipairs(all) do
     if model.is_open_status(t.status) then
@@ -437,6 +438,12 @@ function M.close_projects(project_ids, opts)
       if f.status == "parked" then
         parked[#parked + 1] = f.id
       elseif f.status ~= "done" then
+        holding[#holding + 1] = f.id
+      end
+    end
+    -- an open learning path of the project is open work of it, as a plan is
+    for _, f in ipairs(projects.paths_of(file.id, open_paths)) do
+      if f.status ~= "parked" and f.status ~= "done" then
         holding[#holding + 1] = f.id
       end
     end
