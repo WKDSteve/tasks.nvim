@@ -16,6 +16,7 @@
     "etag",
     "find",
     "finished",
+    "finished_ci",
     "groupings",
     "hello",
     "history",

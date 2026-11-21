@@ -184,6 +184,7 @@ local methods = {
       ["until"] = "string",
       limit = "integer",
       offset = "integer",
+      ci = "string_list",
     },
     run = function(params, opts)
       return contract.finished(params, opts)

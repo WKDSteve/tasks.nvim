@@ -94,6 +94,7 @@ return function(H)
     "claims",
     "eff_prio",
     "etag",
+    "finished_ci",
     "icon",
     "if_match",
     "meeting_ops",

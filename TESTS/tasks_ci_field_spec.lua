@@ -157,6 +157,43 @@ return function(H)
   end
   eq(by_id["lib.nvim/pushed-and-waiting"].ci, "red", "tasks.finished carries ci")
   eq(by_id["lib.nvim/plain-finish"].ci, nil, "only when the file has it")
+
+  -- `finished` narrowed by the CI state (capability `finished_ci`): what an overview counts as "CI open or red"
+  ok(vim.tbl_contains(contract.CAPABILITIES, "finished_ci"), "capability finished_ci")
+  local function ids_of(params)
+    local doc, err = contract.finished(
+      vim.tbl_extend("force", { limit = 100 }, params),
+      { root = root, today = TODAY }
+    )
+    assert(doc, vim.inspect(err))
+    local list = vim.tbl_map(function(item)
+      return item.id
+    end, doc.items)
+    table.sort(list)
+    return list, doc.total
+  end
+  local open_or_red, total = ids_of({ ci = { "pending", "red" } })
+  eq(open_or_red, { "lib.nvim/own-state", "lib.nvim/pushed-and-waiting" }, "pending or red")
+  eq(total, 2, "total counts the matching ones: the number an overview shows")
+  local none_ids = ids_of({ ci = { "none" } })
+  ok(vim.tbl_contains(none_ids, "lib.nvim/plain-finish"), "none: no ci written")
+  ok(not vim.tbl_contains(none_ids, "lib.nvim/own-state"))
+  eq(#ids_of({}), #fin.items, "without ci every finished task, as before")
+  for _, bad in ipairs({ { "yellow" }, {}, "pending", { "pending", 1 } }) do
+    local doc, err = contract.finished({ ci = bad }, { root = root, today = TODAY })
+    eq(doc, nil, "refused: " .. vim.inspect(bad))
+    eq(err and err.code, "invalid_argument")
+  end
+  -- through the request door: a list of words
+  local reply_text = require("tasks_nvim.api").call(
+    "finished",
+    vim.json.encode({ params = { ci = { "red" }, area = "lib.nvim" } }),
+    { root = root, today = TODAY }
+  )
+  local reply = vim.json.decode(reply_text)
+  eq(reply.kind, "tasks.finished", vim.inspect(reply))
+  eq(reply.total, 2, "own-state and pushed-and-waiting are red")
+
   local tdoc =
     assert(contract.task("lib.nvim/own-state", { root = root, today = TODAY, finished = true }))
   eq(tdoc.task.ci, "red", "the task entry carries ci")

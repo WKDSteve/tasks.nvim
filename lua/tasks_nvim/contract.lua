@@ -74,6 +74,7 @@ M.CAPABILITIES = {
   "etag",
   "find",
   "finished",
+  "finished_ci",
   "groupings",
   "hello",
   "history",
@@ -2329,8 +2330,9 @@ end
 ---it by the day `done` ran (the date in the file name); a task whose file has no such date is counted under
 ---`undated` and is only in the figures when no window is asked for. Every figure covers all the tasks that match, the
 ---page (`items`, newest first) only what `limit` and `offset` ask for. The area is the one the file is in now. `plan` (a
----plan id) keeps the tasks that name that plan.
----@param params? { area?: string, plan?: string, since?: string, until?: string, limit?: integer, offset?: integer }
+---plan id) keeps the tasks that name that plan. `ci` (a list of `pending`, `green`, `red` and `none`, capability
+---`finished_ci`) keeps the tasks whose CI state is one of them, `none` for a task without `ci`.
+---@param params? { area?: string, plan?: string, since?: string, until?: string, limit?: integer, offset?: integer, ci?: string[] }
 ---@param opts? { root?: string }
 ---@return table|nil doc
 ---@return Tasks.ContractError|string|nil err
@@ -2372,6 +2374,24 @@ function M.finished(params, opts)
   if params.since and params["until"] and params.since > params["until"] then
     return nil, { code = "invalid_argument", message = "since is after until", retryable = false }
   end
+  local ci_set = nil
+  if params.ci ~= nil then
+    local list = params.ci
+    local bad = type(list) ~= "table" or #list == 0 or #list > #model.CI_STATES + 1
+    ci_set = {}
+    for _, c in ipairs(type(list) == "table" and list or {}) do
+      bad = bad or not (c == "none" or model.is_ci(c))
+      ci_set[c] = true
+    end
+    if bad then
+      return nil,
+        {
+          code = "invalid_argument",
+          message = "ci must be a list of " .. table.concat(model.CI_STATES, ", ") .. " and none",
+          retryable = false,
+        }
+    end
+  end
   local root, rerr = vault.root(opts)
   if not root then
     return nil, rerr
@@ -2411,6 +2431,7 @@ function M.finished(params, opts)
         undated = undated + 1
       end
       local inside = (params.plan == nil or t.plan == params.plan)
+        and (ci_set == nil or ci_set[model.is_ci(t.ci) and t.ci or "none"] == true)
         and (date ~= nil or not windowed)
         and (params.since == nil or (date ~= nil and date >= params.since))
         and (params["until"] == nil or (date ~= nil and date <= params["until"]))

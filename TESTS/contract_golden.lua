@@ -489,6 +489,12 @@ G.cases = {
     method = "finished",
     request = '{"params":{"since":"2025-12-31","until":"2026-01-01"}}',
   },
+  -- the finished tasks by the CI state of their commits (capability `finished_ci`): the shipped bug says green
+  {
+    name = "finished-ci",
+    method = "finished",
+    request = '{"params":{"ci":["green","red"]}}',
+  },
   -- the series of the figures: a window around the rows of the fixture (a day before the first row, a carried day,
   -- a line that is no row), and the same by week for one area
   {
