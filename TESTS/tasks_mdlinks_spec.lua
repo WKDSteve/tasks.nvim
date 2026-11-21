@@ -25,6 +25,12 @@ return function(H)
 
   -- ── resolve folds `..` by the text: a link from a folder that does not exist yet (a draft's `paths/`) ──
   eq(mdlinks.resolve("/v/a/ROADMAP/paths", "../tasks/x.md"), "/v/a/ROADMAP/tasks/x.md")
+  -- the key of two spellings of one file, and of two files that only differ by a climb out of the folder
+  ok(mdlinks.key("../assets/a.svg") ~= mdlinks.key("assets/a.svg"), "../x is another file than x")
+  eq(mdlinks.key("./assets/a%20b.svg#x"), mdlinks.key("assets/a b.svg"))
+  eq(mdlinks.key("assets/../assets/a.svg"), "assets/a.svg")
+  eq(mdlinks.key("../../x.md"), "../../x.md")
+  eq(mdlinks.key("#only"), nil)
   eq(mdlinks.resolve("E:/v/a/paths", "./../../b%20c.md#k"), "E:/v/b c.md")
   eq(
     mdlinks.resolve("rel/a", "../../../x.md"),

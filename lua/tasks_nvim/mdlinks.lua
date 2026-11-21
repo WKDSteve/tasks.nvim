@@ -241,11 +241,28 @@ function M.resolve(dir, target)
 end
 
 ---The file a relative target names, as a key to compare two spellings: `./assets/x.svg`, `assets/x.svg` and
----`assets/%78.svg` give the same key (`resolve` without a folder). nil: the target names no file.
+---`assets/%78.svg` give the same key (without `#anchor` and `?query`, percent-escapes decoded, `.` dropped, `..` folded
+---into the segment before it). A `..` with nothing before it stays: `../x` and `x` are two files. nil: the target names
+---no file.
 ---@param target string
 ---@return string|nil
 function M.key(target)
-  return M.resolve("", target)
+  local t = target:gsub("[#?].*$", "")
+  if t == "" then
+    return nil
+  end
+  t = t:gsub("%%(%x%x)", function(hex)
+    return string.char(tonumber(hex, 16))
+  end)
+  local parts = {}
+  for seg in t:gmatch("[^/]+") do
+    if seg == ".." and #parts > 0 and parts[#parts] ~= ".." then
+      parts[#parts] = nil
+    elseif seg ~= "." then
+      parts[#parts + 1] = seg
+    end
+  end
+  return table.concat(parts, "/")
 end
 
 ---The relative links of `text` whose file (or folder) below `dir` does not exist. `skip(link)` returning true leaves a
