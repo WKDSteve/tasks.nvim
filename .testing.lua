@@ -57,6 +57,8 @@ return {
       -- the launcher spec runs bin/tasks (sh) and bin/tasks.cmd (cmd) like a user does
       "sh",
       "cmd",
+      -- the sources spec asks a local test server for its links (`check --sources`, curl)
+      "curl",
     },
     -- the agent spec plays ai-desktop on a port of the loopback address and hands a task to it; nothing leaves the
     -- machine

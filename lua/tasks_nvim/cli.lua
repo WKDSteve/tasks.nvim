@@ -277,6 +277,12 @@ commands:
                                           the sheet (testing sheets accept: only when it loads) or the bug task of
                                           the AI's answer; shown only, written with --yes
   check [<area>]                          rule check; exit 1 on any error
+  check --sources [<file|dir>] [--write] [--timeout=<s>]
+                                          ask the web links of the `## Quellen` table of a learning path (all open
+                                          paths without an argument) with HEAD (GET as fallback): dead (404),
+                                          blocked (401/403/429), moved; exit 1 on a dead link. Needs the network, so
+                                          only on this flag, never in the hook. --write puts date and answer into
+                                          the column Geprüft
   relink [<area>] [--dry-run]             mend the dead relative links to .md files below ROADMAP/, Backlog/ and
                                           MEETINGS/: a link whose slug names one file (a task finished into the
                                           Backlog, a folder task, another area) is rewritten to it; ambiguous and
@@ -615,7 +621,7 @@ local SPECS = {
   folderize = { value = { "by", "note" }, flag = { "no-index", "force" } },
   ["sheet-run"] = { value = { "testing-cli" }, flag = { "dry-run" } },
   ["sheet-ai"] = { value = { "testing-cli", "from" }, flag = { "yes" } },
-  check = { value = {}, flag = { "all" } },
+  check = { value = { "timeout" }, flag = { "all", "sources", "write" } },
   relink = { value = {}, flag = { "dry-run" } },
   ci = { value = { "md-lint" }, flag = { "strict", "no-lint", "trust-vault-lint" } },
   template = {
@@ -3515,8 +3521,99 @@ commands["sheet-ai"] = function(ctx)
   return res.code
 end
 
+---`check --sources [<file|dir>]`: the web links of the Quellen tables, asked on purpose (`tasks_nvim.sources`).
+---@param ctx Tasks.CliCtx
+---@return integer
+local function check_sources(ctx)
+  local args, eo = ctx.args, ctx.eo
+  if #args.pos > 1 or args.opt.all then
+    ctx.warn("error: check --sources takes at most one file or folder")
+    return 2
+  end
+  local timeout = args.opt.timeout and tonumber(args.opt.timeout)
+  if args.opt.timeout and (not timeout or timeout < 1 or timeout > 120 or timeout % 1 ~= 0) then
+    ctx.warn("error: --timeout must be a whole number of seconds from 1 to 120")
+    return 2
+  end
+  local files = {}
+  local given = args.pos[1]
+  if given then
+    local path = fsio.doc_path(given)
+    if fsio.is_dir(path) then
+      files = vim.fs.find(function(name)
+        return name:match("%.md$") ~= nil
+      end, { path = path, type = "file", limit = math.huge })
+      table.sort(files)
+    else
+      files = { path }
+    end
+  else
+    local open, err = require("tasks_nvim.paths").all({ root = eo.root })
+    if not open then
+      ctx.warn("error: " .. tostring(err))
+      return 1
+    end
+    for _, f in ipairs(open) do
+      files[#files + 1] = f.path
+    end
+  end
+  local sources = require("tasks_nvim.sources")
+  local today = eo.today or model.today()
+  local counts = { ok = 0, redirected = 0, blocked = 0, dead = 0, error = 0, unreachable = 0 }
+  local total = 0
+  for _, path in ipairs(files) do
+    local results, err = sources.check_file(path, {
+      timeout = timeout,
+      write = args.opt.write == true,
+      today = today,
+    })
+    if not results then
+      ctx.warn("error: " .. tostring(err))
+      return 1
+    end
+    for _, r in ipairs(results) do
+      total = total + 1
+      counts[r.state] = counts[r.state] + 1
+      if r.state ~= "ok" then
+        local note = r.state == "redirected" and (" -> " .. r.final)
+          or (r.timeout and " (timeout)" or "")
+        ctx.say(
+          ("%s\t%s:%d\t%s%s\t%s"):format(
+            r.state,
+            path,
+            r.row.line,
+            r.code > 0 and tostring(r.code) or "-",
+            note,
+            r.row.url
+          )
+        )
+      end
+    end
+  end
+  ctx.say(
+    ("sources: %d link(s) in %d file(s): %d ok, %d moved, %d blocked (not checkable), %d dead, %d other error, %d no answer%s"):format(
+      total,
+      #files,
+      counts.ok,
+      counts.redirected,
+      counts.blocked,
+      counts.dead,
+      counts.error,
+      counts.unreachable,
+      args.opt.write and "; column Geprüft written" or ""
+    )
+  )
+  return counts.dead > 0 and 1 or 0
+end
+
 function commands.check(ctx)
   local args, eo = ctx.args, ctx.eo
+  if args.opt.sources then
+    return check_sources(ctx)
+  elseif args.opt.write or args.opt.timeout then
+    ctx.warn("error: --write and --timeout belong to --sources")
+    return 2
+  end
   if #args.pos > 1 then
     ctx.warn("error: check takes at most one area")
     return 2
