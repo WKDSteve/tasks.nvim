@@ -11,6 +11,7 @@ the version is not tagged yet (the repository is not published).
 
 ### Changed
 
+- `tasks index <area> --staged` says when the working tree keeps an index file that is not the staged one (`tree_differs` on the result): `check` reads the tree and calls it `index-stale` although the commit holds the right one, which read as "`--staged` did nothing" in a linked worktree of the vault. Covered in a linked worktree; its staging area is the one written, the main checkout's stays untouched.
 - `reminders.on_start` is opt-in now: the one line at startup about due reminders no longer shows unless `setup({ reminders = { on_start = true } })` asks for it.
 
 ### Added

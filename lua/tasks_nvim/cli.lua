@@ -147,7 +147,7 @@ commands:
   index <area> --staged                   build it from the staging area and stage it; the working tree stays as it
                                           is, so another session's uncommitted tasks stay out of the commit;
                                           lists the staged files of the area (`staged<TAB><path>`) and refuses a
-                                          staging area with a conflict
+                                          staging area with a conflict; notes when the tree keeps another index file
                                           index without an area also writes down the figures of today when the vault
                                           keeps a series (_Telemetry/history exists); --no-history leaves that out
   history [<area>] [--since=YYYY-MM-DD] [--until=YYYY-MM-DD] [--resolution=day|week] [--format=tsv|json]
@@ -1892,6 +1892,14 @@ function commands.index(ctx)
     if res.staged and #res.staged > 0 then
       ctx.warn(
         "note: the index counts the staged files above; one that is not yours: `git restore --staged <path>`, then run again"
+      )
+    end
+    if res.tree_differs then
+      ctx.warn(
+        (
+          "note: the working tree keeps its %s, so `check` (it reads the tree) still calls it index-stale; the commit"
+          .. " holds the staged one. In a checkout of your own: after the commit, `git checkout -- %s`"
+        ):format(res.path, res.path)
       )
     end
     return 0

@@ -116,6 +116,7 @@
 ---@field action "written"|"removed"|"unchanged"|"stale"  # `stale` only in check mode: the file differs from what would be generated.
 ---@field reason? string              # For `stale`: "missing", "outdated" or "orphan".
 ---@field staged? string[]            # `stage_area` only: files of the area staged apart from `HEAD` (the index aside), relative to the repository.
+---@field tree_differs? boolean       # `stage_area` only: the tree's index file is not the staged one (the tree stays as it was; `check` reads the tree).
 
 ---@class Tasks.Finding
 ---@field code string                 # Stable rule code, e.g. `unknown-status`.

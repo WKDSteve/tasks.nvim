@@ -296,6 +296,13 @@ function M.stage_area(area, opts)
     end
     result.path = rel
     result.staged = staged
+    -- The tree keeps its index file on purpose, but `check` and the gate read the tree: say when the two part,
+    -- or the next `check` reads as if this run had done nothing (2026-11-21, a linked worktree of the vault).
+    -- Exit 1 of `diff --quiet` is "differs"; a missing file on either side is a difference too.
+    local diff = vim.system({ "git", "-C", top, "diff", "--quiet", "--", rel }):wait()
+    local in_tree = vim.fn.filereadable(top .. "/" .. rel) == 1
+    local in_index = vim.system({ "git", "-C", top, "cat-file", "-e", ":" .. rel }):wait().code == 0
+    result.tree_differs = diff.code ~= 0 or in_tree ~= in_index
     return result
   end
   local ran, result, err = pcall(run)

@@ -137,4 +137,58 @@ return function(H)
   local none, none_err = index.stage_area("no-such.nvim", { root = root })
   eq(none, nil, "an unknown area is an error")
   ok(tostring(none_err):find("unknown area", 1, true), "and says so: " .. tostring(none_err))
+
+  -- A linked worktree of the vault (`git worktree add`; `.git` is a file there), as on 2026-11-21: a staged
+  -- deletion reaches the staging area of exactly that worktree, the main checkout's stays as it was, and the
+  -- run says that the tree's index file is not the staged one (that is what `check` reads).
+  local main = F.vault(H)
+  local function git_in(dir, args)
+    local out = vim.system(vim.list_extend({ "git", "-C", dir }, args), { text = true }):wait()
+    return out.stdout or "", out.code
+  end
+  git_in(main, { "init", "-q" })
+  git_in(main, { "config", "core.autocrlf", "false" })
+  F.task(H, main, "lib.nvim", "keep-task", F.meta("Keep task", "open"))
+  F.task(H, main, "lib.nvim", "done-task", F.meta("Done task", "open"))
+  ok(index.write_area("lib.nvim", { root = main }), "seed index")
+  git_in(main, { "add", "." })
+  local _, seed_code = git_in(
+    main,
+    { "-c", "user.name=t", "-c", "user.email=t@example.org", "commit", "-q", "-m", "seed" }
+  )
+  eq(seed_code, 0, "seed commit of the main checkout")
+  local linked = vim.fn.tempname() .. "-linked"
+  local _, add_code = git_in(main, { "worktree", "add", "-q", linked, "HEAD" })
+  eq(add_code, 0, "git worktree add")
+  ok(vim.fn.isdirectory(linked .. "/.git") == 0, ".git is a file in a linked worktree")
+  local main_index_before = git_in(main, { "ls-files", "-s" })
+
+  git_in(linked, { "rm", "-q", "--", "lib.nvim/ROADMAP/tasks/done-task.md" })
+  local wres, werr = index.stage_area("lib.nvim", { root = linked })
+  ok(wres, "the run in the linked worktree succeeds: " .. tostring(werr))
+  eq(wres.action, "written", "the deletion changes the staged index")
+  local linked_staged = git_in(linked, { "show", ":lib.nvim/ROADMAP/TASKS.md" })
+  ok(
+    linked_staged:find("keep-task", 1, true),
+    "the linked worktree's staged index keeps the open task"
+  )
+  ok(not linked_staged:find("done-task", 1, true), "and drops the deleted one")
+  eq(
+    git_in(main, { "ls-files", "-s" }),
+    main_index_before,
+    "the main checkout's staging area is untouched"
+  )
+  eq(git_in(main, { "status", "--porcelain" }), "", "and its tree too")
+  eq(wres.tree_differs, true, "the run says the tree keeps the old index file")
+
+  -- Brought in line after the commit, the next run has nothing to say about the tree.
+  git_in(
+    linked,
+    { "-c", "user.name=t", "-c", "user.email=t@example.org", "commit", "-q", "-m", "done" }
+  )
+  git_in(linked, { "checkout", "--", "lib.nvim/ROADMAP/TASKS.md" })
+  local settled = index.stage_area("lib.nvim", { root = linked })
+  eq(settled.action, "unchanged", "nothing left to stage")
+  eq(settled.tree_differs, false, "and the tree's index is the staged one")
+  git_in(main, { "worktree", "remove", "--force", linked })
 end
