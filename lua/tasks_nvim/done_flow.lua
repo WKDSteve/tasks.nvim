@@ -366,10 +366,12 @@ end
 ---@field closed string[]                        # Ids of the project files that were finished.
 ---@field summaries table<string, Tasks.ProjectSummary>
 ---@field refused table<string, string[]>        # Project id -> the open tasks and plans that hold it open.
+---@field waiting table<string, string[]>        # Project id -> what it builds on and waits for (`requires_gate: hard`; also in `refused`).
 ---@field notes string[]                         # Projects that could not be closed, or whose state could not be judged.
 
 ---The step after `close_plans`: finish every project of `project_ids` that has no open task of its own, no open plan
----and no open learning path left. A parked plan or path does not hold a project open (a parked plan is named in the
+---and no open learning path left, and that waits for nothing it builds on under `requires_gate: hard` (`requires`:
+---`waiting`; the soft gate finishes it with a note). A parked plan or path does not hold a project open (a parked plan is named in the
 ---summary); a plan, path or task of any other status does. A project that nothing finished is never asked about: an
 ---empty project does not close by itself. The scan guards are those of `close_plans`: an incomplete scan closes nothing.
 ---`opts.dry_run` names what would be closed and writes nothing.
@@ -379,7 +381,7 @@ end
 function M.close_projects(project_ids, opts)
   opts = opts or {}
   ---@type Tasks.ClosedProjects
-  local out = { closed = {}, summaries = {}, refused = {}, notes = {} }
+  local out = { closed = {}, summaries = {}, refused = {}, waiting = {}, notes = {} }
   local files, seen = {}, {}
   for _, project_id in ipairs(project_ids) do
     if project_id and not seen[project_id] then
@@ -426,7 +428,7 @@ function M.close_projects(project_ids, opts)
       open_tasks[#open_tasks + 1] = t
     end
   end
-  local finished
+  local finished, req_index
   for _, file in ipairs(files) do
     local holding, parked = {}, {}
     for _, t in ipairs(projects.members(file.id, all)) do
@@ -449,6 +451,22 @@ function M.close_projects(project_ids, opts)
     end
     table.sort(holding)
     table.sort(parked)
+    -- what the project builds on (`tasks_nvim.requires`): a hard gate holds it open, a soft one says so
+    local wait_note
+    if #holding == 0 and file.requires and #file.requires > 0 then
+      local req = require("tasks_nvim.requires")
+      req_index = req_index or req.index({ root = opts.root, paths = open_paths })
+      local st = req.state(file, req_index)
+      if st and st.held then
+        holding = vim.list_slice(st.waiting_on, 1)
+        out.waiting[file.id] = holding
+      elseif st and #st.open_soft > 0 then
+        wait_note = ("the project %s is finished before %s it builds on"):format(
+          file.id,
+          table.concat(st.open_soft, ", ")
+        )
+      end
+    end
     if #holding > 0 then
       out.refused[file.id] = holding
     else
@@ -473,6 +491,9 @@ function M.close_projects(project_ids, opts)
         )
       else
         out.closed[#out.closed + 1] = file.id
+        if wait_note then
+          out.notes[#out.notes + 1] = wait_note
+        end
         out.summaries[file.id] = {
           title = file.title,
           plans = rollup.plans_total,

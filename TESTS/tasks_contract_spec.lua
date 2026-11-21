@@ -129,6 +129,7 @@ return function(H)
     "reorder",
     "repeat",
     "repeat_steps",
+    "requires",
     "rounds",
     "set_body",
     "set_section",

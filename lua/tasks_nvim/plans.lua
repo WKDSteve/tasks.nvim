@@ -59,6 +59,9 @@ M.STATUSES = { "planning", "doing", "parked", "done" }
 ---@field tags string[]               # `tags:`; a path's `on-workstation` / `not-on-workstation` goes to the tasks `promote` makes of it.
 ---@field folder boolean              # The folder form `<slug>/<slug>.md`: the other files in that folder are its assets.
 ---@field gate? string                # `hard` or nil.
+---@field requires? string[]          # A path or project: the paths and projects it builds on (ids; `tasks_nvim.requires`).
+---@field requires_raw? string[]      # `requires` as the file writes them (ids or wikilinks).
+---@field requires_gate? "soft"|"hard"  # What an unmet requirement does (absent: `soft`).
 ---@field created? string
 ---@field updated? string
 ---@field summary string
@@ -258,6 +261,8 @@ function M.parse(text, ctx)
         end
       end
     end
+    -- what a path or project builds on (`tasks_nvim.requires`); a plan has neither field
+    require("tasks_nvim.requires").read(meta, plan, bad, ctx.link_resolver)
     for _, field in ipairs({ "created", "updated" }) do
       local date = model.field_text(meta[field], field, bad)
       if date then
@@ -640,6 +645,8 @@ end
 ---@field link_resolver? Tasks.LinkResolver
 ---@field phases? string[]|string
 ---@field gate? string
+---@field requires? string[]|string  # A path or project: the paths and projects it builds on (ids or wikilinks; a text is split at commas).
+---@field requires_gate? string      # `soft` or `hard` (only with `requires`).
 ---@field status? string
 ---@field summary? string
 ---@field slug? string
@@ -810,6 +817,50 @@ function M.new(area, opts)
     project_text = wikilinks.is_wikilink(raw) and raw
       or wikilinks.render(pid, wikilinks.mode(opts), link_resolver)
   end
+  -- what a path or project builds on (`tasks_nvim.requires`): known paths and projects only
+  local requires_ids, requires_gate
+  if opts.requires ~= nil or opts.requires_gate ~= nil then
+    if file_kind == "plan" then
+      return nil,
+        "a plan has no requires or requires_gate: its order is its stages and the blocked_by of its tasks",
+        { code = "invalid_argument" }
+    end
+    local req = require("tasks_nvim.requires")
+    link_resolver = link_resolver or wikilinks.resolver(root)
+    local ids, ierr = req.ids_of(opts.requires or {}, link_resolver)
+    if not ids then
+      return nil, ierr, { code = "invalid_argument" }
+    end
+    if opts.requires_gate ~= nil then
+      local gerr
+      requires_gate, gerr = req.gate_of(opts.requires_gate)
+      if not requires_gate then
+        return nil, gerr, { code = "invalid_argument" }
+      end
+    end
+    if #ids > 0 then
+      local idx = req.index({ root = root })
+      local problems = {}
+      for _, id in ipairs(ids) do
+        -- a dry run: a path or project an earlier operation of the same request would create
+        local pending = opts.pending_files and opts.pending_files[id]
+        local known = idx.items[id]
+          or (pending and (pending.kind == "path" or pending.kind == "project"))
+        if not known then
+          problems[#problems + 1] = {
+            code = "requires-unknown",
+            key = "requires",
+            target = id,
+            message = "requires " .. id .. ": no learning path or project of that id",
+          }
+        end
+      end
+      if #problems > 0 then
+        return nil, problems[1].message, { code = "invalid_argument", problems = problems }
+      end
+      requires_ids = ids
+    end
+  end
   local dir_of = vault.file_kind_dir(file_kind)
   local function path_of(r, a, s)
     return vault.file_kind_path(file_kind, r, a, s)
@@ -875,6 +926,12 @@ function M.new(area, opts)
   end
   if phase_text then
     pairs_[#pairs_ + 1] = { "phase", phase_text }
+  end
+  if requires_ids then
+    pairs_[#pairs_ + 1] = { "requires", requires_ids }
+  end
+  if requires_gate then
+    pairs_[#pairs_ + 1] = { "requires_gate", requires_gate }
   end
   if #web_links > 0 then
     pairs_[#pairs_ + 1] = { "links", web_links }
@@ -1022,8 +1079,22 @@ M.SET_KEYS = {
     "links",
     "icon",
     "cover",
+    "requires",
+    "requires_gate",
   },
-  path = { "title", "status", "areas", "target", "project", "links", "icon", "cover", "tags" },
+  path = {
+    "title",
+    "status",
+    "areas",
+    "target",
+    "project",
+    "links",
+    "icon",
+    "cover",
+    "tags",
+    "requires",
+    "requires_gate",
+  },
 }
 
 ---The finder of a kind of file: plans here, projects and paths in their own modules (required where used: they
@@ -1121,6 +1192,18 @@ function M.set(id, patch, opts)
         return nil, lerr, { code = "invalid_argument" }
       end
       pairs_[#pairs_ + 1] = { key, list }
+    elseif key == "requires" then
+      local list, lerr = require("tasks_nvim.requires").ids_of(value, resolver)
+      if not list then
+        return nil, lerr, { code = "invalid_argument" }
+      end
+      pairs_[#pairs_ + 1] = { key, #list > 0 and list or mutate.REMOVE }
+    elseif key == "requires_gate" then
+      local gate, gerr = require("tasks_nvim.requires").gate_of(value)
+      if not gate then
+        return nil, gerr, { code = "invalid_argument" }
+      end
+      pairs_[#pairs_ + 1] = { key, gate }
     elseif key == "icon" or key == "cover" then
       local stored, ierr = (key == "icon" and mutate.icon_field or mutate.cover_field)(value)
       if stored == nil then
@@ -1205,6 +1288,20 @@ function M.set(id, patch, opts)
     end
     if problem then
       return nil, problem.message, { code = "invalid_argument", problems = { problem } }
+    end
+  end
+
+  -- what a path or project builds on, as it would be afterwards: known ids, no circle through the file
+  if patch.requires ~= nil then
+    for _, kv in ipairs(pairs_) do
+      if kv[1] == "requires" and kv[2] ~= mutate.REMOVE then
+        local req = require("tasks_nvim.requires")
+        local after = vim.tbl_extend("force", {}, file, { requires = kv[2] })
+        local problems = req.problems(after, req.index({ root = root }))
+        if #problems > 0 then
+          return nil, problems[1].message, { code = "invalid_argument", problems = problems }
+        end
+      end
     end
   end
 

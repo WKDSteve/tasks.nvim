@@ -558,7 +558,7 @@
       "additionalProperties": false
     },
     "Paths": {
-      "description": "tasks.paths: the open learning paths of the vault or of an area, each with its progress; no tree (that is tasks.path). Capability `paths`.",
+      "description": "tasks.paths: the open learning paths of the vault or of an area (with `include_done` the finished ones too, `stage: done`, after them), each with its progress; no tree (that is tasks.path). Capability `paths`.",
       "allOf": [{ "$ref": "#/$defs/Head" }],
       "type": "object",
       "required": ["kind", "rev", "digest", "items", "incomplete"],
@@ -567,7 +567,26 @@
         "rev": { "$ref": "#/$defs/Rev" },
         "digest": { "$ref": "#/$defs/Digest" },
         "items": { "type": "array", "items": { "$ref": "#/$defs/PathEntry" } },
-        "incomplete": { "type": "array", "items": { "type": "string" } }
+        "incomplete": { "type": "array", "items": { "type": "string" } },
+        "requires_cycles": {
+          "description": "The circles of requirements among the open paths and projects (those `check` reports as `requires-cycle`), each starting at its smallest id. Only when a path or project names a requirement. Capability `requires`.",
+          "type": "array",
+          "items": { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+        },
+        "done_projects": {
+          "description": "With `include_done`: the finished projects a requirement names, so that an arrow of a map ends in a box. Only when a path or project names a requirement. Capability `requires`.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "area", "title"],
+            "properties": {
+              "id": { "type": "string" },
+              "area": { "type": "string" },
+              "title": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        }
       },
       "unevaluatedProperties": false
     },
@@ -644,6 +663,10 @@
         "xp": { "$ref": "#/$defs/PathXp", "description": "The XP of the tree; only when a point carries XP. Capability `xp`." },
         "level": { "$ref": "#/$defs/PathLevelState", "description": "The level reached and what comes next; only when the file has levels. Capability `xp`." },
         "optional": { "$ref": "#/$defs/PathOptional" },
+        "requires": { "$ref": "#/$defs/Requires" },
+        "requires_gate": { "$ref": "#/$defs/RequiresGate" },
+        "waiting_on": { "$ref": "#/$defs/WaitingOn" },
+        "stage": { "$ref": "#/$defs/PathStage" },
         "links": { "type": "array", "items": { "type": "string", "pattern": "^[Hh][Tt][Tt][Pp][Ss]?://" } },
         "icon": { "$ref": "#/$defs/Icon" },
         "cover": { "$ref": "#/$defs/Cover" },
@@ -656,6 +679,42 @@
         "problems": { "type": "array", "items": { "type": "string" } }
       },
       "additionalProperties": false
+    },
+    "Requires": {
+      "description": "What this path or project builds on (`requires:`), in the order of the file: `id`, `gate` (the file's `requires_gate`), `kind` (`path`, `project`, or `unknown`: no learning path or project of that id, `check` says `requires-unknown`) and `met` (the requirement is finished, closed into a Backlog). Only when the file names some. Capability `requires`.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "gate", "kind", "met"],
+        "properties": {
+          "id": { "type": "string" },
+          "gate": { "$ref": "#/$defs/RequiresGate" },
+          "kind": { "enum": ["path", "project", "unknown"] },
+          "met": { "type": "boolean" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "RequiresGate": {
+      "description": "What a requirement that is not finished does (`requires_gate`): `soft` (the default) is a hint only (the item keeps its stage), `hard` keeps the path or project from being finished and the line of the whole path in `## Level` open. Capability `requires`.",
+      "enum": ["soft", "hard"]
+    },
+    "WaitingOn": {
+      "description": "The open HARD requirements: the item cannot be finished while one is listed (a path's `level` then reads `finished: false`, the line of the whole path not reached). A path also lists the open hard requirements of its project, with `via` the project (a `requires` of a project holds for its paths). Empty: it may be finished. Present when the item names a requirement or inherits one. Capability `requires`.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id"],
+        "properties": {
+          "id": { "type": "string" },
+          "via": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "PathStage": {
+      "description": "The stage of a path for a map of them: `done` (finished), `parked`, `waiting` (`waiting_on` not empty), `doing` (`status: doing`, or a point learned or seen), else `idle`. An open soft requirement never makes it wait. Capability `requires`.",
+      "enum": ["done", "parked", "waiting", "doing", "idle"]
     },
     "PathOptional": {
       "description": "The optional points of a tree (`{optional}` on a node, and its subtree), apart: `progress` and `xp` of the path leave them out, so they count for no level in percent and not for the path being finished; their XP count for a level in XP once earned (`xp` only when the tree has XP). Only when the tree has optional points. Capability `optional_points`.",
@@ -2129,6 +2188,9 @@
                 "$ref": "#/$defs/Etag",
                 "description": "The version of the project file, for `if_match` of `project_set`; absent for a file that cannot be read."
               },
+              "requires": { "$ref": "#/$defs/Requires" },
+              "requires_gate": { "$ref": "#/$defs/RequiresGate" },
+              "waiting_on": { "$ref": "#/$defs/WaitingOn" },
               "valid": { "type": "boolean" },
               "links": { "$ref": "#/$defs/PlanLinks" },
               "icon": { "$ref": "#/$defs/Icon" },

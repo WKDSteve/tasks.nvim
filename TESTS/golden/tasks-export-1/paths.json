@@ -1,5 +1,5 @@
 {
-  "digest": "sha256:719e7717e4acb4b8",
+  "digest": "sha256:f522117b726b74bb",
   "engine": {
     "git": "0000000",
     "nvim": "0.0.0",
@@ -27,6 +27,7 @@
         "total": 0
       },
       "slug": "leer",
+      "stage": "idle",
       "status": "planning",
       "summary": "Noch kein Baum.",
       "title": "Leer",
@@ -58,6 +59,7 @@
         "total": 6
       },
       "slug": "lua-lernen",
+      "stage": "doing",
       "status": "doing",
       "summary": "Plugins schreiben können.",
       "title": "Lua lernen",

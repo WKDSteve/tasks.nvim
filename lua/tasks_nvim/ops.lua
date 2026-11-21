@@ -319,6 +319,8 @@ local FIELDS = {
     icon = "string",
     cover = "string",
     template = "string",
+    requires = "strings",
+    requires_gate = "string",
   },
   plan_set = { id = "string", patch = "object", if_match = "string" },
   project_set = { id = "string", patch = "object", if_match = "string" },
@@ -337,6 +339,8 @@ local FIELDS = {
     icon = "string",
     cover = "string",
     template = "string",
+    requires = "strings",
+    requires_gate = "string",
   },
   path_set = { id = "string", patch = "object", if_match = "string" },
   path_close = { id = "string" },
@@ -1777,6 +1781,8 @@ local function new_file(op, ctx, kind)
     "icon",
     "cover",
     "template",
+    "requires",
+    "requires_gate",
   }) do
     if has_control(op[key]) then
       return refuse("invalid_argument", key .. " contains a control character")
@@ -1789,6 +1795,7 @@ local function new_file(op, ctx, kind)
     or (op.summary and over_limit("summary", op.summary))
     or (op.areas and over_limit("areas", op.areas))
     or (op.phases and over_limit("phases", op.phases))
+    or (op.requires and over_limit("requires", op.requires))
   if over then
     return refuse("payload_too_large", over)
   end
@@ -1813,6 +1820,8 @@ local function new_file(op, ctx, kind)
     icon = op.icon,
     cover = op.cover,
     template = op.template,
+    requires = op.requires,
+    requires_gate = op.requires_gate,
     dry_run = ctx.dry,
     pending_files = ctx.dry and ctx.files or nil,
     -- the ids earlier operations of the request take: a second plan of the same title gets `-2`, as in the real run
@@ -1821,7 +1830,11 @@ local function new_file(op, ctx, kind)
   })
   if not r then
     if info and info.code == "invalid_argument" then
-      return refuse("invalid_argument", tostring(err), info.details)
+      return refuse(
+        "invalid_argument",
+        tostring(err),
+        info.problems and { problems = info.problems } or info.details
+      )
     end
     return mutate_failure(ctx, err, info)
   end
@@ -1992,6 +2005,22 @@ local function close_file(op, ctx, kind)
     local res = done_flow.close_projects({ op.id }, opts)
     if #res.closed == 0 then
       local holding = res.refused[op.id]
+      local waiting = res.waiting and res.waiting[op.id]
+      if waiting then
+        return refuse(
+          "invalid_argument",
+          ("%s waits for %s (requires_gate: hard): finish that first"):format(
+            op.id,
+            table.concat(waiting, ", ")
+          ),
+          {
+            holding = waiting,
+            waiting_on = vim.tbl_map(function(id)
+              return json.object({ id = id })
+            end, waiting),
+          }
+        )
+      end
       if holding then
         return refuse(
           "invalid_argument",
@@ -2079,6 +2108,16 @@ local function do_path_close(op, ctx)
     end
     return refuse("not_found", tostring(ferr))
   end
+  -- what the path builds on (`requires`): a hard gate refuses, in a dry run too
+  local gerr, ginfo = paths.close_gate(file, ctx.root)
+  if gerr then
+    return refuse("invalid_argument", contract.redact(ctx.root, gerr), {
+      holding = ginfo and ginfo.waiting_on or {},
+      waiting_on = vim.tbl_map(function(w)
+        return json.object({ id = w.id, via = w.via })
+      end, ginfo and ginfo.waiting or {}),
+    })
+  end
   if ctx.dry then
     return { ok = true, id = op.id, outcome = "would_close", changed_ids = {} }
   end
@@ -2089,12 +2128,18 @@ local function do_path_close(op, ctx)
   end
   ctx.touched[file.area] = true
   local changed = { op.id }
+  -- a soft requirement not finished yet, a routine that could not start: said, never refused
+  local notes = {}
+  for _, note in ipairs(r.notes or {}) do
+    notes[#notes + 1] = contract.redact(ctx.root, tostring(note))
+  end
   return {
     ok = true,
     id = op.id,
     outcome = "closed",
     to = rel(ctx, r.to),
     routines_started = routines_written(ctx, r.routines_started, changed),
+    notes = #notes > 0 and notes or nil,
     changed_ids = changed,
   }
 end

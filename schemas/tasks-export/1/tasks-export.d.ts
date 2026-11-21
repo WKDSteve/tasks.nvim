@@ -274,6 +274,9 @@ export type Snapshot = Head & {
      * The version of a file: `sha256:` and 16 hex digits of the hash of its bytes.
      */
     etag?: string;
+    requires?: Requires;
+    requires_gate?: RequiresGate;
+    waiting_on?: WaitingOn;
     valid: boolean;
     links?: PlanLinks;
     icon?: Icon;
@@ -343,6 +346,26 @@ export type PlanAssets = string[];
  * The folder holds more than the 100 `assets` listed.
  */
 export type PlanAssetsTruncated = true;
+/**
+ * What a requirement that is not finished does (`requires_gate`): `soft` (the default) is a hint only (the item keeps its stage), `hard` keeps the path or project from being finished and the line of the whole path in `## Level` open. Capability `requires`.
+ */
+export type RequiresGate = "soft" | "hard";
+/**
+ * What this path or project builds on (`requires:`), in the order of the file: `id`, `gate` (the file's `requires_gate`), `kind` (`path`, `project`, or `unknown`: no learning path or project of that id, `check` says `requires-unknown`) and `met` (the requirement is finished, closed into a Backlog). Only when the file names some. Capability `requires`.
+ */
+export type Requires = {
+  id: string;
+  gate: RequiresGate;
+  kind: "path" | "project" | "unknown";
+  met: boolean;
+}[];
+/**
+ * The open HARD requirements: the item cannot be finished while one is listed (a path's `level` then reads `finished: false`, the line of the whole path not reached). A path also lists the open hard requirements of its project, with `via` the project (a `requires` of a project holds for its paths). Empty: it may be finished. Present when the item names a requirement or inherits one. Capability `requires`.
+ */
+export type WaitingOn = {
+  id: string;
+  via?: string;
+}[];
 /**
  * The CI state of a task's commits beside `commits` (capability `ci`): pending (pushed, no verdict yet), green (the CI passed on every system) or red (it failed). Absent: not known.
  */
@@ -1048,7 +1071,7 @@ export type MeetingParse = Head & {
   problems: string[];
 };
 /**
- * tasks.paths: the open learning paths of the vault or of an area, each with its progress; no tree (that is tasks.path). Capability `paths`.
+ * tasks.paths: the open learning paths of the vault or of an area (with `include_done` the finished ones too, `stage: done`, after them), each with its progress; no tree (that is tasks.path). Capability `paths`.
  */
 export type Paths = Head & {
   kind: "tasks.paths";
@@ -1056,7 +1079,23 @@ export type Paths = Head & {
   digest: Digest;
   items: PathEntry[];
   incomplete: string[];
+  /**
+   * The circles of requirements among the open paths and projects (those `check` reports as `requires-cycle`), each starting at its smallest id. Only when a path or project names a requirement. Capability `requires`.
+   */
+  requires_cycles?: [string, ...string[]][];
+  /**
+   * With `include_done`: the finished projects a requirement names, so that an arrow of a map ends in a box. Only when a path or project names a requirement. Capability `requires`.
+   */
+  done_projects?: {
+    id: string;
+    area: string;
+    title: string;
+  }[];
 };
+/**
+ * The stage of a path for a map of them: `done` (finished), `parked`, `waiting` (`waiting_on` not empty), `doing` (`status: doing`, or a point learned or seen), else `idle`. An open soft requirement never makes it wait. Capability `requires`.
+ */
+export type PathStage = "done" | "parked" | "waiting" | "doing" | "idle";
 /**
  * tasks.path: one learning path with its body and its tree as a flat list in document order. Capability `path`.
  */
@@ -2110,6 +2149,10 @@ export interface PathEntry {
   xp?: PathXp;
   level?: PathLevelState;
   optional?: PathOptional;
+  requires?: Requires;
+  requires_gate?: RequiresGate;
+  waiting_on?: WaitingOn;
+  stage?: PathStage;
   links?: string[];
   icon?: Icon;
   cover?: Cover;

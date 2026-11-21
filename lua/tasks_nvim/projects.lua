@@ -147,17 +147,23 @@ end
 ---@field open integer       # Open (and blocked) leaves.
 ---@field percent integer    # The progress (`lernlevel.percent`); 100 for a finished path.
 ---@field done boolean       # Finished (closed into the Backlog).
+---@field waiting_on? string[]  # The open hard requirements, its own and its project's (`requires`; only with an index).
+---@field wait? string          # `requires.waiting_text`: what it waits for, or builds on and is not finished.
+---@field requires_gate? "soft"|"hard"  # Its gate, when it has `requires` (only with an index).
 
----One row of a learning path: what `tasks paths` lists and a project's overview shows.
+---One row of a learning path: what `tasks paths` lists and a project's overview shows. With `idx`
+---(`requires.index`) the row says what the path waits for.
 ---@param f Tasks.PlanFile  # An open path file (`paths.find`, `paths.area`).
+---@param idx? Tasks.RequiresIndex
 ---@return Tasks.PathRow
-function M.path_row(f)
+function M.path_row(f, idx)
   local tree = f.tree
   local points, open, percent = 0, 0, 0
   if tree then
     points, open = tree.progress.total, tree.progress.open
     percent = require("tasks_nvim.lernlevel").percent(tree)
   end
+  local st = idx and require("tasks_nvim.requires").state(f, idx) or nil
   return {
     id = f.id,
     title = f.title,
@@ -166,19 +172,30 @@ function M.path_row(f)
     open = open,
     percent = percent,
     done = false,
+    waiting_on = st and st.waiting_on or nil,
+    wait = st and require("tasks_nvim.requires").waiting_text(st) or nil,
+    requires_gate = st and st.gate or nil,
   }
 end
 
+---Whether any of the files names what it builds on (`requires`): only then is an index of the vault worth reading.
+---@param files Tasks.PlanFile[]
+---@return boolean
+function M.any_requires(files)
+  return require("tasks_nvim.requires").any(files)
+end
+
 ---The rows of the paths of a project: its open paths (`ctx.paths`), then the finished ones of the Backlogs
----(`closed_kind: path`, at 100 %), in id order each.
+---(`closed_kind: path`, at 100 %), in id order each. `idx` as `path_row`.
 ---@param project_id string
 ---@param path_files Tasks.PlanFile[]
 ---@param finished Tasks.Task[]
+---@param idx? Tasks.RequiresIndex
 ---@return Tasks.PathRow[]
-function M.path_rows(project_id, path_files, finished)
+function M.path_rows(project_id, path_files, finished, idx)
   local rows = {}
   for _, f in ipairs(M.paths_of(project_id, path_files)) do
-    rows[#rows + 1] = M.path_row(f)
+    rows[#rows + 1] = M.path_row(f, idx)
   end
   table.sort(rows, function(a, b)
     return a.id < b.id
@@ -530,7 +547,21 @@ function M.overview(project, ctx)
     end
     return a.id < b.id
   end)
+  -- what the project and its paths build on (`requires`): read only when one of them names something
+  local req = require("tasks_nvim.requires")
+  local idx
+  if
+    (project.requires and #project.requires > 0)
+    or (ctx.paths and M.any_requires(M.paths_of(project.id, ctx.paths)))
+  then
+    idx = req.index({ root = ctx.root, paths = ctx.paths, finished = finished })
+  end
   local lines = { ("**%s** (%s)"):format(cell(project.title), project.status or "?") }
+  local own_wait = idx and req.waiting_text(req.state(project, idx))
+  if own_wait then
+    lines[#lines + 1] = ""
+    lines[#lines + 1] = "Builds on: " .. cell(own_wait)
+  end
   if #(project.phase_order or {}) > 0 then
     lines[#lines + 1] = ""
     lines[#lines + 1] = w.stages .. ": " .. table.concat(project.phase_order, " > ")
@@ -539,7 +570,7 @@ function M.overview(project, ctx)
     lines[#lines + 1] = ""
     lines[#lines + 1] = w.done_when .. ": " .. cell(project.target)
   end
-  local path_rows = ctx.paths and M.path_rows(project.id, ctx.paths, finished) or {}
+  local path_rows = ctx.paths and M.path_rows(project.id, ctx.paths, finished, idx) or {}
   if #rows == 0 and #path_rows == 0 and ctx.paths then
     -- the paths were looked for too: neither a table of plans nor one of paths
     vim.list_extend(lines, { "", w.none })
@@ -565,7 +596,7 @@ function M.overview(project, ctx)
       lines[#lines + 1] = ("| `%s` %s | %s | %s | %s | %d %% |"):format(
         cell(r.id),
         cell(r.title),
-        cell(r.status),
+        cell(r.status) .. (r.wait and (", " .. cell(r.wait)) or ""),
         r.done and "-" or tostring(r.points),
         r.done and "-" or tostring(r.open),
         r.percent

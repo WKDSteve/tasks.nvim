@@ -297,25 +297,30 @@ local function ratio(done, total)
 end
 
 ---The TSV line of a project: the file's cells, then what it adds up to (plans finished/all, tasks finished/all, days
----still open, learning paths finished/all with their mean progress).
+---still open, learning paths finished/all with their mean progress), and last what it waits for (`requires`).
 ---@param f Tasks.PlanFile
 ---@param r Tasks.ProjectRollup
+---@param wait? string  # `requires.waiting_text`.
 ---@return string
-local function project_line(f, r)
-  return table.concat({
+local function project_line(f, r, wait)
+  local cells = {
     file_line(f),
     "plans " .. ratio(r.plans_done, r.plans_total),
     "tasks " .. ratio(r.tasks_done, r.tasks_done + r.tasks_open),
     ("%s d open"):format(require("tasks_nvim.estimate").fmt_days(r.days_open)),
     ("paths %s %d %%"):format(ratio(r.paths_done or 0, r.paths_total or 0), r.paths_percent or 0),
-  }, "\t")
+  }
+  if wait then
+    cells[#cells + 1] = fsio.clean(wait)
+  end
+  return table.concat(cells, "\t")
 end
 
----Every project of the areas asked for, with its rollup: `{ file, rollup }`.
+---Every project of the areas asked for, with its rollup and what it waits for: `{ file, rollup, wait? }`.
 ---@param ctx Tasks.CliCtx
 ---@param set table<string, boolean>|nil
 ---@param plan_files Tasks.PlanFile[]
----@return { file: Tasks.PlanFile, rollup: Tasks.ProjectRollup }[]|nil rows
+---@return { file: Tasks.PlanFile, rollup: Tasks.ProjectRollup, wait?: string }[]|nil rows
 ---@return string|nil err
 local function project_rows(ctx, set, plan_files)
   local files, err = projects.all({ root = ctx.eo.root })
@@ -329,6 +334,7 @@ local function project_rows(ctx, set, plan_files)
   local finished
   local rows = {}
   local path_files = require("tasks_nvim.paths").all({ root = ctx.eo.root }) or {}
+  local req, req_index = require("tasks_nvim.requires"), nil
   for _, f in ipairs(files) do
     local own_area = set == nil or set[f.area] == true
     local has_plan_here = false
@@ -346,6 +352,16 @@ local function project_rows(ctx, set, plan_files)
           { plans = plan_files, open = open, finished = finished, paths = path_files }
         ),
       }
+      if f.requires and #f.requires > 0 then
+        req_index = req_index
+          or req.index({
+            root = ctx.eo.root,
+            paths = path_files,
+            projects = files,
+            finished = finished,
+          })
+        rows[#rows].wait = req.waiting_text(req.state(f, req_index))
+      end
     end
   end
   return rows, nil
@@ -484,7 +500,7 @@ local function run_projects(ctx, helpers)
     return 1
   end
   for _, row in ipairs(rows) do
-    ctx.say(project_line(row.file, row.rollup))
+    ctx.say(project_line(row.file, row.rollup, row.wait))
   end
   return 0
 end

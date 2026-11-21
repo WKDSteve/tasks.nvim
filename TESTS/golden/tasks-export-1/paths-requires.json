@@ -1,0 +1,167 @@
+{
+  "digest": "sha256:c03a6319cea6b340",
+  "done_projects": [],
+  "engine": {
+    "git": "0000000",
+    "nvim": "0.0.0",
+    "version": "0.1.0-test"
+  },
+  "generated_at": "2026-01-01T00:00:00Z",
+  "incomplete": [],
+  "items": [
+    {
+      "area": "lib.nvim",
+      "areas": [],
+      "created": "2026-01-02",
+      "etag": "sha256:21dd02eb79c63876",
+      "file": "lib.nvim/ROADMAP/paths/digital.md",
+      "has_tree": true,
+      "id": "lib.nvim/digital",
+      "level": {
+        "finished": false,
+        "level": 1,
+        "open_rewards": [],
+        "percent": 100
+      },
+      "points": 1,
+      "problems": [],
+      "progress": {
+        "blocked": 0,
+        "dropped": 0,
+        "learned": 1,
+        "open": 0,
+        "seen": 0,
+        "total": 1
+      },
+      "requires": [
+        {
+          "gate": "hard",
+          "id": "lib.nvim/hobby",
+          "kind": "path",
+          "met": false
+        },
+        {
+          "gate": "hard",
+          "id": "lib.nvim/grundlagen",
+          "kind": "path",
+          "met": true
+        }
+      ],
+      "requires_gate": "hard",
+      "slug": "digital",
+      "stage": "waiting",
+      "status": "doing",
+      "summary": "",
+      "title": "Digitaltechnik",
+      "updated": "2026-01-02",
+      "valid": true,
+      "waiting_on": [
+        {
+          "id": "lib.nvim/hobby"
+        }
+      ]
+    },
+    {
+      "area": "lib.nvim",
+      "areas": [],
+      "created": "2026-01-01",
+      "etag": "sha256:295610731618b7e4",
+      "file": "lib.nvim/ROADMAP/paths/hobby.md",
+      "has_tree": true,
+      "id": "lib.nvim/hobby",
+      "points": 1,
+      "problems": [],
+      "progress": {
+        "blocked": 0,
+        "dropped": 0,
+        "learned": 0,
+        "open": 1,
+        "seen": 0,
+        "total": 1
+      },
+      "slug": "hobby",
+      "stage": "doing",
+      "status": "doing",
+      "summary": "",
+      "title": "Elektronik Hobby",
+      "updated": "2026-01-01",
+      "valid": true
+    },
+    {
+      "area": "lib.nvim",
+      "areas": [],
+      "created": "2026-01-03",
+      "etag": "sha256:084dbbb1e8c4c46f",
+      "file": "lib.nvim/ROADMAP/paths/weiter.md",
+      "has_tree": false,
+      "id": "lib.nvim/weiter",
+      "points": 0,
+      "problems": [],
+      "progress": {
+        "blocked": 0,
+        "dropped": 0,
+        "learned": 0,
+        "open": 0,
+        "seen": 0,
+        "total": 0
+      },
+      "requires": [
+        {
+          "gate": "soft",
+          "id": "lib.nvim/grundlagen",
+          "kind": "path",
+          "met": true
+        },
+        {
+          "gate": "soft",
+          "id": "lib.nvim/nirgends",
+          "kind": "unknown",
+          "met": false
+        }
+      ],
+      "requires_gate": "soft",
+      "slug": "weiter",
+      "stage": "idle",
+      "status": "planning",
+      "summary": "Noch kein Baum.",
+      "title": "Weiter",
+      "updated": "2026-01-03",
+      "valid": true,
+      "waiting_on": []
+    },
+    {
+      "area": "lib.nvim",
+      "areas": [],
+      "created": "2026-01-01",
+      "etag": "sha256:584b740786d67039",
+      "file": "lib.nvim/Backlog/FEATURES/2026-01-04_grundlagen.md",
+      "has_tree": false,
+      "id": "lib.nvim/grundlagen",
+      "points": 0,
+      "problems": [],
+      "progress": {
+        "blocked": 0,
+        "dropped": 0,
+        "learned": 0,
+        "open": 0,
+        "seen": 0,
+        "total": 0
+      },
+      "slug": "grundlagen",
+      "stage": "done",
+      "status": "done",
+      "summary": "Fertig.",
+      "title": "Grundlagen",
+      "updated": "2026-01-04",
+      "valid": true
+    }
+  ],
+  "kind": "tasks.paths",
+  "plugin": "tasks.nvim",
+  "requires_cycles": [],
+  "rev": "rev:ee0a5b",
+  "schema": 1,
+  "vault": {
+    "id": "vault"
+  }
+}

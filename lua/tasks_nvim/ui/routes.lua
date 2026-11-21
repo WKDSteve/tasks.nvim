@@ -1364,6 +1364,17 @@ local function nested_routes()
         },
         { name = "project", type = "STRING", desc = "The project the path belongs to (area/slug)" },
         {
+          name = "requires",
+          type = "STRING",
+          desc = "The learning paths and projects it builds on (comma list of area/slug)",
+        },
+        {
+          name = "requires-gate",
+          type = "STRING",
+          enum = { "soft", "hard" },
+          desc = "soft (default): a hint; hard: not finished before what it builds on",
+        },
+        {
           name = "tags",
           type = "STRING",
           desc = "Tags (comma list); on-/not-on-workstation go to the tasks promoted from it",

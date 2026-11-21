@@ -129,6 +129,7 @@ M.CAPABILITIES = {
   "reorder",
   "repeat",
   "repeat_steps",
+  "requires",
   "rounds",
   "set_body",
   "set_section",
@@ -531,6 +532,7 @@ end
 ---@field shared Tasks.PlanShared           # What `plan_scope` read: the readiness filters ask it again.
 ---@field file_etags? table<string, string|false> # The version tags of plan and project files read so far (`file_etag`).
 ---@field late table<string, Tasks.LateBlocker[]> # The blockers due after a task begins, by task id (`tasks_nvim.late`).
+---@field requires_index? Tasks.RequiresIndex|false # What the projects build on (`view_requires_index`); false: none does.
 
 ---Scan the vault once and compute the plan once.
 ---@param opts? { root?: string }
@@ -735,6 +737,72 @@ function M.icon_entry(icon)
   return json.object({ kind = icon.kind, value = icon.value })
 end
 
+---What a path or project builds on, as the documents carry it (capability `requires`): `requires`
+---(`{ id, gate, kind, met }` in the file's order: `kind` `path`, `project` or `unknown`, `met` the requirement is
+---finished), `requires_gate` (the file's gate) and `waiting_on` (`{ id, via? }`: the open HARD requirements, its own
+---and, for a path, its project's with `via` the project; empty: it may be finished). A file that names nothing and
+---inherits nothing gets no field, so such an entry reads as before.
+---@param st? Tasks.RequiresState
+---@return table
+local function requires_fields(st)
+  if not st then
+    return {}
+  end
+  return {
+    requires = #st.requirements > 0 and json.array(vim.tbl_map(function(r)
+      return json.object({ id = r.id, gate = r.gate, kind = r.kind, met = r.met })
+    end, st.requirements)) or nil,
+    requires_gate = #st.requirements > 0 and st.gate or nil,
+    waiting_on = json.array(vim.tbl_map(function(w)
+      return json.object({ id = w.id, via = w.via })
+    end, st.waiting)),
+  }
+end
+
+---The lines a `rev` takes for what files build on: `requires:<id>` and what it waits for, so that a requirement
+---finished elsewhere gives a new revision. Only files with `requires`.
+---@param files Tasks.PlanFile[]
+---@param idx? Tasks.RequiresIndex
+---@return string[]
+local function requires_rev_lines(files, idx)
+  local out = {}
+  if not idx then
+    return out
+  end
+  local req = require("tasks_nvim.requires")
+  for _, f in ipairs(files) do
+    local st = req.state(f, idx)
+    if st then
+      local states = vim.tbl_map(function(r)
+        return r.id .. "=" .. r.kind .. (r.met and "+" or "-")
+      end, st.requirements)
+      for _, w in ipairs(st.waiting) do
+        states[#states + 1] = "wait:" .. w.id .. "@" .. (w.via or "")
+      end
+      out[#out + 1] = "requires:" .. f.id .. "\t" .. table.concat(states, ",")
+    end
+  end
+  return out
+end
+
+---The index of paths and projects (`requires.index`) a view needs, read once per view, and only when one of its
+---project files names what it builds on (nil otherwise).
+---@param view Tasks.ContractView
+---@return Tasks.RequiresIndex|nil
+local function view_requires_index(view)
+  if view.requires_index == nil then
+    if require("tasks_nvim.requires").any(view.projects or {}) then
+      view.requires_index = require("tasks_nvim.requires").index({
+        root = view.root,
+        projects = view.projects,
+      })
+    else
+      view.requires_index = false
+    end
+  end
+  return view.requires_index or nil
+end
+
 ---`snapshot.projects`: the project files with what each adds up to (`projects.rollup`) and its plans. The finished
 ---items of the Backlogs are read once, and only when there is a project at all.
 ---@param view Tasks.ContractView
@@ -742,13 +810,14 @@ end
 local function project_entries(view)
   local out = {}
   local finished
+  local idx = view_requires_index(view)
   for _, f in ipairs(view.projects or {}) do
     finished = finished or require("tasks_nvim.projects").finished_items({ root = view.root })
     local r = require("tasks_nvim.projects").rollup(
       f,
       { plans = view.files, open = view.open, finished = finished }
     )
-    out[#out + 1] = with_links_and_assets({
+    local entry = {
       id = f.id,
       title = f.title,
       status = f.status,
@@ -768,7 +837,12 @@ local function project_entries(view)
         own_open = r.own_open,
         days_open = r.days_open,
       }),
-    }, f)
+    }
+    -- capability `requires`: what the project builds on
+    for k, v in pairs(requires_fields(idx and require("tasks_nvim.requires").state(f, idx))) do
+      entry[k] = v
+    end
+    out[#out + 1] = with_links_and_assets(entry, f)
   end
   return out
 end
@@ -789,6 +863,8 @@ local function rev_of(view, entries)
   for _, f in ipairs(view.projects or {}) do
     lines[#lines + 1] = "project:" .. f.id .. "\t" .. (file_etag(view, f.path) or "")
   end
+  -- what the projects build on (capability `requires`): only when one names something
+  vim.list_extend(lines, requires_rev_lines(view.projects or {}, view_requires_index(view)))
   -- the meeting files only when there are some: a vault without meetings keeps its revision
   for _, m in ipairs(view.meetings or {}) do
     lines[#lines + 1] = "meeting:" .. m.id .. "\t" .. (m.etag or "")
@@ -3391,16 +3467,28 @@ end
 
 ---A learning path as the documents carry it (`tasks.paths` items, `tasks.path`): the head of its file, its progress and
 ---its version, its XP (when the tree has any) and its level state (when it has levels); no tree (that is `tasks.path`).
+---With `idx` (`requires.index`) the entry says what the path builds on (capability `requires`), and a held path keeps
+---the line of the whole path open in its level. `stage` (capability `requires`) is its stage for a map of the paths.
 ---@param root string
 ---@param f Tasks.PlanFile
 ---@param text? string  # The file as read (its `etag`).
+---@param idx? Tasks.RequiresIndex
+---@param finished? boolean  # A finished path, read from its Backlog (`include_done`).
 ---@return table
-local function path_entry(root, f, text)
+local function path_entry(root, f, text, idx, finished)
   local tree = f.tree or require("tasks_nvim.lernbaum").parse("")
-  return with_links_and_assets({
+  local req = require("tasks_nvim.requires")
+  local rst = (idx and not finished) and req.state(f, idx) or nil
+  if finished and idx and f.requires and #f.requires > 0 then
+    -- a finished path still names what it built on (the arrows of a map), but waits for nothing
+    rst =
+      req.state(vim.tbl_extend("force", {}, f, { requires_gate = "soft", project = false }), idx)
+  end
+  local entry = {
+    stage = req.stage(f, rst, finished),
     -- capability `xp`: only when there is something to say, so a path without XP and levels reads as before
     xp = tree.has_xp and xp_entry(tree.xp) or nil,
-    level = level_state_entry(f.level_state),
+    level = level_state_entry(req.hold_levels(f.level_state, rst)),
     -- capability `optional_points`: the points of `{optional}` subtrees, apart from `progress` and `xp` (which leave
     -- them out); only when the tree has any
     optional = tree.optional and tree.optional.progress.total > 0 and json.object({
@@ -3428,7 +3516,12 @@ local function path_entry(root, f, text)
     problems = vim.tbl_map(function(e)
       return redact(root, tostring(e))
     end, f.errors or {}),
-  }, f)
+  }
+  -- capability `requires`: what the path builds on
+  for k, v in pairs(requires_fields(rst)) do
+    entry[k] = v
+  end
+  return with_links_and_assets(entry, f)
 end
 
 ---`tasks.paths`: the open learning paths of the vault or of one area (an area group stands for its members), each with
@@ -3462,23 +3555,99 @@ function M.paths(params, opts)
       end, vault.areas(root))
     end
     local paths_mod = require("tasks_nvim.paths")
+    local projects_mod = require("tasks_nvim.projects")
+    local req = require("tasks_nvim.requires")
     local items, lines, incomplete = {}, {}, {}
+    local files = {}
+    local in_scope = {}
     for _, name in ipairs(names) do
+      in_scope[name] = true
       local list, errs = paths_mod.area(name, { root = root })
       for _, e in ipairs(type(errs) == "table" and errs or {}) do
         incomplete[#incomplete + 1] = redact(root, tostring(e))
       end
-      for _, f in ipairs(list or {}) do
-        local text = fsio.read(f.path)
-        local entry = path_entry(root, f, text)
-        items[#items + 1] = json.object(entry)
-        lines[#lines + 1] = f.id .. "\t" .. (entry.etag or "")
-        vim.list_extend(lines, task_xp_lines(f))
-      end
+      vim.list_extend(files, list or {})
     end
+    -- the finished paths of the areas (capability `requires`, `include_done`): read from the Backlogs, at the end
+    local finished_files = {}
+    local finished_items
+    if params.include_done == true then
+      finished_items = projects_mod.finished_items({ root = root })
+      for _, item in ipairs(finished_items) do
+        if in_scope[item.area] and projects_mod.finished_kind(item) == "path" then
+          local area, slug = vault.parse_id(item.id)
+          if area and slug then
+            finished_files[#finished_files + 1] = paths_mod.from_file(
+              item.path,
+              { area = area, slug = slug, location = "backlog", root = root }
+            )
+          end
+        end
+      end
+      table.sort(finished_files, function(a, b)
+        return a.id < b.id
+      end)
+    end
+    -- what the paths build on (capability `requires`): the index of the vault, only when a path or project names
+    -- something (a `requires` of a project holds for its paths)
+    local project_files = projects_mod.all({ root = root }) or {}
+    local idx = req.any(files, finished_files, project_files)
+        and req.index({
+          root = root,
+          paths = paths_mod.all({ root = root }) or {},
+          projects = project_files,
+          finished = finished_items,
+        })
+      or nil
+    for _, f in ipairs(files) do
+      local text = fsio.read(f.path)
+      local entry = path_entry(root, f, text, idx)
+      items[#items + 1] = json.object(entry)
+      lines[#lines + 1] = f.id .. "\t" .. (entry.etag or "")
+      vim.list_extend(lines, task_xp_lines(f))
+    end
+    for _, f in ipairs(finished_files) do
+      local text = fsio.read(f.path)
+      local entry = path_entry(root, f, text, idx, true)
+      items[#items + 1] = json.object(entry)
+      lines[#lines + 1] = "done:" .. f.id .. "\t" .. (entry.etag or "")
+    end
+    vim.list_extend(lines, requires_rev_lines(files, idx))
     local doc = M.head("tasks.paths", root)
     doc.items = items
     doc.incomplete = incomplete
+    if idx then
+      -- the circles of requirements among the open paths and projects (those `check` reports as `requires-cycle`)
+      doc.requires_cycles = json.array(vim.tbl_map(function(c)
+        return json.array(c)
+      end, req.cycles(idx)))
+      if params.include_done == true then
+        -- the finished projects a requirement names, so an arrow of a map ends in a box
+        local named = {}
+        for _, f in ipairs(vim.list_extend(vim.list_extend({}, files), finished_files)) do
+          for _, id in ipairs(f.requires or {}) do
+            named[id] = true
+          end
+        end
+        for _, p in ipairs(project_files) do
+          for _, id in ipairs(p.requires or {}) do
+            named[id] = true
+          end
+        end
+        local done_projects = {}
+        local ids = vim.tbl_keys(named)
+        table.sort(ids)
+        for _, id in ipairs(ids) do
+          local it = idx.items[id]
+          if it and it.done and it.kind == "project" then
+            done_projects[#done_projects + 1] =
+              json.object({ id = id, area = (vault.parse_id(id)), title = it.title })
+            lines[#lines + 1] = "done-project:" .. id
+          end
+        end
+        doc.done_projects = json.array(done_projects)
+      end
+    end
     return seal(doc, builder.rev_of(lines)), nil
   end)
 end
@@ -3514,7 +3683,10 @@ function M.path(id, opts)
     local lernbaum = require("tasks_nvim.lernbaum")
     local tree = f.tree or lernbaum.parse("")
     local doc = M.head("tasks.path", root)
-    doc.path = json.object(path_entry(root, f, text))
+    local req = require("tasks_nvim.requires")
+    local idx = ((f.requires and #f.requires > 0) or f.project) and req.index({ root = root })
+      or nil
+    doc.path = json.object(path_entry(root, f, text, idx))
     doc.body = body
     doc.body_truncated = truncated
     doc.nodes = vim.tbl_map(function(n)
@@ -3559,7 +3731,8 @@ function M.path(id, opts)
     -- the lines of `## Level` (capability `xp`), only when the file has the section
     local lv = f.levels
     if lv and lv.has_section then
-      local st = f.level_state or {}
+      -- a held path (capability `requires`) keeps the line of the whole path open
+      local st = req.hold_levels(f.level_state, idx and req.state(f, idx) or nil) or {}
       local all = vim.list_slice(lv.levels, 1)
       all[#all + 1] = lv.final
       doc.levels = vim.tbl_map(function(l)
@@ -3583,6 +3756,7 @@ function M.path(id, opts)
     end
     local rev_lines = { f.id .. "\t" .. fsio.etag(text) }
     vim.list_extend(rev_lines, task_xp_lines(f))
+    vim.list_extend(rev_lines, requires_rev_lines({ f }, idx))
     return seal(doc, builder.rev_of(rev_lines)), nil
   end)
 end

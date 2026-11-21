@@ -106,6 +106,9 @@
 ---    is not checked out: `link-repo-absent`); `level-bad-line`,
 ---    `level-bad-mark`, `level-order`, `level-badge-outside`, `level-badge-missing` (warnings): the levels of
 ---    `## Level`; `xp-missing` (a hint): points without XP in a path with levels
+---  - what learning paths and projects build on (`requires`, `tasks_nvim.requires`): `requires-unknown`,
+---    `requires-cycle` (errors); a broken entry or gate is the file's `path-bad-requires`, `path-bad-requires-gate`
+---    (`project-...`), a plan file with either field `plan-requires`
 ---  - milestones (`<area>/ROADMAP/milestones/`, `tasks_nvim.milestones`): a broken file (`milestone-bad-status`,
 ---    `milestone-bad-close`, `milestone-too-many`, `bad-date`, ...); `milestone-include-unknown`,
 ---    `milestone-include-foreign`, `milestone-bad-include`, `milestone-nested`, `milestone-id-taken` (errors): a member
@@ -1378,6 +1381,70 @@ local function path_findings(findings, open_ids, names, scan_opts, is_finished, 
   end
 end
 
+---What the learning paths and projects of the checked areas build on (`requires`, `tasks_nvim.requires`):
+---`requires-unknown` (error) an id that is no learning path or project of the vault, open or finished, `requires-cycle`
+---(error) a circle of requirements among open ones (named once, on its first member of a checked area), and for a path
+---a bare `[[slug]]` that names none or several (`wikilink-dangling` / `wikilink-ambiguous`; a project's are
+---`project_findings`').
+---@param findings Tasks.Finding[]
+---@param names string[]
+---@param scan_opts table
+local function requires_findings(findings, names, scan_opts)
+  local checked = {}
+  for _, n in ipairs(names) do
+    checked[n] = true
+  end
+  local req = require("tasks_nvim.requires")
+  local idx = req.index({ root = scan_opts.root })
+  local ids = vim.tbl_keys(idx.items)
+  table.sort(ids)
+  local any = false
+  for _, id in ipairs(ids) do
+    local f = idx.items[id].file
+    if f and checked[f.area] then
+      if f.kind == "path" then
+        for _, p in ipairs(f.link_problems or {}) do
+          if p.field == "requires" then
+            add(findings, "error", p.code, f, link_problem_message(p))
+          end
+        end
+      end
+      local st = req.state(f, idx)
+      if st then
+        any = true
+        for _, u in ipairs(st.unknown) do
+          add(
+            findings,
+            "error",
+            "requires-unknown",
+            f,
+            u == f.id and ("requires names " .. u .. " itself")
+              or ("requires " .. u .. ": no learning path or project of that id (open or finished)")
+          )
+        end
+      end
+    end
+  end
+  if not any then
+    return
+  end
+  for _, cyc in ipairs(req.cycles(idx)) do
+    for _, id in ipairs(cyc) do
+      local f = idx.items[id].file
+      if f and checked[f.area] then
+        add(
+          findings,
+          "error",
+          "requires-cycle",
+          f,
+          "requires closes a circle: " .. req.cycle_text(cyc)
+        )
+        break
+      end
+    end
+  end
+end
+
 ---The findings of promoted learning points, for the tasks (open and finished) of the checked areas that name one with
 ---`point:`, and the arrows of the `## Lernpunkte` of open learning tasks. Warnings only (R3).
 ---@param findings Tasks.Finding[]
@@ -2135,6 +2202,7 @@ function M.run(opts)
   project_findings(findings, open_ids, names, scan_opts, is_finished, repos)
   meeting_findings(findings, hints, open_ids, names, scan_opts, is_finished, today, repos)
   path_findings(findings, open_ids, names, scan_opts, is_finished, hints, repos)
+  requires_findings(findings, names, scan_opts)
   milestone_findings(findings, open_ids, names, scan_opts, is_finished, today)
   promote_findings(findings, open_ids, names, scan_opts, is_finished, finished_by_area)
   view_findings(findings, root, names)

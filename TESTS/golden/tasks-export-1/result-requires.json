@@ -1,0 +1,121 @@
+{
+  "client_op_id": "golden-requires",
+  "digest": "sha256:f1e5d030f2f54dc7",
+  "dry_run": false,
+  "engine": {
+    "git": "0000000",
+    "nvim": "0.0.0",
+    "version": "0.1.0-test"
+  },
+  "generated_at": "2026-01-01T00:00:00Z",
+  "kind": "tasks.result",
+  "ok": false,
+  "plugin": "tasks.nvim",
+  "results": [
+    {
+      "changed_ids": [
+        "lib.nvim/mikrocontroller"
+      ],
+      "file": "lib.nvim/ROADMAP/paths/mikrocontroller.md",
+      "id": "lib.nvim/mikrocontroller",
+      "n": 1,
+      "ok": true,
+      "op": "path_new",
+      "outcome": "created",
+      "renamed": false,
+      "slug": "mikrocontroller"
+    },
+    {
+      "changed_ids": [],
+      "error": {
+        "code": "invalid_argument",
+        "details": {
+          "problems": [
+            {
+              "code": "requires-cycle",
+              "key": "requires",
+              "message": "requires closes a circle: lib.nvim/digital -> lib.nvim/hobby -> lib.nvim/digital",
+              "target": "lib.nvim/digital"
+            }
+          ]
+        },
+        "message": "requires closes a circle: lib.nvim/digital -> lib.nvim/hobby -> lib.nvim/digital",
+        "retryable": false
+      },
+      "n": 2,
+      "ok": false,
+      "op": "path_set",
+      "outcome": "failed"
+    },
+    {
+      "changed_ids": [],
+      "error": {
+        "code": "invalid_argument",
+        "details": {
+          "problems": [
+            {
+              "code": "requires-unknown",
+              "key": "requires",
+              "message": "requires lib.nvim/nirgends: no learning path or project of that id",
+              "target": "lib.nvim/nirgends"
+            }
+          ]
+        },
+        "message": "requires lib.nvim/nirgends: no learning path or project of that id",
+        "retryable": false
+      },
+      "n": 3,
+      "ok": false,
+      "op": "path_set",
+      "outcome": "failed"
+    },
+    {
+      "changed_ids": [],
+      "error": {
+        "code": "invalid_argument",
+        "details": {
+          "holding": [
+            "lib.nvim/hobby"
+          ],
+          "waiting_on": [
+            {
+              "id": "lib.nvim/hobby"
+            }
+          ]
+        },
+        "message": "lib.nvim/digital waits for lib.nvim/hobby (requires_gate: hard): finish that first",
+        "retryable": false
+      },
+      "n": 4,
+      "ok": false,
+      "op": "path_close",
+      "outcome": "failed"
+    },
+    {
+      "changed_ids": [],
+      "error": {
+        "code": "invalid_argument",
+        "details": {
+          "holding": [
+            "lib.nvim/hobby-niveau"
+          ],
+          "waiting_on": [
+            {
+              "id": "lib.nvim/hobby-niveau"
+            }
+          ]
+        },
+        "message": "lib.nvim/digital-projekt waits for lib.nvim/hobby-niveau (requires_gate: hard): finish that first",
+        "retryable": false
+      },
+      "n": 5,
+      "ok": false,
+      "op": "project_close",
+      "outcome": "failed"
+    }
+  ],
+  "schema": 1,
+  "vault": {
+    "id": "vault"
+  }
+}

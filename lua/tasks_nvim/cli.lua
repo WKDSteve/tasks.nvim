@@ -95,17 +95,20 @@ commands:
   plan-new <area> <title> [--slug=s] [--areas=a,b] [--target=<id>] [--phases=a,b,c] [--gate=hard] [--summary=text] [--links=url,url] [--icon=<emoji|assets/x.svg|word>] [--cover=assets/x.png] [--template=learning]
                                           create ROADMAP/plans/<slug>.md; tasks join it with plan=<id> phase=<word>;
                                           without --slug the slug is the title, cut at a word boundary
-  project-new <area> <title> [--slug=s] [options as plan-new]
+  project-new <area> <title> [--slug=s] [options as plan-new] [--requires=id,id] [--requires-gate=soft|hard]
                                           create ROADMAP/projects/<slug>.md; plans join it with project=<id>, learning
-                                          paths with path-new --project=<id>; --template=learning writes a
+                                          paths with path-new --project=<id>; --requires names the learning paths
+                                          and projects it builds on (gate soft: a note; hard: not finished before
+                                          them; set later with set <id> "requires=[a/b,c/d]"); --template=learning writes a
                                           curriculum: goal and competence target, ## Lernpfade with the generated
                                           table of its paths (refreshed by projects --of=<id> --write=<file>), ## Takt,
                                           definition of done (no stages are proposed)
-  path-new <area> <title> [--slug=s] [--areas=a,b] [--target=<id>] [--project=<id>] [--tags=a,b] [--status=planning|doing|parked] [--summary=text] [--links=url,url] [--icon=...] [--cover=assets/x.png] [--template=learning] [--no-index] [--dry-run]
+  path-new <area> <title> [--slug=s] [--areas=a,b] [--target=<id>] [--project=<id>] [--requires=id,id] [--requires-gate=soft|hard] [--tags=a,b] [--status=planning|doing|parked] [--summary=text] [--links=url,url] [--icon=...] [--cover=assets/x.png] [--template=learning] [--no-index] [--dry-run]
                                           create the learning path ROADMAP/paths/<slug>.md (no stages; its tree goes
                                           into ## Lernpunkte); --template=learning writes the sections of a learning path;
                                           --tags=not-on-workstation (or on-workstation) goes to every task promoted
-                                          from the path; --no-index is accepted (a new path changes no index)
+                                          from the path; --requires as project-new; --no-index is accepted (a new
+                                          path changes no index)
   path-new <area> --from=<draft.md> [--slug=s] [--dry-run]
                                           the whole path from a draft file: checked as check checks a path (keys,
                                           marks, XP, arrows, links, levels, images), written only when nothing is
@@ -495,6 +498,8 @@ local SPECS = {
       "icon",
       "cover",
       "template",
+      "requires",
+      "requires-gate",
     },
     flag = {},
   },
@@ -515,6 +520,8 @@ local SPECS = {
       "template",
       "tags",
       "from",
+      "requires",
+      "requires-gate",
     },
     -- `--no-index` for scripts that pass it to every writing command: a new path changes no index
     flag = { "no-index", "dry-run" },
@@ -1404,8 +1411,8 @@ end
 ---@type table<string, string>
 local NEW_FILE_USAGE = {
   plan = 'plan-new <area> "<title>" [--slug=s] [--areas=a,b] [--target=id] [--phases=a,b,c] [--gate=hard] [--template=learning]',
-  project = 'project-new <area> "<title>" [--slug=s] [--areas=a,b] [--target=id] [--phases=a,b,c] [--gate=hard] [--template=learning]',
-  path = 'path-new <area> "<title>" [--slug=s] [--areas=a,b] [--target=id] [--project=id] [--tags=a,b] [--template=learning] [--no-index] [--dry-run]',
+  project = 'project-new <area> "<title>" [--slug=s] [--areas=a,b] [--target=id] [--phases=a,b,c] [--gate=hard] [--requires=id,id] [--requires-gate=soft|hard] [--template=learning]',
+  path = 'path-new <area> "<title>" [--slug=s] [--areas=a,b] [--target=id] [--project=id] [--requires=id,id] [--requires-gate=soft|hard] [--tags=a,b] [--template=learning] [--no-index] [--dry-run]',
 }
 
 ---`plan-new`, `project-new` and `path-new`: make the file (`plans.new` with `kind`) and say its id.
@@ -1438,6 +1445,8 @@ local function new_file_command(ctx, kind)
     project = args.opt.project --[[@as string|nil]],
     template = args.opt.template --[[@as "learning"|nil]],
     tags = args.opt.tags --[[@as string|nil]],
+    requires = args.opt.requires --[[@as string|nil]],
+    requires_gate = args.opt["requires-gate"] --[[@as string|nil]],
     -- only `path-new` takes `--dry-run` (for `--from`); without it the flag must not write either
     dry_run = args.opt["dry-run"] == true,
   })
@@ -1609,7 +1618,16 @@ commands.path = function(ctx)
     return 1
   end
   local tree = file.tree or require("tasks_nvim.lernbaum").parse("")
-  local st = require("tasks_nvim.path_stats").compute(tree, file.levels, file.level_state)
+  -- what the path builds on: a hard gate keeps the line of the whole path open while it waits
+  local req = require("tasks_nvim.requires")
+  local rst = ((file.requires and #file.requires > 0) or file.project)
+      and req.state(file, req.index({ root = eo.root }))
+    or nil
+  local st = require("tasks_nvim.path_stats").compute(
+    tree,
+    file.levels,
+    req.hold_levels(file.level_state, rst)
+  )
   local marks = require("tasks_nvim.path_stats").marks(tree, machine)
   if format == "json" then
     ctx.say(vim.json.encode({
@@ -1618,6 +1636,9 @@ commands.path = function(ctx)
       id = file.id,
       title = file.title,
       status = file.status,
+      requires = rst and rst.requirements or nil,
+      requires_gate = rst and rst.gate or nil,
+      waiting_on = rst and rst.waiting or nil,
       has_xp = st.has_xp,
       points = st.points,
       xp = st.xp,
@@ -1652,6 +1673,19 @@ commands.path = function(ctx)
         sp.line
       )
     )
+  end
+  for _, r in ipairs(rst and rst.requirements or {}) do
+    ctx.say(
+      ("requires\t%s\t%s\t%s\t%s"):format(
+        r.id,
+        r.kind == "unknown" and "unknown" or (r.met and "done" or "open"),
+        r.gate,
+        clean(r.title or "")
+      )
+    )
+  end
+  if rst then
+    ctx.say(("gate\t%s\t%s"):format(rst.gate, req.waiting_text(rst) or "nothing open"))
   end
   ctx.say(
     ("points\t%d\topen %d\tlearned %d\tseen %d\tdropped %d\twithout xp %d"):format(
@@ -1951,11 +1985,29 @@ commands.paths = function(ctx)
       ctx.warn("error: no such open project: " .. pid)
       return 1
     end
-    rows = projects.path_rows(pid, files, projects.finished_items({ root = root }))
+    local finished = projects.finished_items({ root = root })
+    local project_files = projects.all({ root = root }) or {}
+    local idx = require("tasks_nvim.requires").any(files, project_files)
+        and require("tasks_nvim.requires").index({
+          root = root,
+          paths = files,
+          projects = project_files,
+          finished = finished,
+        })
+      or nil
+    rows = projects.path_rows(pid, files, finished, idx)
   else
+    local project_files = projects.all({ root = root }) or {}
+    local idx = require("tasks_nvim.requires").any(files, project_files)
+        and require("tasks_nvim.requires").index({
+          root = root,
+          paths = files,
+          projects = project_files,
+        })
+      or nil
     rows = {}
     for _, f in ipairs(files) do
-      rows[#rows + 1] = projects.path_row(f)
+      rows[#rows + 1] = projects.path_row(f, idx)
     end
   end
   if in_area then
@@ -1968,16 +2020,16 @@ commands.paths = function(ctx)
     return 0
   end
   for _, r in ipairs(rows) do
-    ctx.say(
-      ("%s\t%s\tpoints %d\topen %d\t%d %%\t%s"):format(
-        clean(r.id),
-        clean(r.status),
-        r.points,
-        r.open,
-        r.percent,
-        clean(r.title or "")
-      )
-    )
+    ctx.say(("%s\t%s\tpoints %d\topen %d\t%d %%\t%s%s"):format(
+      clean(r.id),
+      clean(r.status),
+      r.points,
+      r.open,
+      r.percent,
+      clean(r.title or ""),
+      -- what the path waits for (or builds on), last, so the columns before stay where they were
+      r.wait and ("\t" .. clean(r.wait)) or ""
+    ))
   end
   return 0
 end

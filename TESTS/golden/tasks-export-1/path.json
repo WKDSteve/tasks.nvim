@@ -1,7 +1,7 @@
 {
   "body": "\nPlugins schreiben können.\n\n## Lernpunkte\n\n- [ ] Lua lernen {#lua}\n  - [ ] Syntax {#syntax}\n    - [x] [Manual](https://www.lua.org/manual/5.4/)\n      > Notiz: Rangfolge von `..` und `^`.\n    - [~] Programming in Lua – Grund: nur Kapitel 1\n  - [ ] C-Compiler → lib.nvim/c-compiler {#cc}\n  - [-] JIT – Grund: nicht nötig\n  - [!] Profiler {#prof}\n  - [~] Ohne Grund\n",
   "body_truncated": false,
-  "digest": "sha256:41593ad3b105d6f4",
+  "digest": "sha256:c993e9252bceddbf",
   "engine": {
     "git": "0000000",
     "nvim": "0.0.0",
@@ -210,6 +210,7 @@
       "total": 6
     },
     "slug": "lua-lernen",
+    "stage": "doing",
     "status": "doing",
     "summary": "Plugins schreiben können.",
     "title": "Lua lernen",

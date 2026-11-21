@@ -590,7 +590,7 @@ all see it), `--target` the task that means "done". When the last member task is
 or project takes assets like a task: `attach <plan id> <file>` (or `folderize`) turns it into its folder form
 `plans/<slug>/<slug>.md` with `assets/` beside the file, and finishing it moves the folder to the Backlog.
 
-### `:Tasks path-new <area> <title...> [--areas=a,b] [--target=<id>] [--project=<id>] [--tags=a,b] [--status=] [--template=learning]`
+### `:Tasks path-new <area> <title...> [--areas=a,b] [--target=<id>] [--project=<id>] [--requires=<id,id>] [--requires-gate=soft|hard] [--tags=a,b] [--status=] [--template=learning]`
 
 Creates the learning path `<area>/ROADMAP/paths/<slug>.md` and opens it: the frontmatter of a plan without stages and
 the sections `## Warum`, `## Lernpunkte` (the tree, [ENGINE.md](ENGINE.md), "Learning paths") and `## Notizen`;
@@ -600,6 +600,16 @@ sources with the column `Geprüft`, `## Lernpunkte` with the stages and the lite
 `LP-06`, `LP-07`, `LP-11`, `LP-15`, `LP-18` of the rules vault). `--tags=not-on-workstation` (or `on-workstation`) goes to
 every task promoted from the path. `--summary`, `--slug`, `--links`, `--icon` and `--cover` as for a plan; `--title=` names it when no words follow the area. A taken slug gets `-2`. Headless: `path-new` with the same
 options. Then `:Tasks learn` shows the tree, and `:Tasks point` and `:Tasks promote` work on its points.
+
+**Paths and projects that build on each other.** `--requires=<id,id>` names the learning paths and projects the new
+path builds on (`requires:` in its file; known ids only), `--requires-gate=hard` makes them a condition for finishing
+it: the path may be started at any time, but it is not finished (`path_close`) and the line of the whole path in
+`## Level` stays open while one of them is not finished. Without it (`soft`) an open requirement is only a hint. A
+project takes the same two options (`project-new`), and a hard requirement of a project holds for each of its paths.
+Change it later with `tasks set <id> "requires=[a/b,c/d]"` and `requires_gate=hard` (an empty value removes it); a
+circle is refused. `tasks path <id>` shows each requirement and what the path waits for, `tasks paths`, `tasks
+projects` and the generated overview of a project add `waits for <id>` (hard) or `builds on <id> (not finished)`
+(soft); `check` reports `requires-unknown` and `requires-cycle`.
 
 Headless `path-new <area> --from=<draft.md> [--slug=s] [--dry-run]` makes a whole path from one draft file (frontmatter,
 sections, the tree, `## Level`): the slug as `path-new` gives the draft's `title`, `status: planning`, `created` and
@@ -673,7 +683,8 @@ in `doing` with no open plan or learning path that is not parked and no open tas
 verb to run.
 
 **A project, headless.** `project-new <area> "<title>" [--slug=s] [--areas=a,b] [--target=<id>] [--phases=a,b,c]
-[--gate=hard] [--status=] [--summary=text] [--links=url,url] [--icon=] [--cover=] [--template=learning]` makes
+[--gate=hard] [--requires=<id,id>] [--requires-gate=soft|hard] [--status=] [--summary=text] [--links=url,url] [--icon=]
+[--cover=] [--template=learning]` makes
 `ROADMAP/projects/<slug>.md` (the write door: `project_new`). Plans join it with `project=<id>`, learning paths with
 `path-new … --project=<id>` or `set <path> project=<id>`. `--template=learning` writes a curriculum of learning paths
 (`LP-01`): `## Ziel und Abgrenzung` with the competence target, `## Lernpfade` with the generated overview block of the

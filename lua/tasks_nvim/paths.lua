@@ -181,14 +181,52 @@ function M.set(id, patch, opts)
 end
 
 ---Finish a path by hand: moved to `Backlog/FEATURES/<date>_<slug>.md` (`closed_kind: path`), a row in the README.
----Starts the routines that waited for the path (`routine_after.settle`: `routines_started`, `notes`).
+---Starts the routines that waited for the path (`routine_after.settle`: `routines_started`, `notes`). A path that waits
+---for what it `requires` (`tasks_nvim.requires`) is refused under `requires_gate: hard` (`invalid_argument` with
+---`waiting_on`); under the soft gate it is finished with a note first in `notes`.
 ---@param id string
 ---@param opts? table
 ---@return { id: string, from: string, to: string, readme: string, routines_started?: table[], notes?: string[] }|nil result
 ---@return string|nil err
 ---@return table|nil info
+---Whether an open path may be finished now, by what it builds on (`requires`, `tasks_nvim.requires`, its own and the
+---hard ones of its project): under `requires_gate: hard` a requirement not finished yet refuses it (an error and `{ code = "invalid_argument",
+---waiting_on }`); under the soft gate it may, with a note. Nothing to say: all nil.
+---@param file Tasks.PlanFile
+---@param root? string
+---@return string|nil err
+---@return table|nil info
+---@return string|nil note
+function M.close_gate(file, root)
+  -- its own requirements, or those of its project (a `requires` of a project holds for its paths)
+  if not ((file.requires and #file.requires > 0) or file.project) then
+    return nil
+  end
+  local req = require("tasks_nvim.requires")
+  local st = req.state(file, req.index({ root = root }))
+  if st and st.held then
+    return ("%s %s (requires_gate: hard): finish that first"):format(file.id, req.waiting_text(st)),
+      { code = "invalid_argument", waiting_on = st.waiting_on, waiting = st.waiting }
+  elseif st and #st.open_soft > 0 then
+    return nil,
+      nil,
+      ("%s is finished before %s it builds on"):format(file.id, table.concat(st.open_soft, ", "))
+  end
+  return nil
+end
+
 function M.close(id, opts)
   opts = opts or {}
+  -- what the path builds on: a hard gate keeps it open, a soft one says so
+  local wait_note
+  local open_file = M.find(id, { root = opts.root })
+  if open_file then
+    local gerr, ginfo, note = M.close_gate(open_file, opts.root)
+    if gerr then
+      return nil, gerr, ginfo
+    end
+    wait_note = note
+  end
   local res, err, info = plans.close(id, vim.tbl_extend("force", opts, { kind = "path" }))
   -- the routines that waited for the path (`repeat_after`), now that it is in the Backlog
   if res and not opts.dry_run and res.from ~= res.to then
@@ -199,6 +237,10 @@ function M.close(id, opts)
     if ran then
       res.routines_started, res.notes = started, notes
     end
+  end
+  if res and wait_note then
+    res.notes = res.notes or {}
+    table.insert(res.notes, 1, wait_note)
   end
   return res, err, info
 end

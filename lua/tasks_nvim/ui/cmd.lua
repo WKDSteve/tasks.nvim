@@ -731,6 +731,8 @@ function M.path_new(ctx)
     cover = flags.cover,
     template = flags.template,
     tags = flags.tags,
+    requires = flags.requires,
+    requires_gate = flags["requires-gate"],
   })
   if not res then
     notify.error(tostring(err))

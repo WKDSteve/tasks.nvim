@@ -68,6 +68,68 @@ local function write_learning_paths(root)
   )
 end
 
+---Learning paths and projects that build on each other, for the golden cases `paths-requires`, `snapshot-requires`
+---and `result-requires`: a path that waits under the hard gate (levels, the line of the whole path held open), one
+---whose requirement is finished, one naming an id that exists nowhere, and a project that waits for another.
+---@param root string
+local function write_requires(root)
+  local function put(path, text)
+    vim.fn.mkdir(vim.fs.dirname(path), "p")
+    local fh = assert(io.open(path, "wb"))
+    fh:write(text)
+    fh:close()
+  end
+  local paths_dir = root .. "/lib.nvim/ROADMAP/paths"
+  put(
+    paths_dir .. "/hobby.md",
+    "---\ntitle: Elektronik Hobby\nstatus: doing\ncreated: 2026-01-01\nupdated: 2026-01-01\n---\n\n"
+      .. "## Lernpunkte\n\n- [ ] Ohmsches Gesetz {#ohm}\n"
+  )
+  put(
+    paths_dir .. "/digital.md",
+    table.concat({
+      "---",
+      "title: Digitaltechnik",
+      "status: doing",
+      "requires: [lib.nvim/hobby, lib.nvim/grundlagen]",
+      "requires_gate: hard",
+      "created: 2026-01-02",
+      "updated: 2026-01-02",
+      "---",
+      "",
+      "## Lernpunkte",
+      "",
+      "- [x] Gatter {#gatter}",
+      "",
+      "## Level",
+      "",
+      "- [ ] 50 %",
+      "- [ ] Pfad fertig \194\183 Belohnung: L\195\182tstation",
+      "",
+    }, "\n")
+  )
+  put(
+    paths_dir .. "/weiter.md",
+    "---\ntitle: Weiter\nstatus: planning\nrequires: [lib.nvim/grundlagen, lib.nvim/nirgends]\n"
+      .. "created: 2026-01-03\nupdated: 2026-01-03\n---\n\nNoch kein Baum.\n"
+  )
+  -- the finished requirement: a path closed into the Backlog
+  put(
+    root .. "/lib.nvim/Backlog/FEATURES/2026-01-04_grundlagen.md",
+    "---\ntitle: Grundlagen\nstatus: done\nclosed_kind: path\ncreated: 2026-01-01\nupdated: 2026-01-04\n---\n\nFertig.\n"
+  )
+  local projects_dir = root .. "/lib.nvim/ROADMAP/projects"
+  put(
+    projects_dir .. "/hobby-niveau.md",
+    "---\ntitle: Hobby-Niveau\nstatus: doing\ncreated: 2026-01-01\nupdated: 2026-01-01\n---\n\nErst das.\n"
+  )
+  put(
+    projects_dir .. "/digital-projekt.md",
+    "---\ntitle: Digital-Projekt\nstatus: planning\nrequires: [lib.nvim/hobby-niveau]\n"
+      .. "requires_gate: hard\ncreated: 2026-01-02\nupdated: 2026-01-02\n---\n\nDanach.\n"
+  )
+end
+
 ---Three milestones for the golden cases `milestones`, `milestone` and `result-milestone`: one over a plan, a task, a
 ---finished task and a task of another area with a `due` passed and a history; one of `close: manual` reached by hand;
 ---one broken (a bad status, a member that exists nowhere).
@@ -430,6 +492,58 @@ G.cases = {
     request = function(root)
       write_learning_paths(root)
       return '{"params":{"id":"lib.nvim/lua-lernen"}}'
+    end,
+  },
+  {
+    -- what learning paths build on (capability `requires`): each requirement with its gate, kind and whether it is
+    -- met, the open hard ones it waits for, its stage, a waiting path whose line of the whole path stays open in its
+    -- level, and with `include_done` the finished path a requirement names
+    name = "paths-requires",
+    method = "paths",
+    fresh = true,
+    request = function(root)
+      write_requires(root)
+      return '{"params":{"include_done":true}}'
+    end,
+  },
+  {
+    -- a project that waits for another under the hard gate (capability `requires`), in the snapshot's projects
+    name = "snapshot-requires",
+    method = "snapshot",
+    fresh = true,
+    request = function(root)
+      write_requires(root)
+      return '{"params":{}}'
+    end,
+  },
+  {
+    -- writing what paths and projects build on (capability `requires`): path_new with a requirement, a circle and
+    -- an unknown id refused (`details.problems`), a held path and a held project refused (`details.waiting_on`)
+    name = "result-requires",
+    method = "ops",
+    fresh = true,
+    request = function(root)
+      write_requires(root)
+      return encode({
+        client_op_id = "golden-requires",
+        ops = {
+          {
+            op = "path_new",
+            area = "lib.nvim",
+            title = "Mikrocontroller",
+            requires = { "lib.nvim/digital" },
+            requires_gate = "soft",
+          },
+          { op = "path_set", id = "lib.nvim/hobby", patch = { requires = { "lib.nvim/digital" } } },
+          {
+            op = "path_set",
+            id = "lib.nvim/hobby",
+            patch = { requires = { "lib.nvim/nirgends" } },
+          },
+          { op = "path_close", id = "lib.nvim/digital" },
+          { op = "project_close", id = "lib.nvim/digital-projekt" },
+        },
+      })
     end,
   },
   {
