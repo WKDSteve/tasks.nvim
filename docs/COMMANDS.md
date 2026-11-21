@@ -578,13 +578,15 @@ all see it), `--target` the task that means "done". When the last member task is
 or project takes assets like a task: `attach <plan id> <file>` (or `folderize`) turns it into its folder form
 `plans/<slug>/<slug>.md` with `assets/` beside the file, and finishing it moves the folder to the Backlog.
 
-### `:Tasks path-new <area> <title...> [--areas=a,b] [--target=<id>] [--project=<id>] [--status=] [--template=learning]`
+### `:Tasks path-new <area> <title...> [--areas=a,b] [--target=<id>] [--project=<id>] [--tags=a,b] [--status=] [--template=learning]`
 
 Creates the learning path `<area>/ROADMAP/paths/<slug>.md` and opens it: the frontmatter of a plan without stages and
 the sections `## Warum`, `## Lernpunkte` (the tree, [ENGINE.md](ENGINE.md), "Learning paths") and `## Notizen`;
 `--template=learning` writes the sections of a learning path instead (goal and competence level, access, schedule,
-sources, `## Lernpunkte`, self-check, open questions). `--summary`, `--slug`, `--links`, `--icon` and `--cover` as for a
-plan; `--title=` names it when no words follow the area. A taken slug gets `-2`. Headless: `path-new` with the same
+sources with the column `Geprüft`, `## Lernpunkte` with the stages and the literature group named in its hints,
+`## Level` with a commented example, self-check, open questions, repetition, `## Ergebnis schreiben`; the rules
+`LP-06`, `LP-07`, `LP-11`, `LP-15`, `LP-18` of the rules vault). `--tags=not-on-workstation` (or `on-workstation`) goes to
+every task promoted from the path. `--summary`, `--slug`, `--links`, `--icon` and `--cover` as for a plan; `--title=` names it when no words follow the area. A taken slug gets `-2`. Headless: `path-new` with the same
 options. Then `:Tasks learn` shows the tree, and `:Tasks point` and `:Tasks promote` work on its points.
 
 Headless `plan-close <area>/<slug>` finishes a plan by hand (refused while a member task is open: the message names them)

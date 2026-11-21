@@ -82,17 +82,46 @@ return function(H)
     "## Zeitplan",
     "## Quellen",
     "## Lernpunkte",
+    "## Level",
     "## Selbstcheck",
     "## Offene Fragen",
     "## Wiederholung",
+    "## Ergebnis schreiben",
   }) do
     has(ltext, "\n" .. heading .. "\n", heading)
   end
-  has(ltext, "| Quelle | Typ | Worauf achten | Zugang |")
+  -- the rules of a learning path (LP-07, LP-06, LP-11, LP-15, LP-18)
+  has(
+    ltext,
+    "| Quelle | Typ | Worauf achten | Zugang | Geprüft |",
+    "the date a source was checked"
+  )
+  has(ltext, "„ungeprüft“")
+  for _, stage in ipairs(plans.LEARNING_PHASES) do
+    has(ltext, "{#" .. stage .. "}", "the stage " .. stage .. " is named in the hint")
+  end
+  has(ltext, "{#literatur}", "the group of the literature")
+  has(ltext, "Fehlt im Bestand")
+  has(ltext, "Terminologie, DocLinks, Portfolio-Notiz, Support-Scope")
+  ok(
+    ltext:find("## Lernpunkte", 1, true) < ltext:find("## Level", 1, true)
+      and ltext:find("## Wiederholung", 1, true) < ltext:find("## Ergebnis schreiben", 1, true)
+      and ltext:find("## Ergebnis schreiben", 1, true) < ltext:find("## Notizen", 1, true),
+    "the order of the model paths"
+  )
   local found = assert(paths.find(path.id, { root = root }))
   ok(found.tree.has_section, "the tree reads the section")
-  eq(#found.tree.nodes, 0, "and finds no points yet (the hint is a comment)")
+  eq(#found.tree.nodes, 0, "and finds no points yet (the hints are comments)")
   eq(#found.errors, 0, vim.inspect(found.errors))
+  ok(found.levels and found.levels.has_section, "the level section is there")
+  eq(#found.levels.levels, 0, "its example is a comment: no level yet")
+  eq(found.levels.final, nil)
+  eq(found.levels.problems, {}, "and no problem")
+  local report =
+    assert(require("tasks_nvim.check").run({ root = root, area = "lib.nvim", today = TODAY }))
+  for _, f in ipairs(report.findings) do
+    ok(f.id ~= path.id, "check has nothing to say about a new learning path: " .. vim.inspect(f))
+  end
   ok(lernbaum.parse(ltext:match("\n%-%-%-\n(.*)$") or "").has_section)
 
   -- ── the command line ──────────────────────────────────────────────────────

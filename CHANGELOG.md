@@ -11,6 +11,7 @@ the version is not tagged yet (the repository is not published).
 
 ### Changed
 
+- The learning template of a path (`path-new --template=learning`) follows the rules of learning paths: the sources table has the column `Geprüft` (date or `ungeprüft`), the hints under `## Lernpunkte` name the stages `orientieren` … `festigen` and the literature group, and the sections `## Level` (a commented example) and `## Ergebnis schreiben` are new. The hints stand above the syntax line, so a tree written below them never takes a hint into a subtree.
 - A slug made of a title (`new`, `plan-new`, `project-new`, `path-new`, meetings, the key of a promoted point) is cut at a word boundary of the title: whole words as long as they fit, a hyphenated word like `Web-Variante` counts as one. Before, it was cut after 60 characters, inside a word (`…-und-webvari`).
 - `tasks index <area> --staged` says when the working tree keeps an index file that is not the staged one (`tree_differs` on the result): `check` reads the tree and calls it `index-stale` although the commit holds the right one, which read as "`--staged` did nothing" in a linked worktree of the vault. Covered in a linked worktree; its staging area is the one written, the main checkout's stays untouched.
 - `reminders.on_start` is opt-in now: the one line at startup about due reminders no longer shows unless `setup({ reminders = { on_start = true } })` asks for it.
