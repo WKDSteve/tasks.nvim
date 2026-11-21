@@ -186,6 +186,12 @@ return function(H)
   -- the draft's line 8, though status, created and updated were added above the body
   has(err, "hint\txp-missing\tline 8:")
 
+  -- ── --dry-run without --from writes nothing either ──
+  code, out, err = run({ "path-new", A, "Nur ein Probelauf", "--dry-run" })
+  eq(code, 0, err)
+  has(out, "would-create\t" .. A .. "/nur-ein-probelauf\t")
+  ok(H.read(path_file("nur-ein-probelauf")) == nil, "a dry run of path-new writes nothing")
+
   -- ── usage ──
   code, _, err = run({ "path-new", A, "--from=" .. sound, "--areas=x" })
   eq(code, 2)

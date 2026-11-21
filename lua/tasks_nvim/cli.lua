@@ -101,7 +101,7 @@ commands:
                                           curriculum: goal and competence target, ## Lernpfade with the generated
                                           table of its paths (refreshed by projects --of=<id> --write=<file>), ## Takt,
                                           definition of done (no stages are proposed)
-  path-new <area> <title> [--slug=s] [--areas=a,b] [--target=<id>] [--project=<id>] [--tags=a,b] [--status=planning|doing|parked] [--summary=text] [--links=url,url] [--icon=...] [--cover=assets/x.png] [--template=learning] [--no-index]
+  path-new <area> <title> [--slug=s] [--areas=a,b] [--target=<id>] [--project=<id>] [--tags=a,b] [--status=planning|doing|parked] [--summary=text] [--links=url,url] [--icon=...] [--cover=assets/x.png] [--template=learning] [--no-index] [--dry-run]
                                           create the learning path ROADMAP/paths/<slug>.md (no stages; its tree goes
                                           into ## Lernpunkte); --template=learning writes the sections of a learning path;
                                           --tags=not-on-workstation (or on-workstation) goes to every task promoted
@@ -1364,7 +1364,7 @@ end
 local NEW_FILE_USAGE = {
   plan = 'plan-new <area> "<title>" [--slug=s] [--areas=a,b] [--target=id] [--phases=a,b,c] [--gate=hard] [--template=learning]',
   project = 'project-new <area> "<title>" [--slug=s] [--areas=a,b] [--target=id] [--phases=a,b,c] [--gate=hard] [--template=learning]',
-  path = 'path-new <area> "<title>" [--slug=s] [--areas=a,b] [--target=id] [--project=id] [--tags=a,b] [--template=learning] [--no-index]',
+  path = 'path-new <area> "<title>" [--slug=s] [--areas=a,b] [--target=id] [--project=id] [--tags=a,b] [--template=learning] [--no-index] [--dry-run]',
 }
 
 ---`plan-new`, `project-new` and `path-new`: make the file (`plans.new` with `kind`) and say its id.
@@ -1397,10 +1397,16 @@ local function new_file_command(ctx, kind)
     project = args.opt.project --[[@as string|nil]],
     template = args.opt.template --[[@as "learning"|nil]],
     tags = args.opt.tags --[[@as string|nil]],
+    -- only `path-new` takes `--dry-run` (for `--from`); without it the flag must not write either
+    dry_run = args.opt["dry-run"] == true,
   })
   if not res then
     ctx.warn("error: " .. tostring(err))
     return 1
+  end
+  if args.opt["dry-run"] == true then
+    ctx.say(("would-create\t%s\t%s"):format(res.id, res.path))
+    return 0
   end
   ctx.say(("created\t%s\t%s"):format(res.id, res.path))
   if res.ambiguous then
