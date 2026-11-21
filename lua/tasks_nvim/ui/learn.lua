@@ -339,6 +339,10 @@ function M.set_point(buf, row, state, reason)
     if not res then
       return nil, err
     end
+    -- a routine that waited for this point (`repeat_after: <path>#<key>`) has its first round now
+    for _, r in ipairs(res.routines_started or {}) do
+      notify.info(("routine %s starts: due %s"):format(r.id, r.due))
+    end
     return reload_following(buf, row, node), nil
   end
   local changed, err = lernbaum.set_state(snap.tree, node.index, state, reason)

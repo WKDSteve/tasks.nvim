@@ -356,4 +356,26 @@ return function(H)
   eq(code, 0, table.concat(err, "\n"))
   local cli_task = assert(scan.find(A .. "/per-cli", { root = root }))
   eq({ cli_task.repeat_every, cli_task.repeat_after }, { "1w,4w,12w", t3.id })
+
+  -- ── the editor: a point set in `:Tasks learn` says that a routine starts ───
+  require("tasks_nvim.vault").set_root(root)
+  local learn = require("tasks_nvim.ui.learn")
+  local editor_path = root .. "/" .. A .. "/ROADMAP/paths/editor-pfad.md"
+  H.write(
+    editor_path,
+    "---\ntitle: Editor\nstatus: doing\n---\n\n## Lernpunkte\n\n- [ ] Eins {#eins}\n- [ ] Zwei {#zwei}\n"
+  )
+  local in_editor = routine("Nach Eins im Editor", A .. "/editor-pfad#eins")
+  local told = {}
+  local real_notify = vim.notify
+  vim.notify = function(msg)
+    told[#told + 1] = tostring(msg)
+  end
+  vim.cmd("silent edit! " .. vim.fn.fnameescape(editor_path))
+  local ebuf = vim.api.nvim_get_current_buf()
+  local set_ok, set_err = learn.set_point(ebuf, 8, "learned")
+  vim.notify = real_notify
+  ok(set_ok, tostring(set_err))
+  has(table.concat(told, "\n"), "routine " .. in_editor.id .. " starts: due ")
+  vim.cmd("silent bwipeout! " .. ebuf)
 end
