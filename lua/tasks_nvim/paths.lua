@@ -181,12 +181,26 @@ function M.set(id, patch, opts)
 end
 
 ---Finish a path by hand: moved to `Backlog/FEATURES/<date>_<slug>.md` (`closed_kind: path`), a row in the README.
+---Starts the routines that waited for the path (`routine_after.settle`: `routines_started`, `notes`).
 ---@param id string
 ---@param opts? table
----@return { id: string, from: string, to: string, readme: string }|nil result
+---@return { id: string, from: string, to: string, readme: string, routines_started?: table[], notes?: string[] }|nil result
 ---@return string|nil err
+---@return table|nil info
 function M.close(id, opts)
-  return plans.close(id, vim.tbl_extend("force", opts or {}, { kind = "path" }))
+  opts = opts or {}
+  local res, err, info = plans.close(id, vim.tbl_extend("force", opts, { kind = "path" }))
+  -- the routines that waited for the path (`repeat_after`), now that it is in the Backlog
+  if res and not opts.dry_run and res.from ~= res.to then
+    local ran, started, notes = pcall(
+      require("tasks_nvim.routine_after").settle,
+      { root = opts.root, today = opts.today, index = opts.index, ids = { id } }
+    )
+    if ran then
+      res.routines_started, res.notes = started, notes
+    end
+  end
+  return res, err, info
 end
 
 ---Change the body of an open path under the lock of its file, every byte before the body (the frontmatter) as it was
@@ -269,12 +283,13 @@ end
 ---@param state? string
 ---@param reason? string
 ---@param opts? { root?: string, today?: string, if_match?: string, dry_run?: boolean, note?: string, xp?: integer|string }
----@return { id: string, path: string, etag_before: string, etag_after: string, changed: boolean, node: { line: integer, key?: string, state: string, xp?: integer }, progress: Tasks.LernProgress }|nil result
+---A changed state starts the routines that waited for a point of the path (`routines_started`, `notes`).
+---@return { id: string, path: string, etag_before: string, etag_after: string, changed: boolean, node: { line: integer, key?: string, state: string, xp?: integer }, progress: Tasks.LernProgress, routines_started?: table[], notes?: string[] }|nil result
 ---@return string|nil err
 ---@return table|nil info  # `{ code = "not_found"|"invalid_argument"|"conflict" }`
 function M.point(id, ref, state, reason, opts)
   opts = opts or {}
-  return edit_body(id, opts, function(body, result)
+  local res, err, info = edit_body(id, opts, function(body, result)
     local tree = lernbaum.parse(body)
     if state == nil and opts.note == nil and opts.xp == nil then
       return nil, "nothing to change: give a state, a note or xp", { code = "invalid_argument" }
@@ -302,6 +317,17 @@ function M.point(id, ref, state, reason, opts)
     result.progress = tree.progress
     return lernbaum.render(tree)
   end)
+  -- a point (or the stage above it) may be what a routine waits for (`repeat_after: <path>#<key>`)
+  if res and res.changed and state ~= nil and not opts.dry_run then
+    local ran, started, notes = pcall(
+      require("tasks_nvim.routine_after").settle,
+      { root = opts.root, today = opts.today, index = opts.index, ids = { res.id } }
+    )
+    if ran then
+      res.routines_started, res.notes = started, notes
+    end
+  end
+  return res, err, info
 end
 
 ---Mark the reward of a level granted (`given = true`, `[x]` in `## Level`) or not, under the lock of the file, every

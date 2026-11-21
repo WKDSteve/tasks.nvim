@@ -14,7 +14,7 @@
 ---    cannot both win; a change of the relations (`blocked_by`, `after`, `plan`, `phase`) is judged first
 ---    (`tasks_nvim.edges`)
 ---  - `new` { area, title, fields?, body? }: create a task; `body` (text, at most 20000 characters) replaces the template
----    sections of the file; `fields` are the keys (kind, prio, effort, tags, category, severity, value, actor, due, start, repeat, repeat_from, summary,
+---    sections of the file; `fields` are the keys (kind, prio, effort, tags, category, severity, value, actor, due, start, repeat, repeat_from, repeat_after, summary,
 ---    refs, links, status, slug, after, plan, phase); `after`, `plan` and `phase` are judged as `set` judges them
 ---    (`tasks_nvim.edges`: a target that exists nowhere, a plan that is no plan file, a phase not in its `phase_order`)
 ---  - `reorder` { id, after?, before?, group?, if_match? }: move a task inside its group (`batch.reorder`)
@@ -451,6 +451,7 @@ local NEW_FIELDS = {
   start = true,
   ["repeat"] = true,
   repeat_from = true,
+  repeat_after = true,
 }
 M.NEW_FIELDS = NEW_FIELDS
 
@@ -701,6 +702,28 @@ local function proposal_of(pairs_)
     end
   end
   return proposal
+end
+
+---The routines a write started (`repeat_after`, `routine_after.settle`): their ids join `changed`, their areas are
+---indexed with the others. Nil when none started, so a result without one reads as before.
+---@param ctx Tasks.OpsCtx
+---@param started? { id: string, due: string, after: string }[]
+---@param changed string[]
+---@return table[]|nil
+local function routines_written(ctx, started, changed)
+  if type(started) ~= "table" or #started == 0 then
+    return nil
+  end
+  local out = {}
+  for _, r in ipairs(started) do
+    changed[#changed + 1] = r.id
+    local area = r.id:match("^([^/]+)/")
+    if area then
+      ctx.touched[area] = true
+    end
+    out[#out + 1] = json.object({ id = r.id, due = r.due, after = r.after })
+  end
+  return out
 end
 
 ---A write that took the learning point of its task along (`set` to or from `blocked`, `reopen`): the container is
@@ -1574,6 +1597,7 @@ local function do_done(op, ctx)
   end
   vim.list_extend(changed, flow.milestones_reached)
   vim.list_extend(changed, flow.milestones_reopened)
+  local routines = routines_written(ctx, flow.routines_started, changed)
   local notes = {}
   for _, note in ipairs(flow.notes) do
     notes[#notes + 1] = contract.redact(ctx.root, note)
@@ -1590,6 +1614,8 @@ local function do_done(op, ctx)
     -- capability `milestones`: only when the finish reached or opened one
     milestones_reached = #flow.milestones_reached > 0 and flow.milestones_reached or nil,
     milestones_reopened = #flow.milestones_reopened > 0 and flow.milestones_reopened or nil,
+    -- capability `repeat_steps`: the routines that waited for this task (`repeat_after`) and start now
+    routines_started = routines,
     -- the learning point the task was promoted from, set to the finish's state (capability `outcome`)
     point = flow.point and {
       container = flow.point.container,
@@ -2028,17 +2054,20 @@ local function do_path_close(op, ctx)
   if ctx.dry then
     return { ok = true, id = op.id, outcome = "would_close", changed_ids = {} }
   end
-  local r, err = paths.close(op.id, { root = ctx.root, today = ctx.today, date = ctx.today })
+  local r, err =
+    paths.close(op.id, { root = ctx.root, today = ctx.today, date = ctx.today, index = false })
   if not r then
     return mutate_failure(ctx, err, nil)
   end
   ctx.touched[file.area] = true
+  local changed = { op.id }
   return {
     ok = true,
     id = op.id,
     outcome = "closed",
     to = rel(ctx, r.to),
-    changed_ids = { op.id },
+    routines_started = routines_written(ctx, r.routines_started, changed),
+    changed_ids = changed,
   }
 end
 
@@ -2090,6 +2119,7 @@ local function do_node_set(op, ctx)
   local r, err, info = paths.point(op.id, ref, op.state, op.reason, {
     root = ctx.root,
     today = ctx.today,
+    index = false,
     if_match = op.if_match,
     dry_run = ctx.dry,
     note = op.note,
@@ -2117,6 +2147,7 @@ local function do_node_set(op, ctx)
     progress = json.object(r.progress),
     changed_ids = (r.changed and not ctx.dry) and { r.id } or {},
   }
+  entry.routines_started = routines_written(ctx, r.routines_started, entry.changed_ids)
   -- the inverse gives back what the op touched: the state and reason the point had, its note ("" when it had none)
   if r.changed and not ctx.dry and old and (op.state == nil or old.state) then
     entry.inverse = json.object({

@@ -1909,6 +1909,7 @@ function M.task_new(ctx)
       start = ctx.kv.start,
       repeat_every = ctx.kv["repeat"],
       repeat_from = ctx.kv.repeat_from,
+      repeat_after = ctx.kv.repeat_after,
       status = values.status,
       waits_for = values.waits_for,
       web_links = values.links,
@@ -2479,6 +2480,12 @@ local function finish_task(id, opts)
   M.retarget_buffers(res.from, res.to)
   if flow.next_round then
     notify.info(("next round of %s: due %s"):format(flow.next_round.id, flow.next_round.due))
+  end
+  if flow.routine_ended then
+    notify.info(("%s was the last round of its routine"):format(id))
+  end
+  for _, r in ipairs(flow.routines_started or {}) do
+    notify.info(("routine %s starts: due %s"):format(r.id, r.due))
   end
   if res.index_err then
     notify.warn("task finished, but the index was not updated: " .. res.index_err)

@@ -346,8 +346,29 @@ that were missed). `new --repeat=8w [--repeat-from=due]`, `set <id> repeat=2w` (
 
 The next round of a folder task is a plain task file: its assets stay with the finished round.
 
-`check`: `bad-repeat` (error, also a `repeat_from` that is neither word), `repeat-without-due` (warning: the first round has
-no deadline) and `repeat-from-without-repeat` (warning). Not built: deleting with a warning, a history of the rounds beyond
+**A ladder** (`repeat: 1w,4w,12w`, 2 to 12 intervals, comma separated without spaces) is a routine with an end: each
+round takes the next interval, counted in `repeat_step` (the open round; absent: 1, written by `done` into the next
+round). The first round is due when you say (`due`, or `repeat_after` below); finishing it starts the second round due
+the finish plus the second interval, and so on. Finishing the last round ends the routine as `--last` does: no next
+round, `done_preview` says `ends_routine`, the CLI prints `routine-ended`. Counted from `due` (`repeat_from: due`) a
+ladder goes on by the next interval once, it skips no round. Learning paths repeat this way (`LP-14`: after one week,
+one month, three months: `repeat: 1w,4w,12w`).
+
+**A start after something** (`repeat_after: <area>/<slug>` for a task or a learning path, `<area>/<slug>#<key>` for a
+point of a path) lets a routine wait without a due date: no `repeat-without-due` while it waits. When that is finished
+(the task by `done`, a point by `paths.point` or the write door's `node_set`, or the task it was promoted to by `done`,
+the path by `path_close`), the engine writes `due`, `start` and `remind` = that day plus the first interval
+(`tasks_nvim.routine_after`; the finish reports it as `routines_started`, the CLI as `routine-started`). A point counts
+as finished when it is closed and something of it was learned or seen (a stage: all its leaves); a point dropped in
+full starts nothing. `repeat_after` stays in the first round and is not carried into the next. A routine with a `due`
+is never touched again. `new --repeat=1w,4w,12w --repeat-after=<ref>`, `set <id> repeat_after=<ref>`.
+
+`check`: `bad-repeat` (error, also a `repeat_from` that is neither word, a `repeat_step` past the ladder and a
+`repeat_after` that is no reference), `repeat-without-due` (warning: the first round has no deadline; not while it waits
+for `repeat_after`), `repeat-from-without-repeat`, `repeat-after-without-repeat`, `repeat-step-without-ladder`
+(warnings), `repeat-after-unknown` (warning: `repeat_after` names nothing that exists, the routine never starts) and
+`repeat-after-missed` (warning: what it waits for is finished, but it has no `due`, e.g. after a hand edit; the message
+names the due date to set). Not built: deleting with a warning, a history of the rounds beyond
 the Backlog files. `start` counts for every task, not only for rounds: a task whose earliest day to begin is ahead is not offered by `next`
 and not listed by `list --ready` (a clock-dependent answer, `--today` fixes the day).
 
@@ -822,7 +843,7 @@ file that is there (also not a refused one). Nobody else writes it: a person edi
 | `frontmatter-warning` (warning) | a frontmatter line was kept but not understood |
 | `area-groups-invalid` (error) | `<vault>/area-groups.json` cannot be read or parsed, or one of its groups (or one of `setup({ area_groups })`) is malformed; whole-vault runs only, area `""` |
 | `claim-expired`, `claim-orphan`, `doing-unclaimed` (warnings) | a claim that ran out, a claim file of a task that is not open, a `doing` task nobody claimed for seven days. See [Claims](#claims) |
-| `bad-repeat` (error), `repeat-without-due`, `repeat-from-without-repeat` (warnings) | `repeat` is no interval (or `repeat_from` is neither `done` nor `due`); a routine with no `due` date; `repeat_from` on a task that is no routine. See [Routines](#routines-repeat) |
+| `bad-repeat` (error), `repeat-without-due`, `repeat-from-without-repeat`, `repeat-after-without-repeat`, `repeat-step-without-ladder`, `repeat-after-unknown`, `repeat-after-missed` (warnings) | `repeat` is neither an interval nor a ladder (or `repeat_from` is neither `done` nor `due`, `repeat_step` is past the ladder, `repeat_after` is no reference); a routine with no `due` date that waits for nothing; `repeat_from` / `repeat_after` on a task that is no routine, `repeat_step` without a ladder; `repeat_after` names nothing, or names something finished while the routine has no `due`. See [Routines](#routines-repeat) |
 | `vault-marker-missing`, `vault-marker-outdated` (warnings) | the vault has no `tasks-vault.json`, or it names an older layout version than this engine writes; vault-wide, so the finding has `area: ""` and `file: tasks-vault.json` and a check of one area leaves it out |
 | `area-groups-config` (warning) | a group of `setup({ area_groups })` is malformed (the file is fine; a `setup()` group that replaces one of the file by name is no finding) |
 | `area-group-shadowed`, `area-group-empty`, `area-group-unknown-member`, `area-group-nested` (warnings) | an area group has the name of an area (the area wins), matches no area, names an exact area that does not exist, or names another group (groups do not nest); whole-vault runs only |

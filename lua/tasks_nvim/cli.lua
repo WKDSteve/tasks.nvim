@@ -169,7 +169,7 @@ commands:
   migrate-actor [<area>] [--write]        propose actor=me for tasks that wait for you (status decision, tag
                                           needs-user) and leave every other task EMPTY; dry run unless --write
   new <area>[,<area>...] <title> [--kind=k] [--prio=1..3] [--effort=XS..XL|0.5d] [--value=1..5] [--xp=N] [--actor=cdx|me|pair] [--after=id,id] [--order=2.5] [--plan=id|--project=id] [--phase=word] [--created=YYYY-MM-DD] [--tags=a,b]
-       [--category=c,d] [--scope=a,b] [--severity=low|medium|high|critical] [--due=YYYY-MM-DD] [--start=YYYY-MM-DD] [--repeat=8w] [--repeat-from=done|due] [--refs=path,repo@sha] [--links=https://...,...]
+       [--category=c,d] [--scope=a,b] [--severity=low|medium|high|critical] [--due=YYYY-MM-DD] [--start=YYYY-MM-DD] [--repeat=8w|1w,4w,12w] [--repeat-from=done|due] [--repeat-after=<id>|<path id>#<key>] [--refs=path,repo@sha] [--links=https://...,...]
        [--summary=text] [--slug=slug] [--status=s] [--waits-for=key] [--outcome=learned|seen|not-applicable] [--reason=text]
        [--icon=<emoji|assets/x.svg|word>] [--cover=assets/x.png]
        [--lang=de|en] [--folder]             create a task file (--lang: body headings;
@@ -527,6 +527,7 @@ local SPECS = {
       "start",
       "repeat",
       "repeat-from",
+      "repeat-after",
       "lang",
       "summary",
       "slug",
@@ -2140,6 +2141,7 @@ function commands.new(ctx)
     created = opt.created --[[@as string|nil]],
     repeat_every = opt["repeat"] --[[@as string|nil]],
     repeat_from = opt["repeat-from"] --[[@as string|nil]],
+    repeat_after = opt["repeat-after"] --[[@as string|nil]],
     lang = opt.lang --[[@as "de"|"en"|nil]],
     summary = opt.summary --[[@as string|nil]],
     slug = opt.slug --[[@as string|nil]],
@@ -2522,6 +2524,12 @@ function commands.done(ctx)
   end
   if flow.next_round then
     ctx.say(("next-round\t%s\t%s"):format(flow.next_round.id, flow.next_round.due))
+  end
+  if flow.routine_ended then
+    ctx.say(("routine-ended\t%s\tthe last round of repeat"):format(id))
+  end
+  for _, r in ipairs(flow.routines_started or {}) do
+    ctx.say(("routine-started\t%s\t%s\tafter %s"):format(r.id, r.due, r.after))
   end
   for _, plan_id in ipairs(flow.plans_closed) do
     ctx.say(

@@ -96,6 +96,10 @@ mutate(
   (d) => (d.tasks[0].readiness.state = "maybe"),
 );
 mutate("a prio of 4", "snapshot", (d) => (d.tasks[0].prio = 4));
+mutate("a ladder of 13 intervals", "task-ladder", (d) => (d.task.repeat = Array(13).fill("1w").join(",")));
+mutate("a ladder with a space", "task-ladder", (d) => (d.task.repeat = "1w, 4w"));
+mutate("a round 0 of a ladder", "task-ladder", (d) => (d.task.repeat_step = 0));
+mutate("a last round that is not true", "donepreview-ladder-last", (d) => (d.ends_routine = false));
 mutate("a sheet state nobody defined", "task-alpha", (d) => (d.task.sheets.state = "purple"));
 mutate("sheet counts without a state", "task-alpha", (d) => delete d.task.sheets.counts.inbox);
 mutate(

@@ -174,6 +174,8 @@ return function(H)
         "reason",
         "refs",
         "repeat",
+        -- `repeat_after=` in the editor, as `repeat_from=`
+        "repeat-after",
         "repeat-from",
         "scope",
         "severity",

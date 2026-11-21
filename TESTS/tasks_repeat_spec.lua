@@ -117,7 +117,7 @@ return function(H)
   has(text, "repeat_from: due")
   eq(
     select(2, mutate.new("lib.nvim", with({ title = "X", repeat_every = "soon" }))),
-    model.repeat_error("soon")
+    model.repeat_steps_error("soon")
   )
   has(select(2, mutate.new("lib.nvim", with({ title = "Y", repeat_from = "due" }))), "needs repeat")
   has(

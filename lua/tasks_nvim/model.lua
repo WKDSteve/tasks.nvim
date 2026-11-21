@@ -573,6 +573,94 @@ function M.repeat_error(value)
   )
 end
 
+---The most intervals of a ladder (`1w,4w,12w`).
+M.REPEAT_STEPS_MAX = 12
+
+---Split the `repeat` of a routine into its intervals: one (`8w`, every eight weeks for good) or a ladder of 2 to
+---`REPEAT_STEPS_MAX`, comma separated without spaces (`1w,4w,12w`: each round takes the next interval, after the last
+---the routine ends). A meeting's series takes one interval only (`parse_repeat`).
+---@param s any
+---@return { n: integer, unit: string }[]|nil steps
+function M.parse_repeat_steps(s)
+  if type(s) ~= "string" or s == "" or #s > M.REPEAT_STEPS_MAX * 5 then
+    return nil
+  end
+  local out = {}
+  for part in (s .. ","):gmatch("([^,]*),") do
+    local n, unit = M.parse_repeat(part)
+    if not n or #out >= M.REPEAT_STEPS_MAX then
+      return nil
+    end
+    out[#out + 1] = { n = n, unit = unit }
+  end
+  return out
+end
+
+---Whether a value is the `repeat` of a routine: one interval or a ladder (`parse_repeat_steps`).
+---@param s any
+---@return boolean
+function M.is_repeat_steps(s)
+  return M.parse_repeat_steps(s) ~= nil
+end
+
+---The message for a routine's `repeat` that is neither an interval nor a ladder.
+---@param value any
+---@return string
+function M.repeat_steps_error(value)
+  return M.repeat_error(value)
+    .. (", or a ladder of up to %d of them, comma separated: 1w,4w,12w"):format(M.REPEAT_STEPS_MAX)
+end
+
+---The `repeat_step` of a ladder: the 1-based round the open task is (absent: 1). A whole number of 1 to
+---`REPEAT_STEPS_MAX`, as a number or its digits.
+---@param v any
+---@return integer|nil
+function M.to_repeat_step(v)
+  local n = type(v) == "number" and v
+    or (type(v) == "string" and v:match("^[1-9]%d?$") and tonumber(v))
+  if type(n) ~= "number" or n ~= math.floor(n) or n < 1 or n > M.REPEAT_STEPS_MAX then
+    return nil
+  end
+  return n
+end
+
+---Whether a value names what a routine starts after (`repeat_after`): a task or learning path id (`<area>/<slug>`) or
+---a point of a path (`<area>/<slug>#<key>`).
+---@param v any
+---@return boolean
+function M.is_repeat_after(v)
+  if type(v) ~= "string" or #v > 300 then
+    return false
+  end
+  local id, key = v:match("^([^#]+)#(.+)$")
+  id = id or v
+  if not id:match("^[%w._-]+/[%w._-]+$") or id:find("..", 1, true) then
+    return false
+  end
+  return key == nil or key:match("^[%w_-]+$") ~= nil
+end
+
+---Whether the open round of a routine is the last of its ladder: finishing it ends the routine.
+---@param task { repeat_every?: string, repeat_step?: integer }
+---@return boolean
+function M.is_last_round(task)
+  local ladder = M.parse_repeat_steps(task.repeat_every)
+  return ladder ~= nil and #ladder > 1 and (task.repeat_step or 1) >= #ladder
+end
+
+---The due date of a routine's first round when it starts after something (`repeat_after`): the day that was finished
+---plus the first interval.
+---@param task { repeat_every?: string }
+---@param date string  YYYY-MM-DD
+---@return string|nil due
+function M.first_round_due(task, date)
+  local ladder = M.parse_repeat_steps(task.repeat_every)
+  if not ladder then
+    return nil
+  end
+  return M.add_interval(date, ladder[1].n, ladder[1].unit)
+end
+
 ---@param value any
 ---@return boolean
 function M.is_repeat_from(value)
@@ -615,15 +703,30 @@ end
 ---With `repeat_from` `done` (the default) it counts from `done_date`; with `due` from the finished round's due date and
 ---goes on by whole intervals until the date is after `today` (a rhythm that fell behind skips the missed rounds). A
 ---round with no due date counts from `done_date` either way.
----@param task { due?: string, repeat_every?: string, repeat_from?: string }
+---
+---A ladder (`1w,4w,12w`) takes the interval after the one of the finished round (`repeat_step`, absent: 1) and answers
+---that step as the second value; after its last round there is none (nil). Counted from the due date it goes on by
+---that interval once: a ladder skips no round.
+---@param task { due?: string, repeat_every?: string, repeat_from?: string, repeat_step?: integer }
 ---@param done_date string
 ---@param today string
 ---@return string|nil due
+---@return integer|nil step  # The round the next one is on the ladder; nil for a routine of one interval.
 function M.next_round_due(task, done_date, today)
-  local n, unit = M.parse_repeat(task.repeat_every)
-  if not n then
+  local ladder = M.parse_repeat_steps(task.repeat_every)
+  if not ladder then
     return nil
   end
+  if #ladder > 1 then
+    local step = (task.repeat_step or 1) + 1
+    local s = ladder[step]
+    if not s then
+      return nil
+    end
+    local from = (task.repeat_from == "due" and M.is_date(task.due)) and task.due or done_date
+    return M.add_interval(from, s.n, s.unit), step
+  end
+  local n, unit = ladder[1].n, ladder[1].unit
   if task.repeat_from == "due" and M.is_date(task.due) then
     local due = task.due
     for _ = 1, 100000 do
@@ -1551,11 +1654,55 @@ function M.parse_text(text, ctx)
 
     -- a routine: `repeat: 8w` makes `done` start the next round; `repeat_from` says where it counts from
     local every = as_text(meta["repeat"], "repeat", bad)
+    -- `repeat_after`: the routine starts when that task, path or point is finished (its first `due` is written then)
+    local after = as_text(meta.repeat_after, "repeat_after", bad)
+    if after then
+      task.repeat_after = after
+      if not M.is_repeat_after(after) then
+        bad(
+          "bad-repeat",
+          ("repeat_after '%s' is no id (<area>/<slug>) and no point of a path (<area>/<slug>#<key>)"):format(
+            after
+          )
+        )
+      elseif not every then
+        hints[#hints + 1] = {
+          code = "repeat-after-without-repeat",
+          msg = "repeat_after without repeat does nothing",
+        }
+      end
+    end
+    -- `repeat_step`: the round of a ladder (`1w,4w,12w`) the open task is; written by `done`
+    if meta.repeat_step ~= nil then
+      local step = M.to_repeat_step(meta.repeat_step)
+      local ladder = M.parse_repeat_steps(every)
+      if not step then
+        bad(
+          "bad-repeat",
+          ("repeat_step '%s' is no round (a whole number of 1 to %d)"):format(
+            tostring(meta.repeat_step),
+            M.REPEAT_STEPS_MAX
+          )
+        )
+      elseif not ladder or #ladder < 2 then
+        hints[#hints + 1] = {
+          code = "repeat-step-without-ladder",
+          msg = "repeat_step without a ladder in repeat (1w,4w,12w) does nothing",
+        }
+      elseif step > #ladder then
+        bad(
+          "bad-repeat",
+          ("repeat_step %d is past the last round of repeat %s"):format(step, tostring(every))
+        )
+      else
+        task.repeat_step = step
+      end
+    end
     if every then
       task.repeat_every = every
-      if not M.is_repeat(every) then
-        bad("bad-repeat", M.repeat_error(every))
-      elseif not M.is_date(task.due) then
+      if not M.is_repeat_steps(every) then
+        bad("bad-repeat", M.repeat_steps_error(every))
+      elseif not M.is_date(task.due) and not (after and M.is_repeat_after(after)) then
         hints[#hints + 1] = {
           code = "repeat-without-due",
           msg = ("repeat '%s' on a task with no due date: the first round has no deadline (set due=YYYY-MM-DD)"):format(

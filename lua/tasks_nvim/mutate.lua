@@ -472,6 +472,9 @@ local function meta_pairs(meta)
   if meta.repeat_from then
     pairs_[#pairs_ + 1] = { "repeat_from", meta.repeat_from }
   end
+  if meta.repeat_after then
+    pairs_[#pairs_ + 1] = { "repeat_after", meta.repeat_after }
+  end
   pairs_[#pairs_ + 1] = { "created", meta.created }
   pairs_[#pairs_ + 1] = { "updated", meta.updated }
   if meta.refs then
@@ -827,6 +830,8 @@ local SETTABLE = {
   "start",
   "repeat",
   "repeat_from",
+  "repeat_after",
+  "repeat_step",
 }
 
 ---@type string[]
@@ -1005,10 +1010,30 @@ local FIELD_NORMALIZERS = {
   due = date_field,
   start = date_field,
   ["repeat"] = function(value)
-    if not model.is_repeat(value) then
-      return nil, model.repeat_error(value)
+    if not model.is_repeat_steps(value) then
+      return nil, model.repeat_steps_error(value)
     end
     return value
+  end,
+  repeat_after = function(value)
+    if not model.is_repeat_after(value) then
+      return nil,
+        ("repeat_after '%s' is no id (<area>/<slug>) and no point of a path (<area>/<slug>#<key>)"):format(
+          tostring(value)
+        )
+    end
+    return value
+  end,
+  repeat_step = function(value)
+    local step = model.to_repeat_step(value)
+    if not step then
+      return nil,
+        ("repeat_step must be a whole number from 1 to %d, got %s"):format(
+          model.REPEAT_STEPS_MAX,
+          tostring(value)
+        )
+    end
+    return tostring(step)
   end,
   repeat_from = one_of("repeat_from", model.is_repeat_from, model.REPEAT_FROMS),
   remind = function(value, _, ctx)
@@ -1542,8 +1567,19 @@ function M.new(area, opts)
   if opts.due ~= nil and opts.start ~= nil and opts.start > opts.due then
     return nil, ("start %s is after due %s"):format(opts.start, opts.due)
   end
-  if opts.repeat_every ~= nil and not model.is_repeat(opts.repeat_every) then
-    return nil, model.repeat_error(opts.repeat_every)
+  if opts.repeat_every ~= nil and not model.is_repeat_steps(opts.repeat_every) then
+    return nil, model.repeat_steps_error(opts.repeat_every)
+  end
+  if opts.repeat_after ~= nil then
+    if not model.is_repeat_after(opts.repeat_after) then
+      return nil,
+        ("repeat_after '%s' is no id (<area>/<slug>) and no point of a path (<area>/<slug>#<key>)"):format(
+          tostring(opts.repeat_after)
+        )
+    end
+    if opts.repeat_every == nil then
+      return nil, "repeat_after needs repeat"
+    end
   end
   if opts.repeat_from ~= nil then
     if not model.is_repeat_from(opts.repeat_from) then
@@ -1634,6 +1670,7 @@ function M.new(area, opts)
       start = opts.start,
       repeat_every = opts.repeat_every,
       repeat_from = opts.repeat_from,
+      repeat_after = opts.repeat_after,
       refs = refs,
       links = links,
       icon = icon,

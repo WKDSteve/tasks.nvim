@@ -101,6 +101,10 @@
 ---    `milestone-include-overlap`, `milestone-drift`, `milestone-overdue`, `milestone-empty` (warnings): a member in it
 ---    twice (through a plan or project it names), a status behind its members, a `due` passed, no members
 ---  - `bad-xp`: the `xp:` of a task is no whole number from 0 to `lernbaum.MAX_XP`
+---  - routines (`repeat`): `bad-repeat` (error), `repeat-without-due` (warning; not while it waits for `repeat_after`),
+---    `repeat-from-without-repeat`, `repeat-after-without-repeat`, `repeat-step-without-ladder` (warnings);
+---    `repeat-after-unknown` (warning: `repeat_after` names nothing that exists), `repeat-after-missed` (warning: what it
+---    waits for is finished, the routine has no `due`)
 ---  - promoted learning points (`tasks_nvim.promote`, warnings): `promote-point-dangling` (a task's `point:` names no
 ---    open path or task, or no point there whose arrow names the task), `promote-state-drift` (the mark of the point
 ---    says something else than the task: closed while it is open, `[!]` against an open task or `[ ]` against a
@@ -1596,6 +1600,45 @@ function M.ui_words_on(root)
   return true
 end
 
+---`repeat-after-unknown`, `repeat-after-missed` (warnings): a routine that waits for something to be finished
+---(`repeat_after`, no `due` yet) names nothing that exists, or waits for something finished already, so it was not
+---started (finished by hand, outside the engine); the message names the due date it would have.
+---@param findings Tasks.Finding[]
+---@param root string
+---@param t Tasks.Task
+---@param today string
+local function repeat_after_findings(findings, root, t, today)
+  if
+    not model.is_repeat_after(t.repeat_after)
+    or not model.is_repeat_steps(t.repeat_every)
+    or model.is_date(t.due)
+  then
+    return
+  end
+  local r = require("tasks_nvim.routine_after").resolve(t.repeat_after, root, today)
+  if r.state == "unknown" then
+    add(
+      findings,
+      "warn",
+      "repeat-after-unknown",
+      t,
+      ("repeat_after %s: %s, so the routine never starts"):format(t.repeat_after, tostring(r.why))
+    )
+  elseif r.state == "finished" then
+    add(
+      findings,
+      "warn",
+      "repeat-after-missed",
+      t,
+      ("%s was finished on %s, but the routine did not start (set due=%s)"):format(
+        t.repeat_after,
+        tostring(r.date),
+        tostring(model.first_round_due(t, r.date))
+      )
+    )
+  end
+end
+
 ---Run the checks.
 ---@param opts? Tasks.CheckOpts
 ---@return Tasks.CheckResult|nil result
@@ -1833,6 +1876,7 @@ function M.run(opts)
   for _, name in ipairs(names) do
     for _, t in ipairs(by_area[name] and by_area[name].tasks or {}) do
       ui_findings(findings, hints, t, words)
+      repeat_after_findings(findings, root, t, today)
       if t.status ~= "parked" and model.is_date(t.due) and t.due < today then
         add(findings, "warn", "overdue", t, ("due %s is before today (%s)"):format(t.due, today))
       end

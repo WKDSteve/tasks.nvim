@@ -1,0 +1,47 @@
+{
+  "client_op_id": "golden-routine-started",
+  "digest": "sha256:816cbec9622c6663",
+  "dry_run": false,
+  "engine": {
+    "git": "0000000",
+    "nvim": "0.0.0",
+    "version": "0.1.0-test"
+  },
+  "generated_at": "2026-01-01T00:00:00Z",
+  "kind": "tasks.result",
+  "ok": true,
+  "plugin": "tasks.nvim",
+  "results": [
+    {
+      "changed_ids": [
+        "lib.nvim/delta",
+        "lib.nvim/delta-review"
+      ],
+      "etag_before": "sha256:98c1b0df33935da9",
+      "id": "lib.nvim/delta",
+      "index": {
+        "action": "written"
+      },
+      "n": 1,
+      "notes": [],
+      "ok": true,
+      "op": "done",
+      "outcome": "done",
+      "plans_closed": [],
+      "projects_closed": [],
+      "routines_started": [
+        {
+          "after": "lib.nvim/delta",
+          "due": "2026-01-09",
+          "id": "lib.nvim/delta-review"
+        }
+      ],
+      "steps_ticked": 0,
+      "to": "lib.nvim/Backlog/TASKS/2026-01-02_delta.md"
+    }
+  ],
+  "schema": 1,
+  "vault": {
+    "id": "vault"
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "area": "lib.nvim",
+  "bucket": "TASKS",
+  "confirm": "done-daa7ad988b73dacb-f6da83",
+  "digest": "sha256:32138e328294755c",
+  "ends_routine": true,
+  "engine": {
+    "git": "0000000",
+    "nvim": "0.0.0",
+    "version": "0.1.0-test"
+  },
+  "etag": "sha256:daa7ad988b73dacb",
+  "freed": [],
+  "from": "lib.nvim/ROADMAP/tasks/review-2026-03-02.md",
+  "generated_at": "2026-01-01T00:00:00Z",
+  "id": "lib.nvim/review-2026-03-02",
+  "kind": "tasks.donepreview",
+  "plugin": "tasks.nvim",
+  "readme": {
+    "row": "| [`2026-01-02_review-2026-03-02.md`](./TASKS/2026-01-02_review-2026-03-02.md) | Review — Again. (2026-01-02) |",
+    "state": "updated"
+  },
+  "resumed": false,
+  "schema": 1,
+  "steps_ticked": 0,
+  "to": "lib.nvim/Backlog/TASKS/2026-01-02_review-2026-03-02.md",
+  "vault": {
+    "id": "vault"
+  }
+}

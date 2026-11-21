@@ -14,7 +14,10 @@
 --- and acceptance boxes ticked off again), `due` and `remind` set to the next date, and the slug `<base>-<due>`
 --- (`sweep` becomes `sweep-2027-01-05`: an open task and a finished one may not share an id, `check` says
 --- `duplicate-id`, so each round has an id of its own)
---- (`model.next_round_due`); `opts.last` finishes a routine without one. It is written after the finish and reported in
+--- (`model.next_round_due`); `opts.last` finishes a routine without one. A ladder (`repeat: 1w,4w,12w`) counts its round in
+--- `repeat_step`: each round takes the next interval, and the last one ends the routine as `opts.last` does
+--- (`routine_ended`). After the finish the routines that wait for this task, or for the learning point it was promoted
+--- from, start (`repeat_after`, `tasks_nvim.routine_after`; reported in `routines_started`). It is written after the finish and reported in
 --- `next_round`; if it cannot be written the finish stands and a note says so (a routine must not be lost silently).
 ---
 --- Rules the chain keeps (so they can be relied on now):
@@ -61,6 +64,8 @@ local M = {}
 ---@field milestones_reopened string[]  # Reached milestones set back to `doing` (a member open again).
 ---@field docs_refreshed string[]    # Generated plan blocks that were refreshed.
 ---@field next_round? { id: string, due: string, path: string }  # The next round of a routine that was started.
+---@field routine_ended? boolean    # The task was the last round of a ladder (`repeat: 1w,4w,12w`): no next round.
+---@field routines_started { id: string, due: string, after: string }[]  # Routines that waited for this (`repeat_after`).
 ---@field meetings_ticked? string[]  # Meetings whose follow-up line of this task was ticked.
 ---@field notes string[]             # Follow-up steps that did not work; the finish itself stands.
 ---@field next? Tasks.NextPick       # What to start next (`next_pick`); absent when not asked for or not computable.
@@ -500,7 +505,7 @@ local function read_routine(id, opts)
     return nil
   end
   local task = mutate.find_open(id, root)
-  if not task or not model.is_repeat(task.repeat_every) then
+  if not task or not model.is_repeat_steps(task.repeat_every) then
     return nil
   end
   local text = fsio.read(task.path)
@@ -530,7 +535,7 @@ M.ROUNDS_MAX = 100
 ---@return { task: Tasks.Task, done: string|nil }[]|nil rounds
 ---@return boolean truncated
 function M.rounds(task, opts)
-  if not model.is_repeat(task.repeat_every) then
+  if not model.is_repeat_steps(task.repeat_every) then
     return nil, false
   end
   local stem = M.round_base(task.slug)
@@ -570,7 +575,7 @@ local function start_next_round(routine, opts)
   end
   local today = opts.today or model.today()
   local done_date = opts.date or today
-  local due = model.next_round_due(task, done_date, today)
+  local due, step = model.next_round_due(task, done_date, today)
   if not due then
     return nil, "the next due date cannot be worked out from repeat " .. tostring(task.repeat_every)
   end
@@ -584,6 +589,9 @@ local function start_next_round(routine, opts)
     { "outcome", mutate.REMOVE },
     { "outcome_reason", mutate.REMOVE },
     { "blocked_by", mutate.REMOVE },
+    -- the round of a ladder; a routine of one interval has none. What it started after belongs to its first round.
+    { "repeat_step", step and tostring(step) or mutate.REMOVE },
+    { "repeat_after", mutate.REMOVE },
     -- the round is not ready before its due day: `next` and `list --ready` honour `start`
     { "start", due },
     { "remind", due },
@@ -616,6 +624,7 @@ end
 ---@field closes_project? string # The project file this finish closes after that: no other plan (a parked one does not count) and no task of its own is open.
 ---@field freed string[]        # Open tasks that wait on nothing but this one.
 ---@field next_round? { due: string }  # The due date of the next round, when the task is a routine.
+---@field ends_routine? boolean  # The task is the last round of a ladder: finishing it ends the routine.
 
 ---What finishing `id` would do, chain included, with nothing written: `mutate.done_preview` plus the plan it would
 ---close and the tasks it would free. The `confirm` token in the answer is what `run` is confirmed with.
@@ -637,7 +646,9 @@ function M.preview(id, opts)
   end
   if not opts.last then
     local routine = read_routine(id, opts)
-    if routine then
+    if routine and model.is_last_round(routine.task) then
+      pv.ends_routine = true
+    elseif routine then
       local today = opts.today or model.today()
       local due = model.next_round_due(routine.task, opts.date or today, today)
       pv.next_round = due and { due = due } or nil
@@ -717,6 +728,11 @@ end
 function M.run(id, opts)
   opts = opts or {}
   local routine = not opts.last and not opts.drafts and read_routine(id, opts) or nil
+  -- the last round of a ladder ends the routine, as `--last` does
+  local routine_ended = routine ~= nil and model.is_last_round(routine.task)
+  if routine_ended then
+    routine = nil
+  end
   -- a claim of somebody else that this finish goes past (force and a note): written into the finished task afterwards
   local passed
   do
@@ -752,6 +768,7 @@ function M.run(id, opts)
     milestones_reached = {},
     milestones_reopened = {},
     docs_refreshed = {},
+    routines_started = {},
     notes = {},
   }
   flow.steps_ticked = done.steps_ticked or 0
@@ -806,6 +823,25 @@ function M.run(id, opts)
   end
   if passed and done.to then
     require("tasks_nvim.claims").record_override_in_file(done.to, passed, opts)
+  end
+  flow.routine_ended = routine_ended or nil
+  -- the routines that waited for this task, or for the point it was promoted from (`repeat_after`)
+  do
+    local ran, started, rnotes = pcall(require("tasks_nvim.routine_after").settle, {
+      root = opts.root,
+      today = opts.today,
+      index = opts.index,
+      ids = { done.id, flow.point and flow.point.container or nil },
+    })
+    if ran then
+      flow.routines_started = started
+      vim.list_extend(flow.notes, rnotes)
+    else
+      flow.notes[#flow.notes + 1] = "the routines waiting for "
+        .. id
+        .. " were not started: "
+        .. tostring(started)
+    end
   end
   -- the routine first: the plan below must see the open next round, or it would close a plan that goes on
   if routine then

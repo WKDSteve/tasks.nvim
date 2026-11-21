@@ -328,7 +328,7 @@ so on stderr as `warn: <id>: plan X is no plan file ...`; `tasks check` reports 
 
 Changes frontmatter of an *open* task and sets `updated` -- but only when something really
 changed (an identical value rewrites nothing). Settable: `title status waits_for kind prio effort tags
-category scope severity value actor summary blocked_by after order plan phase refs rules done_in commits created remind due start repeat repeat_from`. A value may contain spaces
+category scope severity value actor summary blocked_by after order plan phase refs rules done_in commits created remind due start repeat repeat_from repeat_after repeat_step`. A value may contain spaces
 (`title=Fix the thing status=doing`: a word that does not start with a known `key=`
 continues the value before it); an empty value removes the key (`kind=`). `status=done` is
 refused: finishing moves the file, see `task done`. A *finished* task takes `remind=` only (a date, or `+7d` / `+2w` from today;
@@ -857,7 +857,9 @@ with that first row, as closing a plan does.
 **A routine** (`repeat: 8w`, see [ENGINE.md](ENGINE.md#routines-repeat)) starts its next round when it is finished: the
 finished round goes to `Backlog/` as always, and a new open task with the slug `<base>-<due>` takes its place. The CLI
 prints `next-round<TAB><id><TAB><due>`, the editor says "next round of ...". `tasks done <id> --last` (headless) finishes a
-routine for good: no next round (or take `repeat` away with `set <id> repeat=` first).
+routine for good: no next round (or take `repeat` away with `set <id> repeat=` first). A ladder (`repeat: 1w,4w,12w`)
+ends by itself after its last round (`routine-ended`), and a finish that a routine waited for (`repeat_after`) starts
+it (`routine-started <id> <due> after <ref>`); see [ENGINE.md](ENGINE.md#routines-repeat).
 
 Rule R6, after a confirmation (`--yes` skips it): `status: done`, `done_in`, `commits`; the file moves
 to `Backlog/FEATURES/` (`feature`, `idea`, `research`) or `Backlog/TASKS/` (`task`, `bug`, no

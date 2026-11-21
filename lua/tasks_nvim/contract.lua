@@ -124,6 +124,7 @@ M.CAPABILITIES = {
   "reopen",
   "reorder",
   "repeat",
+  "repeat_steps",
   "rounds",
   "set_body",
   "set_section",
@@ -368,8 +369,12 @@ local function task_entry(root, task, node, rank, meeting_ids)
     start = model.is_date(task.start) and task.start or nil,
     claim = M.claim_entry(root, task.id),
     -- a routine: the interval and where the next round counts from (only well-formed values)
-    ["repeat"] = model.is_repeat(task.repeat_every) and task.repeat_every or nil,
+    -- (capability `repeat_steps`: `repeat` may be a ladder `1w,4w,12w`, with `repeat_step` the round of it, and
+    -- `repeat_after` what the routine starts after)
+    ["repeat"] = model.is_repeat_steps(task.repeat_every) and task.repeat_every or nil,
     repeat_from = model.is_repeat_from(task.repeat_from) and task.repeat_from or nil,
+    repeat_step = model.is_repeat_steps(task.repeat_every) and task.repeat_step or nil,
+    repeat_after = model.is_repeat_after(task.repeat_after) and task.repeat_after or nil,
     plan = task.plan,
     project = task.project,
     phase = task.phase,
@@ -2938,6 +2943,8 @@ function M.done_preview(id, opts)
   doc.closes_plan = pv.closes_plan
   doc.closes_project = pv.closes_project
   doc.next_round = pv.next_round and json.object({ due = pv.next_round.due }) or nil
+  -- capability `repeat_steps`: the last round of a ladder starts none
+  doc.ends_routine = pv.ends_routine == true or nil
   doc.freed = vim.list_slice(pv.freed, 1)
   doc.etag = pv.etag
   doc.confirm = pv.confirm

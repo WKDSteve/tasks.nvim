@@ -1343,8 +1343,18 @@
         },
         "repeat": {
           "type": "string",
-          "pattern": "^[1-9][0-9]{0,2}[dwmy]$",
-          "description": "A routine (optional): every N days, weeks, months or years (`8w`). Finishing the task starts the next round. Capability `repeat`."
+          "pattern": "^[1-9][0-9]{0,2}[dwmy](,[1-9][0-9]{0,2}[dwmy]){0,11}$",
+          "description": "A routine (optional): every N days, weeks, months or years (`8w`). Finishing the task starts the next round. Capability `repeat`. With capability `repeat_steps` also a ladder of 2 to 12 intervals (`1w,4w,12w`): each round takes the next interval, the last round ends the routine."
+        },
+        "repeat_step": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 12,
+          "description": "A ladder (`repeat: 1w,4w,12w`): the round the open task is, 1-based; absent: 1 (capability `repeat_steps`)."
+        },
+        "repeat_after": {
+          "type": "string",
+          "description": "A routine that starts when something is finished (capability `repeat_steps`): a task or learning path id (`<area>/<slug>`) or a point of a path (`<area>/<slug>#<key>`). While it has no `due` it waits; the finish writes due = that day + the first interval."
         },
         "repeat_from": {
           "enum": ["done", "due"],
@@ -4639,6 +4649,20 @@
           "type": "array",
           "items": { "type": "string" }
         },
+        "routines_started": {
+          "description": "`done`, `node_set`, `path_close`: the routines that waited for what this operation finished (`repeat_after`) and got their first `due` (capability `repeat_steps`; only when there is one). Their ids are in `changed_ids`.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "due", "after"],
+            "properties": {
+              "id": { "type": "string" },
+              "due": { "$ref": "#/$defs/Date" },
+              "after": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        },
         "point": {
           "description": "`done`: the learning point the task was promoted from, set to the state of the finish (capability `outcome`).",
           "type": "object",
@@ -4786,6 +4810,10 @@
         "closes_project": {
           "description": "The project this finish closes after that: no other plan (a parked one does not count) and no task of its own is open (capability `projects`).",
           "type": "string"
+        },
+        "ends_routine": {
+          "description": "The task is the last round of a ladder (`repeat: 1w,4w,12w`): the finish starts no next round (capability `repeat_steps`; only when true).",
+          "const": true
         },
         "next_round": {
           "description": "Present when the task is a routine (`repeat`): the due date of the round the finish starts.",

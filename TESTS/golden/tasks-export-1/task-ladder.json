@@ -1,0 +1,53 @@
+{
+  "body": "\nAgain.\n",
+  "body_truncated": false,
+  "digest": "sha256:fdf5aca2f6ed95f8",
+  "engine": {
+    "git": "0000000",
+    "nvim": "0.0.0",
+    "version": "0.1.0-test"
+  },
+  "generated_at": "2026-01-01T00:00:00Z",
+  "kind": "tasks.task",
+  "plugin": "tasks.nvim",
+  "questions": [],
+  "rev": "rev:b7acfe",
+  "rounds": [],
+  "schema": 1,
+  "steps": [],
+  "task": {
+    "after": [],
+    "area": "lib.nvim",
+    "blocked_by": [],
+    "category": [],
+    "created": "2026-01-01",
+    "due": "2026-03-02",
+    "etag": "sha256:2b7dbc18affb6897",
+    "file": "lib.nvim/ROADMAP/tasks/review-2026-03-02.md",
+    "folder": false,
+    "group": "open|-",
+    "id": "lib.nvim/review-2026-03-02",
+    "problems": [],
+    "readiness": {
+      "leverage": 0,
+      "open_blockers": [],
+      "rank": 7,
+      "stage": 0,
+      "state": "ready"
+    },
+    "refs": [],
+    "repeat": "1w,4w,12w",
+    "repeat_after": "lib.nvim/alpha#lua",
+    "repeat_step": 2,
+    "slug": "review-2026-03-02",
+    "status": "open",
+    "summary": "Again.",
+    "tags": [],
+    "title": "Review",
+    "updated": "2026-01-01",
+    "valid": true
+  },
+  "vault": {
+    "id": "vault"
+  }
+}

@@ -664,8 +664,10 @@ local FIELD_DESC = {
   cover = "A large picture below assets/ (png, jpg, webp, svg)",
   due = "Deadline as YYYY-MM-DD (optional); the reminder is remind",
   start = "Earliest day to begin as YYYY-MM-DD (optional); never after due",
-  ["repeat"] = "A routine: every N d, w, m or y (8w); finishing it starts the next round",
+  ["repeat"] = "A routine: every N d, w, m or y (8w), or a ladder 1w,4w,12w that ends",
   repeat_from = "Where the next round counts from: done (default) or due",
+  repeat_after = "Start the routine when this is done: a task, path or <path>#<key>",
+  repeat_step = "Round of a ladder (repeat: 1w,4w,12w) the open task is: 1, 2 or 3",
   category = "Concerns the task serves; several allowed, comma list",
   scope = "What the task touches (usercmd, keymap, ui, ...); several allowed, comma list",
   severity = "How serious a bug or security task is",
@@ -721,6 +723,8 @@ local function set_kv()
     start = FIELD_DESC.start,
     ["repeat"] = FIELD_DESC["repeat"],
     repeat_from = FIELD_DESC.repeat_from,
+    repeat_after = FIELD_DESC.repeat_after,
+    repeat_step = FIELD_DESC.repeat_step,
   })
   local out = {}
   for _, key in ipairs(mutate.SETTABLE) do
@@ -846,6 +850,7 @@ local function nested_routes()
         { key = "start", type = "STRING", desc = FIELD_DESC.start },
         { key = "repeat", type = "STRING", desc = FIELD_DESC["repeat"] },
         { key = "repeat_from", type = "STRING", desc = FIELD_DESC.repeat_from },
+        { key = "repeat_after", type = "STRING", desc = FIELD_DESC.repeat_after },
         {
           key = "status",
           type = "STRING",

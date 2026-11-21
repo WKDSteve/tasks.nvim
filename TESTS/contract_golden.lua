@@ -632,6 +632,68 @@ G.cases = {
   { name = "error-unknown-parameter", method = "list", request = '{"params":{"colour":"red"}}' },
   { name = "donepreview", method = "done_preview", request = '{"params":{"id":"lib.nvim/delta"}}' },
   {
+    -- a ladder (capability `repeat_steps`): the open round carries `repeat` as a ladder, its `repeat_step` and what
+    -- the routine started after; the preview of its last round says that the finish ends the routine
+    name = "donepreview-ladder-last",
+    method = "done_preview",
+    fresh = true,
+    request = function(root)
+      local path = root .. "/lib.nvim/ROADMAP/tasks/review-2026-03-02.md"
+      vim.fn.mkdir(vim.fs.dirname(path), "p")
+      local fh = assert(io.open(path, "wb"))
+      fh:write(
+        "---\ntitle: Review\nstatus: open\nrepeat: 1w,4w,12w\nrepeat_step: 3\n"
+          .. "repeat_after: lib.nvim/alpha\ndue: 2026-03-02\ncreated: 2026-01-01\nupdated: 2026-01-01\n---\n\nAgain.\n"
+      )
+      fh:close()
+      return '{"params":{"id":"lib.nvim/review-2026-03-02"}}'
+    end,
+  },
+  {
+    -- the same ladder as a task entry (capability `repeat_steps`)
+    name = "task-ladder",
+    method = "task",
+    fresh = true,
+    request = function(root)
+      local path = root .. "/lib.nvim/ROADMAP/tasks/review-2026-03-02.md"
+      vim.fn.mkdir(vim.fs.dirname(path), "p")
+      local fh = assert(io.open(path, "wb"))
+      fh:write(
+        "---\ntitle: Review\nstatus: open\nrepeat: 1w,4w,12w\nrepeat_step: 2\n"
+          .. "repeat_after: lib.nvim/alpha#lua\ndue: 2026-03-02\ncreated: 2026-01-01\nupdated: 2026-01-01\n---\n\nAgain.\n"
+      )
+      fh:close()
+      return '{"params":{"id":"lib.nvim/review-2026-03-02"}}'
+    end,
+  },
+  {
+    -- a finish that starts a routine waiting for it (`repeat_after`, capability `repeat_steps`): `routines_started`
+    -- names it with its first due date, `changed_ids` carries it
+    name = "result-routine-started",
+    method = "ops",
+    fresh = true,
+    request = function(root)
+      local mutate = require("tasks_nvim.mutate")
+      local path = root .. "/lib.nvim/ROADMAP/tasks/delta-review.md"
+      local fh = assert(io.open(path, "wb"))
+      fh:write(
+        "---\ntitle: Delta review\nstatus: open\nrepeat: 1w,4w,12w\nrepeat_after: lib.nvim/delta\n"
+          .. "created: 2026-01-01\nupdated: 2026-01-01\n---\n\nAfter delta.\n"
+      )
+      fh:close()
+      return encode({
+        client_op_id = "golden-routine-started",
+        ops = {
+          {
+            op = "done",
+            id = "lib.nvim/delta",
+            confirm = mutate.confirm_token("lib.nvim/delta", etag(root, "lib.nvim/delta")),
+          },
+        },
+      })
+    end,
+  },
+  {
     -- every operation as a dry run: nothing is written, the answer says what would happen
     name = "result-dry-run",
     method = "ops",

@@ -1187,6 +1187,10 @@ export type DonePreview = Head & {
    */
   closes_project?: string;
   /**
+   * The task is the last round of a ladder (`repeat: 1w,4w,12w`): the finish starts no next round (capability `repeat_steps`; only when true).
+   */
+  ends_routine?: true;
+  /**
    * Present when the task is a routine (`repeat`): the due date of the round the finish starts.
    */
   next_round?: {
@@ -1524,9 +1528,17 @@ export interface TaskEntry {
     expired: boolean;
   };
   /**
-   * A routine (optional): every N days, weeks, months or years (`8w`). Finishing the task starts the next round. Capability `repeat`.
+   * A routine (optional): every N days, weeks, months or years (`8w`). Finishing the task starts the next round. Capability `repeat`. With capability `repeat_steps` also a ladder of 2 to 12 intervals (`1w,4w,12w`): each round takes the next interval, the last round ends the routine.
    */
   repeat?: string;
+  /**
+   * A ladder (`repeat: 1w,4w,12w`): the round the open task is, 1-based; absent: 1 (capability `repeat_steps`).
+   */
+  repeat_step?: number;
+  /**
+   * A routine that starts when something is finished (capability `repeat_steps`): a task or learning path id (`<area>/<slug>`) or a point of a path (`<area>/<slug>#<key>`). While it has no `due` it waits; the finish writes due = that day + the first interval.
+   */
+  repeat_after?: string;
   /**
    * Where the next round counts from: the day the round was finished (`done`, the default) or the due date of the finished round (`due`, a fixed rhythm).
    */
@@ -2516,6 +2528,14 @@ export interface ResultEntry {
    * The reached milestones this operation set back to `doing`: a member of theirs is open again; `reached` stays (capability `milestones`; only when there is one).
    */
   milestones_reopened?: string[];
+  /**
+   * `done`, `node_set`, `path_close`: the routines that waited for what this operation finished (`repeat_after`) and got their first `due` (capability `repeat_steps`; only when there is one). Their ids are in `changed_ids`.
+   */
+  routines_started?: {
+    id: string;
+    due: Date;
+    after: string;
+  }[];
   /**
    * `done`: the learning point the task was promoted from, set to the state of the finish (capability `outcome`).
    */
