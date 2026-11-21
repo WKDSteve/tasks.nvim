@@ -580,6 +580,10 @@ of a path or of a task's own `## Lernpunkte`:
 - the task (`kind: task`, `category: [learning]`, `point: <container>#<key>`) is made in the container's area or
   `--area`, titled after the point's text without its Markdown (`--title`); its body names where it came from, copies
   the point's link and note, and holds the point's **subtree** in its own `## Lernpunkte`, dedented to the root;
+- the point's text (its label without Markdown) is the task's summary line, the first line of the body;
+- the tags of the container that hold for everything in it, `on-workstation` and `not-on-workstation`, go to the task
+  (a path takes `tags:` with `path-new --tags=`); `--tags=a,b` adds more, `--after=id,id` and `--effort=` are taken as
+  `new` takes them and judged before anything is written (also in a `--dry-run`); `--no-index` leaves the indexes;
 - the point's line gets `→ <task id>`, the mark `[ ]` and a key when it had none; its note stays.
 
 From then on the **task owns the point's state**. `done` writes it into the container: `learned` for no outcome or
@@ -914,7 +918,7 @@ nvim --headless -u NONE -l scripts/tasks.lua check
 | `plan [area] [--for=id] [filters] [--ready] [--format=md\|tsv\|ids]` | the plan: ready now, decisions by leverage, stages, critical path |
 | `next [area] [--n=3] [--actor=cdx\|me\|pair\|none] [--format=json]` | `next: <id> <title> <reason>`, `then: ...`, `freed:`, `cdx:`, `empty:` and `remind:` lines; `remind: <id>\t<title>\t<date>` lists the open tasks whose reminder is due (oldest first, judged by `--today`, which must be a date), a last `remind: N finished task(s) with a reminder due (`list --done --reminders`)` counts the finished ones; `--format=json` is the `tasks.next` document (no `remind:` there) |
 | `estimate [area] [--for=id] [filters]` | the estimate line, `quick wins:`, `unestimated:` |
-| `path-new <area> <title> [--slug --areas --target --project --status --summary --links --icon --cover --template=learning] [--no-index]` | create a learning path under `ROADMAP/paths/` through `paths.new` (no stages: `--phases` is no option); the editor's `:Tasks path-new` makes it and opens it. `--no-index` is accepted for scripts and changes nothing: a new path is in no index |
+| `path-new <area> <title> [--slug --areas --target --project --tags --status --summary --links --icon --cover --template=learning] [--no-index]` | create a learning path under `ROADMAP/paths/` through `paths.new` (no stages: `--phases` is no option); the editor's `:Tasks path-new` makes it and opens it. `--no-index` is accepted for scripts and changes nothing: a new path is in no index |
 | `milestone-new <area> <title> [--due --includes --close --status --summary --slug]` | create a milestone under `ROADMAP/milestones/` (`milestones.new`); the members must exist in this vault |
 | `milestones [<area>] [--format=tsv\|json]` | the milestones: id, status, due, members done/all (and `overdue`), title |
 | `plan-new <area> <title> [--slug --areas --target --phases --gate --summary --template=learning]` | create a plan file under `ROADMAP/plans/`; `--template=learning` writes the sections of a learning plan and proposes the stages `orientieren, grundlagen, vertiefen, anwenden, festigen` (stages given win). `paths.new` takes the same template: goal and competence level, access, schedule, sources, `## Lernpunkte`, self-check, open questions, repetition |

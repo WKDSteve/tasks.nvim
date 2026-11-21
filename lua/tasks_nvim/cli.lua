@@ -97,10 +97,11 @@ commands:
                                           without --slug the slug is the title, cut at a word boundary
   project-new <area> <title> [--slug=s] [options as plan-new]
                                           create ROADMAP/projects/<slug>.md; plans join it with project=<id>
-  path-new <area> <title> [--slug=s] [--areas=a,b] [--target=<id>] [--project=<id>] [--status=planning|doing|parked] [--summary=text] [--links=url,url] [--icon=...] [--cover=assets/x.png] [--template=learning] [--no-index]
+  path-new <area> <title> [--slug=s] [--areas=a,b] [--target=<id>] [--project=<id>] [--tags=a,b] [--status=planning|doing|parked] [--summary=text] [--links=url,url] [--icon=...] [--cover=assets/x.png] [--template=learning] [--no-index]
                                           create the learning path ROADMAP/paths/<slug>.md (no stages; its tree goes
                                           into ## Lernpunkte); --template=learning writes the sections of a learning path;
-                                          --no-index is accepted (a new path changes no index)
+                                          --tags=not-on-workstation (or on-workstation) goes to every task promoted
+                                          from the path; --no-index is accepted (a new path changes no index)
   milestone-new <area> <title> [--due=YYYY-MM-DD] [--includes=<id>,<id>] [--close=manual] [--status=planning|doing|parked] [--summary=text] [--slug=]
                                           create the milestone ROADMAP/milestones/<slug>.md over tasks, plans,
                                           projects, paths and meetings of this vault; reached when they are all done
@@ -181,9 +182,11 @@ commands:
                                           gets status open and loses the key; --dry-run only names the tasks
   answer <area>/<slug> <q1|#n> <n|clear>  answer a question of the `## Offene Fragen` section: tick option n (1-based),
                                           or take the answer back (clear)
-  promote <area>/<slug>#<key|n> [--area=a] [--title=t] [--actor=cdx|me|pair] [--dry-run]
+  promote <area>/<slug>#<key|n> [--area=a] [--title=t] [--actor=cdx|me|pair] [--tags=a,b] [--after=id,id] [--effort=XS..XL] [--dry-run] [--no-index]
                                           make a task of a learning point (of a path or a task's ## Lernpunkte): its
-                                          subtree moves into the task, the point gets the arrow; done writes its state
+                                          subtree moves into the task, the point gets the arrow; done writes its state.
+                                          The point's text is the summary line; on-workstation / not-on-workstation
+                                          of the path (or task) come along; --no-index leaves the index as it is
   unpromote <area>/<slug>#<key|n> [--dry-run]
                                           take it back while the task holds no work (open, no commits, no assets)
   done <area>/<slug> [--commits=repo@sha,repo@sha] [--done-in=text] [--date=YYYY-MM-DD] [--remind=7d|YYYY-MM-DD]
@@ -450,6 +453,7 @@ local SPECS = {
       "cover",
       "project",
       "template",
+      "tags",
     },
     -- `--no-index` for scripts that pass it to every writing command: a new path changes no index
     flag = { "no-index" },
@@ -537,7 +541,10 @@ local SPECS = {
   waits = { value = { "format" }, flag = {} },
   release = { value = {}, flag = { "dry-run", "no-index" } },
   answer = { value = {}, flag = { "no-index" } },
-  promote = { value = { "area", "title", "actor" }, flag = { "dry-run", "no-index" } },
+  promote = {
+    value = { "area", "title", "actor", "tags", "after", "effort" },
+    flag = { "dry-run", "no-index" },
+  },
   unpromote = { value = {}, flag = { "dry-run", "no-index" } },
   ["migrate-actor"] = { value = {}, flag = { "write", "no-index" } },
   done = {
@@ -1333,7 +1340,7 @@ end
 local NEW_FILE_USAGE = {
   plan = 'plan-new <area> "<title>" [--slug=s] [--areas=a,b] [--target=id] [--phases=a,b,c] [--gate=hard] [--template=learning]',
   project = 'project-new <area> "<title>" [--slug=s] [--areas=a,b] [--target=id] [--phases=a,b,c] [--gate=hard] [--template=learning]',
-  path = 'path-new <area> "<title>" [--slug=s] [--areas=a,b] [--target=id] [--project=id] [--template=learning] [--no-index]',
+  path = 'path-new <area> "<title>" [--slug=s] [--areas=a,b] [--target=id] [--project=id] [--tags=a,b] [--template=learning] [--no-index]',
 }
 
 ---`plan-new`, `project-new` and `path-new`: make the file (`plans.new` with `kind`) and say its id.
@@ -1365,6 +1372,7 @@ local function new_file_command(ctx, kind)
     cover = args.opt.cover --[[@as string|nil]],
     project = args.opt.project --[[@as string|nil]],
     template = args.opt.template --[[@as "learning"|nil]],
+    tags = args.opt.tags --[[@as string|nil]],
   })
   if not res then
     ctx.warn("error: " .. tostring(err))
@@ -2220,7 +2228,7 @@ function commands.promote(ctx)
   local container, ref = point_arg(args.pos[1])
   if not container or #args.pos > 1 then
     ctx.warn(
-      "error: usage: promote <area>/<slug>#<key|n> [--area=a] [--title=t] [--actor=cdx|me|pair] [--dry-run]"
+      "error: usage: promote <area>/<slug>#<key|n> [--area=a] [--title=t] [--actor=cdx|me|pair] [--tags=a,b] [--after=id,id] [--effort=XS..XL] [--dry-run] [--no-index]"
     )
     return 2
   end
@@ -2230,6 +2238,9 @@ function commands.promote(ctx)
     area = args.opt.area --[[@as string|nil]],
     title = args.opt.title --[[@as string|nil]],
     actor = args.opt.actor --[[@as string|nil]],
+    tags = args.opt.tags --[[@as string|nil]],
+    after = args.opt.after --[[@as string|nil]],
+    effort = args.opt.effort --[[@as string|nil]],
     dry_run = args.opt["dry-run"] == true,
     index = not args.opt["no-index"],
   })

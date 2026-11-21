@@ -348,4 +348,75 @@ return function(H)
   eq(up.code, 0, up.err)
   has(up.out, "unpromoted\tlib.nvim/rust#own\tlib.nvim/ownership-verstehen")
   eq(run({ "promote", "lib.nvim/rust" }).code, 2, "the point needs #<key>")
+
+  -- ── summary, tags of the path, --tags / --after / --effort, --no-index ───
+  eq(
+    promote.task_tags({ "not-on-workstation", "lernen" }, "rust,lernen,not-on-workstation"),
+    { "not-on-workstation", "rust", "lernen" },
+    "only the machine tags of the container come along, each tag once"
+  )
+  local made = run({
+    "path-new",
+    "lib.nvim",
+    "Bauen lernen",
+    "--slug=bauen",
+    "--tags=not-on-workstation,lernen",
+  })
+  eq(made.code, 0, made.err)
+  local bau = assert(paths.find("lib.nvim/bauen", { root = root }))
+  eq(bau.tags, { "not-on-workstation", "lernen" }, "the path keeps its tags")
+  local bau_file = root .. "/lib.nvim/ROADMAP/paths/bauen.md"
+  local bau_text = assert(H.read(bau_file))
+  H.write(
+    bau_file,
+    (
+      bau_text:gsub(
+        "## Lernpunkte\n",
+        "## Lernpunkte\n\n- [ ] Mini-Hub ohne KI: [axum](https://docs.rs/axum), eine Seite {#hub}\n- [ ] Mini-Tauri {#tauri}\n",
+        1
+      )
+    )
+  )
+  local index_file = require("tasks_nvim.vault").index_path(root, "lib.nvim")
+  assert(require("tasks_nvim.index").write_area("lib.nvim", { root = root }))
+  local index_before = assert(H.read(index_file), "the index is there")
+  local hub = run({
+    "promote",
+    "lib.nvim/bauen#hub",
+    "--title=Mini-Hub bauen",
+    "--tags=rust",
+    "--effort=M",
+    "--no-index",
+  })
+  eq(hub.code, 0, hub.err)
+  has(hub.out, "promoted\tlib.nvim/bauen#hub\tlib.nvim/mini-hub-bauen")
+  eq(H.read(index_file), index_before, "--no-index leaves the index as it is")
+  local hub_task = assert(scan.find("lib.nvim/mini-hub-bauen", { root = root }))
+  eq(hub_task.tags, { "not-on-workstation", "rust" }, "the machine tag of the path, then --tags")
+  eq(hub_task.effort, "M")
+  eq(hub_task.summary, "Mini-Hub ohne KI: axum, eine Seite", "the point's text is the summary line")
+  has(
+    assert(H.read(hub_task.path)),
+    "---\n\nMini-Hub ohne KI: axum, eine Seite\n\n## Kontext",
+    "the summary is the first line of the body"
+  )
+  local tauri = run({ "promote", "lib.nvim/bauen#tauri", "--after=lib.nvim/mini-hub-bauen" })
+  eq(tauri.code, 0, tauri.err)
+  has(assert(H.read(index_file)), "mini-tauri", "without --no-index the index is written")
+  local tauri_task = assert(scan.find("lib.nvim/mini-tauri", { root = root }))
+  eq(tauri_task.after, { "lib.nvim/mini-hub-bauen" })
+  eq(tauri_task.tags, { "not-on-workstation" })
+  -- a field `new` refuses is refused before anything is written, also in a dry run
+  local bad = run({ "promote", "lib.nvim/bauen#tauri", "--effort=huge", "--dry-run" })
+  eq(bad.code, 1)
+  has(bad.err, "effort")
+  -- a task's machine tags go on to the tasks promoted from it (the recursion)
+  local text = assert(H.read(tauri_task.path))
+  H.write(
+    tauri_task.path,
+    (text:gsub("## Lernpunkte\n", "## Lernpunkte\n\n- [ ] Fenster {#fenster}\n", 1))
+  )
+  local sub = run({ "promote", "lib.nvim/mini-tauri#fenster" })
+  eq(sub.code, 0, sub.err)
+  eq(assert(scan.find("lib.nvim/fenster", { root = root })).tags, { "not-on-workstation" })
 end

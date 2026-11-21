@@ -6,6 +6,9 @@
 ---   - the task (`kind: task`, `category: [learning]`, `point: <container>#<key>`) is made in the container's area or
 ---     the one asked for; the node's subtree moves into the task's own `## Lernpunkte`, so the task can promote again
 ---     (the recursion: Lua lernen -> C-Compiler -> Sprache C);
+---   - the text of the point (its label without Markdown) is the task's summary line; the machine tags of the container
+---     (`on-workstation`, `not-on-workstation`: they hold for everything in it) go to the task, with the `tags`, `after`
+---     and `effort` asked for;
 ---   - the node's line gets the arrow `→ <task id>` and the mark `[ ]`, and a key when it had none. From now on the
 ---     state of the node belongs to the task: `done_flow` writes it when the task is finished (`lernbaum.state_of_task`:
 ---     learned, seen or dropped after the task's `outcome`), `check` names a node whose mark says otherwise.
@@ -30,6 +33,9 @@ local M = {}
 
 ---The heading a task's tree stands under.
 local SECTION = "Lernpunkte"
+
+---The tags of a container that hold for every task made of it (`MASCHINE-05`).
+M.INHERITED_TAGS = { "on-workstation", "not-on-workstation" }
 
 ---The promoted points below `node` (its descendants with an arrow and a key): their tasks name the container in
 ---`point:`, which changes when the subtree moves.
@@ -77,17 +83,31 @@ end
 ---The container of a learning point: an open path or an open task, with its file.
 ---@param id string
 ---@param root string
----@return { id: string, area: string, kind: "path"|"task", path: string, folder: boolean }|nil
+---@return { id: string, area: string, kind: "path"|"task", path: string, folder: boolean, tags: string[] }|nil
 ---@return string|nil err
 local function container_of(id, root)
   local p = paths.find(id, { root = root })
   if p and not (p.errors and #p.errors > 0 and not p.title) then
-    return { id = p.id, area = p.area, kind = "path", path = p.path, folder = p.folder == true },
+    return {
+      id = p.id,
+      area = p.area,
+      kind = "path",
+      path = p.path,
+      folder = p.folder == true,
+      tags = p.tags or {},
+    },
       nil
   end
   local t = mutate.find_open(id, root)
   if t then
-    return { id = t.id, area = t.area, kind = "task", path = t.path, folder = t.folder == true },
+    return {
+      id = t.id,
+      area = t.area,
+      kind = "task",
+      path = t.path,
+      folder = t.folder == true,
+      tags = t.tags or {},
+    },
       nil
   end
   return nil, "no open learning path or task: " .. tostring(id)
@@ -179,10 +199,39 @@ local function task_body(container, key, node, subtree)
   return table.concat(lines, "\n")
 end
 
+---The tags of the new task: the machine tags of the container (`INHERITED_TAGS`), then the ones asked for, once each.
+---@param container_tags string[]
+---@param given? string[]|string  # A text is split at commas.
+---@return string[]
+function M.task_tags(container_tags, given)
+  local out, seen = {}, {}
+  local function add(tag)
+    tag = vim.trim(tostring(tag))
+    if tag ~= "" and not seen[tag] then
+      seen[tag] = true
+      out[#out + 1] = tag
+    end
+  end
+  for _, tag in ipairs(container_tags or {}) do
+    if vim.tbl_contains(M.INHERITED_TAGS, tag) then
+      add(tag)
+    end
+  end
+  local list = type(given) == "table" and given
+    or (given ~= nil and vim.split(tostring(given), ",", { plain = true }) or {})
+  for _, tag in ipairs(list) do
+    add(tag)
+  end
+  return out
+end
+
 ---@class Tasks.PromoteOpts
 ---@field root? string
 ---@field area? string        # The area of the new task (default: the container's).
 ---@field title? string       # Default: the node's label without its Markdown.
+---@field tags? string[]|string  # More tags; the container's machine tags come along anyway (`task_tags`).
+---@field after? string[]|string # Ids the task comes after (`after:`), as `new` takes them.
+---@field effort? string      # `effort:` of the task (XS..XL or days).
 ---@field actor? string
 ---@field today? string
 ---@field if_match? string    # The `etag` of the container file the caller read.
@@ -193,7 +242,7 @@ end
 ---@param container string
 ---@param ref string|integer
 ---@param opts? Tasks.PromoteOpts
----@return { id: string, path?: string, container: string, key: string, point: string, moved: integer, repointed?: string[], dry_run?: boolean, inverse: { op: string, container: string, key: string } }|nil result
+---@return { id: string, path?: string, container: string, key: string, point: string, tags: string[], moved: integer, repointed?: string[], dry_run?: boolean, inverse: { op: string, container: string, key: string } }|nil result
 ---@return string|nil err
 ---@return table|nil info  # `{ code = "not_found"|"invalid_argument"|"conflict" }`
 function M.promote(container, ref, opts)
@@ -245,9 +294,19 @@ function M.promote(container, ref, opts)
     end
     local key = node.key or free_key(tree, title)
     local point = c.id .. "#" .. key
-    -- the id first (a dry run of `new`): the arrow names it
-    local probe, perr =
-      mutate.new(area, { root = root, title = title, today = today, dry_run = true })
+    local summary = M.plain_label(node.label)
+    local tags = M.task_tags(c.tags, opts.tags)
+    -- the id first (a dry run of `new`, which judges the fields too): the arrow names it
+    local probe, perr = mutate.new(area, {
+      root = root,
+      title = title,
+      today = today,
+      tags = #tags > 0 and tags or nil,
+      after = opts.after,
+      effort = opts.effort,
+      summary = summary ~= "" and summary or nil,
+      dry_run = true,
+    })
     if not probe then
       return nil, perr, { code = "invalid_argument" }
     end
@@ -263,6 +322,10 @@ function M.promote(container, ref, opts)
       category = "learning",
       actor = opts.actor,
       point = point,
+      tags = #tags > 0 and tags or nil,
+      after = opts.after,
+      effort = opts.effort,
+      summary = summary ~= "" and summary or nil,
       -- the XP of the point go along: the task counts them from now on
       xp = node.xp_own,
       today = today,
@@ -279,6 +342,7 @@ function M.promote(container, ref, opts)
       container = c.id,
       key = key,
       point = point,
+      tags = tags,
       moved = n_moved,
       inverse = { op = "unpromote", container = c.id, key = key },
     }

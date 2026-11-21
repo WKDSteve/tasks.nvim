@@ -17,6 +17,7 @@ the version is not tagged yet (the repository is not published).
 
 ### Added
 
+- `tasks promote` writes the point's text as the summary line of the new task, carries the container's `on-workstation` / `not-on-workstation` over to it and takes `--tags=`, `--after=` and `--effort=` (judged as `new` judges them, also in a dry run); `--no-index` is named in its usage and `--help`. A learning path takes `tags:` (`path-new --tags=`, read as `tags` of the path file) for the machine tags its tasks inherit.
 - `tasks project-new <area> "<title>"` makes a project file from the command line (the options of `plan-new`); `plan-new`, `project-new` and `path-new` name `--slug=` in their usage and `--help` (it was taken already but not shown), and `path-new` accepts `--no-index` like the other writing commands (a new path is in no index).
 - `tasks reopen <id> [--status=]` and `:Tasks reopen <id> [status=] [--yes]`: a finished task back to `ROADMAP/tasks` through the operation `reopen` of `tasks-ops/1` (the Backlog README row goes, the index is written, a reached milestone goes back to `doing`). The CLI takes the id or the name of the finished file; `already-open` (exit 0) for an open task. The editor asks first and completes over the finished tasks only.
 - `tasks-export/1` (additive, capability `finished_ci`): `finished` takes `ci`, a list of `pending`, `green`, `red` and `none`, and keeps the finished tasks whose CI state is one of them; `total` of `["pending", "red"]` is what an overview shows as "finished, CI open or red". Golden `finished-ci`.

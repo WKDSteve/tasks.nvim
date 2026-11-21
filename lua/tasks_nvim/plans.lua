@@ -55,6 +55,7 @@ M.STATUSES = { "planning", "doing", "parked", "done" }
 ---@field phase? string               # A plan only: its stage in the project's `phase_order`.
 ---@field phase_order string[]
 ---@field links string[]              # Web addresses (`links:`, http/https); an entry that is none is `bad-link`.
+---@field tags string[]               # `tags:`; a path's `on-workstation` / `not-on-workstation` goes to the tasks `promote` makes of it.
 ---@field folder boolean              # The folder form `<slug>/<slug>.md`: the other files in that folder are its assets.
 ---@field gate? string                # `hard` or nil.
 ---@field created? string
@@ -103,6 +104,7 @@ function M.parse(text, ctx)
     areas = {},
     phase_order = {},
     links = {},
+    tags = {},
     folder = ctx.folder == true,
     summary = "",
     errors = errors,
@@ -141,6 +143,7 @@ function M.parse(text, ctx)
         bad("plan-bad-area", "areas: invalid area name " .. fsio.clean(a))
       end
     end
+    plan.tags = model.field_list(meta.tags, "tags", bad)
     plan.links = model.field_list(meta.links, "links", bad)
     for _, link in ipairs(plan.links) do
       if not model.is_web_link(link) then
@@ -580,6 +583,7 @@ M.TEMPLATES = {
 ---@field summary? string
 ---@field slug? string
 ---@field web_links? string[]|string  # Web addresses for `links:` (http/https; a text is split at commas).
+---@field tags? string[]|string     # `tags:` (a text is split at commas).
 ---@field icon? string            # `icon:`: an emoji, a file below `assets/` or a word (`model.icon_of`).
 ---@field cover? string           # `cover:`: a picture below `assets/`.
 ---@field today? string
@@ -628,6 +632,10 @@ function M.new(area, opts)
       end
     end
     return out, nil
+  end
+  local tags, tags_err = list(opts.tags, "tags")
+  if not tags then
+    return nil, tags_err, { code = "invalid_argument" }
   end
   local areas, aerr = list(opts.areas, "areas")
   if not areas then
@@ -788,6 +796,9 @@ function M.new(area, opts)
   local pairs_ = { { "title", title }, { "status", status } }
   if #areas > 0 then
     pairs_[#pairs_ + 1] = { "areas", areas }
+  end
+  if #tags > 0 then
+    pairs_[#pairs_ + 1] = { "tags", tags }
   end
   if target_text then
     pairs_[#pairs_ + 1] = { "target", target_text }
