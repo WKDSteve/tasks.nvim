@@ -989,7 +989,8 @@ local data_sections
 ---headings, single-line HTML comments and fenced code. Whitespace is collapsed.
 ---The sections `## Lernpunkte` and `## Level` (any heading of `tasks_nvim.lernbaum` and `tasks_nvim.lernlevel`, as
 ---they read them: a level-2 heading, up to the next heading of level 1 or 2) are data, not prose: they are skipped, so
----a path or a task that starts with its learning points has no summary made of checkbox lines.
+---a path or a task that starts with its learning points has no summary made of checkbox lines. Checkbox items
+---anywhere (`- [ ] …`, `1. [x] …`, with the indented lines below them) are skipped too: a checklist is no summary.
 ---@param body string
 ---@return string
 function M.first_paragraph(body)
@@ -1005,6 +1006,7 @@ function M.first_paragraph(body)
   local para = {}
   local in_fence = false
   local skipping = false -- inside a data section
+  local in_box = false -- below a checkbox item
   for line in (body .. "\n"):gmatch("([^\n]*)\n") do
     local t = trim(line)
     local hashes, name = t:match("^(#+)%s+(.-)%s*$")
@@ -1029,10 +1031,22 @@ function M.first_paragraph(body)
         break
       end
     elseif t == "" or t:match("^#+%s") or t:match("^<!%-%-.*%-%->$") then
+      in_box = false
+      if #para > 0 then
+        break
+      end
+    elseif
+      t:match("^[-*+]%s+%[.%]")
+      or t:match("^%d+[.)]%s+%[.%]")
+      or (in_box and line:match("^%s"))
+    then
+      -- a checkbox item (and the indented lines below it) is a list to work through, not prose
+      in_box = true
       if #para > 0 then
         break
       end
     else
+      in_box = false
       para[#para + 1] = t
     end
   end

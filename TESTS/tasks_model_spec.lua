@@ -151,6 +151,27 @@ return function(H)
     "A level-3 heading is no data section.",
     "only a level-2 heading starts a data section, as lernbaum and lernlevel read it"
   )
+  -- a checklist is no summary, wherever it stands (the agenda of a meeting, the acceptance of a task)
+  eq(
+    model.first_paragraph("## Akzeptanz\n\n- [x] it ships\n"),
+    "",
+    "a checklist only has no summary"
+  )
+  eq(
+    model.first_paragraph("- [ ] One\n  a note below it\n* [x] Two\n1. [~] Three\n\nThe prose.\n"),
+    "The prose.",
+    "checkbox items (- * 1.) and the indented lines below them are skipped"
+  )
+  eq(
+    model.first_paragraph("Intro line\n- [ ] A box\nnot this\n"),
+    "Intro line",
+    "a checkbox item ends the paragraph"
+  )
+  eq(
+    model.first_paragraph("- plain bullet\n- another\n"),
+    "- plain bullet - another",
+    "a list without boxes is still text (as before)"
+  )
   eq(
     parse(F.text(F.meta("T", "open"), "\nIntro.\n\n## Lernpunkte\n\n- [ ] A\n")).summary,
     "Intro.",

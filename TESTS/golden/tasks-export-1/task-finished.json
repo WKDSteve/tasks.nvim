@@ -1,7 +1,7 @@
 {
   "body": "\n## Akzeptanz\n\n- [x] it ships\n",
   "body_truncated": false,
-  "digest": "sha256:86d2531e82b12d9b",
+  "digest": "sha256:017ccd51269bfd5d",
   "engine": {
     "git": "0000000",
     "nvim": "0.0.0",
@@ -38,7 +38,7 @@
     "refs": [],
     "slug": "shipped",
     "status": "done",
-    "summary": "- [x] it ships",
+    "summary": "",
     "tags": [],
     "title": "Shipped",
     "updated": "2026-01-09",

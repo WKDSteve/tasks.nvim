@@ -1,5 +1,5 @@
 {
-  "digest": "sha256:8d1b6630093c6685",
+  "digest": "sha256:f34c162d7534b73b",
   "engine": {
     "git": "0000000",
     "nvim": "0.0.0",
@@ -40,7 +40,7 @@
       "slug": "one-on-one-2026-01-05",
       "starts_at": "2026-01-05T10:00",
       "status": "planned",
-      "summary": "- [ ] Blockers",
+      "summary": "",
       "tags": [],
       "tasks": [
         "lib.nvim/alpha"
@@ -123,7 +123,7 @@
       "slug": "one-on-one-2026-01-26",
       "starts_at": "2026-01-26T10:00",
       "status": "planned",
-      "summary": "- [ ] Blockers",
+      "summary": "",
       "tags": [],
       "tasks": [
         "lib.nvim/alpha"
@@ -165,7 +165,7 @@
       "slug": "one-on-one-2026-02-02",
       "starts_at": "2026-02-02T10:00",
       "status": "planned",
-      "summary": "- [ ] Blockers",
+      "summary": "",
       "tags": [],
       "tasks": [
         "lib.nvim/alpha"
