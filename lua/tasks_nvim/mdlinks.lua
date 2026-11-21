@@ -223,7 +223,21 @@ function M.resolve(dir, target)
   t = t:gsub("%%(%x%x)", function(hex)
     return string.char(tonumber(hex, 16))
   end)
-  return dir .. "/" .. t
+  -- `..` is folded by the text, not by the file system: Linux cannot climb out of a folder that is not there yet
+  -- (`paths/../tasks/x.md` of a draft whose `paths/` is not made), Windows can. The answer is the same on both.
+  local joined = dir .. "/" .. t
+  local lead = joined:match("^%a:/") or joined:match("^/+") or ""
+  local parts = {}
+  for seg in joined:sub(#lead + 1):gmatch("[^/]+") do
+    if seg == ".." and #parts > 0 and parts[#parts] ~= ".." then
+      parts[#parts] = nil
+    elseif seg == ".." and lead ~= "" then
+      -- above the root of an absolute path: stays at the root, as the file system does
+    elseif seg ~= "." then
+      parts[#parts + 1] = seg
+    end
+  end
+  return lead .. table.concat(parts, "/")
 end
 
 ---The relative links of `text` whose file (or folder) below `dir` does not exist. `skip(link)` returning true leaves a

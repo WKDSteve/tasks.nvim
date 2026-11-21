@@ -23,6 +23,25 @@ return function(H)
     return out
   end
 
+  -- ── resolve folds `..` by the text: a link from a folder that does not exist yet (a draft's `paths/`) ──
+  eq(mdlinks.resolve("/v/a/ROADMAP/paths", "../tasks/x.md"), "/v/a/ROADMAP/tasks/x.md")
+  eq(mdlinks.resolve("E:/v/a/paths", "./../../b%20c.md#k"), "E:/v/b c.md")
+  eq(
+    mdlinks.resolve("rel/a", "../../../x.md"),
+    "../x.md",
+    "a relative dir keeps what it cannot fold"
+  )
+  eq(mdlinks.resolve("/v", "../../x.md"), "/x.md", "never above the root")
+  local gone = vim.fn.tempname()
+  vim.fn.mkdir(gone .. "/tasks", "p")
+  H.write(gone .. "/tasks/x.md", "x\n")
+  eq(
+    #mdlinks.missing("[x](../tasks/x.md)\n", gone .. "/paths-not-made"),
+    0,
+    "a link out of a folder that is not there yet still finds its file"
+  )
+  vim.fn.delete(gone, "rf")
+
   -- ── what is a link ───────────────────────────────────────────────────────
   local sample = table.concat({
     "---", -- 1
