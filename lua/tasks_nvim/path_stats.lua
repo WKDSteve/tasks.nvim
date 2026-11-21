@@ -12,6 +12,9 @@
 --- counts its points instead, as `lernlevel.evaluate` does); the line for the whole path at the last point that is not
 --- dropped. A threshold of 0 is reached before the first point (`at_start`); one the path cannot reach has no `at`.
 ---
+--- Optional points (`{optional}` in `lernbaum`) stand apart (`optional`): the counts, the XP and the forecast hold the
+--- other points only; a stage that is optional as a whole says so (`optional = true`) and counts its own points.
+---
 --- Pure Lua, no I/O: the caller reads the path (`paths.find`).
 
 local M = {}
@@ -33,6 +36,7 @@ local M = {}
 ---@field xp integer            # The XP of its leaves that are not dropped.
 ---@field earned integer
 ---@field without_xp integer
+---@field optional? boolean     # The stage is optional as a whole; else its numbers leave optional points out.
 
 ---@class Tasks.PathStatsLevel
 ---@field ref string             # `"1"`, `"2"`, … or `"done"`.
@@ -50,6 +54,7 @@ local M = {}
 ---@field has_xp boolean
 ---@field points { total: integer, open: integer, learned: integer, seen: integer, dropped: integer, blocked: integer, without_xp: integer, counted: integer }
 ---@field xp { total: integer, earned: integer, open: integer }
+---@field optional? { points: integer, open: integer, learned: integer, seen: integer, dropped: integer, xp: integer, earned: integer }  # nil: no optional points.
 ---@field stages Tasks.PathStatsStage[]
 ---@field without_xp { line: integer, key?: string, label: string, stage: integer }[]
 ---@field levels Tasks.PathStatsLevel[]
@@ -75,9 +80,11 @@ end
 ---@return Tasks.PathStats
 function M.compute(tree, lv, state)
   local p, x = tree.progress, tree.xp
+  -- XP when the points that count carry any (a tree whose XP are all optional counts points, as `lernlevel` does)
+  local by_xp = x.points > 0
   ---@type Tasks.PathStats
   local out = {
-    has_xp = tree.has_xp,
+    has_xp = by_xp,
     points = {
       total = p.total,
       open = p.open,
@@ -94,27 +101,51 @@ function M.compute(tree, lv, state)
     levels = {},
     level = 0,
   }
+  local op = tree.optional and tree.optional.progress
+  if op and op.total > 0 then
+    local ox = tree.optional.xp
+    out.optional = {
+      points = op.total,
+      open = op.open,
+      learned = op.learned,
+      seen = op.seen,
+      dropped = op.dropped,
+      xp = ox.possible,
+      earned = ox.earned,
+    }
+  end
 
   -- the points in the order of learning, each with its stage
   ---@type { node: Tasks.LernNode, stage: integer }[]
   local order = {}
   for i, root in ipairs(tree.roots) do
-    local xp = root.xp_progress
+    local whole = root.in_optional == true
+    local rp, xp = root.progress, root.xp_progress
+    if not whole and root.opt_progress and root.opt_progress.total > 0 then
+      rp, xp = {}, {}
+      for k, v in pairs(root.progress) do
+        rp[k] = v - root.opt_progress[k]
+      end
+      for k, v in pairs(root.xp_progress) do
+        xp[k] = v - root.opt_xp[k]
+      end
+    end
     out.stages[#out.stages + 1] = {
       number = i,
       line = root.line,
       key = root.key,
       label = root.label,
-      points = root.progress.total,
-      open = root.progress.open,
+      points = rp.total,
+      open = rp.open,
       xp = xp.possible,
       earned = xp.earned,
       without_xp = xp.missing,
+      optional = whole or nil,
     }
     local list = {}
     leaves(root, list)
     for _, leaf in ipairs(list) do
-      if leaf.state ~= "dropped" then
+      if leaf.state ~= "dropped" and not leaf.in_optional then
         order[#order + 1] = { node = leaf, stage = i }
         if not leaf.xp then
           out.without_xp[#out.without_xp + 1] =
@@ -131,7 +162,7 @@ function M.compute(tree, lv, state)
   out.level = state.level or 0
 
   -- the running sum after each point: XP, or points when the tree has no XP
-  local units = tree.has_xp and x.possible or #order
+  local units = by_xp and x.possible or #order
   ---@param i integer
   ---@return Tasks.PathStatsPoint
   local function point(i)
@@ -147,7 +178,7 @@ function M.compute(tree, lv, state)
     end
     local sum = 0
     for i, o in ipairs(order) do
-      sum = sum + (tree.has_xp and (o.node.xp or 0) or 1)
+      sum = sum + (by_xp and (o.node.xp or 0) or 1)
       if reached_at(sum) then
         return false, point(i)
       end
@@ -167,9 +198,9 @@ function M.compute(tree, lv, state)
     }
     local reached_at
     if l.kind == "xp" then
-      -- a level in XP needs XP: a tree without any is never there (as `evaluate` says)
+      -- a level in XP needs XP of the points that count: without any it is not forecast (the optional XP are no order)
       row.needed = l.threshold
-      if tree.has_xp then
+      if by_xp then
         reached_at = function(sum)
           return sum >= l.threshold
         end

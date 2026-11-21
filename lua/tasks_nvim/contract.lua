@@ -101,6 +101,7 @@ M.CAPABILITIES = {
   "node_note",
   "node_set",
   "ops",
+  "optional_points",
   "order",
   "outcome",
   "path",
@@ -3390,6 +3391,12 @@ local function path_entry(root, f, text)
     -- capability `xp`: only when there is something to say, so a path without XP and levels reads as before
     xp = tree.has_xp and xp_entry(tree.xp) or nil,
     level = level_state_entry(f.level_state),
+    -- capability `optional_points`: the points of `{optional}` subtrees, apart from `progress` and `xp` (which leave
+    -- them out); only when the tree has any
+    optional = tree.optional and tree.optional.progress.total > 0 and json.object({
+      progress = progress_entry(tree.optional.progress),
+      xp = tree.has_xp and xp_entry(tree.optional.xp) or nil,
+    }) or nil,
     id = f.id,
     area = f.area,
     slug = f.slug,
@@ -3526,6 +3533,8 @@ function M.path(id, opts)
         image = n.image,
         note = n.note,
         progress = progress_entry(n.progress),
+        -- capability `optional_points`: the point is `{optional}`, or below one
+        optional = n.in_optional or nil,
       })
     end, tree.nodes)
     doc.progress = progress_entry(tree.progress)

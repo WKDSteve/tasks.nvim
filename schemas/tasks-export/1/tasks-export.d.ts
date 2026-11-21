@@ -1072,7 +1072,7 @@ export type PathDocument = Head & {
   body_truncated: boolean;
   nodes: PathNode[];
   progress: PathProgress;
-  xp?: PathXp2;
+  xp?: PathXp3;
   /**
    * The lines of `## Level` in file order, the line of the whole path last; only when the file has the section. Capability `xp`.
    */
@@ -2084,7 +2084,7 @@ export interface MeetingEntry {
   problems: Problem[];
 }
 /**
- * A learning path (`<area>/ROADMAP/paths/<slug>.md`): the head of its file, its progress over the leaves of its tree, its version.
+ * A learning path (`<area>/ROADMAP/paths/<slug>.md`): the head of its file, its progress over the leaves of its tree (optional ones apart, `optional`), its version.
  */
 export interface PathEntry {
   id: string;
@@ -2109,6 +2109,7 @@ export interface PathEntry {
   progress: PathProgress;
   xp?: PathXp;
   level?: PathLevelState;
+  optional?: PathOptional;
   links?: string[];
   icon?: Icon;
   cover?: Cover;
@@ -2183,7 +2184,36 @@ export interface PathLevelState {
   }[];
 }
 /**
- * One learning point of a tree. A parent has no mark of its own: its `derived` state comes from its leaves (learned, partial, open); `closed` when every leaf is.
+ * The optional points of a tree (`{optional}` on a node, and its subtree), apart: `progress` and `xp` of the path leave them out, so they count for no level in percent and not for the path being finished; their XP count for a level in XP once earned (`xp` only when the tree has XP). Only when the tree has optional points. Capability `optional_points`.
+ */
+export interface PathOptional {
+  progress: PathProgress;
+  xp?: PathXp1;
+}
+/**
+ * XP of a tree or a point (capability `xp`): learned counts in full, seen half (rounded down), dropped leaves sum and maximum.
+ */
+export interface PathXp1 {
+  earned: number;
+  /**
+   * Every leaf but the dropped ones.
+   */
+  possible: number;
+  /**
+   * The XP of the open and blocked leaves.
+   */
+  open: number;
+  /**
+   * Leaves (not dropped) with XP.
+   */
+  points: number;
+  /**
+   * Leaves (not dropped) without XP.
+   */
+  missing: number;
+}
+/**
+ * One learning point of a tree. A parent has no mark of its own: its `derived` state comes from its leaves (learned, partial, open); `closed` when every leaf is (a parent with points that are not optional: every one of those).
  */
 export interface PathNode {
   /**
@@ -2223,7 +2253,11 @@ export interface PathNode {
    */
   image?: string;
   note?: string;
-  progress: PathProgress;
+  progress: PathProgress1;
+  /**
+   * The point is `{optional}` or below one: it counts for nothing that says how far the path is. Capability `optional_points`.
+   */
+  optional?: true;
   /**
    * The XP the leaf counts: its task's when it was promoted and the task has `xp`, else its own `{xp=N}`. Capability `xp`.
    */
@@ -2236,12 +2270,23 @@ export interface PathNode {
    * A leaf without XP: a suggestion to fill a form in beforehand (never stored). Capability `xp`.
    */
   xp_suggest?: number;
-  xp_progress?: PathXp1;
+  xp_progress?: PathXp2;
 }
 /**
- * The XP below the point (its own for a leaf); only when the tree has XP. Capability `xp`.
+ * Progress over leaves, counted apart: learned, seen, dropped, open (blocked ones counted as open and once more as blocked).
  */
-export interface PathXp1 {
+export interface PathProgress1 {
+  learned: number;
+  seen: number;
+  dropped: number;
+  open: number;
+  blocked: number;
+  total: number;
+}
+/**
+ * XP of a tree or a point (capability `xp`): learned counts in full, seen half (rounded down), dropped leaves sum and maximum.
+ */
+export interface PathXp2 {
   earned: number;
   /**
    * Every leaf but the dropped ones.
@@ -2261,9 +2306,9 @@ export interface PathXp1 {
   missing: number;
 }
 /**
- * The XP of the tree; only when a point carries XP. Capability `xp`.
+ * XP of a tree or a point (capability `xp`): learned counts in full, seen half (rounded down), dropped leaves sum and maximum.
  */
-export interface PathXp2 {
+export interface PathXp3 {
   earned: number;
   /**
    * Every leaf but the dropped ones.
@@ -2465,7 +2510,7 @@ export interface ResultEntry {
      */
     xp?: number;
   };
-  progress?: PathProgress1;
+  progress?: PathProgress2;
   /**
    * `path_reward`: the level as it is now (capability `path_reward`).
    */
@@ -2582,7 +2627,7 @@ export interface ResultEntry {
 /**
  * Progress over leaves, counted apart: learned, seen, dropped, open (blocked ones counted as open and once more as blocked).
  */
-export interface PathProgress1 {
+export interface PathProgress2 {
   learned: number;
   seen: number;
   dropped: number;

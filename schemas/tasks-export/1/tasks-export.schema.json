@@ -623,7 +623,7 @@
       "unevaluatedProperties": false
     },
     "PathEntry": {
-      "description": "A learning path (`<area>/ROADMAP/paths/<slug>.md`): the head of its file, its progress over the leaves of its tree, its version.",
+      "description": "A learning path (`<area>/ROADMAP/paths/<slug>.md`): the head of its file, its progress over the leaves of its tree (optional ones apart, `optional`), its version.",
       "type": "object",
       "required": ["id", "area", "slug", "title", "areas", "summary", "has_tree", "points", "progress", "file", "valid", "problems"],
       "properties": {
@@ -643,6 +643,7 @@
         "progress": { "$ref": "#/$defs/PathProgress" },
         "xp": { "$ref": "#/$defs/PathXp", "description": "The XP of the tree; only when a point carries XP. Capability `xp`." },
         "level": { "$ref": "#/$defs/PathLevelState", "description": "The level reached and what comes next; only when the file has levels. Capability `xp`." },
+        "optional": { "$ref": "#/$defs/PathOptional" },
         "links": { "type": "array", "items": { "type": "string", "pattern": "^[Hh][Tt][Tt][Pp][Ss]?://" } },
         "icon": { "$ref": "#/$defs/Icon" },
         "cover": { "$ref": "#/$defs/Cover" },
@@ -653,6 +654,16 @@
         "etag": { "$ref": "#/$defs/Etag" },
         "valid": { "type": "boolean" },
         "problems": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false
+    },
+    "PathOptional": {
+      "description": "The optional points of a tree (`{optional}` on a node, and its subtree), apart: `progress` and `xp` of the path leave them out, so they count for no level in percent and not for the path being finished; their XP count for a level in XP once earned (`xp` only when the tree has XP). Only when the tree has optional points. Capability `optional_points`.",
+      "type": "object",
+      "required": ["progress"],
+      "properties": {
+        "progress": { "$ref": "#/$defs/PathProgress" },
+        "xp": { "$ref": "#/$defs/PathXp" }
       },
       "additionalProperties": false
     },
@@ -671,7 +682,7 @@
       "additionalProperties": false
     },
     "PathNode": {
-      "description": "One learning point of a tree. A parent has no mark of its own: its `derived` state comes from its leaves (learned, partial, open); `closed` when every leaf is.",
+      "description": "One learning point of a tree. A parent has no mark of its own: its `derived` state comes from its leaves (learned, partial, open); `closed` when every leaf is (a parent with points that are not optional: every one of those).",
       "type": "object",
       "required": ["index", "line", "depth", "children", "mark", "derived", "closed", "label", "progress"],
       "properties": {
@@ -691,7 +702,8 @@
         "link": { "type": "string" },
         "image": { "type": "string", "description": "A file below `assets/` of the path; a client draws it as an image only." },
         "note": { "type": "string" },
-        "progress": { "$ref": "#/$defs/PathProgress" },
+        "progress": { "$ref": "#/$defs/PathProgress", "description": "Over every leaf below the point, optional ones included (for showing it)." },
+        "optional": { "const": true, "description": "The point is `{optional}` or below one: it counts for nothing that says how far the path is. Capability `optional_points`." },
         "xp": { "type": "integer", "minimum": 0, "maximum": 100000, "description": "The XP the leaf counts: its task's when it was promoted and the task has `xp`, else its own `{xp=N}`. Capability `xp`." },
         "xp_from": { "enum": ["point", "task"], "description": "Where `xp` comes from. Capability `xp`." },
         "xp_suggest": { "type": "integer", "minimum": 0, "maximum": 100000, "description": "A leaf without XP: a suggestion to fill a form in beforehand (never stored). Capability `xp`." },

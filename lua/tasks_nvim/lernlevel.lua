@@ -254,7 +254,8 @@ end
 function M.percent(tree)
   local x = tree.xp
   local p = tree.progress
-  if tree.has_xp then
+  -- the XP of the points that count (optional ones never do); a tree whose XP are all optional counts points
+  if x.points > 0 then
     return x.possible > 0 and math.floor(x.earned * 100 / x.possible) or 0, x.possible
   end
   -- without XP every point weighs one: learned 1, seen one half, dropped out
@@ -264,7 +265,8 @@ function M.percent(tree)
 end
 
 ---Evaluate the levels against a tree (`lernbaum.parse`, with the task XP given): the level reached, the next one with
----what is missing, and the rewards reached but not granted.
+---what is missing, and the rewards reached but not granted. Optional points (`{optional}`) count for a level in XP once
+---earned, never for a level in percent or for the path being finished.
 ---@param lv Tasks.Levels
 ---@param tree Tasks.LernTree
 ---@return Tasks.LevelState
@@ -273,6 +275,8 @@ function M.evaluate(lv, tree)
   local p = tree.progress
   local percent, unit_possible = M.percent(tree)
   local finished = p.total > 0 and p.open == 0
+  -- a level in XP: the XP earned, the optional ones included
+  local earned = x.earned + (tree.optional and tree.optional.xp.earned or 0)
   ---@type Tasks.LevelState
   local st = {
     has_levels = #lv.levels > 0 or lv.final ~= nil,
@@ -286,7 +290,7 @@ function M.evaluate(lv, tree)
   for _, l in ipairs(lv.levels) do
     local reached
     if l.kind == "xp" then
-      reached = tree.has_xp and x.earned >= l.threshold
+      reached = tree.has_xp and earned >= l.threshold
     else
       reached = unit_possible > 0 and percent >= l.threshold
     end
@@ -298,8 +302,8 @@ function M.evaluate(lv, tree)
     elseif not reached and not st.next then
       local nx = { number = l.number, name = l.name }
       if l.kind == "xp" then
-        nx.missing_xp = l.threshold - x.earned
-      elseif tree.has_xp then
+        nx.missing_xp = l.threshold - earned
+      elseif x.points > 0 then
         nx.missing_xp = math.max(0, math.ceil(l.threshold * x.possible / 100) - x.earned)
       else
         nx.missing_percent = l.threshold - percent

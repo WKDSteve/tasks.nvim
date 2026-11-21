@@ -106,6 +106,7 @@ return function(H)
     "next_not_category",
     "node_note",
     "node_set",
+    "optional_points",
     "outcome",
     "path_close",
     "path_levels",

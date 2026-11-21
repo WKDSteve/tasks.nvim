@@ -113,7 +113,9 @@ commands:
                                           written); --dry-run says what would be made and writes nothing
   path <area>/<slug> [--format=text|json]  the XP overview of a learning path: points (all, open, without XP), XP in
                                           all and per stage (a root of ## Lernpunkte), and for each level the point
-                                          at which it is reached when the points are learned in their order
+                                          at which it is reached when the points are learned in their order; the
+                                          optional points ({optional} on a node) apart: they count for no level in
+                                          percent and not for the path being done, their XP once earned do
   paths [<area>] [--project=<id>] [--format=tsv|json]
                                           the learning paths: id, status, points, open points, progress in percent
                                           (of the XP, else of the points), title; --project: the paths of a project,
@@ -1529,6 +1531,7 @@ commands.path = function(ctx)
       has_xp = st.has_xp,
       points = st.points,
       xp = st.xp,
+      optional = st.optional,
       level = st.level,
       stages = st.stages,
       without_xp = st.without_xp,
@@ -1561,15 +1564,31 @@ commands.path = function(ctx)
     )
   )
   ctx.say(("xp\t%d\tearned %d\topen %d"):format(x.total, x.earned, x.open))
+  -- optional points (`{optional}`): apart, never in the counts above, the levels in percent or the path being done
+  local o = st.optional
+  if o then
+    ctx.say(
+      ("optional\t%d\topen %d\tlearned %d\tseen %d\tdropped %d\txp %d\tearned %d"):format(
+        o.points,
+        o.open,
+        o.learned,
+        o.seen,
+        o.dropped,
+        o.xp,
+        o.earned
+      )
+    )
+  end
   for _, s in ipairs(st.stages) do
     ctx.say(
-      ("stage\t%d\txp %d\tpoints %d\topen %d\twithout xp %d\t%s"):format(
+      ("stage\t%d\txp %d\tpoints %d\topen %d\twithout xp %d\t%s%s"):format(
         s.number,
         s.xp,
         s.points,
         s.open,
         s.without_xp,
-        clean(s.label)
+        clean(s.label),
+        s.optional and "\toptional" or ""
       )
     )
   end

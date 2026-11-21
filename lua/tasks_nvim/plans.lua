@@ -549,7 +549,7 @@ M.TEMPLATES = {
       "## Lernpunkte",
       "",
       "<!-- Stufen als oberste Punkte, in dieser Reihenfolge (LP-06): Stufe 0 · Orientieren {#orientieren}, Stufe 1 · Grundlagen {#grundlagen}, Stufe 2 · Vertiefen {#vertiefen}, Stufe 3 · Anwenden {#anwenden}, Stufe 4 · Festigen {#festigen}; weglassen ja, umbenennen nein. -->",
-      "<!-- Literatur als letzte Gruppe (LP-11): - [ ] Hintergrund aus der Literatur (optional; je Buch nur das Kapitel zur Frage) {#literatur}, darunter je Buch ein Punkt mit Link und der Frage, die es beantwortet; danach eine Zeile „Fehlt im Bestand: …“ für die Beschaffungsliste. -->",
+      "<!-- Literatur als letzte Gruppe (LP-11): - [ ] Hintergrund aus der Literatur (je Buch nur das Kapitel zur Frage) {optional} {#literatur}, darunter je Buch ein Punkt mit Link und der Frage, die es beantwortet ({optional}: zählt nicht für Fortschritt, Prozent-Level und „Pfad fertig“, die XP gelesener Bücher schon); danach eine Zeile „Fehlt im Bestand: …“ für die Beschaffungsliste. -->",
       '<!-- - [ ] Punkt {#schluessel}: [x] gelernt, [~] angeschaut, [-] entfaellt (mit "– Grund: ..."), [!] blockiert -->',
       "",
       "## Level",

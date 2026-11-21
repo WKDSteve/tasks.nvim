@@ -1,7 +1,7 @@
 {
-  "body": "\n## Lernpunkte\n\n- [ ] Rust lernen {#rust}\n  - [x] Das Buch {xp=30} {#book}\n  - [~] Rustlings – Grund: nur die Hälfte {xp=20}\n  - [ ] C-Compiler → lib.nvim/c-compiler {xp=40} {#cc}\n  - [-] Embedded – Grund: nicht nötig {xp=50}\n  - [ ] Ohne XP {#plain}\n\n## Level\n\n- [x] 30 XP · Einsteiger · Badge assets/badges/stern.png · Belohnung: großes Eis\n- [ ] 50 % · Badge assets/badges/mond.svg · Belohnung: Kino\n- [ ] 100 XP · Belohnung: ein Buch\n- [ ] 20 XP\n- [ ] Pfad fertig · Belohnung: Wochenende am See\n",
+  "body": "\n## Lernpunkte\n\n- [ ] Rust lernen {#rust}\n  - [x] Das Buch {xp=30} {#book}\n  - [~] Rustlings – Grund: nur die Hälfte {xp=20}\n  - [ ] C-Compiler → lib.nvim/c-compiler {xp=40} {#cc}\n  - [-] Embedded – Grund: nicht nötig {xp=50}\n  - [ ] Ohne XP {#plain}\n- [ ] Literatur {optional} {#lit}\n  - [x] Ein Buch {xp=10} {#lit-a}\n  - [ ] Noch ein Buch {xp=10}\n\n## Level\n\n- [x] 30 XP · Einsteiger · Badge assets/badges/stern.png · Belohnung: großes Eis\n- [ ] 50 % · Badge assets/badges/mond.svg · Belohnung: Kino\n- [ ] 100 XP · Belohnung: ein Buch\n- [ ] 20 XP\n- [ ] Pfad fertig · Belohnung: Wochenende am See\n",
   "body_truncated": false,
-  "digest": "sha256:29349e05ff8ac5a4",
+  "digest": "sha256:8f24b47b5b72963e",
   "engine": {
     "git": "0000000",
     "nvim": "0.0.0",
@@ -12,8 +12,8 @@
   "level_problems": [
     {
       "code": "level-order",
-      "line": 16,
-      "message": "the thresholds must rise: 20 XP after 100 on line 15"
+      "line": 19,
+      "message": "the thresholds must rise: 20 XP after 100 on line 18"
     }
   ],
   "levels": [
@@ -21,7 +21,7 @@
       "badge": "assets/badges/stern.png",
       "given": true,
       "kind": "xp",
-      "line": 13,
+      "line": 16,
       "name": "Einsteiger",
       "number": 1,
       "reached": true,
@@ -33,7 +33,7 @@
       "badge": "assets/badges/mond.svg",
       "given": false,
       "kind": "percent",
-      "line": 14,
+      "line": 17,
       "number": 2,
       "reached": false,
       "ref": "2",
@@ -43,7 +43,7 @@
     {
       "given": false,
       "kind": "xp",
-      "line": 15,
+      "line": 18,
       "number": 3,
       "reached": false,
       "ref": "3",
@@ -53,7 +53,7 @@
     {
       "given": false,
       "kind": "xp",
-      "line": 16,
+      "line": 19,
       "number": 4,
       "reached": true,
       "ref": "4",
@@ -62,7 +62,7 @@
     {
       "given": false,
       "kind": "done",
-      "line": 17,
+      "line": 20,
       "reached": false,
       "ref": "done",
       "reward": "Wochenende am See"
@@ -245,13 +245,102 @@
         "possible": 0
       },
       "xp_suggest": 15
+    },
+    {
+      "children": 2,
+      "closed": false,
+      "depth": 0,
+      "derived": "partial",
+      "index": 7,
+      "key": "lit",
+      "label": "Literatur",
+      "line": 10,
+      "mark": " ",
+      "optional": true,
+      "progress": {
+        "blocked": 0,
+        "dropped": 0,
+        "learned": 1,
+        "open": 1,
+        "seen": 0,
+        "total": 2
+      },
+      "state": "open",
+      "xp_progress": {
+        "earned": 10,
+        "missing": 0,
+        "open": 10,
+        "points": 2,
+        "possible": 20
+      }
+    },
+    {
+      "children": 0,
+      "closed": true,
+      "depth": 1,
+      "derived": "learned",
+      "index": 8,
+      "key": "lit-a",
+      "label": "Ein Buch",
+      "line": 11,
+      "mark": "x",
+      "optional": true,
+      "parent": 7,
+      "progress": {
+        "blocked": 0,
+        "dropped": 0,
+        "learned": 1,
+        "open": 0,
+        "seen": 0,
+        "total": 1
+      },
+      "state": "learned",
+      "xp": 10,
+      "xp_from": "point",
+      "xp_progress": {
+        "earned": 10,
+        "missing": 0,
+        "open": 0,
+        "points": 1,
+        "possible": 10
+      }
+    },
+    {
+      "children": 0,
+      "closed": false,
+      "depth": 1,
+      "derived": "open",
+      "index": 9,
+      "label": "Noch ein Buch",
+      "line": 12,
+      "mark": " ",
+      "optional": true,
+      "parent": 7,
+      "progress": {
+        "blocked": 0,
+        "dropped": 0,
+        "learned": 0,
+        "open": 1,
+        "seen": 0,
+        "total": 1
+      },
+      "state": "open",
+      "xp": 10,
+      "xp_from": "point",
+      "xp_progress": {
+        "earned": 0,
+        "missing": 0,
+        "open": 10,
+        "points": 1,
+        "possible": 10
+      }
     }
   ],
   "path": {
     "area": "lib.nvim",
     "areas": [],
     "created": "2026-01-01",
-    "etag": "sha256:8ec6f3239a19a8ca",
+    "etag": "sha256:76ca721af329df22",
     "file": "lib.nvim/ROADMAP/paths/rust-lernen.md",
     "has_tree": true,
     "id": "lib.nvim/rust-lernen",
@@ -267,7 +356,24 @@
       "open_rewards": [],
       "percent": 36
     },
-    "points": 6,
+    "optional": {
+      "progress": {
+        "blocked": 0,
+        "dropped": 0,
+        "learned": 1,
+        "open": 1,
+        "seen": 0,
+        "total": 2
+      },
+      "xp": {
+        "earned": 10,
+        "missing": 0,
+        "open": 10,
+        "points": 2,
+        "possible": 20
+      }
+    },
+    "points": 9,
     "problems": [],
     "progress": {
       "blocked": 0,
@@ -279,7 +385,7 @@
     },
     "slug": "rust-lernen",
     "status": "doing",
-    "summary": "- [ ] Rust lernen {#rust} - [x] Das Buch {xp=30} {#book} - [~] Rustlings – Grund: nur die Hälfte {xp=20} - [ ] C-Compiler → lib.nvim/c-compiler {xp=40} {#cc} - [-] Embedded – Grund: nicht nötig {xp=50} - [ ] Ohne XP {#plain}",
+    "summary": "- [ ] Rust lernen {#rust} - [x] Das Buch {xp=30} {#book} - [~] Rustlings – Grund: nur die Hälfte {xp=20} - [ ] C-Compiler → lib.nvim/c-compiler {xp=40} {#cc} - [-] Embedded – Grund: nicht nötig {xp=50} - [ ] Ohne XP {#plain} - [ ] Literatur {optional} {#lit} - [x] Ein Buch {xp=10} {#lit-a} - [ ] Noch ein Buch {xp=10}",
     "title": "Rust lernen",
     "updated": "2026-01-05",
     "valid": true,
@@ -300,7 +406,7 @@
     "seen": 1,
     "total": 5
   },
-  "rev": "rev:a436a4",
+  "rev": "rev:17b539",
   "schema": 1,
   "tree_problems": [],
   "vault": {

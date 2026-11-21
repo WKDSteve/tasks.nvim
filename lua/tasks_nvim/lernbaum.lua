@@ -16,8 +16,8 @@
 --- none closed: open; else partial), and it is closed when every leaf is. Progress is always counted apart: learned,
 --- seen, dropped, open (blocked ones counted as open and once more as blocked).
 ---
---- A node line reads `<label>[ → <id>][ – Grund: <reason>][ {xp=N}][ {#key}]`; key and XP come last (in either
---- order), the reason after the label (also `Reason:`, and `—` or `-` as the dash), the arrow names the task the node
+--- A node line reads `<label>[ → <id>][ – Grund: <reason>][ {xp=N}][ {optional}][ {#key}]`; key, XP and the optional
+--- mark come last (in any order), the reason after the label (also `Reason:`, and `—` or `-` as the dash), the arrow names the task the node
 --- was promoted to. An arrow is a reference only when an id `<area>/<slug>` follows it and nothing but the marks after
 --- that; any other arrow (`Test rot → grün`) is text of the label. A `> ` line indented
 --- below a node is its note. Every other line of the section (prose, blank lines, comments, code fences) is kept as it
@@ -28,6 +28,12 @@
 --- A promoted leaf counts the `xp:` of its task when the caller gives it (`set_task_xp`), else its own. A parent sums
 --- its children; an `{xp=N}` on a parent is a problem (`path-bad-xp`) and counts nothing. A tree without any XP works
 --- as before (`has_xp = false`).
+---
+--- Optional (`{optional}` on a node, mostly a group such as the books of a path): the node and its subtree count for
+--- nothing that says how far the path is: `tree.progress` and `tree.xp` hold the other points only (progress, percent
+--- levels and the path being finished), `tree.optional` holds the optional ones. Their XP still count once earned (an
+--- XP level adds `tree.optional.xp.earned`, `lernlevel.evaluate`). A node keeps the progress of its whole subtree for
+--- showing it; a parent is closed (and learned) when its points that are not optional are.
 ---
 --- Pure Lua, no I/O. Not its job: whether an arrow names a task that exists, cycles over files, images on disk
 --- (`check`); the path file itself (`tasks_nvim.paths`); levels and rewards (`tasks_nvim.lernlevel`).
@@ -151,6 +157,10 @@ end
 ---@field xp_raw? string         # The text of an `{xp=…}` that is no XP (kept as written).
 ---@field xp_from? "point"|"task"
 ---@field xp_progress Tasks.LernXp
+---@field optional? boolean      # `{optional}` on its own line.
+---@field in_optional boolean     # It, or a node above it, is optional.
+---@field opt_progress Tasks.LernProgress  # The part of `progress` that is optional.
+---@field opt_xp Tasks.LernXp              # The part of `xp_progress` that is optional.
 ---@field dirty? boolean         # Changed by `set_state`: `render` writes the line anew.
 ---@field prefix string          # The text before the mark: indent and bullet, as written.
 ---@field cr string              # `"\r"` when the line ended with CRLF.
@@ -183,7 +193,9 @@ end
 ---@field by_key table<string, Tasks.LernNode>  # The first node of each key.
 ---@field progress Tasks.LernProgress
 ---@field xp Tasks.LernXp
----@field has_xp boolean          # Some leaf carries XP.
+---@field has_xp boolean          # Some leaf carries XP (an optional one too).
+---@field optional { progress: Tasks.LernProgress, xp: Tasks.LernXp }  # The optional points, apart.
+---@field has_optional boolean    # Some node is optional.
 ---@field problems Tasks.LernProblem[]
 ---@field hints Tasks.LernProblem[]   # Worth a word, never a fault: an arrow before a word that looks like an id but is none.
 ---@field lines string[]           # The body split at `\n` (a CR stays on its line).
@@ -232,15 +244,18 @@ end
 
 ---Split the text after the mark into label, arrow, reason and key.
 ---@param text string
----@return { label: string, key?: string, xp?: integer, xp_raw?: string, reason?: string, promoted?: string, arrow_bad?: string }
+---@return { label: string, key?: string, xp?: integer, xp_raw?: string, optional?: boolean, reason?: string, promoted?: string, arrow_bad?: string }
 function M.split(text)
   local rest = text:gsub("%s+$", "")
   local out = {}
-  -- the key and the XP at the end, in either order, each once
-  for _ = 1, 2 do
+  -- the key, the XP and the optional mark at the end, in any order, each once
+  for _ = 1, 3 do
     local before, key = rest:match("^(.-)%s*{#([^{}%s]+)}$")
+    local b3 = rest:match("^(.-)%s*{optional}$")
     if before and not out.key then
       rest, out.key = before, key
+    elseif b3 and not out.optional then
+      rest, out.optional = b3, true
     else
       local b2, raw = rest:match("^(.-)%s*{xp=([^{}]*)}$")
       if b2 and out.xp == nil and out.xp_raw == nil then
@@ -312,11 +327,23 @@ local function add_progress(into, from)
   end
 end
 
+---@param into table<string, integer>
+---@param from table<string, integer>
+---@param minus table<string, integer>
+local function add_difference(into, from, minus)
+  for k, v in pairs(from) do
+    into[k] = into[k] + v - minus[k]
+  end
+end
+
 ---Derive state, closedness and progress of a node from its leaves (recursive).
 ---@param node Tasks.LernNode
-local function derive(node)
+---@param in_optional? boolean  # A node above it is optional.
+local function derive(node, in_optional)
   local p = zero()
   local x = zero_xp()
+  local op, ox = zero(), zero_xp()
+  node.in_optional = in_optional == true or node.optional == true
   if #node.children == 0 then
     local s = node.state or "open"
     p.total = 1
@@ -340,16 +367,28 @@ local function derive(node)
     end
     node.derived = node.state or "open"
     node.closed = CLOSED[s] == true
+    if node.in_optional then
+      add_progress(op, p)
+      add_progress(ox, x)
+    end
   else
     for _, c in ipairs(node.children) do
-      derive(c)
+      derive(c, node.in_optional)
       add_progress(p, c.progress)
       add_progress(x, c.xp_progress)
+      add_progress(op, c.opt_progress)
+      add_progress(ox, c.opt_xp)
     end
-    node.closed = p.open == 0
-    if p.learned == p.total then
+    -- closed and learned by the points that are not optional; a subtree of optional points only by its own
+    local r = p
+    if op.total < p.total then
+      r = zero()
+      add_difference(r, p, op)
+    end
+    node.closed = r.open == 0
+    if r.learned == r.total then
       node.derived = "learned"
-    elseif p.learned + p.seen + p.dropped == 0 then
+    elseif r.learned + r.seen + r.dropped == 0 then
       node.derived = "open"
     else
       node.derived = "partial"
@@ -357,18 +396,30 @@ local function derive(node)
   end
   node.progress = p
   node.xp_progress = x
+  node.opt_progress = op
+  node.opt_xp = ox
 end
 
 ---Derive every root anew and sum the tree's progress and XP.
 ---@param tree Tasks.LernTree
 local function derive_tree(tree)
   tree.progress, tree.xp = zero(), zero_xp()
+  tree.optional = { progress = zero(), xp = zero_xp() }
   for _, root in ipairs(tree.roots) do
     derive(root)
-    add_progress(tree.progress, root.progress)
-    add_progress(tree.xp, root.xp_progress)
+    add_difference(tree.progress, root.progress, root.opt_progress)
+    add_difference(tree.xp, root.xp_progress, root.opt_xp)
+    add_progress(tree.optional.progress, root.opt_progress)
+    add_progress(tree.optional.xp, root.opt_xp)
   end
-  tree.has_xp = tree.xp.points > 0
+  tree.has_xp = tree.xp.points + tree.optional.xp.points > 0
+  tree.has_optional = false
+  for _, node in ipairs(tree.nodes) do
+    if node.optional then
+      tree.has_optional = true
+      break
+    end
+  end
 end
 
 ---Read the learning tree of a body (the text below the frontmatter). Without a `## Lernpunkte` section the tree is
@@ -386,6 +437,8 @@ function M.parse(body)
     progress = zero(),
     xp = zero_xp(),
     has_xp = false,
+    optional = { progress = zero(), xp = zero_xp() },
+    has_optional = false,
     problems = {},
     hints = {},
     lines = lines,
@@ -447,6 +500,10 @@ function M.parse(body)
             xp_raw = parts.xp_raw,
             xp_from = parts.xp and "point" or nil,
             xp_progress = zero_xp(),
+            optional = parts.optional,
+            in_optional = false,
+            opt_progress = zero(),
+            opt_xp = zero_xp(),
             prefix = ws .. bullet .. " ",
             cr = raw:sub(-1) == "\r" and "\r" or "",
           }
@@ -570,6 +627,9 @@ local function line_of(node)
     parts[#parts + 1] = " {xp=" .. node.xp_own .. "}"
   elseif node.xp_raw then
     parts[#parts + 1] = " {xp=" .. node.xp_raw .. "}"
+  end
+  if node.optional then
+    parts[#parts + 1] = " {optional}"
   end
   if node.key then
     parts[#parts + 1] = " {#" .. node.key .. "}"

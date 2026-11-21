@@ -607,6 +607,23 @@ function M.xp_text(tree, ls)
   return table.concat(parts, sep)
 end
 
+---The heading's text for the optional points (`{optional}`), apart from the progress: `optional 1/4 gelernt (10 XP)`;
+---"" when the tree has none.
+---@param tree Tasks.LernTree
+---@return string
+function M.optional_text(tree)
+  local o = tree.optional
+  if not o or o.progress.total == 0 then
+    return ""
+  end
+  local p = o.progress
+  local text = ("optional %d/%d gelernt"):format(p.learned, p.total - p.dropped)
+  if o.xp.points > 0 then
+    text = text .. (" (%d XP)"):format(o.xp.earned)
+  end
+  return text
+end
+
 ---Draw the progress and the image placeholders anew (and the folds of an attached buffer).
 ---@param buf integer
 function M.refresh(buf)
@@ -643,9 +660,10 @@ function M.refresh(buf)
   end
   if snap.heading and #snap.tree.nodes > 0 then
     local text = lernbaum.progress_text(snap.tree.progress)
-    local extra = game and M.xp_text(snap.tree, ls) or ""
-    if extra ~= "" then
-      text = text .. " " .. MIDDOT .. " " .. extra
+    for _, extra in ipairs({ game and M.xp_text(snap.tree, ls) or "", M.optional_text(snap.tree) }) do
+      if extra ~= "" then
+        text = text .. " " .. MIDDOT .. " " .. extra
+      end
     end
     mark(snap.heading, {
       virt_text = { { "  " .. text, "Comment" } },
@@ -656,7 +674,14 @@ function M.refresh(buf)
     local row = snap.offset + node.line
     if #node.children > 0 then
       mark(row, {
-        virt_text = { { "  " .. lernbaum.progress_text(node.progress), "Comment" } },
+        virt_text = {
+          {
+            "  "
+              .. lernbaum.progress_text(node.progress)
+              .. (node.optional and " (optional)" or ""),
+            "Comment",
+          },
+        },
         virt_text_pos = "eol",
       })
     elseif game and node.xp then

@@ -599,6 +599,21 @@ the XP (or percent) missing, `open_rewards` the rewards reached but not granted.
 `level-bad-mark`, `level-order` (thresholds that do not rise), `level-badge-outside`, `level-badge-missing`
 (warnings) and, for a path with levels, the hint `xp-missing` (points without XP count nothing towards them).
 
+#### Optional subtrees
+
+`{optional}` on a node (beside `{xp=N}` and `{#key}`, in any order; mostly the group of books, `LP-11`) makes it and
+its subtree optional: those points count for nothing that says how far the path is: not for the progress, not for a
+level in percent, not for `Pfad fertig`. Their XP still count for a level in XP once earned, so reading a book is
+worth something without being a duty; nobody has to drop an unread book with a reason. `tree.progress` and
+`tree.xp` hold the other points, `tree.optional` the optional ones; a node shows the progress of its whole subtree,
+and a parent is closed when its points that are not optional are. `tasks path` prints them in a line `optional`
+and marks a stage that is optional as a whole; `:Tasks learn` adds `optional n/m gelernt` to the heading.
+
+```markdown
+- [ ] Hintergrund aus der Literatur {optional} {#literatur}
+  - [ ] [Ein Buch](../../Literatur/buch.pdf): das Kapitel zur Frage {xp=5} {#lit-buch}
+```
+
 #### Promoting a learning point (`tasks_nvim.promote`)
 
 `tasks promote <area>/<slug>#<key|n>` (Lua: `promote.promote(container, ref, opts)`) makes a task of a learning point
