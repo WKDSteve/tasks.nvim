@@ -34,7 +34,9 @@
 ---  - `slug-conflict`: the same slug exists as a file and as a folder task
 ---  - `asset-dangling` (warning): a folder task links `assets/<file>` that is not there
 ---  - `link-missing` (warning): a relative Markdown link of an open task (not in code, not `http(s):`, `mailto:`,
----    `#anchor`; a folder task's `assets/` links are `asset-dangling`'s) leads to no file, with its line
+---    `#anchor`; a folder task's `assets/` links are `asset-dangling`'s) leads to no file, with its line;
+---    `plan-link-missing`, `project-link-missing`, `meeting-link-missing` (warnings) the same for those files (their
+---    cover and icon asset are `cover-missing` / `icon-missing`)
 ---  - `asset-unused` (warning): a folder task has an image in `assets/` that its text never mentions
 ---  - `bad-icon`, `bad-cover` (errors): `icon` is no emoji, no image below `assets/` and no word of `model.ICON_WORDS`,
 ---    `cover` no image below `assets/` (task, plan, project, path); `icon-missing`, `cover-missing` (warnings): the
@@ -507,6 +509,18 @@ local function link_findings(findings, item, code, skip, text)
   end
 end
 
+---`plan-link-missing`, `project-link-missing`, `meeting-link-missing` (warnings): a dead relative link of a plan, project
+---or meeting file, as `link-missing`; its `cover` and its `icon` asset are `picture_findings`' already.
+---@param findings Tasks.Finding[]
+---@param item { area: string, path: string, id?: string, icon?: Tasks.Icon, cover?: string }
+---@param code string
+local function file_link_findings(findings, item, code)
+  local icon = item.icon and item.icon.kind == "asset" and item.icon.value or nil
+  link_findings(findings, item, code, function(l)
+    return l.target == item.cover or l.target == icon
+  end)
+end
+
 ---Images in a folder task's `assets/`, and in the folders of the kinds below it (`assets/images/`,
 ---`assets/screenshots/`, `assets/videos/`: where `attach` puts an asset with a kind), that the task's text does not
 ---mention as `assets/<name>` (a percent-encoded link counts). A name below a kind's folder is `<folder>/<name>`.
@@ -663,6 +677,7 @@ local function plan_file_findings(findings, open_ids, names, scan_opts, is_finis
         add(findings, "error", file.error_codes[i] or "frontmatter-invalid", file, msg)
       end
       picture_findings(findings, file)
+      file_link_findings(findings, file, "plan-link-missing")
       for _, p in ipairs(file.link_problems or {}) do
         add(findings, "error", p.code, file, link_problem_message(p))
       end
@@ -818,6 +833,7 @@ local function meeting_findings(findings, hints, open_ids, names, scan_opts, is_
         end
       end
       picture_findings(findings, m, "meeting-")
+      file_link_findings(findings, m, "meeting-link-missing")
       if m.image_alias then
         hint(
           "meeting-image-alias",
@@ -1449,6 +1465,7 @@ local function project_findings(findings, open_ids, names, scan_opts, is_finishe
         add(findings, "error", file.error_codes[i] or "frontmatter-invalid", file, msg)
       end
       picture_findings(findings, file)
+      file_link_findings(findings, file, "project-link-missing")
       for _, p in ipairs(file.link_problems or {}) do
         add(findings, "error", p.code, file, link_problem_message(p))
       end

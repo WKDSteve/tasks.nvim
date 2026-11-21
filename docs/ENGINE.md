@@ -865,6 +865,7 @@ file that is there (also not a refused one). Nobody else writes it: a person edi
 | `slug-conflict` | the same slug exists as a file and as a folder task |
 | `asset-dangling` (warning) | a folder task links `assets/<file>` that is not there |
 | `link-missing` (warning) | a relative Markdown link or image of an open task leads to no file (with its line); not checked: links in code, `http(s):`, `mailto:` and other schemes, `#anchor`, and a folder task's `assets/` links (`asset-dangling`) |
+| `plan-link-missing`, `project-link-missing`, `meeting-link-missing` (warnings) | the same for a plan, project or meeting file, with its line; the `cover` and `icon` asset it names are left to `cover-missing` / `icon-missing` (`meeting-image-missing`, `meeting-icon-missing`). A block indented by four spaces counts as text, not code: in the vault such lines are the continuation of a list item and hold real links |
 | `asset-unused` (warning) | a folder task has an image in `assets/` that its text never mentions |
 | `view-invalid` (warning) | a file of a saved view (`<area>/ROADMAP/views/*.md`) is no view: a field or value the engine does not have, no frontmatter, a symbolic link, or a folder of views that leads out of the vault (the reason is in the message; `tasks.views` lists it under `problems`) |
 | `index-stale`, `index-error` | `ROADMAP/TASKS.md` is missing, outdated or left over / could not be checked |
