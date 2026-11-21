@@ -601,6 +601,14 @@ sources with the column `Geprüft`, `## Lernpunkte` with the stages and the lite
 every task promoted from the path. `--summary`, `--slug`, `--links`, `--icon` and `--cover` as for a plan; `--title=` names it when no words follow the area. A taken slug gets `-2`. Headless: `path-new` with the same
 options. Then `:Tasks learn` shows the tree, and `:Tasks point` and `:Tasks promote` work on its points.
 
+Headless `path-new <area> --from=<draft.md> [--slug=s] [--dry-run]` makes a whole path from one draft file (frontmatter,
+sections, the tree, `## Level`): the slug as `path-new` gives the draft's `title`, `status: planning`, `created` and
+`updated` added when the draft leaves them out, then the checks of `check` for a path (keys, marks, XP, arrows, relative
+links, levels, images) as if the file were in place. Any error or warning refuses the draft and nothing is written; each
+finding is a line `<severity>\t<code>\tline N: <message>` on stderr with the draft's line, then `refused\t<n> finding(s)`
+(exit 1). A hint (`xp-missing`) does not refuse it. `--dry-run` prints `would-create\t<id>\t<path>` and writes
+nothing; the frontmatter options (`--areas`, `--tags`, …) are refused beside `--from` (exit 2).
+
 Headless `path <area>/<slug> [--format=text|json]` is the XP overview of a path while it is planned (`path_stats`):
 
 ```

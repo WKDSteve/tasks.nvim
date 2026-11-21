@@ -95,8 +95,9 @@ return function(H)
       },
     },
     ["estimate"] = { composer = { "list", "walk" }, cli = { "stale-refs" } },
-    -- a new path is in no index: the CLI takes `--no-index` only so that scripts may pass it to every writing verb
-    ["path-new"] = { composer = {}, cli = { "no-index" } },
+    -- a new path is in no index: the CLI takes `--no-index` only so that scripts may pass it to every writing verb;
+    -- `--from=<draft.md> [--dry-run]` reads a whole draft file, a step for scripts and agents, not for the editor
+    ["path-new"] = { composer = {}, cli = { "dry-run", "from", "no-index" } },
     ["folderize"] = { composer = {}, cli = { "by", "force", "no-index", "note" } },
     -- `--staged` is for the shell around a commit; the editor has no staging step of its own.
     -- `--no-history`: only the CLI's index writes down the figures of the day (`tasks history`), so only it can skip it.

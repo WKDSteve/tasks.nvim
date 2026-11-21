@@ -106,6 +106,11 @@ commands:
                                           into ## Lernpunkte); --template=learning writes the sections of a learning path;
                                           --tags=not-on-workstation (or on-workstation) goes to every task promoted
                                           from the path; --no-index is accepted (a new path changes no index)
+  path-new <area> --from=<draft.md> [--slug=s] [--dry-run]
+                                          the whole path from a draft file: checked as check checks a path (keys,
+                                          marks, XP, arrows, links, levels, images), written only when nothing is
+                                          wrong; every finding names the draft's line and its code (exit 1, nothing
+                                          written); --dry-run says what would be made and writes nothing
   path <area>/<slug> [--format=text|json]  the XP overview of a learning path: points (all, open, without XP), XP in
                                           all and per stage (a root of ## Lernpunkte), and for each level the point
                                           at which it is reached when the points are learned in their order
@@ -471,9 +476,10 @@ local SPECS = {
       "project",
       "template",
       "tags",
+      "from",
     },
     -- `--no-index` for scripts that pass it to every writing command: a new path changes no index
-    flag = { "no-index" },
+    flag = { "no-index", "dry-run" },
   },
   ["plan-close"] = { value = {}, flag = {} },
   ["milestone-new"] = {
@@ -1411,7 +1417,78 @@ commands["project-new"] = function(ctx)
   return new_file_command(ctx, "project")
 end
 
+---`path-new <area> --from=<draft.md> [--slug=s] [--dry-run]`: a whole path from a draft (`tasks_nvim.path_draft`).
+---Exit 0: written (or, with `--dry-run`, it would be); 1: a finding refused it or the call failed; 2: usage.
+---@param ctx Tasks.CliCtx
+---@return integer code
+local function path_from_draft(ctx)
+  local args, eo = ctx.args, ctx.eo
+  local usage = "path-new <area> --from=<draft.md> [--slug=s] [--dry-run]"
+  local area = args.pos[1]
+  local source = args.opt.from
+  if not area or #args.pos > 1 or type(source) ~= "string" or source == "" then
+    ctx.warn("error: usage: " .. usage)
+    return 2
+  end
+  -- the draft holds the frontmatter: an option that would write one of its keys has no place beside it
+  for _, key in ipairs({
+    "title",
+    "areas",
+    "target",
+    "status",
+    "summary",
+    "links",
+    "icon",
+    "cover",
+    "project",
+    "template",
+    "tags",
+  }) do
+    if args.opt[key] ~= nil then
+      ctx.warn(("error: --%s goes into the draft's frontmatter, not beside --from"):format(key))
+      return 2
+    end
+  end
+  local draft, rerr = fsio.read(source)
+  if not draft then
+    ctx.warn("error: cannot read " .. source .. ": " .. tostring(rerr))
+    return 1
+  end
+  local res, err = require("tasks_nvim.path_draft").run(area, draft, {
+    root = eo.root,
+    today = eo.today,
+    slug = args.opt.slug --[[@as string|nil]],
+    dry_run = args.opt["dry-run"] == true,
+  })
+  if not res then
+    ctx.warn("error: " .. tostring(err))
+    return 1
+  end
+  -- `<severity>\t<code>\tline N: <message>`: the line is the draft's, also when the message did not name one
+  local function line_out(word, f)
+    return ("%s\t%s\tline %d: %s"):format(word, f.code, f.line, (f.message:gsub("^line %d+: ", "")))
+  end
+  for _, f in ipairs(res.findings) do
+    ctx.warn(line_out(f.severity, f))
+  end
+  for _, h in ipairs(res.hints) do
+    ctx.warn(line_out("hint", h))
+  end
+  if #res.findings > 0 then
+    ctx.warn(("refused\t%d finding(s); nothing written"):format(#res.findings))
+    return 1
+  end
+  ctx.say(("%s\t%s\t%s"):format(res.written and "created" or "would-create", res.id, res.path))
+  if res.renamed then
+    ctx.warn("warn: the slug was taken: the path is " .. res.id)
+  end
+  return 0
+end
+
 commands["path-new"] = function(ctx)
+  if ctx.args.opt.from ~= nil then
+    return path_from_draft(ctx)
+  end
   return new_file_command(ctx, "path")
 end
 

@@ -139,7 +139,14 @@ return function(H)
       hint = h
     end
   end
-  has(hint.message, "1 learning point(s) without XP (line 10)")
+  -- the line of the file, frontmatter counted
+  local new_line
+  for i, l in ipairs(vim.split(H.read(file), "\n", { plain = true })) do
+    if l:find("Noch eins", 1, true) then
+      new_line = i
+    end
+  end
+  has(hint.message, ("1 learning point(s) without XP (line %d)"):format(new_line))
 
   -- a path without levels: no level findings, no hint
   H.write(
