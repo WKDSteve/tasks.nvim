@@ -98,6 +98,8 @@ return {
         },
       },
       env = { TASKS_REQUIRE_SNACKS = "1" },
+      -- `testing ci land`: a check branch ci/** runs the hosted legs, main moves only once it is green there (CI-05)
+      land = true,
     },
     steps = {
       luacheck = { preset = "luacheck", args = { "lua", "TESTS", "scripts" } },
