@@ -209,4 +209,20 @@ return function(H)
   eq(stale.error.code, "conflict")
   eq(one({ op = "path_levels", id = "lib.nvim/nope", levels = NEW }).error.code, "not_found")
   eq(one({ op = "path_levels", id = ID }).error.code, "invalid_argument")
+  -- a line separator, a C1 character or broken UTF-8 in a text of the levels: refused as everywhere else
+  for _, text in ipairs({ "a\226\128\168b", "a\194\155b", "a\255b" }) do
+    local c = one({
+      op = "path_levels",
+      id = ID,
+      levels = {
+        list = { { threshold = 5, unit = "xp", reward = text } },
+        done = { reward = "ok" },
+      },
+    })
+    eq({ c.ok, c.error.code }, { false, "invalid_argument" }, vim.inspect(text))
+    has(c.error.message, "control character")
+    local d2 =
+      one({ op = "path_levels", id = ID, levels = { list = {}, done = { reward = text } } })
+    eq(d2.error.code, "invalid_argument")
+  end
 end

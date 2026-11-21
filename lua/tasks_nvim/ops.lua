@@ -2227,6 +2227,26 @@ local function do_path_levels(op, ctx)
   if op.id == nil or op.levels == nil then
     return refuse("invalid_argument", "path_levels needs id and levels")
   end
+  -- the door looks into the lists of an operation, not into its objects: the texts of the levels are checked here as
+  -- every other text is (C1, a line separator, broken UTF-8; `lernlevel.render` sees only C0 and DEL)
+  if type(op.levels) == "table" then
+    local texts = {}
+    for _, l in ipairs(type(op.levels.list) == "table" and op.levels.list or {}) do
+      if type(l) == "table" then
+        for _, key in ipairs({ "name", "badge", "reward" }) do
+          texts[#texts + 1] = l[key]
+        end
+      end
+    end
+    if type(op.levels.done) == "table" then
+      texts[#texts + 1] = op.levels.done.reward
+    end
+    for _, text in pairs(texts) do
+      if has_control(text) then
+        return refuse("invalid_argument", "levels contain a control character")
+      end
+    end
+  end
   local r, err, info = require("tasks_nvim.paths").set_levels(op.id, op.levels, {
     root = ctx.root,
     today = ctx.today,

@@ -530,7 +530,8 @@ function M.render(spec)
     if gerr then
       return nil, gerr
     end
-    local parts = { unit == "xp" and (th .. " XP") or (th .. " %") }
+    -- `%d`: a number that came as 5.0 (Lua 5.4 of the web variant) is written as 5, as the reader reads it
+    local parts = { unit == "xp" and ("%d XP"):format(th) or ("%d %%"):format(th) }
     parts[#parts + 1] = name
     parts[#parts + 1] = badge and ("Badge " .. badge) or nil
     parts[#parts + 1] = reward and ("Belohnung: " .. reward) or nil
