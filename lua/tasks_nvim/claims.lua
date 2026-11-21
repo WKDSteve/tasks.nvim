@@ -308,11 +308,13 @@ end
 ---@param claim Tasks.Claim
 ---@return string
 local function held_message(id, claim)
-  return ("%s is claimed by %s since %s until %s: ask them, wait for the claim to run out, or --force --note=<why>"):format(
+  -- the own claim first: a missing --by is the common case, --force there would record a wrong override
+  return ("%s is claimed by %s since %s until %s: your own claim? pass --by=%s; else ask them, wait for the claim to run out, or --force --note=<why>"):format(
     id,
     claim.by,
     claim.since,
-    claim.until_
+    claim.until_,
+    claim.by
   )
 end
 

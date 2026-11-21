@@ -190,7 +190,8 @@ commands:
                                                --folder: a folder task that can hold assets;
                                                --waits-for: created parked, waiting for that key;
                                                scopes: @SCOPES@)
-  set <area>/<slug> key=value ...         change frontmatter (empty value removes the key); waits_for=<key> parks
+  set <area>/<slug> key=value ... [--by=<name>] [--force --note=<why>]
+                                          change frontmatter (empty value removes the key); waits_for=<key> parks
                                           the task with that reason, any other status drops the reason again; an id
                                           of a learning path, plan or project (no open task of that id) changes its
                                           file: title status areas target project links icon cover tags (a path),
@@ -210,6 +211,7 @@ commands:
   unpromote <area>/<slug>#<key|n> [--dry-run]
                                           take it back while the task holds no work (open, no commits, no assets)
   done <area>/<slug> [--commits=repo@sha,repo@sha] [--done-in=text] [--date=YYYY-MM-DD] [--remind=7d|YYYY-MM-DD]
+                                          [--by=<name>] [--force --note=<why>]  (a claimed task: see claim)
                                           [--no-next] [--unblock] [--last]  (--commits adds to the task's own `commits`)
                                           [--outcome=learned|seen|not-applicable] [--reason=text]  how it ended:
                                           seen and not-applicable need a reason (or the task's own outcome_reason)
@@ -226,20 +228,23 @@ commands:
                                           prints what it would do (would_create, exists, shown), --yes creates the task
   claim <area>/<slug> [--by=<name>] [--for=4h] [--renew] [--force --note=<why>]
                                           reserve a task while you work on it (status doing); the same name renews,
-                                          an expired claim is taken over, one of somebody else is refused
+                                          an expired claim is taken over, one of somebody else is refused;
+                                          set, done, attach and folderize of a claimed task need the claim's name
+                                          as --by=<name> (else: refused, as if somebody else held it)
   unclaim <area>/<slug> [--by=<name>] [--status=open|parked|decision] [--force --note=<why>]
                                           give it back (a doing task goes to open); `done` releases by itself
-  attach <area>/<slug> <file> [--name=n] [--kind=video|image|screenshot]
+  attach <area>/<slug> <file> [--name=n] [--kind=video|image|screenshot] [--by=<name>] [--force --note=<why>]
+                                          copy a file to <slug>/assets/ (a plain task becomes a folder task; a plan
+                                          or project id too) and print the Markdown link
                                           --kind: into assets/videos/, assets/images/ or assets/screenshots/
                                           (--clipboard and --latest are screenshots without it)
-  attach <area>/<slug> <file> [--name=n]  copy a file to <slug>/assets/ (a plain task becomes a
-                                          folder task; a plan or project id too) and print the Markdown link
-  attach <area>/<slug> --clipboard [--name=n]
+  attach <area>/<slug> --clipboard [--name=n] [--by=<name>]
                                           the image on the clipboard, saved as a PNG named <slug>-<date>-<HHMM>.png
-  attach <area>/<slug> --latest[=<folder>] [--name=n]
+  attach <area>/<slug> --latest[=<folder>] [--name=n] [--by=<name>]
                                           the newest image of the screenshot folder(s) (config attach.screenshot_dirs),
                                           only when modified within attach.max_age_s (300 s); older: nothing is guessed
-  folderize <area>/<slug>                 turn a plain task (or plan, project) file into a folder
+  folderize <area>/<slug> [--by=<name>] [--force --note=<why>]
+                                          turn a plain task (or plan, project) file into a folder
   sheet-run <area>/<slug> [--testing-cli=<path>] [--dry-run]
                                           run the test sheets of a live-check task now: testing.nvim's
                                           `testing sheets run` runs them headless and writes their state into the

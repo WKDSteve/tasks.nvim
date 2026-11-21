@@ -343,6 +343,33 @@ return function(H)
   local s1 = run({ "set", cli_id, "prio=1", "--by=agent-b" })
   eq(s1.code, 1)
   has(s1.err, "is claimed by agent-a")
+  -- the refusal names the own claim's --by before --force: a forgotten --by is the common case
+  local by_at = s1.err:find("--by=agent-a", 1, true)
+  local force_at = s1.err:find("--force", 1, true)
+  ok(by_at and force_at and by_at < force_at, "--by=<owner> before --force: " .. s1.err)
+  -- every verb that checks a claim (takes --by and --force) names --by in each of its --help entries (the line of
+  -- the verb and the deeper indented lines below it)
+  local entries = {}
+  for line in run({ "--help" }).out:gmatch("[^\n]+") do
+    local verb = line:match("^  ([%w%-]+) ")
+    if verb then
+      entries[#entries + 1] = { verb = verb, text = line }
+    elseif line:match("^     ") and #entries > 0 then
+      entries[#entries].text = entries[#entries].text .. "\n" .. line
+    end
+  end
+  for verb, spec in pairs(cli.specs()) do
+    if vim.tbl_contains(spec.value, "by") and vim.tbl_contains(spec.flag, "force") then
+      local n = 0
+      for _, e in ipairs(entries) do
+        if e.verb == verb then
+          n = n + 1
+          has(e.text, "--by=", "--help of " .. verb)
+        end
+      end
+      ok(n > 0, "--help names " .. verb)
+    end
+  end
   local s2 = run({ "set", cli_id, "prio=1", "--by=agent-a" })
   eq(s2.code, 0, s2.err)
   local s3 = run({ "set", cli_id, "prio=2", "--by=agent-b", "--force", "--note=agent-a stopped" })
