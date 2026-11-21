@@ -79,6 +79,7 @@ return function(H)
     "[asset](assets/a.png) [w](../../wiki_(x).md)",
   })
   eq(mdlinks.shift("no links\n"), "no links\n", "a text without links stays")
+  eq(mdlinks.scan("text](x.md) and ](y)\n"), {}, "a ]( without a [ before it is no link")
   eq(mdlinks.shift("[a](b.md)\r\nx\r\n"), "[a](../b.md)\r\nx\r\n", "line ends stay")
 
   -- ── folderize / attach keep a path's links on the same file ─────────────
@@ -132,4 +133,43 @@ return function(H)
   ok(res == nil and aerr and aerr:find("stubbed copy failure", 1, true), tostring(aerr))
   ok(H.exists(t2.path), "the plain file is back")
   eq(H.read(t2.path), before, "with the links it had")
+
+  -- ── check: a dead relative link of a path or task is a warning, with its line ──
+  local check = require("tasks_nvim.check")
+  ---@return table<string, string[]> code -> messages of the file
+  local function link_codes(file)
+    local out = {}
+    for _, f in ipairs(check.run(opts).findings) do
+      if f.path == file and (f.code == "link-missing" or f.code == "path-link-missing") then
+        out[f.code] = out[f.code] or {}
+        table.insert(out[f.code], f.message)
+      end
+    end
+    return out
+  end
+  -- the links that resolve (the book, after the moves above) are no finding
+  eq(link_codes(att.path), {}, "a path whose links all resolve")
+  eq(link_codes(fz.path), {}, "a task whose links all resolve")
+  eq(link_codes(t2.path), {})
+
+  local path_text = H.read(att.path)
+  local dead_line = #vim.split(path_text, "\n") -- the line the appended text starts on (after the last newline)
+  H.write(
+    att.path,
+    path_text
+      .. "[tot](../../../../Literatur/fehlt.md) [web](https://x.org/fehlt) [m](mailto:a@b.c) [h](#fehlt)\n"
+      .. "`[c](fehlt-im-code.md)` [ok](../../../../Literatur/buch.md#kapitel)\n"
+      .. "```\n[f](fehlt-im-block.md)\n```\n"
+  )
+  eq(link_codes(att.path), {
+    ["path-link-missing"] = {
+      ("line %d: the link ../../../../Literatur/fehlt.md leads to nothing"):format(dead_line),
+    },
+  })
+  H.write(t2.path, H.read(t2.path) .. "[weg](../weg.md) [bild](assets/fehlt.png)\n")
+  local task_hits = link_codes(t2.path)["link-missing"]
+  eq(#task_hits, 2, "a plain task: the dead link and its assets/ link (it has no folder)")
+  ok(task_hits[1]:find("../weg.md", 1, true) and task_hits[2]:find("assets/fehlt.png", 1, true))
+  H.write(fz.path, H.read(fz.path) .. "[bild](assets/fehlt.png)\n")
+  eq(link_codes(fz.path), {}, "a folder task's assets/ link is asset-dangling's")
 end

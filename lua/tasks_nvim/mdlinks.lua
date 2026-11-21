@@ -88,7 +88,9 @@ local function line_links(line, lnum, out)
       break
     end
     init = s + 2
-    if not in_spans(spans, s) and line:find("[", 1, true) < s then
+    -- a `](` with no `[` before it on the line is text, not a link
+    local open = line:find("[", 1, true)
+    if open and open < s and not in_spans(spans, s) then
       local ts, te = s + 2, nil
       if line:sub(ts, ts) == "<" then
         local close = line:find(">", ts + 1, true)

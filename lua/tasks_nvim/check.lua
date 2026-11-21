@@ -33,6 +33,8 @@
 ---    anywhere but as `<slug>/<slug>.md` (a folder task)
 ---  - `slug-conflict`: the same slug exists as a file and as a folder task
 ---  - `asset-dangling` (warning): a folder task links `assets/<file>` that is not there
+---  - `link-missing` (warning): a relative Markdown link of an open task (not in code, not `http(s):`, `mailto:`,
+---    `#anchor`; a folder task's `assets/` links are `asset-dangling`'s) leads to no file, with its line
 ---  - `asset-unused` (warning): a folder task has an image in `assets/` that its text never mentions
 ---  - `bad-icon`, `bad-cover` (errors): `icon` is no emoji, no image below `assets/` and no word of `model.ICON_WORDS`,
 ---    `cover` no image below `assets/` (task, plan, project, path); `icon-missing`, `cover-missing` (warnings): the
@@ -88,7 +90,8 @@
 ---  - learning paths (`<area>/ROADMAP/paths/`, `tasks_nvim.paths`): a broken path file with the codes of a plan file
 ---    as `path-...` (and `path-no-stages`); `path-id-taken` (error); `path-reason-missing`, `path-duplicate-key`,
 ---    `path-bad-key`, `path-bad-mark`, `path-bad-arrow`, `path-image-outside`, `path-arrow-dangling`,
----    `path-image-missing`, `path-cycle`, `path-bad-xp` (warnings): the tree of `## Lernpunkte`; `level-bad-line`,
+---    `path-image-missing`, `path-cycle`, `path-bad-xp` (warnings): the tree of `## Lernpunkte`; `path-link-missing`
+---    (warning): a relative link of the path that leads to no file (as `link-missing`); `level-bad-line`,
 ---    `level-bad-mark`, `level-order`, `level-badge-outside`, `level-badge-missing` (warnings): the levels of
 ---    `## Level`; `xp-missing` (a hint): points without XP in a path with levels
 ---  - milestones (`<area>/ROADMAP/milestones/`, `tasks_nvim.milestones`): a broken file (`milestone-bad-status`,
@@ -114,6 +117,7 @@ local fsio = require("tasks_nvim.fsio")
 local IMAGE_EXT =
   { png = true, jpg = true, jpeg = true, gif = true, webp = true, svg = true, bmp = true }
 local lernbaum = require("tasks_nvim.lernbaum")
+local mdlinks = require("tasks_nvim.mdlinks")
 local meetings = require("tasks_nvim.meetings")
 local model = require("tasks_nvim.model")
 local plan = require("tasks_nvim.plan")
@@ -469,6 +473,29 @@ local function dangling_assets(task)
     pos = math.max(stop, e + 1)
   end
   return missing
+end
+
+---`link-missing` / `path-link-missing` (warnings): a relative Markdown link of the file (`tasks_nvim.mdlinks`: not in
+---code, not `http(s):`, `mailto:` or `#anchor`) whose file is not there, with its line. `skip` leaves out the links
+---another finding already covers (`asset-dangling`, `path-image-missing`, `level-badge-missing`).
+---@param findings Tasks.Finding[]
+---@param item { area: string, path: string, id?: string }
+---@param code string
+---@param skip? fun(link: Tasks.MdLink): boolean
+local function link_findings(findings, item, code, skip)
+  local text = fsio.read(item.path)
+  if not text then
+    return
+  end
+  for _, l in ipairs(mdlinks.missing(text, fsio.dirname(item.path), skip)) do
+    add(
+      findings,
+      "warn",
+      code,
+      item,
+      ("line %d: the link %s leads to nothing"):format(l.line, l.target)
+    )
+  end
 end
 
 ---Images in a folder task's `assets/`, and in the folders of the kinds below it (`assets/images/`,
@@ -1079,6 +1106,21 @@ local function path_findings(findings, open_ids, names, scan_opts, is_finished, 
           )
         end
       end
+      -- the images of the tree and the badges of the levels have their own findings
+      local covered = {}
+      for _, node in ipairs(tree.nodes) do
+        if node.image then
+          covered[node.image] = true
+        end
+      end
+      for _, l in ipairs(lv and vim.list_extend(vim.list_slice(lv.levels, 1), { lv.final }) or {}) do
+        if l.badge then
+          covered[l.badge] = true
+        end
+      end
+      link_findings(findings, p, "path-link-missing", function(l)
+        return covered[l.target] == true
+      end)
       -- a cycle of promotions: the path, the tasks its arrows name, the tasks theirs name, back to one seen on the way
       local state, stack, reported = {}, {}, false
       local function visit(id, arrows)
@@ -1645,6 +1687,10 @@ function M.run(opts)
         )
       end
       seen_slug[t.id] = t.path
+      -- a folder task's own `assets/` links are `asset-dangling`'s
+      link_findings(findings, t, "link-missing", function(l)
+        return t.folder == true and mdlinks.is_asset(l.target)
+      end)
       if t.folder then
         for _, target in ipairs(dangling_assets(t)) do
           add(findings, "warn", "asset-dangling", t, "linked asset is missing: " .. target)

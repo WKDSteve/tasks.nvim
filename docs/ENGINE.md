@@ -542,8 +542,10 @@ on disk under the file's lock. A path is finished by hand with `paths.close`, li
 
 `check` reports the file's faults as errors (`path-...`, `path-id-taken`) and the tree's as warnings, never refusing a
 write: `path-reason-missing`, `path-duplicate-key`, `path-bad-key`, `path-bad-mark`, `path-bad-arrow`,
-`path-image-outside`, `path-arrow-dangling` (an arrow to no task), `path-image-missing` and `path-cycle` (promotions
-that run in a circle over the `## Lernpunkte` of the tasks they name).
+`path-image-outside`, `path-arrow-dangling` (an arrow to no task), `path-image-missing`, `path-cycle` (promotions
+that run in a circle over the `## Lernpunkte` of the tasks they name) and `path-link-missing` (a relative link, to a
+book or file next to the vault say, that leads to nothing; the same exceptions as `link-missing`, and the images and
+badges the two findings above already cover).
 
 #### XP, levels and rewards (optional)
 
@@ -807,6 +809,7 @@ file that is there (also not a refused one). Nobody else writes it: a person edi
 | `slug` | filename is not a kebab-case ASCII slug, or the file lies in a subfolder of `tasks/` other than `<slug>/<slug>.md` |
 | `slug-conflict` | the same slug exists as a file and as a folder task |
 | `asset-dangling` (warning) | a folder task links `assets/<file>` that is not there |
+| `link-missing` (warning) | a relative Markdown link or image of an open task leads to no file (with its line); not checked: links in code, `http(s):`, `mailto:` and other schemes, `#anchor`, and a folder task's `assets/` links (`asset-dangling`) |
 | `asset-unused` (warning) | a folder task has an image in `assets/` that its text never mentions |
 | `view-invalid` (warning) | a file of a saved view (`<area>/ROADMAP/views/*.md`) is no view: a field or value the engine does not have, no frontmatter, a symbolic link, or a folder of views that leads out of the vault (the reason is in the message; `tasks.views` lists it under `problems`) |
 | `index-stale`, `index-error` | `ROADMAP/TASKS.md` is missing, outdated or left over / could not be checked |
