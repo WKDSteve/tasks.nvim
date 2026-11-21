@@ -32,10 +32,11 @@ return function(H)
   })
   eq(r.all, false, tostring(r.all_reason))
   eq(r.source, "heuristic")
-  -- 62 of 115 on 2026-11-16; 60 of 111 on 2026-11-12 (70 before the specs that list a temp vault declared
-  -- `-- @scans-data`, 109 before the vault scanners did)
+  -- 94 of 167 on 2026-11-21 (91 of 164 before three new specs of the command line, which reach api.lua through
+  -- cli.lua by nature: the share grows with such specs, not with a new edge); 62 of 115 on 2026-11-16; 60 of 111 on
+  -- 2026-11-12 (70 before the specs that list a temp vault declared `-- @scans-data`, 109 before the vault scanners did)
   ok(
-    #r.files <= #specs * 0.56,
+    #r.files <= #specs * 0.58,
     ("%d of %d specs: a change of api.lua reaches nearly every spec"):format(#r.files, #specs)
   )
 
