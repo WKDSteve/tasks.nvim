@@ -2720,6 +2720,82 @@ function M.task_done(ctx)
   )
 end
 
+---`:Tasks reopen <id> [status=open|doing|...] [--yes]`: a finished task back to `ROADMAP/tasks`, through the write door
+---(`reopen` of `tasks-ops/1`, as the CLI's `tasks reopen`). Asks first, with the file it comes from; `--yes` skips the
+---question. An open task is only named.
+---@param ctx table  composer context
+---@param confirm_fn? fun(msg: string, label: string, cb: fun(yes: boolean))  A stand-in for the dialog (specs).
+function M.task_reopen(ctx, confirm_fn)
+  if not no_stray_words(ctx) then
+    return
+  end
+  local id, status = ctx.args.id, ctx.kv.status
+  if status ~= nil and not model.is_open_status(status) then
+    notify.error(
+      ("unknown status '%s' (expected %s)"):format(status, table.concat(model.OPEN_STATUSES, ", "))
+    )
+    return
+  end
+  local root = vault_root()
+  if not root then
+    return
+  end
+  if scan.find(id, { root = root }) then
+    notify.info(("%s is open already"):format(id))
+    return
+  end
+  local finished = scan.find_done(id, { root = root })
+  if not finished then
+    notify.error("no such finished task: " .. id)
+    return
+  end
+  local function run()
+    local doc, err = require("tasks_nvim.ops").run(
+      { ops = { { op = "reopen", id = id, status = status } } },
+      { root = root }
+    )
+    if not doc then
+      notify.error(tostring(type(err) == "table" and err.message or err))
+      return
+    end
+    local entry = doc.results[1]
+    if not entry.ok then
+      notify.error(tostring(entry.error.message))
+      return
+    end
+    require("tasks_nvim.ui.routes").reset_complete_cache()
+    refresh_buffers(finished.path)
+    for _, note in ipairs(entry.notes or {}) do
+      notify.warn(note)
+    end
+    local lines = { ("reopened %s -> %s"):format(id, entry.file or "ROADMAP/tasks") }
+    for _, m in ipairs(entry.milestones_reopened or {}) do
+      lines[#lines + 1] = "milestone open again: " .. m
+    end
+    notify.info(table.concat(lines, "\n"))
+  end
+  if ctx.flags.yes then
+    run()
+    return
+  end
+  local ask = confirm_fn or confirm.yesno
+  ask(
+    ("Bring task %s back?\n\n%s\n\nIt moves from Backlog/ to ROADMAP/tasks as %s."):format(
+      id,
+      finished.title,
+      status or "open"
+    ),
+    "reopen",
+    function(yes)
+      if yes then
+        run()
+      else
+        notify.info("cancelled -- the task stays finished")
+      end
+    end
+  )
+end
+
 -- ── plan-close / project-close ───────────────────────────────────────────────
 
 ---What holds a plan or a project open, in one line.

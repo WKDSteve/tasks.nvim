@@ -476,6 +476,7 @@ The design lives with the author's notes; the tasks for it are ordinary tasks in
 | see the work | `:Tasks list [area] [filters] [--sort=]` |
 | see what is stale | `:Tasks list --stale=60`, `--stale=refs` |
 | finish | `:Tasks done <id> [done_in=...]` |
+| take a finish back (the task was not done after all) | `:Tasks reopen <id>` (headless `tasks reopen <id>`), never by moving the file |
 | see what can be started, in what order | `:Tasks plan [area]`, `:Tasks list --ready` |
 | decide what to start next | `:Tasks next [area]` |
 | see how big something is | `:Tasks estimate [area]`, `--walk` to fill the gaps |

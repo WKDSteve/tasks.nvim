@@ -226,6 +226,8 @@ return function(H)
     },
     -- the editor asks before it changes many tasks (`--yes` skips the question)
     ["release"] = { composer = { "yes" }, cli = { "no-index" } },
+    -- the editor asks before it brings a task back; `status=` is a key=value word of `:Tasks reopen`
+    ["reopen"] = { composer = { "yes" }, cli = { "status" } },
     -- the editor names itself (`cdx:<session>` or user@host), the CLI takes `--by`; `for` and `note` are key=value
     -- words in the editor, so they count with the options of the CLI that the editor's flags do not name
     ["claim"] = { composer = {}, cli = { "by", "for", "note" } },

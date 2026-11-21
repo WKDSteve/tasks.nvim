@@ -314,6 +314,10 @@ function M.register_types()
       return false, nil, find_err or ("no such open task: " .. raw)
     end,
     complete = function(arg_lead, spec)
+      if spec and spec.only_done then
+        -- `reopen`: only a finished task can come back
+        return prefix_ci(done_ids(), arg_lead)
+      end
       if spec and (spec.allow_done or spec.allow_plan) and spec.complete_done ~= false then
         local both = vim.list_extend({}, open_ids())
         if spec.allow_done then
@@ -1058,6 +1062,34 @@ local function nested_routes()
       desc = "Finish a task after confirmation: status done, moved to Backlog/FEATURES|TASKS with a date prefix, Backlog README and index updated; --yes skips the question",
       run = function(ctx)
         cmd().task_done(ctx)
+      end,
+    },
+
+    {
+      path = { "task", "reopen" },
+      args = {
+        {
+          name = "id",
+          type = "TASK_ID",
+          allow_done = true,
+          only_done = true,
+          desc = "Id of the finished task to bring back, as area/slug",
+        },
+      },
+      kv = {
+        {
+          key = "status",
+          type = "STRING",
+          values = model.OPEN_STATUSES,
+          desc = "The status it comes back with (default open)",
+        },
+      },
+      flags = {
+        { name = "yes", bool = true, desc = "Bring it back without asking for confirmation" },
+      },
+      desc = "Bring a finished task back after confirmation: its file goes from Backlog/ to ROADMAP/tasks, its row leaves the Backlog README, done_in and remind go, the index is written; a folder task is refused; --yes skips the question",
+      run = function(ctx)
+        cmd().task_reopen(ctx)
       end,
     },
 

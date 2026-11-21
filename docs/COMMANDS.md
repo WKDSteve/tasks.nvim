@@ -862,6 +862,25 @@ After the finish a small dialog names the tasks it freed and the next task to st
 this one and still says `status: blocked` is offered to be set to open (a question, never silently). In the
 dashboard, `D` on several marked tasks shows ONE dialog after the whole stack.
 
+### `:Tasks reopen <id> [status=open|doing|blocked|parked|decision] [--yes]`
+
+The way back from `done`, never by hand: the finished file goes from `Backlog/<bucket>/` to `ROADMAP/tasks/` with
+`status: open` (or the status given), `done_in`, `remind` and `waits_for` (unless it comes back parked) are dropped, its
+row leaves `Backlog/README.md` and the index of the area is written. `commits` and the rest of the file stay: they are
+the history of the task. A milestone that this task had reached goes back to `doing`. It asks first (`--yes` skips the
+question); `<Tab>` offers the finished tasks only. A folder task is refused (move it back by hand), so is a name an
+open task or plan has taken.
+
+Headless it is `tasks reopen <id> [--status=]` (the operation `reopen` of `tasks-ops/1`): the id as `show` takes it,
+or the name of the finished file (`<area>/2026-11-18_<slug>`, also with `.md` or as the path below the vault). It
+prints `reopened<TAB><id><TAB><file>` and `index<TAB>...`; a task that is open already prints `already-open<TAB><id>`
+(exit 0); a refusal is exit 1, a wrong call exit 2.
+
+```
+tasks reopen lib.nvim/fix-parser                   # reopened<TAB>lib.nvim/fix-parser<TAB>lib.nvim/ROADMAP/tasks/fix-parser.md
+tasks reopen lib.nvim/2026-11-18_fix-parser --status=doing
+```
+
 ### `:Tasks template [--to=clipboard|buffer|file:<path>] [--with-plan]`
 
 The task file template (every field, visible placeholders; `--with-plan` adds the optional `## Plan` section with

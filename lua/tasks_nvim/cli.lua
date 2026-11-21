@@ -191,6 +191,10 @@ commands:
                                           finish: move to Backlog/; prints the tasks it freed and what to start
                                           next; --unblock sets the freed tasks that still say blocked to open;
                                           a routine (`repeat: 8w`) starts its next round (--last: it ends for good)
+  reopen <area>/<slug> [--status=open|doing|blocked|parked|decision]
+                                          bring a finished task back to ROADMAP/tasks (the id, or the name of its file
+                                          in Backlog/): its row leaves Backlog/README.md, done_in and remind go, the
+                                          index is written; an open task stays as it is; a folder task is refused
   intent <file|-> [--yes] [--lang=de|en]   take an intent `wkd-intent/1` (tasks.new, tasks.show): checked as untrusted input,
                                           prints what it would do (would_create, exists, shown), --yes creates the task
   claim <area>/<slug> [--by=<name>] [--for=4h] [--renew] [--force --note=<why>]
@@ -518,6 +522,7 @@ local SPECS = {
     value = { "done-in", "commits", "ci", "date", "remind", "by", "note", "outcome", "reason" },
     flag = { "no-index", "no-next", "unblock", "last", "force" },
   },
+  reopen = { value = { "status" }, flag = {} },
   -- `latest` is both: `--latest` (the configured screenshot folders) and `--latest=<folder>`.
   attach = {
     value = { "name", "kind", "latest", "by", "note" },
@@ -2438,6 +2443,78 @@ function commands.done(ctx)
     end
   end
   report_index(ctx, res)
+  return 0
+end
+
+---The id `reopen` is given, as an id: `<area>/<slug>`, also the name of the finished file (`<area>/2026-11-18_<slug>`,
+---with or without `.md`) or its path below the vault (`<area>/Backlog/TASKS/2026-11-18_<slug>.md`).
+---@param arg string
+---@return string id
+function M.reopen_id(arg)
+  local norm = arg:gsub("\\", "/")
+  local area, file = norm:match("^([^/]+)/Backlog/[^/]+/([^/]+)$")
+  if not area then
+    area, file = norm:match("^([^/]+)/([^/]+)$")
+  end
+  if not area then
+    return arg
+  end
+  return area .. "/" .. model.slug_of(file, "backlog")
+end
+
+---`tasks reopen <id> [--status=open|doing|blocked|parked|decision]`: a finished task back to `ROADMAP/tasks`, through
+---the write door (`reopen` of `tasks-ops/1`): the index of its area and the milestones are brought in line there.
+---@param ctx Tasks.CliCtx
+---@return integer code
+function commands.reopen(ctx)
+  local args, eo = ctx.args, ctx.eo
+  local status = args.opt.status --[[@as string|nil]]
+  if not args.pos[1] or #args.pos > 1 then
+    ctx.warn(
+      ("error: usage: reopen <area>/<slug> [--status=%s]"):format(
+        table.concat(model.OPEN_STATUSES, "|")
+      )
+    )
+    return 2
+  end
+  if status ~= nil and not model.is_open_status(status) then
+    ctx.warn(
+      ("error: unknown status '%s' (expected %s)"):format(
+        status,
+        table.concat(model.OPEN_STATUSES, ", ")
+      )
+    )
+    return 2
+  end
+  local id = M.reopen_id(args.pos[1])
+  local doc, err = require("tasks_nvim.ops").run(
+    { ops = { { op = "reopen", id = id, status = status } } },
+    { root = eo.root, today = eo.today }
+  )
+  if not doc then
+    ctx.warn("error: " .. tostring(type(err) == "table" and err.message or err))
+    return 1
+  end
+  local entry = doc.results[1]
+  if not entry.ok then
+    ctx.warn(("error: %s (%s)"):format(tostring(entry.error.message), tostring(entry.error.code)))
+    return 1
+  end
+  if entry.outcome == "unchanged" then
+    ctx.say(("already-open\t%s"):format(fsio.clean(entry.id)))
+    return 0
+  end
+  ctx.say(("reopened\t%s\t%s"):format(fsio.clean(entry.id), fsio.clean(entry.file or "")))
+  say_milestones(ctx, entry.milestones_reached, entry.milestones_reopened)
+  for _, note in ipairs(entry.notes or {}) do
+    ctx.warn(("warn: %s: %s"):format(entry.id, note))
+  end
+  local area = entry.id:match("^([^/]+)/")
+  if entry.index and entry.index.action == "error" then
+    ctx.warn("warn: index not updated: " .. tostring(entry.index.error))
+  elseif entry.index and entry.index.action ~= "unchanged" then
+    ctx.say(("index\t%s\t%s"):format(entry.index.action, vault.index_path(eo.root, area)))
+  end
   return 0
 end
 
