@@ -134,11 +134,17 @@ return function(H)
     eq(asked.label, "reopen")
     ok(H.exists(done3), "declined: the finished file stays")
     has(told[#told], "stays finished")
-    -- yes, as doing
+    -- yes, as doing; a window on the finished file follows it
+    vim.cmd("edit " .. vim.fn.fnameescape(done3))
     cmd.task_reopen(ctx({ status = "doing" }), function(_, _, cb)
       cb(true)
     end)
     ok(not H.exists(done3), "the finished file is gone")
+    has(
+      (vim.api.nvim_buf_get_name(0):gsub("\\", "/")),
+      "/ROADMAP/tasks/" .. id3:match("/(.+)$") .. ".md",
+      "the window shows the open file"
+    )
     has(told[#told], "reopened " .. id3)
     has(
       H.read(root .. "/" .. AREA .. "/ROADMAP/tasks/" .. id3:match("/(.+)$") .. ".md"),
@@ -175,7 +181,25 @@ return function(H)
     ok(vim.tbl_contains(candidates, folder.id), "a finished one is")
   end)
   vim.notify = orig_notify
+  pcall(vim.cmd, "silent! %bwipeout!")
   ok(ran, tostring(rerr))
+
+  -- ── without --vault: the root comes from the configured vault, the lines stay relative ──
+  -- (the regression: the index line was built from the --vault value, and a run without it raised after the write)
+  local id4 = finished("Back without vault option")
+  local out, err = {}, {}
+  local code = cli.run({ "reopen", id4, "--today=" .. TODAY }, {
+    out = function(t)
+      out[#out + 1] = t
+    end,
+    err = function(t)
+      err[#err + 1] = t
+    end,
+  })
+  eq(code, 0, table.concat(err))
+  has(table.concat(out), "reopened\t" .. id4)
+  has(table.concat(out), "\t" .. AREA .. "/ROADMAP/TASKS.md", "the index named below the vault")
+  lacks(table.concat(out), root, "no path of this machine")
 
   -- the help names the command
   r = run({ "--help" })

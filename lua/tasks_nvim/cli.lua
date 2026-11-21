@@ -2509,11 +2509,12 @@ function commands.reopen(ctx)
   for _, note in ipairs(entry.notes or {}) do
     ctx.warn(("warn: %s: %s"):format(entry.id, note))
   end
+  -- relative to the vault, as `file` is: the root may come from $TASKS_VAULT, `eo.root` is nil then
   local area = entry.id:match("^([^/]+)/")
   if entry.index and entry.index.action == "error" then
     ctx.warn("warn: index not updated: " .. tostring(entry.index.error))
   elseif entry.index and entry.index.action ~= "unchanged" then
-    ctx.say(("index\t%s\t%s"):format(entry.index.action, vault.index_path(eo.root, area)))
+    ctx.say(("index\t%s\t%s/ROADMAP/TASKS.md"):format(entry.index.action, fsio.clean(area)))
   end
   return 0
 end

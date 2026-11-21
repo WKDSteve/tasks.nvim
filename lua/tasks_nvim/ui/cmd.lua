@@ -2764,7 +2764,10 @@ function M.task_reopen(ctx, confirm_fn)
       return
     end
     require("tasks_nvim.ui.routes").reset_complete_cache()
-    refresh_buffers(finished.path)
+    -- a window on the finished file follows it to its open place, as after `done`
+    if entry.file then
+      M.retarget_buffers(finished.path, root .. "/" .. entry.file)
+    end
     for _, note in ipairs(entry.notes or {}) do
       notify.warn(note)
     end
