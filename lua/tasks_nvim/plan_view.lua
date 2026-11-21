@@ -642,6 +642,11 @@ function M.next_lines(pick)
       pick.claimed
     )
   end
+  if (pick.left_out or 0) > 0 then
+    out[#out + 1] = ("left out: %d ready task(s) of the excluded categories (--not-category)"):format(
+      pick.left_out
+    )
+  end
   if pick.empty then
     out[#out + 1] = "empty: " .. M.empty_text(pick.empty)
   end
