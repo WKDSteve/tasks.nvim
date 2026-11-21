@@ -16,9 +16,9 @@
 --- none closed: open; else partial), and it is closed when every leaf is. Progress is always counted apart: learned,
 --- seen, dropped, open (blocked ones counted as open and once more as blocked).
 ---
---- A node line reads `<label>[ → <id>][ – Grund: <reason>][ {xp=N}][ {h=N}][ {done_h=N}][ {optional}][ {#key}]`; the
---- marks in braces come last (in any order), the reason after the label (also `Reason:`, and `—` or `-` as the dash), the arrow names the task the node
---- was promoted to. An arrow is a reference only when an id `<area>/<slug>` follows it and nothing but the marks after
+--- A node line reads `<label>[ → <id>][ – Grund: <reason>][ {xp=N}][ {h=N}][ {done_h=N}][ {optional}][ {#key}]`;
+--- the marks in braces come last (in any order), the reason after the label (also `Reason:`, and `—` or `-` as the
+--- dash), the arrow names the task the node was promoted to. An arrow is a reference only when an id `<area>/<slug>` follows it and nothing but the marks after
 --- that; any other arrow (`Test rot → grün`) is text of the label. A `> ` line indented
 --- below a node is its note. Every other line of the section (prose, blank lines, comments, code fences) is kept as it
 --- is: `render` gives back the text byte for byte, only the nodes changed with `set_state` are written anew.
