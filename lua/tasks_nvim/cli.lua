@@ -265,6 +265,11 @@ commands:
                                           the sheet (testing sheets accept: only when it loads) or the bug task of
                                           the AI's answer; shown only, written with --yes
   check [<area>]                          rule check; exit 1 on any error
+  relink [<area>] [--dry-run]             mend the dead relative links to .md files below ROADMAP/, Backlog/ and
+                                          MEETINGS/: a link whose slug names one file (a task finished into the
+                                          Backlog, a folder task, another area) is rewritten to it; ambiguous and
+                                          unresolved ones are listed. done, reopen, move and folderize keep the
+                                          links that name the file they move on it by themselves
   template [--title=t] [--kind=k] [--prio=n] [--effort=e] [--tags=a,b] [--lang=de|en] [--with-plan]
   agent-brief [--format=md|json] [--by=<claim name>] [--repo=<dir>]   the brief for an AI agent: workflow (claim,
                                           set, new, done), allowed values and this command reference, with the
@@ -597,6 +602,7 @@ local SPECS = {
   ["sheet-run"] = { value = { "testing-cli" }, flag = { "dry-run" } },
   ["sheet-ai"] = { value = { "testing-cli", "from" }, flag = { "yes" } },
   check = { value = {}, flag = { "all" } },
+  relink = { value = {}, flag = { "dry-run" } },
   ci = { value = { "md-lint" }, flag = { "strict", "no-lint", "trust-vault-lint" } },
   template = {
     value = { "title", "kind", "prio", "effort", "tags", "lang" },
@@ -1673,6 +1679,72 @@ commands.path = function(ctx)
     ctx.say(("without-xp\tstage %d\t%s"):format(pt.stage, name(pt)))
   end
   return 0
+end
+
+---`relink [<area>] [--dry-run]`: mend the dead relative links (`relink.repair`). One line per link: `relinked` (or
+---`would-relink`), `ambiguous` with the candidates, `unresolved`; then a summary. Exit 1 when a file could not be
+---written.
+---@param ctx Tasks.CliCtx
+---@return integer code
+commands.relink = function(ctx)
+  local area, area_ok = area_arg(ctx, "relink")
+  if not area_ok then
+    return 2
+  end
+  local root, rerr = vault.root(ctx.eo)
+  if not root then
+    ctx.warn("error: " .. tostring(rerr))
+    return 1
+  end
+  local names
+  if area then
+    local scope = vault.area_scope(root, area)
+    names = vim.tbl_keys(scope and scope.set or { [area] = true })
+  end
+  local dry = ctx.args.opt["dry-run"] == true
+  local res = require("tasks_nvim.relink").repair(root, names, { dry_run = dry })
+  local base = fsio.norm(root) .. "/"
+  local function rel(p)
+    p = fsio.norm(p)
+    return p:sub(1, #base) == base and p:sub(#base + 1) or p
+  end
+  for _, e in ipairs(res.edits) do
+    ctx.say(
+      ("%s\t%s:%d\t%s\t%s"):format(
+        dry and "would-relink" or "relinked",
+        rel(e.path),
+        e.line,
+        e.from,
+        e.to
+      )
+    )
+  end
+  for _, a in ipairs(res.ambiguous) do
+    ctx.say(
+      ("ambiguous\t%s:%d\t%s\t%s"):format(
+        rel(a.path),
+        a.line,
+        a.target,
+        table.concat(vim.tbl_map(rel, a.candidates), ", ")
+      )
+    )
+  end
+  for _, u in ipairs(res.unresolved) do
+    ctx.say(("unresolved\t%s:%d\t%s"):format(rel(u.path), u.line, u.target))
+  end
+  for _, e in ipairs(res.errors) do
+    ctx.warn("error: " .. e)
+  end
+  ctx.say(
+    ("relink: %s %d link(s) in %d file(s); %d ambiguous, %d without a file of that slug"):format(
+      dry and "would rewrite" or "rewrote",
+      res.links,
+      #res.files,
+      #res.ambiguous,
+      #res.unresolved
+    )
+  )
+  return #res.errors > 0 and 1 or 0
 end
 
 ---`paths [<area>] [--project=<id>] [--format=tsv|json]`: the open learning paths (and, with `--project`, the finished

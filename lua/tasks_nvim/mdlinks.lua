@@ -5,8 +5,9 @@
 --- reference definition `[id]: target`. Links inside the frontmatter, a fenced code block (```` ``` ```` or `~~~`) or
 --- an inline code span are text, not links, and never touched.
 ---
---- A target is relative when it is none of: empty, an anchor (`#...`), absolute (`/x`, `\x`), or has a scheme
---- (`http:`, `https:`, `mailto:`, `file:`, and a drive letter `C:` reads the same way).
+--- A target is relative when it is none of: empty, an anchor (`#...`), absolute (`/x`, `\x`), a path of some machine
+--- (`$REPOS_DIR/x`, `~/x`), or has a scheme (`http:`, `https:`, `mailto:`, `file:`, and a drive letter `C:` reads the
+--- same way).
 ---
 --- `shift` is what `mutate.to_folder` needs: a file that moves one folder deeper (`tasks/<slug>.md` ->
 --- `tasks/<slug>/<slug>.md`) keeps every link pointing at the same file by gaining one `../`. Links into `assets/`
@@ -163,6 +164,8 @@ function M.is_relative(target)
   return target ~= ""
     and not target:match("^#")
     and not target:match("^[/\\]")
+    -- `$REPOS_DIR/x.md`, `~/x.md`: a path of some machine, not one beside the file
+    and not target:match("^[$~]")
     and not target:match("^%a[%w+.%-]*:")
 end
 

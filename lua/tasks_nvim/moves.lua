@@ -22,6 +22,7 @@ local index = require("tasks_nvim.index")
 local model = require("tasks_nvim.model")
 local mutate = require("tasks_nvim.mutate")
 local plans = require("tasks_nvim.plans")
+local relink = require("tasks_nvim.relink")
 local scan = require("tasks_nvim.scan")
 local vault = require("tasks_nvim.vault")
 local wikilinks = require("tasks_nvim.wikilinks")
@@ -217,6 +218,7 @@ end
 ---@field root? string
 ---@field today? string
 ---@field index? boolean           # Regenerate the index of both areas (default true).
+---@field relink? boolean           # Let the relative links to the task follow it (default true; `tasks_nvim.relink`).
 ---@field if_match? string         # The `etag` of the task file the caller saw.
 ---@field checkpoint_dir? string
 
@@ -269,6 +271,19 @@ function M.move(id, to_area, opts)
   local new_text, uerr = fm.update_text(old_text, { { "updated", today } })
   if not new_text then
     return nil, "cannot update " .. task.path .. ": " .. tostring(uerr), { code = "io" }
+  end
+  -- what moves, for the relative links (`tasks_nvim.relink`): the file's own name the same files from the other area
+  local link_moves = task.folder
+      and {
+        {
+          from = vault.task_dir(root, task.area, task.slug),
+          to = vault.task_dir(root, to_area, task.slug),
+        },
+      }
+    or { { from = task.path, to = report.to } }
+  if opts.relink ~= false then
+    new_text =
+      relink.rewrite(new_text, fsio.dirname(task.path), fsio.dirname(report.to), link_moves)
   end
 
   -- what has to be rewritten: one patch per task, the plans, and the files the snapshot holds
@@ -467,6 +482,14 @@ function M.move(id, to_area, opts)
   end
   checkpoint.discard(cp)
 
+  -- the links of other files follow the task; `move_area` back (the inverse) takes them back
+  local relinked
+  if opts.relink ~= false then
+    relinked = relink.follow(root, link_moves, { skip = { report.to } })
+    for _, e in ipairs(relinked.errors) do
+      notes[#notes + 1] = "a link to the task was not moved along: " .. e
+    end
+  end
   local after = fsio.read(report.to)
   local _, refresh_notes = done_flow.refresh_marker_docs({ root = root })
   for _, n in ipairs(refresh_notes or {}) do
@@ -481,6 +504,7 @@ function M.move(id, to_area, opts)
     to = report.to,
     folder = task.folder,
     rewritten = rewritten,
+    relinked = relinked,
     notes = notes,
     etag_before = etag,
     etag_after = after and fsio.etag(after) or nil,

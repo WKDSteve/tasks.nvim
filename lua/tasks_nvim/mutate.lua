@@ -36,6 +36,7 @@ local scan = require("tasks_nvim.scan")
 local steps = require("tasks_nvim.steps")
 local vault = require("tasks_nvim.vault")
 local wikilinks = require("tasks_nvim.wikilinks")
+local relink = require("tasks_nvim.relink")
 
 local M = {}
 
@@ -2532,6 +2533,7 @@ end
 ---@field today? string          # Sets `updated` (default: today).
 ---@field status? string         # The status it comes back with (default `open`).
 ---@field index? boolean         # Regenerate the area index (default true).
+---@field relink? boolean        # Let the relative links to the task follow it back (default true; `tasks_nvim.relink`).
 ---@field if_match? string       # The `etag` of the finished file the caller saw.
 ---@field dry_run? boolean
 ---@field drafts? table<string, Tasks.DraftTask>   # A dry run: the tasks earlier `new` ops would create.
@@ -2626,6 +2628,11 @@ function M.reopen(id, opts)
       ("there is an open task or plan of this name already: %s"):format(id),
       { code = "exists" }
   end
+  -- its own relative links name the same files from `ROADMAP/tasks` again (`tasks_nvim.relink`)
+  local moves = { { from = finished.path, to = target } }
+  if opts.relink ~= false then
+    new_text = relink.rewrite(new_text, fsio.dirname(finished.path), fsio.dirname(target), moves)
+  end
   local result = {
     id = id,
     area = area,
@@ -2702,6 +2709,13 @@ function M.reopen(id, opts)
       result.notes[#result.notes + 1] = note
     end
   end
+  -- the links that followed the task into the Backlog (`done`) come back with it, and its own links
+  if opts.relink ~= false then
+    result.relinked = relink.follow(root, moves, { skip = { target } })
+    for _, e in ipairs(result.relinked.errors) do
+      result.notes[#result.notes + 1] = "a link to the task was not moved back: " .. e
+    end
+  end
   if opts.index ~= false then
     local _, ierr = index.write_area(area, { root = root })
     if ierr then
@@ -2728,6 +2742,20 @@ local function attempt(fn, ...)
   return ok == true, err
 end
 
+---What `done` moves, for `tasks_nvim.relink`: the file, and a folder task's folder (its assets go along).
+---@param from string
+---@param to string
+---@param src_dir? string
+---@param target_dir? string
+---@return Tasks.RelinkMove[]
+local function done_moves(from, to, src_dir, target_dir)
+  local moves = { { from = from, to = to } }
+  if src_dir and target_dir then
+    moves[2] = { from = src_dir, to = target_dir }
+  end
+  return moves
+end
+
 ---@class Tasks.DoneOpts
 ---@field root? string
 ---@field done_in? string|string[]   # Commit(s) that delivered the task.
@@ -2739,6 +2767,7 @@ end
 ---@field date? string               # `YYYY-MM-DD` filename prefix (default: today).
 ---@field today? string              # Sets `updated` (default: today).
 ---@field index? boolean             # Regenerate the area index (default true).
+---@field relink? boolean            # Let the relative links to the task follow it (default true; `tasks_nvim.relink`).
 ---@field checkpoint_dir? string     # Where the safety snapshot goes.
 ---@field tick_steps? boolean        # Tick the open steps of the task's `## Plan` section in the finished copy (default false).
 ---@field if_match? string           # The `etag` of the task file the caller saw: a different file is `nil, message, { code = "conflict" }`.
@@ -2956,6 +2985,15 @@ local function plan_done(id, opts)
   local target = vault.backlog_dir(root, area, bucket) .. "/" .. rel
   local src_dir = task.folder and fsio.dirname(task.path) or nil
   local target_dir = task.folder and fsio.dirname(target) or nil
+  -- the task's own relative links name the same files from the Backlog (written once, with the rest of the text)
+  if opts.relink ~= false then
+    new_text = relink.rewrite(
+      new_text,
+      fsio.dirname(task.path),
+      fsio.dirname(target),
+      done_moves(task.path, target, src_dir, target_dir)
+    )
+  end
   local resume = false
   local existing = scan.find_done(id, { root = root })
   if existing and existing.path ~= target then
@@ -3299,6 +3337,15 @@ function M.done(id, opts)
   checkpoint.discard(cp)
   -- a finished task has no claim (the file is in the Backlog now)
   claims.remove(plan.root, id)
+  -- the relative links to the task (and the task's own) follow it into the Backlog; `reopen` takes them back
+  local relinked
+  if opts.relink ~= false then
+    relinked = relink.follow(
+      plan.root,
+      done_moves(plan.task.path, plan.target, plan.src_dir, plan.target_dir),
+      { skip = { plan.target } }
+    )
+  end
 
   -- git may have started while the task was finished (after the look above): then the text read may be HEAD's, and
   -- the autostash writes the open file back once git is done. Wait for that, and say so when it happened.
@@ -3329,6 +3376,7 @@ function M.done(id, opts)
     came_back = came_back,
     git_seen = git_seen,
     git_busy = git_still,
+    relinked = relinked,
   },
     nil
 end
@@ -3582,6 +3630,10 @@ function M.folderize(id, opts)
     return nil, err
   end
   local result = { id = task.id, path = dest, changed = true }
+  -- the file's own links moved with it (`to_folder`); the links of other files to it follow now
+  if opts.relink ~= false then
+    result.relinked = relink.follow(root, { { from = task.path, to = dest } }, { skip = { dest } })
+  end
   if opts.index ~= false then
     result.index, result.index_err = index.write_area(task.area, { root = root })
   end
@@ -3721,6 +3773,10 @@ function M.attach(id, src, opts)
     folderized = folderized,
     updated_err = (not bumped) and tostring(bump_err) or nil,
   }
+  -- only now that the folder stays: the links of other files to the plain file follow it
+  if folderized and opts.relink ~= false then
+    result.relinked = relink.follow(root, { { from = task.path, to = path } }, { skip = { path } })
+  end
   if opts.index ~= false then
     result.index, result.index_err = index.write_area(task.area, { root = root })
   end

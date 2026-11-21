@@ -805,6 +805,9 @@ function M.run(id, opts)
       tostring(done.from)
     )
   end
+  for _, e in ipairs(done.relinked and done.relinked.errors or {}) do
+    flow.notes[#flow.notes + 1] = "a link to the task was not moved along: " .. e
+  end
   if open_points > 0 then
     flow.notes[#flow.notes + 1] = ("finished with %d open learning point(s) in its ## Lernpunkte"):format(
       open_points

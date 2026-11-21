@@ -46,6 +46,8 @@ return function(H)
     -- `project-new` makes a project file like `plan-new`; the editor makes neither
     "project-new",
     "projects",
+    -- `relink` mends the links of a vault once from a shell; done, reopen, move and folderize keep them by themselves
+    "relink",
     "show",
   }
   local ONLY_COMPOSER = {
