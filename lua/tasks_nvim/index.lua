@@ -188,22 +188,81 @@ end
 ---`git` in `dir`, or `nil` and what it said.
 ---@param dir string
 ---@param args string[]
+---@param stdin? string
 ---@return string|nil stdout
 ---@return string|nil err
-local function git(dir, args)
-  local res = vim.system(vim.list_extend({ "git", "-C", dir }, args), { text = true }):wait()
+local function git(dir, args, stdin)
+  local res =
+    vim.system(vim.list_extend({ "git", "-C", dir }, args), { text = true, stdin = stdin }):wait()
   if res.code ~= 0 then
     return nil, ("git %s: %s"):format(args[1], vim.trim(res.stderr or ""))
   end
   return res.stdout or ""
 end
 
+---The repository of the vault `root`: its top level and the vault's prefix in it (`""`, or `sub/dir/`).
+---@param root string
+---@return string|nil top
+---@return string prefix_or_err
+local function repo_of(root)
+  local top, terr = git(root, { "rev-parse", "--show-toplevel" })
+  if not top then
+    return nil, tostring(terr)
+  end
+  return vim.trim(top), vim.trim(git(root, { "rev-parse", "--show-prefix" }) or "")
+end
+
+---Check out what rendering the index of `area` reads, from the staging area into `tmp`: the files at the top of the
+---vault (its marker names extra areas) and the area's `ROADMAP/`. Nothing else: the rows hold the ids of blockers,
+---not their titles, so no other area is read. `checkout-index --all` of the whole vault took ~15 s (about 8000
+---files) and was too slow for a pre-commit check.
+---@param top string
+---@param prefix string
+---@param area string
+---@param tmp string
+---@param skip? string  a path left out (a generated index in conflict: `checkout-index` refuses it)
+---@return integer|nil files  how many files of the area's `ROADMAP/` there are
+---@return string|nil err
+local function checkout_area(top, prefix, area, tmp, skip)
+  local roadmap = prefix .. area .. "/ROADMAP/"
+  local out, lerr = git(top, { "ls-files", "-z", "--", ":(glob)" .. prefix .. "*", roadmap })
+  if not out then
+    return nil, lerr
+  end
+  local paths, seen, files = {}, {}, 0
+  for path in out:gmatch("[^%z]+") do
+    if path ~= skip and not seen[path] then
+      seen[path] = true
+      paths[#paths + 1] = path
+      if path:sub(1, #roadmap) == roadmap then
+        files = files + 1
+      end
+    end
+  end
+  vim.fn.mkdir(tmp, "p")
+  if #paths > 0 then
+    local _, cerr = git(
+      top,
+      { "checkout-index", "-z", "--stdin", "--prefix=" .. tmp .. "/" },
+      table.concat(paths, "\0") .. "\0"
+    )
+    if cerr then
+      return nil, cerr
+    end
+  end
+  return files
+end
+
 ---Regenerate the index of `area` from the staging area and stage the result, without touching the
 ---working tree. In a shared checkout the tree also holds another session's uncommitted tasks: an
 ---index written from it lists tasks the commit does not contain, which the pre-push gate refuses.
 ---
----The staging area, not `HEAD`, because it is what the next commit will hold, own new tasks included.
----All of it, not only the area: rendering reads other areas for the titles of blockers and for groups.
+---The staging area, not `HEAD`, because it is what the next commit will hold, own new tasks included. Inside a
+---`git commit` (a hook) the staging area is `$GIT_INDEX_FILE`, the one that commit writes: `git commit -- <paths>`
+---builds its own from `HEAD` and those paths.
+---
+---With `opts.check` nothing is written or staged: the result says whether the staged index is the one the staged
+---tasks render to (`unchanged`) or not (`stale`, with `reason` `missing`, `outdated`, `orphan` or `conflict`).
 ---@param area string
 ---@param opts? Tasks.IndexOpts
 ---@return Tasks.IndexResult|nil result `path` is relative to the repository
@@ -214,12 +273,10 @@ function M.stage_area(area, opts)
   if not root then
     return nil, rerr
   end
-  local top, terr = git(root, { "rev-parse", "--show-toplevel" })
+  local top, prefix = repo_of(root)
   if not top then
-    return nil, terr
+    return nil, prefix
   end
-  top = vim.trim(top)
-  local prefix = vim.trim(git(root, { "rev-parse", "--show-prefix" }) or "")
   local rel = prefix .. area .. "/ROADMAP/TASKS.md"
 
   -- `checkout-index --all` skips a path in conflict without a word: a task file in one would drop out of the
@@ -264,16 +321,31 @@ function M.stage_area(area, opts)
 
   local tmp = vim.fn.tempname()
   local function run()
-    vim.fn.mkdir(tmp, "p")
-    local _, cerr = git(top, { "checkout-index", "--all", "--prefix=" .. tmp .. "/" })
-    if cerr then
+    local files, cerr = checkout_area(top, prefix, area, tmp, index_unmerged and rel or nil)
+    if not files then
       return nil, cerr
     end
+    -- The area's folder as `write_area` wants it: an area all of whose tasks are done has no `ROADMAP/` left
+    -- staged, yet its index must still go. A name that is no area of the vault stays an error.
+    if files == 0 and not vault.has_area(root, area) then
+      return nil, "unknown area: " .. tostring(area)
+    end
     local tmp_root = (tmp .. "/" .. prefix):gsub("/+$", "")
-    local result, werr =
-      M.write_area(area, vim.tbl_extend("force", opts, { root = tmp_root, check = false }))
+    vim.fn.mkdir(tmp_root .. "/" .. area .. "/ROADMAP", "p")
+    local result, werr = M.write_area(
+      area,
+      vim.tbl_extend("force", opts, { root = tmp_root, check = opts.check == true })
+    )
     if not result then
       return nil, werr
+    end
+    if opts.check then
+      if index_unmerged then
+        result.action, result.reason = "stale", "conflict"
+      end
+      result.path = rel
+      result.staged = staged
+      return result
     end
     local _, serr
     if index_unmerged and result.action == "unchanged" then
@@ -315,6 +387,52 @@ function M.stage_area(area, opts)
     return nil, tostring(result)
   end
   return result, err
+end
+
+---The areas whose generated index the staging area may have put out of step: those with a staged change below
+---`<area>/ROADMAP/` against `HEAD`. Renames are split into a deletion and an addition, so `done` (a task leaves
+---`ROADMAP/tasks/` for `Backlog/`) names the area it left.
+---@param opts? Tasks.ScanOpts
+---@return string[]|nil areas  sorted
+---@return string|nil err
+function M.staged_areas(opts)
+  local root, rerr = vault.root(opts)
+  if not root then
+    return nil, rerr
+  end
+  local top, prefix = repo_of(root)
+  if not top then
+    return nil, prefix
+  end
+  -- `--cached` without a commit compares against the empty tree (a vault's first commit).
+  local out, derr = git(top, {
+    "diff",
+    "--cached",
+    "--name-only",
+    "--no-renames",
+    "-z",
+    "--",
+    prefix ~= "" and prefix or ".",
+  })
+  if not out then
+    return nil, derr
+  end
+  local set, areas = {}, {}
+  for path in out:gmatch("[^%z]+") do
+    local area = path:sub(#prefix + 1):match("^([^/]+)/ROADMAP/")
+    if
+      area
+      and not set[area]
+      and vault.valid_area(area)
+      and not area:match("^[._]")
+      and not vault.SKIP[area]
+    then
+      set[area] = true
+      areas[#areas + 1] = area
+    end
+  end
+  table.sort(areas)
+  return areas
 end
 
 ---Who wants to know that an index file changed on disk (`M.on_write`).

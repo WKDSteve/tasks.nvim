@@ -173,12 +173,18 @@ commands:
                                           setup({ quick_wins })), best return first, plus the small tasks that miss a
                                           value; default status open,doing,decision. --report writes the Markdown
   index [<area>] [--check]                (re)write ROADMAP/TASKS.md; --check only reports
+  index [<area>] --staged --check         whether the staged TASKS.md of the area (none: of every area with a staged
+                                          change below ROADMAP/) is the one its staged tasks render to; reads only
+                                          those areas, writes nothing; `stale<TAB>...` and exit 1 when not
   index <area> --staged                   build it from the staging area and stage it; the working tree stays as it
                                           is, so another session's uncommitted tasks stay out of the commit;
                                           lists the staged files of the area (`staged<TAB><path>`) and refuses a
                                           staging area with a conflict; notes when the tree keeps another index file (do not `git add` that one)
                                           index without an area also writes down the figures of today when the vault
                                           keeps a series (_Telemetry/history exists); --no-history leaves that out
+  hook install|status                     the vault's pre-commit hook (<git-common-dir>/hooks/pre-commit): refuses a
+                                          commit whose staged TASKS.md is stale (index --staged --check); never
+                                          overwrites another pre-commit hook
   history [<area>] [--since=YYYY-MM-DD] [--until=YYYY-MM-DD] [--resolution=day|week] [--format=tsv|json]
                                           the overview figures over time (open, ready, with value, ...; default: the
                                           last 90 days); '-' is a day before the first row, '*' a day with a row
@@ -537,6 +543,7 @@ local SPECS = {
   },
   meetings = { value = { "since", "until", "task", "format" }, flag = {} },
   index = { value = {}, flag = { "check", "all", "staged", "no-history" } },
+  hook = { value = {}, flag = {} },
   new = {
     value = {
       "created",
@@ -1681,6 +1688,47 @@ commands.path = function(ctx)
   return 0
 end
 
+---`hook install|status`: the vault's pre-commit hook (`tasks_nvim.vault_hook`). `status` prints the state
+---(`installed`, `outdated`, `absent`, `foreign`) and the file, exit 1 unless installed; `install` writes it, exit 1
+---when another pre-commit hook is in the way.
+---@param ctx Tasks.CliCtx
+---@return integer code
+commands.hook = function(ctx)
+  local sub = ctx.args.pos[1]
+  if (sub ~= "install" and sub ~= "status") or #ctx.args.pos > 1 then
+    ctx.warn("error: hook takes install or status")
+    return 2
+  end
+  local vault_hook = require("tasks_nvim.vault_hook")
+  local res, err
+  if sub == "install" then
+    res, err = vault_hook.install({ root = ctx.eo.root })
+  else
+    res, err = vault_hook.status({ root = ctx.eo.root })
+  end
+  if not res then
+    ctx.warn("error: " .. tostring(err))
+    return 1
+  end
+  local state = res.state
+  if sub == "install" then
+    state = res.state == "installed" and "unchanged"
+      or (res.state == "outdated" and "updated" or "installed")
+  end
+  ctx.say(("%s\t%s"):format(state, res.path))
+  if res.hooks_path then
+    ctx.warn(
+      ("note: core.hooksPath is %s: git runs this hook only if that folder's pre-commit hands over to it"):format(
+        res.hooks_path
+      )
+    )
+  end
+  if sub == "status" and res.state ~= "installed" then
+    return 1
+  end
+  return 0
+end
+
 ---`relink [<area>] [--dry-run]`: mend the dead relative links (`relink.repair`). One line per link: `relinked` (or
 ---`would-relink`), `ambiguous` with the candidates, `unresolved`; then a summary. Exit 1 when a file could not be
 ---written.
@@ -2313,15 +2361,69 @@ commands["next"] = function(ctx)
   return 0
 end
 
+---`index [<area>] --staged --check`: whether the staged `ROADMAP/TASKS.md` of `area` (default: of every area with a
+---staged change below `ROADMAP/`) is the one the staged tasks render to. Writes and stages nothing; one line `stale`
+---per area that is not, with what to type, and exit 1. It reads only those areas, so it is fast enough for the
+---vault's pre-commit hook (`tasks hook install`).
+---@param ctx table
+---@param area string|nil
+---@return integer
+local function staged_check(ctx, area)
+  local root = ctx.eo.root
+  local areas = { area }
+  if not area then
+    local found, err = index.staged_areas({ root = root })
+    if not found then
+      ctx.warn("error: " .. tostring(err))
+      return 1
+    end
+    areas = found
+  end
+  local stale = {}
+  for _, name in ipairs(areas) do
+    local res, err = index.stage_area(name, { root = root, check = true })
+    if not res then
+      ctx.warn("error: " .. name .. ": " .. tostring(err))
+      return 1
+    end
+    if res.action == "stale" then
+      stale[#stale + 1] = name
+      ctx.say(
+        ("stale\t%s\t%d open\t%s (%s)"):format(res.area, res.open, res.path, tostring(res.reason))
+      )
+    end
+  end
+  if #stale == 0 then
+    ctx.say(("index --staged --check: %d area(s) up to date"):format(#areas))
+    return 0
+  end
+  ctx.warn("the staged index does not match the staged task files; to fix, from the vault root:")
+  for _, name in ipairs(stale) do
+    ctx.warn("  tasks index " .. name .. " --staged")
+  end
+  ctx.warn(
+    "  then commit the staging area as it is (`git commit -m ...`, no paths: `git commit -- <paths>` takes the"
+      .. " tree's TASKS.md, not the staged one)"
+  )
+  return 1
+end
+
 function commands.index(ctx)
   local args, eo = ctx.args, ctx.eo
   if #args.pos > 1 then
     ctx.warn("error: index takes at most one area")
     return 2
   end
+  if args.opt.staged and args.opt.check then
+    if args.opt.all then
+      ctx.warn("error: index --staged --check takes an area or none, and no --all")
+      return 2
+    end
+    return staged_check(ctx, args.pos[1])
+  end
   if args.opt.staged then
-    if not args.pos[1] or args.opt.check or args.opt.all then
-      ctx.warn("error: index --staged takes one area, and no --check or --all")
+    if not args.pos[1] or args.opt.all then
+      ctx.warn("error: index --staged takes one area, and no --all (--check only reports)")
       return 2
     end
     local res, err = index.stage_area(args.pos[1], { root = eo.root })

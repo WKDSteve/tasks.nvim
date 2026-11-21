@@ -25,6 +25,8 @@ return function(H)
     -- `history` reads and writes the series of the figures for a hub, a script or a chart of tasks-desktop; the
     -- editor has no view of it
     "history",
+    -- `hook` installs the vault's pre-commit hook once per machine from a shell
+    "hook",
     "import",
     "init-vault",
     -- `intent` takes a document of another app; the editor fills `:Tasks new` from it later
