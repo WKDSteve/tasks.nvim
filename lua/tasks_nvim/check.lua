@@ -489,8 +489,9 @@ end
 ---@param item { area: string, path: string, id?: string }
 ---@param code string
 ---@param skip? fun(link: Tasks.MdLink): boolean
-local function link_findings(findings, item, code, skip)
-  local text = fsio.read(item.path)
+---@param text? string  # The file's text when it is not on disk yet (a draft); its links are judged from `item.path`.
+local function link_findings(findings, item, code, skip, text)
+  text = text or fsio.read(item.path)
   if not text then
     return
   end
@@ -988,15 +989,214 @@ local function task_arrows(task_path)
   return lernbaum.promoted_ids(lernbaum.parse(body))
 end
 
----The findings of the learning paths of the areas checked (`<area>/ROADMAP/paths/`, `tasks_nvim.paths`): a broken
+---A message of the tree or the levels names other lines of the body ("already on line 4"): the file's lines instead.
+---@param message string
+---@param off integer
+---@return string
+local function shift_lines(message, off)
+  return (message:gsub("line (%d+)", function(n)
+    return "line " .. (tonumber(n) + off)
+  end))
+end
+
+---@class Tasks.PathCheckCtx
+---@field open_ids table<string, Tasks.Task>
+---@field is_finished fun(id: string): boolean
+---@field scan_opts table
+---@field text? string  # The path's text when it is not on disk yet (a draft, `tasks_nvim.path_draft`).
+
+---The findings of ONE learning path (`Tasks.PlanFile` of kind `path`), as `check` reports them for an area: a broken
 ---file with its codes (errors), an id another file of the area has (error), and as warnings the problems of the tree
 ---(`path-reason-missing`, `path-duplicate-key`, `path-bad-key`, `path-bad-mark`, `path-image-outside`), as a hint an
----arrow before a word that looks like an id but is none (`path-bad-arrow`: the arrow is text), an arrow to a task that exists nowhere (`path-arrow-dangling`), an image that is not there
----(`path-image-missing`) and a cycle of promotions over paths and the `## Lernpunkte` of tasks (`path-cycle`). The
----levels of `## Level` (`tasks_nvim.lernlevel`): their problems (`level-bad-line`, `level-bad-mark`, `level-order`,
----`level-badge-outside`) and a badge that is not there (`level-badge-missing`) as warnings, an `{xp=…}` that is no XP
----(`path-bad-xp`, a problem of the tree), and as a hint (`xp-missing`) the points without XP of a path with levels.
----None of them refuses a write (R3).
+---arrow before a word that looks like an id but is none (`path-bad-arrow`: the arrow is text), an arrow to a task that
+---exists nowhere (`path-arrow-dangling`), an image that is not there (`path-image-missing`), a relative link that leads to nothing (`path-link-missing`) and a cycle of promotions over
+---paths and the `## Lernpunkte` of tasks (`path-cycle`). The levels of `## Level` (`tasks_nvim.lernlevel`): their
+---problems (`level-bad-line`, `level-bad-mark`, `level-order`, `level-badge-outside`) and a badge that is not there
+---(`level-badge-missing`) as warnings, an `{xp=…}` that is no XP (`path-bad-xp`, a problem of the tree), and as a hint
+---(`xp-missing`) the points without XP of a path with levels. Every `line N` is a line of the file (the body's line
+---plus `body_offset`). `c.text` checks a draft whose file does not exist yet (its links and images are judged from the
+---folder it would have).
+---@param findings Tasks.Finding[]
+---@param hints Tasks.Finding[]
+---@param p Tasks.PlanFile
+---@param c Tasks.PathCheckCtx
+function M.path_file_findings(findings, hints, p, c)
+  local open_ids, is_finished, scan_opts = c.open_ids, c.is_finished, c.scan_opts
+  local off = p.body_offset or 0
+  for i, msg in ipairs(p.errors) do
+    add(findings, "error", p.error_codes[i] or "frontmatter-invalid", p, msg)
+  end
+  picture_findings(findings, p)
+  if
+    open_ids[p.id]
+    or is_finished(p.id)
+    or (plans.find(p.id, scan_opts))
+    or (projects.find(p.id, scan_opts))
+    or (meetings.find(p.id, scan_opts))
+  then
+    add(
+      findings,
+      "error",
+      "path-id-taken",
+      p,
+      "a task (open or finished), plan, project or meeting of the area has the same id: " .. p.id
+    )
+  end
+  local tree = p.tree or lernbaum.parse("")
+  for _, pr in ipairs(tree.problems) do
+    add(
+      findings,
+      "warn",
+      pr.code,
+      p,
+      ("line %d: %s"):format(pr.line + off, shift_lines(pr.message, off))
+    )
+  end
+  for _, h in ipairs(tree.hints or {}) do
+    hints[#hints + 1] = {
+      code = h.code,
+      severity = "info",
+      area = p.area,
+      path = p.path,
+      id = p.id,
+      message = ("line %d: %s"):format(h.line + off, shift_lines(h.message, off)),
+    }
+  end
+  local dir = fsio.dirname(p.path)
+  local lv = p.levels
+  if lv and lv.has_section then
+    local level_problems = vim.list_extend(
+      vim.list_slice(lv.problems, 1),
+      p.level_state and p.level_state.problems or {}
+    )
+    for _, pr in ipairs(level_problems) do
+      add(
+        findings,
+        "warn",
+        pr.code,
+        p,
+        ("line %d: %s"):format(pr.line + off, shift_lines(pr.message, off))
+      )
+    end
+    for _, l in ipairs(vim.list_extend(vim.list_slice(lv.levels, 1), { lv.final })) do
+      if
+        l.badge
+        and l.badge:match("^assets/badges/")
+        and not l.badge:find("..", 1, true)
+        and not (p.folder and fsio.is_file(dir .. "/" .. l.badge))
+      then
+        add(
+          findings,
+          "warn",
+          "level-badge-missing",
+          p,
+          ("line %d: the badge %s is not there"):format(l.line + off, l.badge)
+        )
+      end
+    end
+    -- a path with levels counts XP: a point without any is worth a word, never a warning
+    if #lv.levels > 0 and tree.xp.missing > 0 then
+      local lines = {}
+      for _, node in ipairs(tree.nodes) do
+        if #node.children == 0 and node.state ~= "dropped" and not node.xp then
+          lines[#lines + 1] = tostring(node.line + off)
+        end
+      end
+      hints[#hints + 1] = {
+        code = "xp-missing",
+        severity = "info",
+        area = p.area,
+        path = p.path,
+        id = p.id,
+        message = ("%d learning point(s) without XP (line %s): they count nothing towards the levels"):format(
+          #lines,
+          table.concat(lines, ", ", 1, math.min(#lines, 8)) .. (#lines > 8 and ", …" or "")
+        ),
+      }
+    end
+  end
+  for _, node in ipairs(tree.nodes) do
+    if node.promoted and not open_ids[node.promoted] and not is_finished(node.promoted) then
+      add(
+        findings,
+        "warn",
+        "path-arrow-dangling",
+        p,
+        ("line %d: the arrow names %s, which does not exist"):format(node.line + off, node.promoted)
+      )
+    end
+    if
+      node.image
+      and node.image:match("^assets/")
+      and not node.image:find("..", 1, true)
+      and not (p.folder and fsio.is_file(dir .. "/" .. node.image))
+    then
+      add(
+        findings,
+        "warn",
+        "path-image-missing",
+        p,
+        ("line %d: the image %s is not there"):format(node.line + off, node.image)
+      )
+    end
+  end
+  -- the images of the tree and the badges of the levels have their own findings
+  local covered = {}
+  for _, node in ipairs(tree.nodes) do
+    if node.image then
+      covered[node.image] = true
+    end
+  end
+  for _, l in ipairs(lv and vim.list_extend(vim.list_slice(lv.levels, 1), { lv.final }) or {}) do
+    if l.badge then
+      covered[l.badge] = true
+    end
+  end
+  link_findings(findings, p, "path-link-missing", function(l)
+    return covered[l.target] == true
+  end, c.text)
+  -- a cycle of promotions: the path, the tasks its arrows name, the tasks theirs name, back to one seen on the way
+  local state, stack, reported = {}, {}, false
+  local function visit(id, arrows)
+    state[id] = "on"
+    stack[#stack + 1] = id
+    for _, next_id in ipairs(arrows) do
+      if reported then
+        break
+      end
+      if state[next_id] == "on" then
+        local from
+        for i, s in ipairs(stack) do
+          if s == next_id then
+            from = i
+            break
+          end
+        end
+        local ring = vim.list_slice(stack, from)
+        ring[#ring + 1] = next_id
+        add(
+          findings,
+          "warn",
+          "path-cycle",
+          p,
+          "the promotions run in a circle: " .. table.concat(ring, " -> ")
+        )
+        reported = true
+      elseif state[next_id] == nil then
+        local t = open_ids[next_id]
+        local done = not t and scan.find_done(next_id, scan_opts) or nil
+        local file = (t and t.path) or (done and done.path)
+        visit(next_id, file and task_arrows(file) or {})
+      end
+    end
+    table.remove(stack)
+    state[id] = "done"
+  end
+  visit(p.id, lernbaum.promoted_ids(tree))
+end
+
+---The findings of the learning paths of the areas checked (`<area>/ROADMAP/paths/`, `tasks_nvim.paths`): an area
+---folder that cannot be read (error) and, per path, `M.path_file_findings`. None of them refuses a write (R3).
 ---@param findings Tasks.Finding[]
 ---@param open_ids table<string, Tasks.Task>
 ---@param names string[]
@@ -1005,6 +1205,7 @@ end
 ---@param hints Tasks.Finding[]
 local function path_findings(findings, open_ids, names, scan_opts, is_finished, hints)
   local paths_mod = require("tasks_nvim.paths")
+  local c = { open_ids = open_ids, is_finished = is_finished, scan_opts = scan_opts }
   for _, name in ipairs(names) do
     local list, errs = paths_mod.area(name, scan_opts)
     for _, e in ipairs(type(errs) == "table" and errs or {}) do
@@ -1017,165 +1218,7 @@ local function path_findings(findings, open_ids, names, scan_opts, is_finished, 
       )
     end
     for _, p in ipairs(list or {}) do
-      for i, msg in ipairs(p.errors) do
-        add(findings, "error", p.error_codes[i] or "frontmatter-invalid", p, msg)
-      end
-      picture_findings(findings, p)
-      if
-        open_ids[p.id]
-        or is_finished(p.id)
-        or (plans.find(p.id, scan_opts))
-        or (projects.find(p.id, scan_opts))
-        or (meetings.find(p.id, scan_opts))
-      then
-        add(
-          findings,
-          "error",
-          "path-id-taken",
-          p,
-          "a task (open or finished), plan, project or meeting of the area has the same id: "
-            .. p.id
-        )
-      end
-      local tree = p.tree or lernbaum.parse("")
-      for _, pr in ipairs(tree.problems) do
-        add(findings, "warn", pr.code, p, ("line %d: %s"):format(pr.line, pr.message))
-      end
-      for _, h in ipairs(tree.hints or {}) do
-        hints[#hints + 1] = {
-          code = h.code,
-          severity = "info",
-          area = p.area,
-          path = p.path,
-          id = p.id,
-          message = ("line %d: %s"):format(h.line, h.message),
-        }
-      end
-      local dir = fsio.dirname(p.path)
-      local lv = p.levels
-      if lv and lv.has_section then
-        local level_problems = vim.list_extend(
-          vim.list_slice(lv.problems, 1),
-          p.level_state and p.level_state.problems or {}
-        )
-        for _, pr in ipairs(level_problems) do
-          add(findings, "warn", pr.code, p, ("line %d: %s"):format(pr.line, pr.message))
-        end
-        for _, l in ipairs(vim.list_extend(vim.list_slice(lv.levels, 1), { lv.final })) do
-          if
-            l.badge
-            and l.badge:match("^assets/badges/")
-            and not l.badge:find("..", 1, true)
-            and not (p.folder and fsio.is_file(dir .. "/" .. l.badge))
-          then
-            add(
-              findings,
-              "warn",
-              "level-badge-missing",
-              p,
-              ("line %d: the badge %s is not there"):format(l.line, l.badge)
-            )
-          end
-        end
-        -- a path with levels counts XP: a point without any is worth a word, never a warning
-        if #lv.levels > 0 and tree.xp.missing > 0 then
-          local lines = {}
-          for _, node in ipairs(tree.nodes) do
-            if #node.children == 0 and node.state ~= "dropped" and not node.xp then
-              lines[#lines + 1] = tostring(node.line)
-            end
-          end
-          hints[#hints + 1] = {
-            code = "xp-missing",
-            severity = "info",
-            area = p.area,
-            path = p.path,
-            id = p.id,
-            message = ("%d learning point(s) without XP (line %s): they count nothing towards the levels"):format(
-              #lines,
-              table.concat(lines, ", ", 1, math.min(#lines, 8)) .. (#lines > 8 and ", …" or "")
-            ),
-          }
-        end
-      end
-      for _, node in ipairs(tree.nodes) do
-        if node.promoted and not open_ids[node.promoted] and not is_finished(node.promoted) then
-          add(
-            findings,
-            "warn",
-            "path-arrow-dangling",
-            p,
-            ("line %d: the arrow names %s, which does not exist"):format(node.line, node.promoted)
-          )
-        end
-        if
-          node.image
-          and node.image:match("^assets/")
-          and not node.image:find("..", 1, true)
-          and not (p.folder and fsio.is_file(dir .. "/" .. node.image))
-        then
-          add(
-            findings,
-            "warn",
-            "path-image-missing",
-            p,
-            ("line %d: the image %s is not there"):format(node.line, node.image)
-          )
-        end
-      end
-      -- the images of the tree and the badges of the levels have their own findings
-      local covered = {}
-      for _, node in ipairs(tree.nodes) do
-        if node.image then
-          covered[node.image] = true
-        end
-      end
-      for _, l in ipairs(lv and vim.list_extend(vim.list_slice(lv.levels, 1), { lv.final }) or {}) do
-        if l.badge then
-          covered[l.badge] = true
-        end
-      end
-      link_findings(findings, p, "path-link-missing", function(l)
-        return covered[l.target] == true
-      end)
-      -- a cycle of promotions: the path, the tasks its arrows name, the tasks theirs name, back to one seen on the way
-      local state, stack, reported = {}, {}, false
-      local function visit(id, arrows)
-        state[id] = "on"
-        stack[#stack + 1] = id
-        for _, next_id in ipairs(arrows) do
-          if reported then
-            break
-          end
-          if state[next_id] == "on" then
-            local from
-            for i, s in ipairs(stack) do
-              if s == next_id then
-                from = i
-                break
-              end
-            end
-            local ring = vim.list_slice(stack, from)
-            ring[#ring + 1] = next_id
-            add(
-              findings,
-              "warn",
-              "path-cycle",
-              p,
-              "the promotions run in a circle: " .. table.concat(ring, " -> ")
-            )
-            reported = true
-          elseif state[next_id] == nil then
-            local t = open_ids[next_id]
-            local done = not t and scan.find_done(next_id, scan_opts) or nil
-            local file = (t and t.path) or (done and done.path)
-            visit(next_id, file and task_arrows(file) or {})
-          end
-        end
-        table.remove(stack)
-        state[id] = "done"
-      end
-      visit(p.id, lernbaum.promoted_ids(tree))
+      M.path_file_findings(findings, hints, p, c)
     end
   end
 end

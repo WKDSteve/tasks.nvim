@@ -49,6 +49,7 @@ M.STATUSES = { "planning", "doing", "parked", "done" }
 ---@field kind "plan"|"project"|"path"  # Which kind of file this is (a project file and a learning path are read by the same parser).
 ---@field tree? Tasks.LernTree        # A learning path only: the tree of `## Lernpunkte` (`tasks_nvim.lernbaum`).
 ---@field levels? Tasks.Levels        # A learning path only: the section `## Level` (`tasks_nvim.lernlevel`).
+---@field body_offset? integer        # The lines before the body (the frontmatter block): a line of `tree` or `levels` plus this is the line of the file.
 ---@field level_state? Tasks.LevelState  # A learning path only: the levels against the tree (`paths` sets it).
 ---@field project? string             # A plan only: the project it belongs to (an id; a wikilink in the file is read as its id).
 ---@field project_raw? string         # `project` as the file writes it (an id or a wikilink).
@@ -121,6 +122,9 @@ function M.parse(text, ctx)
     bad("frontmatter-missing", "no frontmatter block")
   else
     local meta = parsed.meta
+    -- the tree and the levels count the lines of the body; the file's line is that plus the frontmatter block
+    local head = text:sub(1, #text - #(parsed.body or ""))
+    plan.body_offset = select(2, head:gsub("\n", ""))
     plan.title = model.field_text(meta.title, "title", bad) or slug
     if meta.title == nil then
       bad("title-missing", "title is missing")

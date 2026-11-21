@@ -8,7 +8,7 @@
 -- Why: a value is bound with assert()/ok() in the same body, so a nil fails the spec at that line.
 
 return function(H)
-  local eq, ok = H.eq, H.ok
+  local eq, ok, has = H.eq, H.ok, H.has
   local F = dofile(vim.fs.dirname(debug.getinfo(1, "S").source:sub(2)) .. "/fixture.lua")
   local paths = require("tasks_nvim.paths")
   local plans = require("tasks_nvim.plans")
@@ -183,6 +183,21 @@ return function(H)
   }, "\n"))
   local run = assert(check.run(opts))
   local found = codes_of(run)
+  -- the line of a finding is the file's, frontmatter counted (it was the body's line before)
+  local twice_line
+  for i, l in ipairs(vim.split(H.read(broken.path), "\n", { plain = true })) do
+    if l:find("zweimal", 1, true) then
+      twice_line = i
+    end
+  end
+  local dup_msg
+  for _, f in ipairs(run.findings) do
+    if f.code == "path-duplicate-key" then
+      dup_msg = f.message
+    end
+  end
+  has(dup_msg, ("line %d:"):format(twice_line))
+  has(dup_msg, ("already on line %d"):format(twice_line - 1), "the line the message names, too")
   eq(found["path-reason-missing"], { broken.id })
   eq(found["path-duplicate-key"], { broken.id })
   eq(found["path-arrow-dangling"], { broken.id })
@@ -195,7 +210,14 @@ return function(H)
       arrow_hints[#arrow_hints + 1] = h.id .. " " .. h.message:match("^line %d+")
     end
   end
-  eq(arrow_hints, { broken.id .. " line 9" })
+  -- the line of the file: the body's line 9 plus the frontmatter block
+  local siehe_line
+  for i, l in ipairs(vim.split(H.read(broken.path), "\n", { plain = true })) do
+    if l:find("Siehe", 1, true) then
+      siehe_line = i
+    end
+  end
+  eq(arrow_hints, { broken.id .. " line " .. siehe_line })
   os.remove(broken.path)
 
   -- a cycle: the path names c-compiler, c-compiler's points name back the path (through a second task)
