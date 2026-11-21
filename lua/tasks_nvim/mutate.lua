@@ -30,6 +30,7 @@ local fsio = require("tasks_nvim.fsio")
 local gitbusy = require("tasks_nvim.gitbusy")
 local index = require("tasks_nvim.index")
 local lernbaum = require("tasks_nvim.lernbaum")
+local mdlinks = require("tasks_nvim.mdlinks")
 local model = require("tasks_nvim.model")
 local scan = require("tasks_nvim.scan")
 local steps = require("tasks_nvim.steps")
@@ -3422,10 +3423,13 @@ end
 
 ---Move a plain task file into its own folder: `tasks/<slug>.md` becomes
 ---`tasks/<slug>/<slug>.md`. A plan or project file (`file_kind`) the same way below `plans/` or `projects/`.
+---The file lies one folder deeper afterwards, so every relative link of its text gains a `../` (`mdlinks.shift`) and
+---still names the same file.
 ---@param root string
 ---@param task Tasks.Task|{ area: string, slug: string, path: string, file_kind?: "plan"|"project" }
 ---@return string|nil path  the new task file
 ---@return string|nil err
+---@return string|nil original  # the text before its links moved (nil: no link changed), for `undo_folder`
 local function to_folder(root, task)
   local dest
   if task.file_kind == "meeting" then
@@ -3443,12 +3447,34 @@ local function to_folder(root, task)
   if not made then
     return nil, "cannot create " .. dir .. ": " .. tostring(merr)
   end
+  local text, read_err = fsio.read(task.path)
+  if not text then
+    pcall((vim.uv or vim.loop).fs_rmdir, dir)
+    return nil, "cannot read " .. task.path .. ": " .. tostring(read_err)
+  end
+  local shifted, changed = mdlinks.shift(text)
   local moved, rerr = fsio.rename(task.path, dest)
   if not moved then
     pcall((vim.uv or vim.loop).fs_rmdir, dir)
     return nil, "cannot move " .. task.path .. ": " .. tostring(rerr)
   end
-  return dest, nil
+  if changed == 0 then
+    return dest, nil, nil
+  end
+  local wrote, werr = fsio.write_atomic(dest, shifted)
+  if not wrote then
+    -- links one level too high are worse than no folder: put the file back as it was
+    if fsio.rename(dest, task.path) then
+      pcall((vim.uv or vim.loop).fs_rmdir, dir)
+      return nil, "cannot rewrite the links of " .. dest .. ": " .. tostring(werr)
+    end
+    return nil,
+      ("cannot rewrite the links of %s (%s); it stays there with links one folder too high"):format(
+        dest,
+        tostring(werr)
+      )
+  end
+  return dest, nil, text
 end
 
 ---Undo `to_folder` after a failed `attach`: the task file goes back to
@@ -3459,9 +3485,10 @@ end
 ---@param folder_file string  the path `to_folder` gave it
 ---@param asset string        the file the failed copy may have left behind
 ---@param asset_dir string    the folder of the asset below the task folder (`assets`, `assets/videos`)
+---@param original? string    the text before `to_folder` moved its links (nil: it changed none)
 ---@return boolean ok
 ---@return string|nil err
-local function undo_folder(plain, folder_file, asset, asset_dir)
+local function undo_folder(plain, folder_file, asset, asset_dir, original)
   local dir = fsio.dirname(folder_file)
   local uv = vim.uv or vim.loop
   if fsio.is_file(asset) then
@@ -3471,6 +3498,13 @@ local function undo_folder(plain, folder_file, asset, asset_dir)
     pcall(uv.fs_rmdir, dir .. "/" .. asset_dir)
   end
   pcall(uv.fs_rmdir, dir .. "/" .. M.ASSETS_DIR)
+  -- the links go back first: back at its old depth, the shifted text would point one folder too high
+  if original then
+    local wrote, werr = fsio.write_atomic(folder_file, original)
+    if not wrote then
+      return false, werr
+    end
+  end
   local moved, err = fsio.rename(folder_file, plain)
   if not moved then
     return false, err
@@ -3601,13 +3635,13 @@ function M.attach(id, src, opts)
     end
   end
 
-  local path, folderized = task.path, false
+  local path, folderized, original = task.path, false, nil
   if not task.folder then
-    local dest, err = to_folder(root, task)
+    local dest, err, before = to_folder(root, task)
     if not dest then
       return nil, err
     end
-    path, folderized = dest, true
+    path, folderized, original = dest, true, before
   end
   local asset = fsio.dirname(path) .. "/" .. asset_dir .. "/" .. name
   local copied, cerr = fsio.copy_whole(src, asset)
@@ -3618,7 +3652,7 @@ function M.attach(id, src, opts)
       return nil, why
     end
     -- The conversion was only a means to an end: a failed attach leaves the task as it was.
-    local undone, uerr = undo_folder(task.path, path, asset, asset_dir)
+    local undone, uerr = undo_folder(task.path, path, asset, asset_dir, original)
     if undone then
       return nil, why
     end
