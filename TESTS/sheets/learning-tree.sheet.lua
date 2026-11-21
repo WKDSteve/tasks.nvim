@@ -5,7 +5,7 @@
 -- terminal (images.nvim) is left to a person (`manual`).
 return {
   id = "tasks.learning-tree",
-  title = "tasks.nvim: :Tasks learn (progress, folds, image placeholder), point (marks, reason), promote and unpromote",
+  title = "tasks.nvim: :Tasks learn (progress, optional group, folds, image placeholder), point (marks, reason), promote and unpromote",
   feature = "tasks.learning-tree",
   task = "tasks.nvim/neovim-lernbaum-ansicht",
   engine = "rpc",
@@ -38,6 +38,8 @@ return {
         "  - [ ] ![Diagramm](assets/images/syntax.svg)",
         "  - [ ] C-Compiler {#cc}",
         "    - [ ] K&R lesen",
+        "- [ ] Literatur {optional} {#lit}",
+        "  - [x] Ein Buch",
         "", "## Notizen", "",
       }, "\n"))
       require("tasks_nvim").setup({ vault = _G.root, keys = { learning = { cycle = "<F5>" } } })
@@ -71,6 +73,10 @@ return {
     {
       expect = [[_G.virt():find("0 gelernt", 1, true) ~= nil and _G.virt():find("[image] assets/images/syntax.svg (missing)", 1, true) ~= nil]],
       note = "the progress of the tree and a placeholder for the missing image",
+    },
+    {
+      expect = [[_G.virt():find("optional 1/1 gelernt", 1, true) ~= nil and _G.virt():find("(optional)", 1, true) ~= nil]],
+      note = "the optional group apart: in the heading, and marked after the group (the learned book is not in 0 gelernt)",
     },
     {
       expect = [[vim.wo.foldmethod == "expr" and vim.fn.foldlevel(12) == 2]],
