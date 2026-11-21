@@ -201,6 +201,31 @@ return function(H)
   assert(mutate.attach(w.id, png, o))
   ok(H.read(y.path):find(("[Andere](%s/%s.md)"):format(w.slug, w.slug), 1, true), H.read(y.path))
 
+  -- a file with nothing to change is read, never locked: a lock for each file below ROADMAP/ would be one lock file
+  -- and one emptied read cache per file of the vault on every done
+  local fsio = require("tasks_nvim.fsio")
+  local real_lock, locks = fsio.with_lock, 0
+  fsio.with_lock = function(...)
+    locks = locks + 1
+    return real_lock(...)
+  end
+  local none = relink.follow(root, {
+    {
+      from = root .. "/" .. A .. "/ROADMAP/tasks/gibt-es-nicht.md",
+      to = root .. "/" .. A .. "/Backlog/TASKS/2026-01-01_gibt-es-nicht.md",
+    },
+  })
+  local goal = new(A, "Lockziel")
+  local from = new(A, "Lockquelle", ("\n[z](%s.md)\n"):format(goal.slug))
+  local some = relink.follow(root, {
+    { from = goal.path, to = root .. "/" .. A .. "/ROADMAP/tasks/woanders.md" },
+  })
+  fsio.with_lock = real_lock
+  eq(none.links, 0)
+  eq(#some.files, 1, "the one file that names it, not the generated index")
+  ok(fsio.same_path(some.files[1], from.path), tostring(some.files[1]))
+  eq(locks, 1, "a lock only for the file that is written")
+
   -- ── repair: the dead links of before ────────────────────────────────────
   local root2 = F.vault(H)
 

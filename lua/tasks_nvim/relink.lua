@@ -226,7 +226,7 @@ local function md_files(dir, out)
   end
 end
 
----The files of the areas `names` (nil: every area) below the folders `dirs`.
+---The files of the areas `names` (nil: every area) below the folders `dirs`, without the generated `ROADMAP/TASKS.md`.
 ---@param root string
 ---@param dirs string[]
 ---@param names? string[]
@@ -247,34 +247,47 @@ function M.files(root, dirs, names)
       end
     end
   end
+  -- the index of an area is generated (`tasks index`): never written by hand, nor here
+  local generated = {}
+  for _, a in ipairs(vault.areas(root)) do
+    generated[key(vault.index_path(root, a.name))] = true
+  end
+  out = vim.tbl_filter(function(p)
+    return not generated[key(p)]
+  end, out)
   table.sort(out)
   return out
 end
 
----Rewrite one file under its lock, on the text it has now. A dry run writes nothing.
+---Rewrite one file. The text is read and worked out without a lock (most files have nothing to change: a lock for each
+---would be one lock file and one emptied read cache per file of the vault); only a file that changes is written, under
+---its lock, on the text it has then (worked out again when it changed meanwhile). A dry run writes nothing.
 ---@param path string
 ---@param fn fun(text: string): string, table[]
 ---@param dry boolean
 ---@param res Tasks.RelinkResult
 local function apply(path, fn, dry, res)
-  local edits
-  local function step()
-    local text = fsio.read(path)
-    if not text then
-      return true
-    end
-    local new
-    new, edits = fn(text)
-    if dry or #edits == 0 then
-      return true
-    end
-    return fsio.write_atomic(path, new)
+  local first = fsio.read(path)
+  if not first then
+    return
   end
-  local ok, err
-  if dry then
-    ok, err = step()
-  else
-    ok, err = fsio.with_lock(path, step)
+  local new, edits = fn(first)
+  local ok, err = true, nil
+  if not dry and #edits > 0 then
+    ok, err = fsio.with_lock(path, function()
+      local text = fsio.read(path)
+      if not text then
+        edits = {}
+        return true
+      end
+      if text ~= first then
+        new, edits = fn(text)
+        if #edits == 0 then
+          return true
+        end
+      end
+      return fsio.write_atomic(path, new)
+    end)
   end
   if not ok then
     res.errors[#res.errors + 1] = ("%s: %s"):format(path, tostring(err))

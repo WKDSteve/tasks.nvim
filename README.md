@@ -75,7 +75,9 @@ sessions that run without an editor. Nothing is stored anywhere but in the files
   (and `:Tasks project-close <id>`) finishes it after a question, and `check` names such plans (`plan-no-open-task`).
 - **Finish safely**: `:Tasks done` moves the file to `Backlog/`, adds a row to its README, regenerates the index,
   and restores everything byte for byte if a step fails. `:Tasks reopen` (headless `tasks reopen`) brings a
-  finished task back, README row and index included.
+  finished task back, README row and index included. Relative Markdown links to a task follow it when it is
+  finished, reopened, moved or turned into a folder task; `tasks relink [<area>] [--dry-run]` mends the dead ones
+  once.
 - **Dashboard** (needs [snacks.nvim](https://github.com/folke/snacks.nvim); a plain list without it): filter chips,
   marks, bulk status/priority/finish, export, live refresh when files change.
 - **Folder tasks** with an `assets/` folder for screenshots and logs.
