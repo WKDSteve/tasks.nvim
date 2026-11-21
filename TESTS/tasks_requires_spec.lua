@@ -194,6 +194,25 @@ return function(H)
       eq(l.reached, true, "the other levels are reached")
     end
   end
+  -- the tree view of the editor: the reward of the whole path is not open while the path waits
+  local learn = require("tasks_nvim.ui.learn")
+  require("tasks_nvim.vault").set_root(root)
+  vim.cmd("silent edit! " .. vim.fn.fnameescape(digital.path))
+  local lbuf = vim.api.nvim_get_current_buf()
+  learn.attach(lbuf)
+  local function heading_text()
+    local texts = {}
+    for _, m in ipairs(vim.api.nvim_buf_get_extmarks(lbuf, learn.ns, 0, -1, { details = true })) do
+      for _, chunk in ipairs(m[4].virt_text or {}) do
+        texts[#texts + 1] = chunk[1]
+      end
+    end
+    return table.concat(texts, "\n")
+  end
+  ok(
+    not heading_text():find("Belohnung offen", 1, true),
+    "held: no open reward in the view: " .. heading_text()
+  )
   local listed = call("paths", { area = A })
   local rev_before = listed.rev
   for _, item in ipairs(listed.items) do
@@ -229,6 +248,11 @@ return function(H)
   eq(pdoc.path.requires[1].met, true)
   eq(pdoc.path.stage, "doing", "a point learned")
   eq(pdoc.path.level.finished, true)
+  learn.forget_task_xp(lbuf)
+  learn.refresh(lbuf)
+  has(heading_text(), "Belohnung offen: Lötstation", "the gate is open: the reward is reached")
+  vim.cmd("silent! bwipeout! " .. lbuf)
+  require("tasks_nvim.vault").set_root(nil)
   local closed = assert(paths.close(digital.id, o))
   eq(closed.notes or {}, {}, "nothing to say")
 

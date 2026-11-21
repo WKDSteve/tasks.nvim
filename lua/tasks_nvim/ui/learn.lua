@@ -269,10 +269,53 @@ local function with_task_xp(buf, snap)
   lernbaum.set_task_xp(snap.tree, hit.xp)
 end
 
----Forget the task XP of a buffer (read again on the next draw).
+---Whether the path of a buffer waits for what it builds on (`requires`, `tasks_nvim.requires`), per buffer, read again
+---when its `requires`, `requires_gate` or `project` change or after a read or a write (`forget_task_xp`).
+---@type table<integer, { key: string, state?: Tasks.RequiresState }>
+local requires_cache = {}
+
+---The level state as the gate of the path leaves it: a path that waits under a hard gate keeps the line of the whole
+---path and its reward open (`requires.hold_levels`). A buffer outside the vault, a task and a path that names and
+---inherits nothing keep the state as it is.
+---@param buf integer
+---@param ls Tasks.LevelState
+---@return Tasks.LevelState
+local function held_levels(buf, ls)
+  if not (ls.reached and ls.reached.done ~= nil) then
+    return ls
+  end
+  local text = table.concat(vim.api.nvim_buf_get_lines(buf, 0, -1, false), "\n")
+  local parsed = fm.parse(text)
+  local meta = parsed and parsed.has_block and parsed.meta or {}
+  if meta.requires == nil and meta.project == nil then
+    requires_cache[buf] = nil
+    return ls
+  end
+  local key = vim.inspect({ meta.requires, meta.requires_gate, meta.project })
+  local hit = requires_cache[buf]
+  if not (hit and hit.key == key) then
+    hit = { key = key }
+    local loc = M.locate(buf)
+    if loc and loc.kind == "path" then
+      local file = require("tasks_nvim.plans").parse(text, {
+        path = loc.path,
+        area = loc.area,
+        slug = loc.slug,
+        kind = "path",
+      })
+      local req = require("tasks_nvim.requires")
+      hit.state = req.state(file, req.index({ root = loc.root }))
+    end
+    requires_cache[buf] = hit
+  end
+  return require("tasks_nvim.requires").hold_levels(ls, hit.state) or ls
+end
+
+---Forget the task XP of a buffer (read again on the next draw), and what its path waits for.
 ---@param buf integer
 function M.forget_task_xp(buf)
   task_xp_cache[buf] = nil
+  requires_cache[buf] = nil
 end
 
 ---Reload a path buffer the engine wrote on disk; the windows whose cursor was on `row` follow the point, not the row
@@ -645,7 +688,7 @@ function M.refresh(buf)
     with_task_xp(buf, snap)
     local lv = lernlevel.parse(snap.body)
     if #lv.levels > 0 or lv.final then
-      ls = lernlevel.evaluate(lv, snap.tree)
+      ls = held_levels(buf, lernlevel.evaluate(lv, snap.tree))
     end
     local st = attached[buf]
     if st and ls then
