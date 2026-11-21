@@ -1399,7 +1399,7 @@ local function nested_routes()
         { name = "id", type = "STRING", desc = "Id of the project to finish, as area/slug" },
       },
       flags = { { name = "yes", bool = true, desc = "Finish without asking for confirmation" } },
-      desc = "Finish a project by hand (only parked plans or nothing left): refused while an own task or an open plan holds it; it moves to Backlog/FEATURES",
+      desc = "Finish a project by hand (only parked plans or nothing left): refused while an own task, an open plan or an open learning path holds it; it moves to Backlog/FEATURES",
       run = function(ctx)
         cmd().close_by_hand(ctx, "project")
       end,

@@ -264,7 +264,7 @@ end
 ---@field id string
 ---@field already? string                     # The file of the finished item: it was finished before (no error).
 ---@field err? string                         # No such open plan or project, or a step that failed.
----@field holding? string[]                   # What holds it open (open tasks, for a project open plans too): refused.
+---@field holding? string[]                   # What holds it open (open tasks; for a project open plans and paths too): refused.
 ---@field plans_closed string[]               # The plan finished (a plan close), empty otherwise.
 ---@field plan_summaries table<string, Tasks.PlanSummary>
 ---@field projects Tasks.ClosedProjects       # The projects finished with it (a plan close: the one the plan was the last of).
@@ -370,8 +370,8 @@ end
 
 ---The step after `close_plans`: finish every project of `project_ids` that has no open task of its own, no open plan
 ---and no open learning path left. A parked plan or path does not hold a project open (a parked plan is named in the
----summary); a plan, path or task of any other status does. A project that nothing finished is never asked about: an empty project does not close by itself. The scan
----guards are those of `close_plans`: an incomplete scan closes nothing.
+---summary); a plan, path or task of any other status does. A project that nothing finished is never asked about: an
+---empty project does not close by itself. The scan guards are those of `close_plans`: an incomplete scan closes nothing.
 ---`opts.dry_run` names what would be closed and writes nothing.
 ---@param project_ids string[]
 ---@param opts? { root?: string, date?: string, today?: string, checkpoint_dir?: string, dry_run?: boolean }
