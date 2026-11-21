@@ -361,6 +361,18 @@ path, which Obsidian resolves, with the id as alias) when it is not. The same ru
 headless CLI has no `setup`: `TASKS_LINKS=wikilink` switches it there. Neovim reads it too as long as `setup()` names
 no `links`; a `links` given to `setup()` (also `"plain"`) wins.
 
+**Headless, a learning path, plan or project:** `tasks set <id> key=value ...` with the id of an open learning path,
+plan or project file (and no open task of that id) changes the frontmatter of that file, the same as `path_set`,
+`plan_set` and `project_set` of the write door (`plans.SET_KEYS`): a path takes `title`, `status` (`planning`,
+`doing`, `parked`; finished with `path_close`), `areas`, `target`, `project`, `links`, `icon`, `cover` and `tags`; a
+plan also `phase_order`, `gate`, `phase`; a project `phase_order` and `gate`. Lists are written with commas
+(`areas=a,b`, `tags=not-on-workstation`), an empty value removes a key (not `title`, `status`). A change that would
+leave the file wrong (a project that is none, an unknown status) is refused (exit 2) and nothing is written.
+
+```sh
+tasks set tasks-desktop/rust-stack-a-rust-kern project=tasks-desktop/rust-stack-der-app-familie status=doing
+```
+
 A new task whose slug another area already has turns every bare `[[slug]]` that named the old task into a
 `wikilink-ambiguous` one. `new` (CLI, `:Tasks new` and its form) says so at once and names those tasks:
 `warn: [[dep-a]] now names cascade.nvim/dep-a and lib.nvim/dep-a: wikilink-ambiguous in lib.nvim/linked (write the id

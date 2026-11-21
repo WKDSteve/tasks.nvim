@@ -177,7 +177,10 @@ commands:
                                                --waits-for: created parked, waiting for that key;
                                                scopes: @SCOPES@)
   set <area>/<slug> key=value ...         change frontmatter (empty value removes the key); waits_for=<key> parks
-                                          the task with that reason, any other status drops the reason again
+                                          the task with that reason, any other status drops the reason again; an id
+                                          of a learning path, plan or project (no open task of that id) changes its
+                                          file: title status areas target project links icon cover tags (a path),
+                                          phase_order gate phase (a plan), as path_set / plan_set / project_set
   waits [<area>] [--format=tsv|json]      what the parked tasks wait for: per `waits_for` key the number of tasks
                                           and their areas, then the parked ones without a reason and the total
                                           (json: the tasks.waits document)
@@ -2178,6 +2181,47 @@ function commands.new(ctx)
   return 0
 end
 
+---The kind of the open plan, project or learning path file an id names (`nil`: none; an open task is looked for
+---first by the caller).
+---@param id string
+---@param root? string
+---@return "plan"|"project"|"path"|nil
+local function file_kind_of(id, root)
+  if require("tasks_nvim.paths").find(id, { root = root }) then
+    return "path"
+  elseif require("tasks_nvim.plans").find(id, { root = root }) then
+    return "plan"
+  elseif require("tasks_nvim.projects").find(id, { root = root }) then
+    return "project"
+  end
+  return nil
+end
+
+---`set` on a plan, project or learning path file (`plans.set` with `kind`, the same as `plan_set`, `project_set` and
+---`path_set` of the write door): its frontmatter keys (`plans.SET_KEYS`), an empty value removes one.
+---@param ctx Tasks.CliCtx
+---@param id string
+---@param patch table<string, any>
+---@param kind "plan"|"project"|"path"
+---@return integer code
+local function set_file(ctx, id, patch, kind)
+  local file_patch = {}
+  for key, value in pairs(patch) do
+    file_patch[key] = value == mutate.REMOVE and vim.NIL or value
+  end
+  local res, err, info = require("tasks_nvim.plans").set(
+    id,
+    file_patch,
+    { root = ctx.eo.root, today = ctx.eo.today, kind = kind }
+  )
+  if not res then
+    ctx.warn("error: " .. tostring(err))
+    return (info and info.code == "invalid_argument") and 2 or 1
+  end
+  ctx.say(("set\t%s\t%s\t%s"):format(res.id, res.changed and "changed" or "unchanged", res.path))
+  return 0
+end
+
 function commands.set(ctx)
   local args, eo = ctx.args, ctx.eo
   local id = args.pos[1]
@@ -2193,6 +2237,13 @@ function commands.set(ctx)
       return 2
     end
     patch[key] = value == "" and mutate.REMOVE or value
+  end
+  -- an id that names no open task may name a plan, project or learning path file: its frontmatter is set there
+  if not scan.find(id, { root = eo.root }) then
+    local kind = file_kind_of(id, eo.root)
+    if kind then
+      return set_file(ctx, id, patch, kind)
+    end
   end
   if patch.status == "doing" then
     -- A guard rail, not a lock (nothing is refused because of plan or meta fields): a headless session that

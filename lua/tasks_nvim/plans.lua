@@ -962,7 +962,7 @@ M.SET_KEYS = {
     "icon",
     "cover",
   },
-  path = { "title", "status", "areas", "target", "project", "links", "icon", "cover" },
+  path = { "title", "status", "areas", "target", "project", "links", "icon", "cover", "tags" },
 }
 
 ---The finder of a kind of file: plans here, projects and paths in their own modules (required where used: they
@@ -1032,7 +1032,7 @@ function M.set(id, patch, opts)
         return nil, key .. " cannot be removed", { code = "invalid_argument" }
       end
       pairs_[#pairs_ + 1] = { key, mutate.REMOVE }
-    elseif key == "areas" or key == "phase_order" then
+    elseif key == "areas" or key == "phase_order" or key == "tags" then
       local items = type(value) == "table" and value
         or vim.split(tostring(value), ",", { plain = true })
       local list = {}
