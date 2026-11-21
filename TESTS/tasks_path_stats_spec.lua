@@ -100,6 +100,22 @@ return function(H)
   eq(plain.levels[1].needed, 2)
   eq(plain.levels[1].at.label, "B", "2 of 4 points are 50 %")
   eq(plain.levels[2].at, nil, "a level in XP is out of reach without XP")
+  -- a percent level of a sum that does not divide: whole XP, rounded up (25 % of 505 is 126.25: 127 reach it)
+  local ODD = table.concat({
+    "## Lernpunkte",
+    "- [ ] A {xp=126}",
+    "- [ ] B {xp=1}",
+    "- [ ] C {xp=378}",
+    "## Level",
+    "- [ ] 25 % · Viertel",
+    "",
+  }, "\n")
+  local odd = stats.compute(lernbaum.parse(ODD), lernlevel.parse(ODD))
+  eq(odd.levels[1].needed, 127, "a level is reached when the threshold is full")
+  eq(odd.levels[1].at.label, "B", "126 XP are not yet 25 %")
+  -- 1 of 3 points without XP at 50 %: 1.5 points, so 2
+  local THIRDS = "## Lernpunkte\n- [ ] A\n- [ ] B\n- [ ] C\n## Level\n- [ ] 50 % · Halb\n"
+  eq(stats.compute(lernbaum.parse(THIRDS), lernlevel.parse(THIRDS)).levels[1].needed, 2)
   -- no levels: only the counts
   local bare = stats.compute(lernbaum.parse(PLAIN), nil)
   eq(#bare.levels, 0)

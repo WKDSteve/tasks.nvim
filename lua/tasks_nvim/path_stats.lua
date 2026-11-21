@@ -40,7 +40,8 @@ local M = {}
 ---@field kind "xp"|"percent"|"done"
 ---@field threshold? integer
 ---@field name? string
----@field needed? number         # The XP (or, without XP, the points) the level needs; nil for the path line.
+---@field needed? integer        # The XP (or, without XP, the points) the level needs, whole (a percent rounded up);
+---                               nil for the path line.
 ---@field reached boolean        # Reached now (`lernlevel.evaluate`).
 ---@field at_start? boolean      # Reached before the first point (a threshold of 0).
 ---@field at? Tasks.PathStatsPoint  # The point at which it would be reached; nil when it cannot be.
@@ -175,7 +176,8 @@ function M.compute(tree, lv, state)
       end
     elseif units > 0 then
       -- `evaluate`: floor(sum * 100 / units) >= threshold, which is sum * 100 >= threshold * units
-      row.needed = l.threshold * units / 100
+      -- whole XP (or points), rounded up: the level is there once the threshold is full, and the sum is whole
+      row.needed = math.ceil(l.threshold * units / 100)
       reached_at = function(sum)
         return sum * 100 >= l.threshold * units
       end

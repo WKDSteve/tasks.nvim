@@ -1129,7 +1129,7 @@ function M.path_file_findings(findings, hints, p, c)
       node.image
       and node.image:match("^assets/")
       and not node.image:find("..", 1, true)
-      and not (p.folder and fsio.is_file(dir .. "/" .. node.image))
+      and not (p.folder and asset_exists(dir, node.image))
     then
       add(
         findings,
@@ -1140,20 +1140,28 @@ function M.path_file_findings(findings, hints, p, c)
       )
     end
   end
-  -- the images of the tree and the badges of the levels have their own findings
+  -- the images of the tree and the badges of the levels have their own findings; both sides by the file they name
+  -- (`./assets/x`, `assets/x%20y` and `assets/x y` are one file)
   local covered = {}
+  local function cover(target)
+    local key = mdlinks.key(target)
+    if key then
+      covered[key] = true
+    end
+  end
   for _, node in ipairs(tree.nodes) do
     if node.image then
-      covered[node.image] = true
+      cover(node.image)
     end
   end
   for _, l in ipairs(lv and vim.list_extend(vim.list_slice(lv.levels, 1), { lv.final }) or {}) do
     if l.badge then
-      covered[l.badge] = true
+      cover(l.badge)
     end
   end
   link_findings(findings, p, "path-link-missing", function(l)
-    return covered[l.target] == true
+    local key = mdlinks.key(l.target)
+    return key ~= nil and covered[key] == true
   end, c.text)
   -- a cycle of promotions: the path, the tasks its arrows name, the tasks theirs name, back to one seen on the way
   local state, stack, reported = {}, {}, false

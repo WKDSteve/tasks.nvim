@@ -191,4 +191,31 @@ return function(H)
   ok(task_hits[1]:find("../weg.md", 1, true) and task_hits[2]:find("assets/fehlt.png", 1, true))
   H.write(fz.path, H.read(fz.path) .. "[bild](assets/fehlt.png)\n")
   eq(link_codes(fz.path), {}, "a folder task's assets/ link is asset-dangling's")
+
+  -- ── one file, two spellings: the image of a point and a link to it are one finding ──
+  local spelled =
+    assert(paths.new(A, vim.tbl_extend("force", opts, { title = "Zwei Schreibweisen" })))
+  local sp = assert(mutate.folderize(spelled.id, opts)).path
+  local sdir = vim.fs.dirname(sp)
+  H.write(sdir .. "/assets/two words.svg", "<svg/>")
+  H.write(
+    sp,
+    H.read(sp)
+      .. "\n## Lernpunkte\n\n"
+      .. "- [ ] Weg ![w](assets/gone.svg) {#gone}\n"
+      .. "- [ ] Da ![d](assets/two%20words.svg) {#there}\n\n"
+      .. "Siehe [weg](./assets/gone.svg), [weg2](assets/go%6Ee.svg) und [da](<./assets/two words.svg>).\n"
+  )
+  local per_code = {}
+  for _, f in ipairs(check.run(opts).findings) do
+    if f.path == sp then
+      per_code[f.code] = (per_code[f.code] or 0) + 1
+    end
+  end
+  eq(per_code["path-image-missing"], 1, "the image that is not there: " .. vim.inspect(per_code))
+  eq(
+    per_code["path-link-missing"],
+    nil,
+    "./ and %-escapes name the image already: " .. vim.inspect(per_code)
+  )
 end

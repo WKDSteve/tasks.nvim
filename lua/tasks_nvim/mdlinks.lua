@@ -240,6 +240,14 @@ function M.resolve(dir, target)
   return lead .. table.concat(parts, "/")
 end
 
+---The file a relative target names, as a key to compare two spellings: `./assets/x.svg`, `assets/x.svg` and
+---`assets/%78.svg` give the same key (`resolve` without a folder). nil: the target names no file.
+---@param target string
+---@return string|nil
+function M.key(target)
+  return M.resolve("", target)
+end
+
 ---The relative links of `text` whose file (or folder) below `dir` does not exist. `skip(link)` returning true leaves a
 ---link out (one another check already covers). Note that the answer says whether a path outside the vault exists:
 ---that is the point (a learning path links to books next to the vault).
