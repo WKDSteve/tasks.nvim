@@ -220,9 +220,13 @@ return function(H)
   -- the text answer of the CLI says it too, so a person reading `tasks next --not-category` is not misled
   local plan_view = require("tasks_nvim.plan_view")
   local text = table.concat(plan_view.next_lines(without), "\n")
-  ok(text:find("left out: 2 ready task(s)", 1, true), "the text names the count: " .. text)
+  -- one word before the colon, like every other line, so a script reading `^(%a[%w_]*):` sees the key
   ok(
-    not table.concat(plan_view.next_lines(all), "\n"):find("left out", 1, true),
+    ("\n" .. text):find("\nleft_out: 2 ready task(s)", 1, true),
+    "the text names the count: " .. text
+  )
+  ok(
+    not table.concat(plan_view.next_lines(all), "\n"):find("left_out", 1, true),
     "nothing left out: no line"
   )
 

@@ -643,7 +643,7 @@ function M.next_lines(pick)
     )
   end
   if (pick.left_out or 0) > 0 then
-    out[#out + 1] = ("left out: %d ready task(s) of the excluded categories (--not-category)"):format(
+    out[#out + 1] = ("left_out: %d ready task(s) of the excluded categories (--not-category)"):format(
       pick.left_out
     )
   end
