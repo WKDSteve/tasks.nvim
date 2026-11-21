@@ -878,9 +878,10 @@ function M.build(tasks, index)
     plan.critical = { days = best_days, path = path, unknown = unknown }
   end
 
+  -- A parked task behind a parked one is a chain shelved on purpose: only a task meant to move is warned about.
   for _, id in ipairs(plan.ids) do
     local node = plan.nodes[id]
-    if node.state == "stuck" and not node.in_cycle then
+    if node.state == "stuck" and not node.in_cycle and node.task.status ~= "parked" then
       local parked = {}
       for _, b in ipairs(node.open_blockers) do
         local blocker = index.open[b]

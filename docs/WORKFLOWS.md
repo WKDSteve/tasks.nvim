@@ -496,7 +496,7 @@ The design lives with the author's notes; the tasks for it are ordinary tasks in
 | `TASKS.md` is your own file | "not a generated index": it is never overwritten | move it; the generated one gets the name |
 | a `blocked_by` id does not exist | `check`: `blocked-by-dangling` | correct the id (ids are `<area>/<slug>`) |
 | two tasks wait on each other | `check`: `blocked-by-cycle` (an error) naming the members; the plan leaves them out of the stages | remove one `blocked_by` |
-| a task waits on a `parked` task | `check` warns `blocked-by-parked`; the plan marks it stuck and `next` never offers it | un-park the blocker or drop the edge |
+| a task waits on a `parked` task | `check` warns `blocked-by-parked`; the plan marks it stuck and `next` never offers it. A task that is `parked` itself is no warning: a chain shelved on purpose | un-park the blocker or drop the edge |
 | `next` says nothing can be started | "Still open: 4 for you, 6 blocked, 3 parked" -- not "all done" | decide what waits for you (`:Tasks list --actor=me`) |
 | many tasks are parked and nobody knows why | "30 parked (25 waiting for mac)"; `:Tasks waits` lists the reasons | give the rest a reason (`set <id> waits_for=<key>`) or un-park them; `:Tasks release <key>` when the thing is there |
 | no vault configured | "vault not found" | `setup({ vault = ... })` or `$TASKS_VAULT` |

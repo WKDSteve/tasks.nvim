@@ -431,6 +431,19 @@ return function(H)
     remove(tasks .. "shelf.md")
     remove(tasks .. "hangs.md")
   end)
+  expect("a parked task behind a parked one is quiet", function()
+    F.task(H, root, "lib.nvim", "shelf", F.meta("Shelf", "parked"))
+    F.task(
+      H,
+      root,
+      "lib.nvim",
+      "later",
+      F.meta("Later", "parked", { { "blocked_by", "lib.nvim/shelf" } })
+    )
+  end, {}, function()
+    remove(tasks .. "shelf.md")
+    remove(tasks .. "later.md")
+  end)
   expect("a blocked task with an open blocker is quiet", function()
     F.task(H, root, "lib.nvim", "base", F.meta("Base", "open"))
     F.task(

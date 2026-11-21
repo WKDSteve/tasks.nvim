@@ -223,6 +223,20 @@ return function(H)
   end
   eq(kinds["blocked-by-parked"], 1)
   eq(kinds["unknown-blocker"], 1)
+  -- a parked task behind a parked one is a chain shelved on purpose: no warning, the open one still warns
+  local pk2 = {
+    T("k/parked", { status = "parked" }),
+    T("k/shelved", { status = "parked", blocked_by = { "k/parked" } }),
+    T("k/waits", { blocked_by = { "k/parked" } }),
+  }
+  local kp2 = plan.build(pk2, index_of(pk2))
+  local warned = {}
+  for _, w in ipairs(kp2.warnings) do
+    if w.code == "blocked-by-parked" then
+      warned[#warned + 1] = w.id
+    end
+  end
+  eq(warned, { "k/waits" }, "only the task that is not parked itself is warned about")
 
   -- ── decisions by leverage ──
   local dec = {

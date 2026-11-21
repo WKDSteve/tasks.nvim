@@ -7,6 +7,7 @@ the version is not tagged yet (the repository is not published).
 
 ### Fixed
 
+- `check` no longer warns `blocked-by-parked` for a task that is `parked` itself: a chain shelved on purpose (the same `waits_for`, one parked task behind the other) is no fault. An open task behind a parked one is still warned about. The plan state of such a task stays `stuck`; `next` offers neither.
 - `path_levels` writes the words of the level lines in the language they use already (`Path done`, `Reward:` stay English), else in the language of the vault's marker file (`tasks-vault.json`, `lang`), else German (`lernlevel.lang_of`, `lernlevel.WORDS`).
 - A dry run of `tasks-ops/1` reserves the ids earlier operations of the request take, for `new`, `plan_new`, `project_new` and `path_new` alike: a second plan of the same title (or a task and a plan of one slug) gets `-2` in the dry run as in the real run.
 - `path-link-missing` compares a link with the images and badges it leaves to their own findings by the file it names: `./assets/x.svg` or `assets/x%20y.svg` next to an image `assets/x.svg` (or `assets/x y.svg`) is no second warning. `path-image-missing` finds a percent-escaped image (`assets/x%20y.svg` names `x y.svg`).

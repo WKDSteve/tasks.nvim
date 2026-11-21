@@ -47,7 +47,8 @@
 ---    the blocker is already finished
 ---  - `blocked-by-cycle` (error): the hard edges form a circle, the members are named
 ---  - `doing-while-blocked`, `blocked-without-blocker`, `blocker-freed`, `blocked-by-parked` (warnings): the status
----    runs behind what the blockers say (`tasks_nvim.plan` is the one definition of "blocked")
+---    runs behind what the blockers say (`tasks_nvim.plan` is the one definition of "blocked"); `blocked-by-parked`
+---    not for a task that is `parked` itself
 ---  - `blocker-late` (hint): an open `blocked_by` or `after` is due after the task begins (its `start`, else its
 ---    `due`); both ids are named (`tasks_nvim.late`)
 ---  - `plan-unknown` (error): `plan:` names no plan file; `bad-plan`, `bad-phase` (errors): a malformed `plan:` /
