@@ -592,7 +592,7 @@ reachable), open and blocked give 0; a parent sums its children (an `{xp=…}` o
 One line per level, the parts apart by ` · ` (or ` | `): the threshold in XP or percent of the possible XP (a tree
 without XP counts its points: learned 1, seen one half), then in any order `Badge <file>` (a picture below
 `assets/badges/`, drawn as an image only), `Belohnung: <text>` (`Reward:`) and a name. `[x]` says the reward was
-granted (`paths.set_reward(id, level, given)`, the op `path_reward`; only the mark changes). `Pfad fertig` (`Path
+granted (`paths.set_reward(id, level, given)`, the op `path_reward`; only the mark changes). The whole section is written from a spec by `paths.set_levels(id, spec)` (`lernlevel.write`, the op `path_levels`, made for a form): the level lines are replaced in place, other text of the section stays, an empty spec removes them. `Pfad fertig` (`Path
 done`) is the line for the whole path, reached when every point is closed. `tasks_nvim.lernlevel` reads the section
 and evaluates it: the level is the run of levels reached from level 1 on, `next` names the first one not reached with
 the XP (or percent) missing, `open_rewards` the rewards reached but not granted. `check` reports `level-bad-line`,

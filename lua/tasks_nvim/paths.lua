@@ -368,4 +368,24 @@ function M.set_reward(id, ref, given, opts)
   end)
 end
 
+---Write the `## Level` section of an open path from a spec (`lernlevel.write`): its levels with threshold, name, badge
+---and reward, and the line for the whole path; an empty spec removes them. `result.before` is the spec the section
+---had (`lernlevel.spec_of`; nil when it held lines a spec cannot carry).
+---@param id string
+---@param spec Tasks.LevelsSpec
+---@param opts? { root?: string, today?: string, if_match?: string, dry_run?: boolean }
+---@return table|nil result
+---@return string|nil err
+---@return table|nil info
+function M.set_levels(id, spec, opts)
+  return edit_body(id, opts or {}, function(body, result)
+    result.before = lernlevel.spec_of(lernlevel.parse(body))
+    local out, err = lernlevel.write(body, spec)
+    if not out then
+      return nil, err, { code = "invalid_argument" }
+    end
+    return out
+  end)
+end
+
 return M

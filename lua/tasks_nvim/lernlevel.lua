@@ -364,4 +364,359 @@ function M.set_reward(lv, ref, given)
   return table.concat(out, "\n"), nil
 end
 
+-- ── writing the whole section ─────────────────────────────────────────────────
+
+---At most this many threshold lines in a section that `write` makes.
+M.MAX_LEVELS = 20
+---Longest name of a level, in characters.
+M.MAX_NAME = 80
+---Longest reward, in characters.
+M.MAX_REWARD = 200
+
+---The picture types a badge may be (as the icons of `asset` kind).
+local BADGE_EXT = { png = true, jpg = true, jpeg = true, webp = true, svg = true }
+
+---@class Tasks.LevelSpec
+---@field threshold integer      # XP (1..999999), or percent (1..100).
+---@field unit "xp"|"percent"
+---@field name? string
+---@field badge? string          # A file below `assets/badges/`.
+---@field reward? string
+---@field given? boolean         # Only with a reward.
+
+---@class Tasks.LevelsSpec
+---@field list Tasks.LevelSpec[]  # The levels in order; their thresholds rise within a unit.
+---@field done? { reward?: string, given?: boolean }  # The line for the whole path.
+
+---@param v any
+---@return any
+local function unnull(v)
+  if v == vim.NIL then
+    return nil
+  end
+  return v
+end
+
+---The number of characters of a UTF-8 text.
+---@param s string
+---@return integer
+local function chars(s)
+  return #(s:gsub("[\128-\191]", ""))
+end
+
+---A text part of a level line, trimmed, or the reason it cannot be one.
+---@param what string
+---@param v any
+---@param max integer
+---@return string|nil text  # nil and no error: absent (nil, `null` or only blanks)
+---@return string|nil err
+local function text_part(what, v, max)
+  v = unnull(v)
+  if v == nil then
+    return nil
+  end
+  if type(v) ~= "string" then
+    return nil, what .. " must be text"
+  end
+  if v:find("[%c\127]") then
+    return nil, what .. " contains a control character"
+  end
+  local t = trim(v)
+  if t == "" then
+    return nil
+  end
+  if chars(t) > max then
+    return nil, ("%s is longer than %d characters"):format(what, max)
+  end
+  if t:find(" " .. MIDDOT .. " ", 1, true) or t:find(" | ", 1, true) then
+    return nil, what .. " must not contain ' " .. MIDDOT .. " ' or ' | ' (they part the line)"
+  end
+  return t
+end
+
+---@param v any
+---@param what string
+---@return boolean|nil given
+---@return string|nil err
+local function given_of(v, what)
+  v = unnull(v)
+  if v == nil then
+    return false
+  end
+  if type(v) ~= "boolean" then
+    return nil, what .. ".given must be true or false"
+  end
+  return v
+end
+
+---The lines of a section's levels from a spec (without line endings, the bullet `- ` and the mark included), or why
+---the spec cannot be written. What it renders reads back the same (`parse`, `spec_of`).
+---@param spec any  # `Tasks.LevelsSpec`
+---@return string[]|nil lines
+---@return string|nil err
+function M.render(spec)
+  if type(spec) ~= "table" or vim.islist(spec) and next(spec) ~= nil then
+    return nil, "levels must be an object { list, done? }"
+  end
+  for key in pairs(spec) do
+    if key ~= "list" and key ~= "done" then
+      return nil, ("levels: unknown field '%s' (fields: done, list)"):format(tostring(key))
+    end
+  end
+  local list = unnull(spec.list) or {}
+  if type(list) ~= "table" or not vim.islist(list) then
+    return nil, "levels.list must be a list"
+  end
+  if #list > M.MAX_LEVELS then
+    return nil, ("levels.list has more than %d levels"):format(M.MAX_LEVELS)
+  end
+  local out, last = {}, {}
+  for i, l in ipairs(list) do
+    local at = ("levels.list[%d]"):format(i)
+    if type(l) ~= "table" or (vim.islist(l) and next(l) ~= nil) then
+      return nil, at .. " must be an object"
+    end
+    for key in pairs(l) do
+      if not ({ threshold = 1, unit = 1, name = 1, badge = 1, reward = 1, given = 1 })[key] then
+        return nil, ("%s: unknown field '%s'"):format(at, tostring(key))
+      end
+    end
+    local unit = l.unit
+    if unit ~= "xp" and unit ~= "percent" then
+      return nil, at .. ".unit must be xp or percent"
+    end
+    local max = unit == "xp" and 999999 or 100
+    local th = l.threshold
+    if type(th) ~= "number" or th ~= math.floor(th) or th < 1 or th > max then
+      return nil, ("%s.threshold must be a whole number from 1 to %d"):format(at, max)
+    end
+    if last[unit] and th <= last[unit] then
+      return nil, ("%s.threshold must rise: %d after %d"):format(at, th, last[unit])
+    end
+    last[unit] = th
+    local name, nerr = text_part(at .. ".name", l.name, M.MAX_NAME)
+    if nerr then
+      return nil, nerr
+    end
+    if
+      name
+      and (
+        name:match("^[Bb]adge:?%s")
+        or name:match("^!%[")
+        or name:match("^[Bb]elohnung:")
+        or name:match("^[Rr]eward:")
+      )
+    then
+      return nil, at .. ".name must not read as a badge or a reward"
+    end
+    local badge = unnull(l.badge)
+    if badge ~= nil then
+      if
+        type(badge) ~= "string"
+        or not badge:match("^assets/badges/[^%s%c]+$")
+        or badge:find("..", 1, true)
+        or badge:find("[%)%(%]%[\\]")
+        or not BADGE_EXT[(badge:match("%.(%w+)$") or ""):lower()]
+      then
+        return nil,
+          at .. ".badge must be a png, jpg, jpeg, webp or svg file below assets/badges/ (no blanks)"
+      end
+    end
+    local reward, rerr = text_part(at .. ".reward", l.reward, M.MAX_REWARD)
+    if rerr then
+      return nil, rerr
+    end
+    local given, gerr = given_of(l.given, at)
+    if gerr then
+      return nil, gerr
+    end
+    local parts = { unit == "xp" and (th .. " XP") or (th .. " %") }
+    parts[#parts + 1] = name
+    parts[#parts + 1] = badge and ("Badge " .. badge) or nil
+    parts[#parts + 1] = reward and ("Belohnung: " .. reward) or nil
+    out[#out + 1] = ("- [%s] %s"):format(
+      (given and reward) and "x" or " ",
+      table.concat(parts, " " .. MIDDOT .. " ")
+    )
+  end
+  local done = unnull(spec.done)
+  if done ~= nil then
+    if type(done) ~= "table" or (vim.islist(done) and next(done) ~= nil) then
+      return nil, "levels.done must be an object { reward?, given? }"
+    end
+    for key in pairs(done) do
+      if key ~= "reward" and key ~= "given" then
+        return nil, ("levels.done: unknown field '%s'"):format(tostring(key))
+      end
+    end
+    local reward, rerr = text_part("levels.done.reward", done.reward, M.MAX_REWARD)
+    if rerr then
+      return nil, rerr
+    end
+    local given, gerr = given_of(done.given, "levels.done")
+    if gerr then
+      return nil, gerr
+    end
+    out[#out + 1] = ("- [%s] Pfad fertig%s"):format(
+      (given and reward) and "x" or " ",
+      reward and (" " .. MIDDOT .. " Belohnung: " .. reward) or ""
+    )
+  end
+  return out
+end
+
+---The spec of a parsed section, as `render` takes it; nil when the section has lines that a spec cannot hold
+---(`level-bad-line`, `level-bad-mark`, `level-order`), so a write of it would lose them.
+---@param lv Tasks.Levels
+---@return Tasks.LevelsSpec|nil
+function M.spec_of(lv)
+  if #lv.problems > 0 then
+    return nil
+  end
+  local list = {}
+  for _, l in ipairs(lv.levels) do
+    list[#list + 1] = {
+      threshold = l.threshold,
+      unit = l.kind,
+      name = l.name,
+      badge = l.badge,
+      reward = l.reward,
+      given = (l.reward and l.given) or nil,
+    }
+  end
+  local spec = { list = list }
+  if lv.final then
+    spec.done = { reward = lv.final.reward, given = (lv.final.reward and lv.final.given) or nil }
+  end
+  return spec
+end
+
+---Where the `## Level` section of the lines is: its heading, its last line (before the next heading of level 1 or 2)
+---and the level lines in it (every `- [?]` line outside a fence).
+---@param lines string[]
+---@return integer|nil heading
+---@return integer|nil last
+---@return integer[] items
+local function locate(lines)
+  local heading, items = nil, {}
+  local fence
+  for i, raw in ipairs(lines) do
+    local line = raw:gsub("\r$", "")
+    if fence then
+      if line:match("^%s*" .. fence) then
+        fence = nil
+      end
+    elseif line:match("^%s*```") or line:match("^%s*~~~") then
+      fence = line:match("^%s*(```)") or "~~~"
+    else
+      local hashes, name = line:match("^(#+)%s+(.-)%s*$")
+      if hashes and #hashes <= 2 then
+        if heading then
+          return heading, i - 1, items
+        end
+        if #hashes == 2 and is_heading(name) then
+          heading = i
+        end
+      elseif heading and line:match("^%s*[-*+]%s%[.%]") then
+        items[#items + 1] = i
+      end
+    end
+  end
+  return heading, heading and #lines or nil, items
+end
+
+---The body with its `## Level` section written from a spec: the level lines of the section are replaced by the
+---rendered ones (where the first of them stood), any other text of the section stays; without a section one is added
+---at the end. An empty spec (no levels, no `done`) removes the level lines, and the whole section when nothing else is
+---in it. The rest of the body stays byte for byte and keeps its line ending.
+---@param body string
+---@param spec any  # `Tasks.LevelsSpec`
+---@return string|nil body
+---@return string|nil err
+function M.write(body, spec)
+  local new, err = M.render(spec)
+  if not new then
+    return nil, err
+  end
+  local eol = body:find("\r\n", 1, true) and "\r" or ""
+  for i, l in ipairs(new) do
+    new[i] = l .. eol
+  end
+  local lines = vim.split(body, "\n", { plain = true })
+  local heading, last, items = locate(lines)
+  if not heading then
+    if #new == 0 then
+      return body
+    end
+    while #lines > 0 and lines[#lines]:gsub("\r$", "") == "" do
+      lines[#lines] = nil
+    end
+    if #lines > 0 then
+      lines[#lines + 1] = eol
+    end
+    lines[#lines + 1] = "## Level" .. eol
+    lines[#lines + 1] = eol
+    vim.list_extend(lines, new)
+    lines[#lines + 1] = ""
+    return table.concat(lines, "\n")
+  end
+  ---@cast last integer
+  local drop = {}
+  for _, i in ipairs(items) do
+    drop[i] = true
+  end
+  local rest_text = false
+  for i = heading + 1, last do
+    if not drop[i] and lines[i]:gsub("\r$", "") ~= "" then
+      rest_text = true
+    end
+  end
+  local out = {}
+  if #new == 0 and not rest_text then
+    -- the whole section goes (its own blank lines with it); the lines after it stay
+    out = vim.list_slice(lines, 1, heading - 1)
+    vim.list_extend(out, vim.list_slice(lines, last + 1))
+    if last >= #lines then
+      while #out > 0 and out[#out]:gsub("\r$", "") == "" do
+        out[#out] = nil
+      end
+      out[#out + 1] = ""
+    end
+    return table.concat(out, "\n")
+  end
+  -- where the new lines go: at the first old level line, else after the heading's blank line
+  local at = items[1]
+  local insert_blank = false
+  if not at then
+    if
+      heading + 1 <= #lines
+      and lines[heading + 1]:gsub("\r$", "") == ""
+      and heading + 1 <= last
+    then
+      at = heading + 2
+    else
+      at, insert_blank = heading + 1, true
+    end
+  end
+  for i = 1, #lines do
+    if i == at then
+      if insert_blank then
+        out[#out + 1] = eol
+      end
+      vim.list_extend(out, new)
+      if at > last then
+        out[#out + 1] = eol
+      end
+    end
+    if not drop[i] then
+      out[#out + 1] = lines[i]
+    end
+  end
+  if at > #lines then
+    vim.list_extend(out, new)
+    out[#out + 1] = ""
+  end
+  return table.concat(out, "\n")
+end
+
 return M

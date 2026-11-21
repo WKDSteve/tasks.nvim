@@ -2401,6 +2401,7 @@ export interface ResultEntry {
     | "promote"
     | "unpromote"
     | "path_reward"
+    | "path_levels"
     | "milestone_new"
     | "milestone_set";
   id?: string;
@@ -2611,6 +2612,7 @@ export interface Inverse {
     | "node_set"
     | "unpromote"
     | "path_reward"
+    | "path_levels"
     | "milestone_set";
   /**
    * `node_set` that wrote XP: the XP the point had (capability `xp`).
@@ -2628,6 +2630,7 @@ export interface Inverse {
    * `path_reward`: whether the reward was granted before.
    */
   given?: boolean;
+  levels?: LevelsSpec;
   /**
    * `unpromote`: the path or task the learning point is in.
    */
@@ -2705,6 +2708,35 @@ export interface Inverse {
   after?: string;
   before?: string;
   if_match?: Etag;
+}
+/**
+ * `path_levels`: the levels the path had (capability `path_levels`); absent when its `## Level` held lines a spec cannot carry.
+ */
+export interface LevelsSpec {
+  /**
+   * At most 20 levels (no `maxItems`: the type generator would make tuples of it).
+   */
+  list: {
+    /**
+     * XP, or percent (1 to 100).
+     */
+    threshold: number;
+    unit: "xp" | "percent";
+    name?: string;
+    /**
+     * A picture below `assets/badges/` of the path.
+     */
+    badge?: string;
+    reward?: string;
+    /**
+     * The reward was granted (only with a reward).
+     */
+    given?: boolean;
+  }[];
+  done?: {
+    reward?: string;
+    given?: boolean;
+  };
 }
 /**
  * Why an operation did not happen. `details` names ids, keys and values (`expected` and `actual` of a conflict, the `problems` of a refused relation, `field`/`value`/`char`/`suggestion` of a word that is no kebab-case word), never a path.

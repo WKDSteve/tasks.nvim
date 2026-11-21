@@ -185,6 +185,7 @@ M.OPS = {
   "promote",
   "unpromote",
   "path_reward",
+  "path_levels",
   "milestone_new",
   "milestone_set",
 }
@@ -350,6 +351,7 @@ local FIELDS = {
     if_match = "string",
   },
   path_reward = { id = "string", level = "string", given = "boolean", if_match = "string" },
+  path_levels = { id = "string", levels = "object", if_match = "string" },
   milestone_new = {
     area = "string",
     title = "string",
@@ -2216,6 +2218,54 @@ local function do_path_reward(op, ctx)
   return entry
 end
 
+---Write the levels of a path, its `## Level` section (`paths.set_levels`): `levels` is `{ list, done? }`. The inverse
+---carries the levels the section had (none when it held lines a spec cannot carry).
+---@param op table
+---@param ctx Tasks.OpsCtx
+---@return table entry
+local function do_path_levels(op, ctx)
+  if op.id == nil or op.levels == nil then
+    return refuse("invalid_argument", "path_levels needs id and levels")
+  end
+  local r, err, info = require("tasks_nvim.paths").set_levels(op.id, op.levels, {
+    root = ctx.root,
+    today = ctx.today,
+    if_match = op.if_match,
+    dry_run = ctx.dry,
+  })
+  if not r then
+    if info and (info.code == "invalid_argument" or info.code == "not_found") then
+      return refuse(info.code, contract.redact(ctx.root, tostring(err)))
+    end
+    return mutate_failure(ctx, err, info)
+  end
+  local entry = {
+    ok = true,
+    id = r.id,
+    outcome = r.changed and (ctx.dry and "would_change" or "changed") or "unchanged",
+    file = rel(ctx, r.path),
+    etag_before = r.etag_before,
+    etag_after = (not ctx.dry) and r.etag_after or nil,
+    changed_ids = (r.changed and not ctx.dry) and { r.id } or {},
+  }
+  if r.changed and not ctx.dry and r.before then
+    local list = {}
+    for _, l in ipairs(r.before.list) do
+      list[#list + 1] = json.object(l)
+    end
+    entry.inverse = json.object({
+      op = "path_levels",
+      id = r.id,
+      levels = json.object({
+        list = json.array(list),
+        done = r.before.done and json.object(r.before.done) or nil,
+      }),
+      if_match = r.etag_after,
+    })
+  end
+  return entry
+end
+
 ---Promote a learning point (of a path or of a task's `## Lernpunkte`) to a task (`tasks_nvim.promote`).
 ---@param op table
 ---@param ctx Tasks.OpsCtx
@@ -3209,6 +3259,7 @@ local HANDLERS = {
   path_close = do_path_close,
   node_set = do_node_set,
   path_reward = do_path_reward,
+  path_levels = do_path_levels,
   promote = do_promote,
   unpromote = do_unpromote,
   plan_close = do_plan_close,

@@ -105,6 +105,7 @@ M.CAPABILITIES = {
   "outcome",
   "path",
   "path_close",
+  "path_levels",
   "path_new",
   "path_reward",
   "path_set",

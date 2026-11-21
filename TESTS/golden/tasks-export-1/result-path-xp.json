@@ -1,6 +1,6 @@
 {
   "client_op_id": "golden-path-xp",
-  "digest": "sha256:019f58f56e2a124a",
+  "digest": "sha256:2a6ec96eee33506e",
   "dry_run": false,
   "engine": {
     "git": "0000000",
@@ -127,6 +127,67 @@
       "ok": false,
       "op": "node_set",
       "outcome": "failed"
+    },
+    {
+      "changed_ids": [
+        "lib.nvim/rust-lernen"
+      ],
+      "etag_after": "sha256:4707c0b8afca8dfb",
+      "etag_before": "sha256:4c1994a21d05696a",
+      "file": "lib.nvim/ROADMAP/paths/rust-lernen.md",
+      "id": "lib.nvim/rust-lernen",
+      "n": 6,
+      "ok": true,
+      "op": "path_levels",
+      "outcome": "changed"
+    },
+    {
+      "changed_ids": [],
+      "error": {
+        "code": "invalid_argument",
+        "message": "levels.list[1].threshold must be a whole number from 1 to 999999",
+        "retryable": false
+      },
+      "n": 7,
+      "ok": false,
+      "op": "path_levels",
+      "outcome": "failed"
+    },
+    {
+      "changed_ids": [
+        "lib.nvim/rust-lernen"
+      ],
+      "etag_after": "sha256:33f6a1d2261262bb",
+      "etag_before": "sha256:4707c0b8afca8dfb",
+      "file": "lib.nvim/ROADMAP/paths/rust-lernen.md",
+      "id": "lib.nvim/rust-lernen",
+      "inverse": {
+        "id": "lib.nvim/rust-lernen",
+        "if_match": "sha256:33f6a1d2261262bb",
+        "levels": {
+          "done": {
+            "reward": "Kino"
+          },
+          "list": [
+            {
+              "name": "Start",
+              "reward": "Tee",
+              "threshold": 10,
+              "unit": "xp"
+            },
+            {
+              "badge": "assets/badges/star.svg",
+              "threshold": 60,
+              "unit": "percent"
+            }
+          ]
+        },
+        "op": "path_levels"
+      },
+      "n": 8,
+      "ok": true,
+      "op": "path_levels",
+      "outcome": "changed"
     }
   ],
   "schema": 1,

@@ -498,7 +498,7 @@ G.cases = {
   },
   {
     -- the XP of a point and the reward of a level written (capabilities `xp`, `path_reward`), each with its inverse;
-    -- a level without a reward and both xp and xp_clear refused
+    -- a level without a reward and both xp and xp_clear refused; the levels written (`path_levels`) and a bad one refused
     name = "result-path-xp",
     method = "ops",
     fresh = true,
@@ -513,6 +513,21 @@ G.cases = {
           { op = "path_reward", id = P, level = "2", given = true },
           { op = "path_reward", id = P, level = "4", given = true },
           { op = "node_set", id = P, point = "plain", xp = 5, xp_clear = true },
+          -- the levels written as a whole (capability `path_levels`), with the levels they had as the inverse
+          {
+            op = "path_levels",
+            id = P,
+            levels = {
+              list = {
+                { threshold = 10, unit = "xp", name = "Start", reward = "Tee" },
+                { threshold = 60, unit = "percent", badge = "assets/badges/star.svg" },
+              },
+              done = { reward = "Kino" },
+            },
+          },
+          { op = "path_levels", id = P, levels = { list = { { threshold = 0, unit = "xp" } } } },
+          -- the old section had falling thresholds (no inverse above); removing the clean one carries it
+          { op = "path_levels", id = P, levels = { list = {} } },
         },
       })
     end,

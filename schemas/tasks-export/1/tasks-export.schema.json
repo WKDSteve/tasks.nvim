@@ -4227,13 +4227,46 @@
       },
       "additionalProperties": false
     },
+    "LevelsSpec": {
+      "description": "The levels of a learning path as `path_levels` takes them: the levels in order (thresholds rising within a unit) and the line for the whole path. An empty `list` without `done` removes them.",
+      "type": "object",
+      "required": ["list"],
+      "properties": {
+        "list": {
+          "description": "At most 20 levels (no `maxItems`: the type generator would make tuples of it).",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["threshold", "unit"],
+            "properties": {
+              "threshold": { "type": "integer", "minimum": 1, "maximum": 999999, "description": "XP, or percent (1 to 100)." },
+              "unit": { "enum": ["xp", "percent"] },
+              "name": { "type": "string" },
+              "badge": { "type": "string", "pattern": "^assets/badges/", "description": "A picture below `assets/badges/` of the path." },
+              "reward": { "type": "string" },
+              "given": { "type": "boolean", "description": "The reward was granted (only with a reward)." }
+            },
+            "additionalProperties": false
+          }
+        },
+        "done": {
+          "type": "object",
+          "properties": {
+            "reward": { "type": "string" },
+            "given": { "type": "boolean" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
     "Inverse": {
       "description": "The operation that undoes a change: send it as a new operation (its `if_match` is the version the change left). A key the change added is `null` in the patch of a `set`.",
       "type": "object",
       "required": ["op", "id"],
       "properties": {
         "op": {
-          "enum": ["set", "reorder", "tick_step", "answer", "set_body", "set_section", "move_area", "view_save", "view_delete", "plan_set", "project_set", "meeting_set", "meeting_attend", "path_set", "node_set", "unpromote", "path_reward", "milestone_set"]
+          "enum": ["set", "reorder", "tick_step", "answer", "set_body", "set_section", "move_area", "view_save", "view_delete", "plan_set", "project_set", "meeting_set", "meeting_attend", "path_set", "node_set", "unpromote", "path_reward", "path_levels", "milestone_set"]
         },
         "xp": {
           "description": "`node_set` that wrote XP: the XP the point had (capability `xp`).",
@@ -4252,6 +4285,10 @@
         "given": {
           "description": "`path_reward`: whether the reward was granted before.",
           "type": "boolean"
+        },
+        "levels": {
+          "description": "`path_levels`: the levels the path had (capability `path_levels`); absent when its `## Level` held lines a spec cannot carry.",
+          "$ref": "#/$defs/LevelsSpec"
         },
         "container": {
           "description": "`unpromote`: the path or task the learning point is in.",
@@ -4443,7 +4480,7 @@
           "minimum": 1
         },
         "op": {
-          "enum": ["set", "new", "reorder", "done", "move_area", "plan_new", "plan_set", "plan_close", "project_new", "project_set", "project_close", "tick_step", "add_steps", "answer", "append_note", "reopen", "set_body", "set_section", "view_save", "view_delete", "attach", "claim", "release", "history_record", "meeting_new", "meeting_set", "meeting_close", "meeting_capture", "meeting_attend", "meeting_followups", "board_save", "path_new", "path_set", "path_close", "node_set", "promote", "unpromote", "path_reward", "milestone_new", "milestone_set"]
+          "enum": ["set", "new", "reorder", "done", "move_area", "plan_new", "plan_set", "plan_close", "project_new", "project_set", "project_close", "tick_step", "add_steps", "answer", "append_note", "reopen", "set_body", "set_section", "view_save", "view_delete", "attach", "claim", "release", "history_record", "meeting_new", "meeting_set", "meeting_close", "meeting_capture", "meeting_attend", "meeting_followups", "board_save", "path_new", "path_set", "path_close", "node_set", "promote", "unpromote", "path_reward", "path_levels", "milestone_new", "milestone_set"]
         },
         "id": {
           "type": "string"
