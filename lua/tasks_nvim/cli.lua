@@ -102,6 +102,9 @@ commands:
                                           into ## Lernpunkte); --template=learning writes the sections of a learning path;
                                           --tags=not-on-workstation (or on-workstation) goes to every task promoted
                                           from the path; --no-index is accepted (a new path changes no index)
+  path <area>/<slug> [--format=text|json]  the XP overview of a learning path: points (all, open, without XP), XP in
+                                          all and per stage (a root of ## Lernpunkte), and for each level the point
+                                          at which it is reached when the points are learned in their order
   milestone-new <area> <title> [--due=YYYY-MM-DD] [--includes=<id>,<id>] [--close=manual] [--status=planning|doing|parked] [--summary=text] [--slug=]
                                           create the milestone ROADMAP/milestones/<slug>.md over tasks, plans,
                                           projects, paths and meetings of this vault; reached when they are all done
@@ -440,6 +443,7 @@ local SPECS = {
     },
     flag = {},
   },
+  path = { value = { "format" }, flag = {} },
   ["path-new"] = {
     value = {
       "areas",
@@ -1395,6 +1399,111 @@ end
 
 commands["path-new"] = function(ctx)
   return new_file_command(ctx, "path")
+end
+
+---`path <area>/<slug> [--format=text|json]`: the XP overview of an open learning path (`path_stats`).
+---@param ctx Tasks.CliCtx
+---@return integer code
+commands.path = function(ctx)
+  local args, eo = ctx.args, ctx.eo
+  local id = args.pos[1]
+  local format = args.opt.format or "text"
+  if not id or #args.pos > 1 or (format ~= "text" and format ~= "json") then
+    ctx.warn("error: usage: path <area>/<slug> [--format=text|json]")
+    return 2
+  end
+  local file, err = require("tasks_nvim.paths").find(id, { root = eo.root })
+  if not file then
+    ctx.warn("error: " .. tostring(err))
+    return 1
+  end
+  local tree = file.tree or require("tasks_nvim.lernbaum").parse("")
+  local st = require("tasks_nvim.path_stats").compute(tree, file.levels, file.level_state)
+  if format == "json" then
+    ctx.say(vim.json.encode({
+      id = file.id,
+      title = file.title,
+      status = file.status,
+      has_xp = st.has_xp,
+      points = st.points,
+      xp = st.xp,
+      level = st.level,
+      stages = st.stages,
+      without_xp = st.without_xp,
+      levels = st.levels,
+    }))
+    return 0
+  end
+  ---@param pt? { key?: string, label: string, line: integer }
+  ---@return string
+  local function name(pt)
+    if not pt then
+      return "-"
+    end
+    return (pt.key and ("#" .. pt.key .. " ") or "")
+      .. clean(pt.label)
+      .. (" (line %d)"):format(pt.line)
+  end
+  local p, x = st.points, st.xp
+  ctx.say(
+    ("path\t%s\t%s\t%s"):format(file.id, tostring(file.status or "-"), clean(file.title or ""))
+  )
+  ctx.say(
+    ("points\t%d\topen %d\tlearned %d\tseen %d\tdropped %d\twithout xp %d"):format(
+      p.total,
+      p.open,
+      p.learned,
+      p.seen,
+      p.dropped,
+      p.without_xp
+    )
+  )
+  ctx.say(("xp\t%d\tearned %d\topen %d"):format(x.total, x.earned, x.open))
+  for _, s in ipairs(st.stages) do
+    ctx.say(
+      ("stage\t%d\txp %d\tpoints %d\topen %d\twithout xp %d\t%s"):format(
+        s.number,
+        s.xp,
+        s.points,
+        s.open,
+        s.without_xp,
+        clean(s.label)
+      )
+    )
+  end
+  local counted = p.counted
+  for _, l in ipairs(st.levels) do
+    local what
+    if l.kind == "xp" then
+      what = ("%d XP"):format(l.threshold)
+    elseif l.kind == "percent" then
+      what = ("%d %%"):format(l.threshold)
+        .. (l.needed and (st.has_xp and " = %g XP" or " = %g points"):format(l.needed) or "")
+    else
+      what = "path done"
+    end
+    local at
+    if l.at_start then
+      at = "at the start"
+    elseif l.at then
+      at = ("at point %d/%d, stage %d: %s"):format(l.at.index, counted, l.at.stage, name(l.at))
+    else
+      at = "not reachable"
+    end
+    ctx.say(
+      ("level\t%s\t%s\t%s\t%s\t%s"):format(
+        l.ref,
+        what,
+        l.name and clean(l.name) or "-",
+        l.reached and "reached" or "open",
+        at
+      )
+    )
+  end
+  for _, pt in ipairs(st.without_xp) do
+    ctx.say(("without-xp\tstage %d\t%s"):format(pt.stage, name(pt)))
+  end
+  return 0
 end
 
 -- ── meetings ─────────────────────────────────────────────────────────────────

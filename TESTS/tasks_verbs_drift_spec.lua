@@ -36,6 +36,9 @@ return function(H)
     -- tasks.nvim/meilensteine-im-editor-zeile-nach-done-tasks-projects-zeigt
     "milestone-new",
     "milestones",
+    -- `path` prints the XP overview of a learning path for a person planning it in a shell; the editor shows XP and
+    -- levels in `:Tasks learn`
+    "path",
     "plan-new",
     "plans",
     -- `project-new` makes a project file like `plan-new`; the editor makes neither

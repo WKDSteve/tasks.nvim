@@ -589,6 +589,25 @@ sources with the column `Geprüft`, `## Lernpunkte` with the stages and the lite
 every task promoted from the path. `--summary`, `--slug`, `--links`, `--icon` and `--cover` as for a plan; `--title=` names it when no words follow the area. A taken slug gets `-2`. Headless: `path-new` with the same
 options. Then `:Tasks learn` shows the tree, and `:Tasks point` and `:Tasks promote` work on its points.
 
+Headless `path <area>/<slug> [--format=text|json]` is the XP overview of a path while it is planned (`path_stats`):
+
+```
+path    Learning/neoload  planning  NeoLoad: Last- und Performance-Tests
+points  100  open 100  learned 0  seen 0  dropped 0  without xp 0
+xp      960  earned 0  open 960
+stage   1  xp 60  points 7  open 7  without xp 0  Stufe 0 · Orientieren
+level   1  50 XP  Erster Lauf  open  at point 7/100, stage 1: #skizze Ergebnis: ... (line 70)
+level   2  25 % = 240 XP  Tacho Bronze  open  at point 25/100, stage 2: ...
+level   done  path done  NeoLoad T 2 / P 2  open  at point 100/100, stage 7: ...
+```
+
+A stage is a root of `## Lernpunkte`, a point a leaf. The XP of a promoted point is the `xp:` of its task. The level
+lines walk the points in their order and count each as learned in full (a dropped one is left out): a level is reached
+at the first point where the sum comes to its threshold (a percent of the possible XP; a path without XP counts its
+points). `at the start` is a threshold of 0, `not reachable` one the path cannot reach (more XP than it has, or XP on a
+path without any). `without-xp` lines name the points that carry no XP. `--format=json` gives the same as one object
+(`points`, `xp`, `stages`, `levels` with `at { index, line, key, label, stage }`, `without_xp`).
+
 Headless `plan-close <area>/<slug>` finishes a plan by hand (refused while a member task is open: the message names them)
 and `project-close <area>/<slug>` a project (refused while a task of its own or a plan that is not parked is open). A
 project is also finished by `done`: when the finish closes its last plan, or is its last own task, and no other plan
