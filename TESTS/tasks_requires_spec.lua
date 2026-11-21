@@ -341,6 +341,35 @@ return function(H)
   eq(found["requires-unknown"], { x.id })
   eq(#(found["requires-cycle"] or {}), 1, vim.inspect(found["requires-cycle"]))
   eq(call("paths", { area = A }).requires_cycles, { { x.id, y.id } }, "the same circle")
+
+  -- a circle through a project's hard requirement, which its paths inherit: a path of the project that a requirement
+  -- of the project needs could never be finished
+  local proj =
+    assert(plans.new(A, vim.tbl_extend("force", o, { kind = "project", title = "Kreis-Projekt" })))
+  local inner = new_path("Innen", { project = proj.id })
+  local outer = new_path("Aussen", { requires = inner.id })
+  local _, kerr, kinfo = plans.set(
+    proj.id,
+    { requires = { outer.id }, requires_gate = "hard" },
+    { root = root, kind = "project" }
+  )
+  ok(kerr and kerr:find("circle", 1, true), "refused: " .. tostring(kerr))
+  eq(kinfo and kinfo.problems[1].code, "requires-cycle")
+  -- the same written by hand: check names it
+  H.write(
+    proj.path,
+    (
+      H.read(proj.path)
+        :gsub("\ntitle:", "\nrequires: [" .. outer.id .. "]\nrequires_gate: hard\ntitle:", 1)
+    )
+  )
+  found = codes_of(assert(check.run({ root = root, area = A })))
+  eq(#(found["requires-cycle"] or {}), 2, vim.inspect(found["requires-cycle"]))
+  -- a project that needs one of its own paths is no circle: the path inherits nothing from it about itself
+  local own = new_path("Eigen", { project = proj.id })
+  H.write(proj.path, (H.read(proj.path):gsub("requires: %b[]", "requires: [" .. own.id .. "]", 1)))
+  found = codes_of(assert(check.run({ root = root, area = A })))
+  eq(#(found["requires-cycle"] or {}), 1, vim.inspect(found["requires-cycle"]))
   -- a plan file with the field is a fault of the plan
   local plan = assert(plans.new(A, vim.tbl_extend("force", o, { title = "Ein Plan" })))
   H.write(

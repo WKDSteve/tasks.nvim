@@ -1292,15 +1292,19 @@ function M.set(id, patch, opts)
   end
 
   -- what a path or project builds on, as it would be afterwards: known ids, no circle through the file
-  if patch.requires ~= nil then
+  -- (a gate made hard may close a circle through the paths of a project, which inherit it)
+  if patch.requires ~= nil or patch.requires_gate ~= nil then
+    local after = vim.tbl_extend("force", {}, file)
     for _, kv in ipairs(pairs_) do
-      if kv[1] == "requires" and kv[2] ~= mutate.REMOVE then
-        local req = require("tasks_nvim.requires")
-        local after = vim.tbl_extend("force", {}, file, { requires = kv[2] })
-        local problems = req.problems(after, req.index({ root = root }))
-        if #problems > 0 then
-          return nil, problems[1].message, { code = "invalid_argument", problems = problems }
-        end
+      if kv[1] == "requires" or kv[1] == "requires_gate" then
+        after[kv[1]] = kv[2] ~= mutate.REMOVE and kv[2] or nil
+      end
+    end
+    if after.requires and #after.requires > 0 then
+      local req = require("tasks_nvim.requires")
+      local problems = req.problems(after, req.index({ root = root }))
+      if #problems > 0 then
+        return nil, problems[1].message, { code = "invalid_argument", problems = problems }
       end
     end
   end

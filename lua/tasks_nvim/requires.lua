@@ -292,10 +292,34 @@ function M.stage(f, st, finished)
   return "idle"
 end
 
----The circles of `requires` among the open paths and projects (a finished one ends every chain): each once, starting
----at its smallest id, in id order. A file that names itself is a circle of one.
+---The circles of `requires` among the open paths and projects (a finished one ends every chain), the hard requirements
+---a path inherits from its project included: each once, starting at its smallest id, in id order. A file that names
+---itself is a circle of one.
 ---@param idx Tasks.RequiresIndex
 ---@return string[][]
+---What an open file waits on as edges of the graph: its own requirements, and for a path of a project the hard
+---requirements of that project (inherited, `state`), never the path itself.
+---@param idx Tasks.RequiresIndex
+---@param it Tasks.RequiresItem
+---@return string[]
+local function edges_of(idx, it)
+  local f = it.file
+  if not f then
+    return {}
+  end
+  local out = vim.list_slice(f.requires or {}, 1)
+  local parent = f.kind == "path" and f.project and idx.items[f.project] or nil
+  local pf = parent and not parent.done and parent.file or nil
+  if pf and (pf.requires_gate or M.GATES[1]) == "hard" then
+    for _, id in ipairs(pf.requires or {}) do
+      if id ~= f.id then
+        out[#out + 1] = id
+      end
+    end
+  end
+  return out
+end
+
 function M.cycles(idx)
   local ids = vim.tbl_keys(idx.items)
   table.sort(ids)
@@ -304,7 +328,7 @@ function M.cycles(idx)
     color[id] = 1
     stack[#stack + 1] = id
     local it = idx.items[id]
-    for _, nxt in ipairs(it.file and it.file.requires or {}) do
+    for _, nxt in ipairs(edges_of(idx, it)) do
       local n = idx.items[nxt]
       if n and not n.done then
         if color[nxt] == 1 then
@@ -375,7 +399,8 @@ function M.cycle_text(cyc)
 end
 
 ---The problems of a file's requirements as a change would leave them: an id that is no path or project of the vault
----(`requires-unknown`) and a circle through the file (`requires-cycle`). Empty when there are none.
+---(`requires-unknown`) and a circle the change makes or keeps through the file (`requires-cycle`; through the paths of a
+---project that inherit its hard requirements too). Empty when there are none.
 ---@param file Tasks.PlanFile  # The file as it would read (`requires` resolved to ids).
 ---@param idx Tasks.RequiresIndex
 ---@return { code: string, key: string, target: string, message: string }[]
@@ -392,7 +417,19 @@ function M.problems(file, idx)
       }
     end
   end
-  local cyc = M.cycle_of(with, file.id)
+  -- a circle the change makes: through the file, or (a project's hard gate) through the paths that inherit it
+  local before = {}
+  for _, c in ipairs(M.cycles(idx)) do
+    before[table.concat(c, " ")] = true
+  end
+  local cyc
+  for _, c in ipairs(M.cycles(with)) do
+    if not before[table.concat(c, " ")] then
+      cyc = c
+      break
+    end
+  end
+  cyc = cyc or M.cycle_of(with, file.id)
   if cyc then
     out[#out + 1] = {
       code = "requires-cycle",
