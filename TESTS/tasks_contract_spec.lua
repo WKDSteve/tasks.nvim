@@ -125,6 +125,7 @@ return function(H)
     "reopen",
     "reorder",
     "repeat",
+    "repeat_steps",
     "rounds",
     "set_body",
     "set_section",

@@ -103,7 +103,9 @@ end
 ---Start the routines that wait for something now finished: each open task with `repeat_after`, a valid `repeat` and no
 ---`due` gets its first round (`due`, `start`, `remind`). `opts.ids` limits it to the references of those ids (a task,
 ---a path, `path#key` counts for its path); without it every waiting routine is looked at.
----@param opts { root?: string, today?: string, ids?: string[], index?: boolean, dry_run?: boolean }
+---`opts.open` is a scan of the open tasks the caller made after the finish (a batch scans once); without it `settle`
+---scans itself.
+---@param opts { root?: string, today?: string, ids?: string[], index?: boolean, dry_run?: boolean, open?: Tasks.Task[] }
 ---@return { id: string, due: string, after: string }[] started
 ---@return string[] notes  # A routine that could not be written.
 function M.settle(opts)
@@ -123,7 +125,7 @@ function M.settle(opts)
     end
   end
   local today = opts.today or model.today()
-  local open = require("tasks_nvim.scan").open_tasks({ root = root }) or {}
+  local open = opts.open or require("tasks_nvim.scan").open_tasks({ root = root }) or {}
   local mutate = require("tasks_nvim.mutate")
   for _, t in ipairs(open) do
     local ref = t.repeat_after

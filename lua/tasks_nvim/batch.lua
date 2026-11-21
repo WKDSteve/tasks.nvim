@@ -541,6 +541,7 @@ end
 ---@field project_summaries table<string, Tasks.ProjectSummary>
 ---@field docs_refreshed string[]        # Documents whose generated blocks changed.
 ---@field milestones_reached string[]    # Milestones the stack reached (`milestones.settle`, once at the end).
+---@field routines_started { id: string, due: string, after: string }[]  # Routines that waited for one of these (`repeat_after`, once at the end).
 ---@field notes string[]                 # Follow-up steps that did not work (the finishes stand).
 
 ---Finish tasks (rule R6) one after the other, the index regenerated once per area at the end.
@@ -563,9 +564,11 @@ function M.done_many(ids, opts)
     project_summaries = {},
     docs_refreshed = {},
     milestones_reached = {},
+    routines_started = {},
     notes = {},
   }
-  local moved, plan_ids, project_ids = {}, {}, {}
+  local moved, plan_ids, project_ids, routine_refs = {}, {}, {}, {}
+  local open_after -- the open tasks of the plans' scan: the waiting routines are judged on it too
   for _, id in ipairs(ids) do
     local flow, err = done_flow.run(id, {
       root = opts.root,
@@ -575,6 +578,7 @@ function M.done_many(ids, opts)
       pick_next = false,
       refresh_docs = false,
       defer_plan_close = true,
+      defer_routines = true,
     })
     local r = flow and flow.done
     if not flow or not r then
@@ -590,6 +594,7 @@ function M.done_many(ids, opts)
       if r.project_id then
         project_ids[#project_ids + 1] = r.project_id
       end
+      vim.list_extend(routine_refs, flow.routine_refs or {})
       res.steps_ticked = res.steps_ticked + flow.steps_ticked
       vim.list_extend(res.plans_closed, flow.plans_closed)
       for plan_id, summary in pairs(flow.plan_summaries) do
@@ -602,6 +607,7 @@ function M.done_many(ids, opts)
     -- The plans of the finished tasks: ONE scan for the whole stack (not one per task), after the last finish.
     local ran, closed = pcall(done_flow.close_plans, plan_ids, opts)
     if ran then
+      open_after = closed.open
       vim.list_extend(res.plans_closed, closed.closed)
       vim.list_extend(res.notes, closed.notes)
       for plan_id, summary in pairs(closed.summaries) do
@@ -631,7 +637,27 @@ function M.done_many(ids, opts)
     -- the milestones once for the whole stack, after its plans and projects
     done_flow.settle_milestones(res, opts)
   end
-  res.areas = areas_of(moved)
+  -- the routines that waited for one of the finished tasks: ONE scan for the whole stack
+  local started_ids = {}
+  if #routine_refs > 0 then
+    local ran, started, rnotes = pcall(require("tasks_nvim.routine_after").settle, {
+      root = opts.root,
+      today = opts.today,
+      index = false,
+      ids = routine_refs,
+      open = open_after,
+    })
+    if ran then
+      res.routines_started = started
+      vim.list_extend(res.notes, rnotes)
+      for _, r in ipairs(started) do
+        started_ids[#started_ids + 1] = r.id
+      end
+    else
+      res.notes[#res.notes + 1] = "starting the routines that waited: " .. tostring(started)
+    end
+  end
+  res.areas = areas_of(vim.list_extend(vim.list_slice(moved, 1), started_ids))
   res.index_errors = reindex(res.areas, opts.root)
   if #res.done > 0 then
     -- The generated blocks of the configured documents: once for the whole stack, after everything is finished.

@@ -49,6 +49,7 @@ local M = {}
 ---@field refresh_docs? boolean  # Refresh the generated blocks of the configured documents (default true; a batch does it once).
 ---@field last? boolean        # Finish a routine (`repeat`) for good: no next round.
 ---@field defer_plan_close? boolean  # Leave step b to the caller (`close_plans`): a batch checks each plan once, not per task.
+---@field defer_routines? boolean  # Leave the routines that wait for this (`repeat_after`) to the caller: `routine_refs` names what to settle; a batch scans once.
 
 ---What a finish did. `done` is what `mutate.done` returned (`done.already` for a task that was finished before).
 ---@class Tasks.DoneFlow
@@ -66,6 +67,7 @@ local M = {}
 ---@field next_round? { id: string, due: string, path: string }  # The next round of a routine that was started.
 ---@field routine_ended? boolean    # The task was the last round of a ladder (`repeat: 1w,4w,12w`): no next round.
 ---@field routines_started { id: string, due: string, after: string }[]  # Routines that waited for this (`repeat_after`).
+---@field routine_refs string[]     # What a routine may wait for after this finish: the task and the path of its point.
 ---@field meetings_ticked? string[]  # Meetings whose follow-up line of this task was ticked.
 ---@field notes string[]             # Follow-up steps that did not work; the finish itself stands.
 ---@field next? Tasks.NextPick       # What to start next (`next_pick`); absent when not asked for or not computable.
@@ -161,6 +163,7 @@ end
 ---@field refused table<string, string[]>        # Plan id -> the open tasks that hold it open.
 ---@field summaries table<string, Tasks.PlanSummary>
 ---@field notes string[]                         # Plans that could not be closed, or whose state could not be judged.
+---@field open? Tasks.Task[]                     # The open tasks of the one scan, when it listed every folder.
 
 ---Step b: finish every plan of `plan_ids` that has no open member task left. One scan for all of them, and none when
 ---no such plan file exists (a task may name a plan that was never written). A member is any task with `plan: <id>`
@@ -192,6 +195,8 @@ function M.close_plans(plan_ids, opts)
     out.notes[1] = ("the plans could not be checked: %s"):format(tostring(errors))
     return out
   end
+  -- the open tasks after the finish, for a caller that looks at them again (a batch: the waiting routines)
+  out.open = (type(errors) ~= "table" or #errors == 0) and all or nil
   if type(errors) == "table" and #errors > 0 then
     for _, file in ipairs(files) do
       out.notes[#out.notes + 1] = ("the plan %s was not closed: the scan was incomplete (%s)"):format(
@@ -769,6 +774,7 @@ function M.run(id, opts)
     milestones_reopened = {},
     docs_refreshed = {},
     routines_started = {},
+    routine_refs = {},
     notes = {},
   }
   flow.steps_ticked = done.steps_ticked or 0
@@ -826,12 +832,13 @@ function M.run(id, opts)
   end
   flow.routine_ended = routine_ended or nil
   -- the routines that waited for this task, or for the point it was promoted from (`repeat_after`)
-  do
+  flow.routine_refs = { done.id, flow.point and flow.point.container or nil }
+  if not opts.defer_routines then
     local ran, started, rnotes = pcall(require("tasks_nvim.routine_after").settle, {
       root = opts.root,
       today = opts.today,
       index = opts.index,
-      ids = { done.id, flow.point and flow.point.container or nil },
+      ids = flow.routine_refs,
     })
     if ran then
       flow.routines_started = started

@@ -357,6 +357,32 @@ return function(H)
   local cli_task = assert(scan.find(A .. "/per-cli", { root = root }))
   eq({ cli_task.repeat_every, cli_task.repeat_after }, { "1w,4w,12w", t3.id })
 
+  -- ── a batch: the waiting routines start once at its end, on the one scan of its plans ──
+  local batch = require("tasks_nvim.batch")
+  local bplan =
+    assert(require("tasks_nvim.plans").new(A, { root = root, today = TODAY, title = "Batch plan" }))
+  local b1 = assert(mutate.new(A, with({ title = "Batch eins", plan = bplan.id })))
+  local b2 = assert(mutate.new(A, with({ title = "Batch zwei", plan = bplan.id })))
+  local wb1 = routine("Nach Batch eins", b1.id)
+  local wb2 = routine("Nach Batch zwei", b2.id)
+  local real_all, scans = scan.all, 0
+  scan.all = function(sopts)
+    scans = scans + 1
+    return real_all(sopts)
+  end
+  local stack = batch.done_many(
+    { b1.id, b2.id },
+    { root = root, today = TODAY, date = TODAY, pick_next = false }
+  )
+  scan.all = real_all
+  eq(#stack.done, 2)
+  eq(stack.routines_started, {
+    { id = wb1.id, due = "2026-11-17", after = b1.id },
+    { id = wb2.id, due = "2026-11-17", after = b2.id },
+  })
+  ok(scans <= 1, "one scan for the batch, not one per task (" .. scans .. ")")
+  eq(assert(scan.find(wb2.id, { root = root })).due, "2026-11-17")
+
   -- ── the editor: a point set in `:Tasks learn` says that a routine starts ───
   require("tasks_nvim.vault").set_root(root)
   local learn = require("tasks_nvim.ui.learn")

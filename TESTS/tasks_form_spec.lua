@@ -266,13 +266,14 @@ return function(H)
   for name in pairs(require("tasks_nvim.ops").NEW_FIELDS) do
     -- the slug comes from the title; `waits_for` creates a task that is parked from the start, which no form offers
     -- (a task is parked with a reason later: `set <id> waits_for=<key>`); a routine is made with `repeat=` on the
-    -- command line or `set`, not by the form; the XP of a learning task come from `promote`, `set` and the command
+    -- command line or `set`, not by the form (with `repeat_after=` for a start after a finish); the XP of a learning task come from `promote`, `set` and the command
     -- line until the forms get the field (`tasks.nvim/lernpfad-xp-im-editor`)
     if
       name ~= "slug"
       and name ~= "waits_for"
       and name ~= "repeat"
       and name ~= "repeat_from"
+      and name ~= "repeat_after"
       and name ~= "xp"
     then
       engine_new[#engine_new + 1] = name
