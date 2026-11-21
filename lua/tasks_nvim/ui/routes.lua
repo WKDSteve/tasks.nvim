@@ -1099,6 +1099,22 @@ local function nested_routes()
     },
 
     {
+      path = { "task", "milestones" },
+      args = {
+        {
+          name = "area",
+          type = "TASK_AREA",
+          optional = true,
+          desc = "Area whose milestones to show (default: every area)",
+        },
+      },
+      desc = "Show the milestones in a float: status, due date and progress (members done of all), overdue ones marked; the next key closes it",
+      run = function(ctx)
+        cmd().task_milestones(ctx)
+      end,
+    },
+
+    {
       path = { "task", "claim" },
       args = {
         {

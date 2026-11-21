@@ -32,10 +32,8 @@ return function(H)
     -- `meetings` lists a window of meetings for a script or a hub; the editor picks one with `:Tasks meeting list`
     "meetings",
     "migrate-actor",
-    -- `milestone-new` and `milestones` are the headless door to the milestones; the editor's view of them is task
-    -- tasks.nvim/meilensteine-im-editor-zeile-nach-done-tasks-projects-zeigt
+    -- `milestone-new` makes a milestone file from a shell; the editor shows them with `:Tasks milestones`
     "milestone-new",
-    "milestones",
     -- `path` prints the XP overview of a learning path for a person planning it in a shell; the editor shows XP and
     -- levels in `:Tasks learn`
     "path",
@@ -73,6 +71,8 @@ return function(H)
       cli = { "by", "clipboard", "force", "kind", "latest", "name", "no-index", "note" },
     },
     -- the editor asks before it finishes; the CLI never asks
+    -- the editor shows them in a float; `--format=json` is for a script
+    ["milestones"] = { composer = {}, cli = { "format" } },
     ["plan-close"] = { composer = { "yes" }, cli = {} },
     ["project-close"] = { composer = { "yes" }, cli = {} },
     ["done"] = {

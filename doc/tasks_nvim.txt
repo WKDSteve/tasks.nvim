@@ -165,6 +165,12 @@ A wrong key or value is ignored with a message and listed in
                                          and `remind` go, the index is written.
                                          <Tab> offers the finished tasks. A
                                          folder task is refused.
+  :Tasks milestones [{area}]             The milestones in a float: status,
+                                         due date, members done of all,
+                                         overdue ones marked (`tasks
+                                         milestones`); any key closes it.
+                                         `:Tasks done` names a milestone the
+                                         finish reached.
   :Tasks agent [{id}] [mode=prefill|run] [kind=handoff|review-done|draft-task|
                 prepare-decision|split-plan]
                                          Hand the task (default: the buffer's)

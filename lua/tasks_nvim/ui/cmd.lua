@@ -2494,7 +2494,15 @@ local function finish_task(id, opts)
     notify.warn("Backlog/README.md does not exist: no row added for the finished task")
   end
   local root = vault.root()
-  notify.info(("done %s -> %s"):format(id, root and rel(res.to, root) or res.to))
+  local lines = { ("done %s -> %s"):format(id, root and rel(res.to, root) or res.to) }
+  -- a milestone this finish reached (or set back to doing), as `tasks done` says it
+  for _, m in ipairs(flow.milestones_reached or {}) do
+    lines[#lines + 1] = "milestone reached: " .. m
+  end
+  for _, m in ipairs(flow.milestones_reopened or {}) do
+    lines[#lines + 1] = "milestone open again: " .. m
+  end
+  notify.info(table.concat(lines, "\n"))
   -- While the AI functions are on: one line that names the review (nothing runs by itself).
   local ai_ok, ai_on = pcall(function()
     return require("tasks_nvim.ai").enabled()
@@ -2726,6 +2734,53 @@ function M.task_done(ctx)
       finish_task(id, opts)
     end
   )
+end
+
+---The lines of `:Tasks milestones`: one per milestone, as `tasks milestones` says it (id, status, due, members done of
+---all, overdue), the overdue ones first is the engine's order; a word when there are none.
+---@param doc table  # `tasks.milestones`
+---@return string[]
+function M.milestone_lines(doc)
+  local items = doc.items or {}
+  if #items == 0 then
+    return { "no milestones" }
+  end
+  local lines = {}
+  for _, m in ipairs(items) do
+    local p = m.progress or {}
+    lines[#lines + 1] = ("%s  %s  due %s  %d/%d%s  %s"):format(
+      m.id,
+      m.status or "?",
+      m.due or "-",
+      p.members_done or 0,
+      p.members or 0,
+      m.overdue and "  overdue" or "",
+      m.title or ""
+    )
+  end
+  return lines
+end
+
+---`:Tasks milestones [area]`: the milestones in a float (`tasks.milestones` of the contract, as `tasks milestones`); the
+---next key closes it.
+---@param ctx table  composer context
+function M.task_milestones(ctx)
+  if not no_stray_words(ctx) then
+    return
+  end
+  local root = vault_root()
+  if not root then
+    return
+  end
+  local doc, err = require("tasks_nvim.contract").milestones(
+    { area = ctx.args.area },
+    { root = root }
+  )
+  if not doc then
+    notify.error(tostring(type(err) == "table" and err.message or err))
+    return
+  end
+  require("tasks_nvim.ui.help_float").open(M.milestone_lines(doc), "tasks_milestones")
 end
 
 ---`:Tasks reopen <id> [status=open|doing|...] [--yes]`: a finished task back to `ROADMAP/tasks`, through the write door

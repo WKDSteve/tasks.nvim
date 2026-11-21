@@ -971,6 +971,14 @@ tasks reopen lib.nvim/fix-parser                   # reopened<TAB>lib.nvim/fix-p
 tasks reopen lib.nvim/2026-11-18_fix-parser --status=doing
 ```
 
+### `:Tasks milestones [<area>]`
+
+The milestones (`<area>/ROADMAP/milestones/`) in a float, one line each: id, status, due date, how many members are done
+of all, `overdue` when the due date has passed while it is open, and the title; the overdue ones first, as the engine
+orders them (`tasks.milestones` of `tasks-export/1`, the same as `tasks milestones`). Any key closes the float. A finish
+that reaches a milestone says so: `:Tasks done` adds `milestone reached: <id>` to its line (`milestone open again: <id>`
+when a reached one goes back to `doing`).
+
 ### `:Tasks template [--to=clipboard|buffer|file:<path>] [--with-plan]`
 
 The task file template (every field, visible placeholders; `--with-plan` adds the optional `## Plan` section with
