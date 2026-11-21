@@ -153,7 +153,7 @@ local function update_readmes(ctx, changed)
             area = area,
             location = "backlog",
           })
-          local date = entry.rel:match("(%d%d%d%d%-%d%d%-%d%d)_") or os.date("%Y-%m-%d")
+          local date = entry.rel:match("(%d%d%d%d%-%d%d%-%d%d)_") or os.date("%Y-%m-%d") --[[@as string]]
           row = mutate.readme_row(entry.bucket, entry.rel, task, date)
         end
         text = mutate.readme_add_row(text, entry.bucket, entry.rel, row)
@@ -202,11 +202,10 @@ end
 ---Build the commit once on top of `head`.
 ---@param ctx { root: string, top: string, prefix: string }
 ---@param paths string[]
----@param opts Tasks.VaultCommitOpts
 ---@param head string
 ---@return { tree: string, indexes: Tasks.IndexResult[], readmes: string[] }|nil
 ---@return string|nil err
-local function build(ctx, paths, opts, head)
+local function build(ctx, paths, head)
   local file = vim.fn.tempname() .. "-index"
   local env = { GIT_INDEX_FILE = file }
   local c = vim.tbl_extend("force", ctx, { env = env })
@@ -346,7 +345,7 @@ function M.commit(paths, opts)
       return nil, herr
     end
     head = vim.trim(head)
-    local built, berr = build(ctx, paths, opts, head)
+    local built, berr = build(ctx, paths, head)
     if not built then
       return nil, berr
     end
