@@ -181,18 +181,51 @@ end
 
 -- ── Slugs ────────────────────────────────────────────────────────────────────
 
+---Cut a slug made of `title` to `max` characters at a word boundary of the title: whole words (separated by white
+---space; a hyphenated word like `Web-Variante` is one) as long as they fit. A first word longer than `max` is cut at
+---its last hyphen that fits, and only a word without one in reach is cut inside.
+---@param title string
+---@param slug string  # `vault.kebab(title)`, longer than `max`.
+---@param max integer
+---@return string
+local function cut_at_word(title, slug, max)
+  local out = ""
+  for chunk in title:gmatch("%S+") do
+    local word = vault.kebab(chunk)
+    if word ~= "" then
+      local joined = out == "" and word or (out .. "-" .. word)
+      if #joined > max then
+        break
+      end
+      out = joined
+    end
+  end
+  if out ~= "" then
+    return out
+  end
+  local head = slug:sub(1, max + 1)
+  local last = head:match("^.*()%-")
+  if last and last > 1 then
+    return (head:sub(1, last - 1):gsub("%-+$", ""))
+  end
+  return (slug:sub(1, max):gsub("%-+$", ""))
+end
+
 ---A kebab-case ASCII slug from free text: umlauts folded (`ü` -> `ue`), other
 ---characters turned into hyphens, runs of hyphens collapsed, at most
----`MAX_SLUG` characters. Text with no usable character gives `"task"`; a
+---`MAX_SLUG` characters, cut at a word boundary of the title (never inside a
+---word, `cut_at_word`). Text with no usable character gives `"task"`; a
 ---result that is a Windows device name (`nul`, `con`, ...) gets `-task`
 ---appended, since a folder task of that name cannot be created there.
 ---@param title string
+---@param max? integer  # Default `MAX_SLUG`.
 ---@return string
-function M.slugify(title)
+function M.slugify(title, max)
   -- Not a string (nil, a number): the empty slug (`vault.kebab`), so `"task"`.
   local slug = vault.kebab(title)
-  if #slug > M.MAX_SLUG then
-    slug = slug:sub(1, M.MAX_SLUG):gsub("%-$", "")
+  max = max or M.MAX_SLUG
+  if #slug > max then
+    slug = cut_at_word(title, slug, max)
   end
   if slug == "" then
     return "task"

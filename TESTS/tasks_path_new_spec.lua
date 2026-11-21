@@ -78,10 +78,54 @@ return function(H)
   eq(code, 0, err)
   has(out, "created\t" .. A .. "/lua-lernen-2\t")
 
+  -- --slug names the file; --no-index is accepted (a new path is in no index)
+  code, out, err = run({
+    "path-new",
+    A,
+    "Wie die App-Familie gebaut ist: Rust, Svelte, Tauri und die Web-Variante",
+    "--slug=app-familie",
+    "--no-index",
+  })
+  eq(code, 0, err)
+  has(out, "created\t" .. A .. "/app-familie\t")
+  ok(H.read(root .. "/" .. A .. "/ROADMAP/paths/app-familie.md") ~= nil, "--slug names the file")
+  -- without --slug a long title is cut at a word boundary
+  code, out, err = run({
+    "path-new",
+    A,
+    "Wie die App-Familie gebaut ist: Rust, Svelte, Tauri und die Web-Variante",
+  })
+  eq(code, 0, err)
+  has(out, "created\t" .. A .. "/wie-die-app-familie-gebaut-ist-rust-svelte-tauri-und-die\t")
+
+  -- plan-new and project-new take --slug as well
+  code, out, err = run({ "plan-new", A, "Ein langer Plan", "--slug=kurzer-plan" })
+  eq(code, 0, err)
+  has(out, "created\t" .. A .. "/kurzer-plan\t")
+  code, out, err =
+    run({ "project-new", A, "Ein Vorhaben", "--slug=vorhaben", "--summary=Alles zusammen." })
+  eq(code, 0, err)
+  has(out, "created\t" .. A .. "/vorhaben\t")
+  local project =
+    assert(H.read(root .. "/" .. A .. "/ROADMAP/projects/vorhaben.md"), "a project file")
+  has(project, "title: Ein Vorhaben\n")
+  has(project, "Alles zusammen.")
+  ok(
+    require("tasks_nvim.projects").find(A .. "/vorhaben", { root = root }) ~= nil,
+    "it reads as a project"
+  )
+  code, _, err = run({ "project-new", A })
+  eq(code, 2)
+  has(err, "usage: project-new <area>")
+  code, _, err = run({ "plan-new", A, "Bad", "--slug=Not A Slug" })
+  eq(code, 1, "a --slug that is no slug is refused")
+  has(err, "slug")
+
   -- what is wrong is said, with the usage
   code, _, err = run({ "path-new", A })
   eq(code, 2)
   has(err, "usage: path-new <area>")
+  has(err, "--slug=")
   code = run({ "path-new", A, "X", "--phases=a,b" })
   eq(code, 2, "a path has no stages: --phases is no option of path-new")
   code, _, err = run({ "path-new", A, "Bad", "--template=nope" })

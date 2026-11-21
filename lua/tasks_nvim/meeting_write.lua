@@ -817,11 +817,8 @@ end
 ---@param date string
 ---@return string
 function M.slug_of(title, date)
-  local base = require("tasks_nvim.mutate").slugify(title)
-  local room = M.MAX_SLUG - #date - 1
-  if #base > room then
-    base = base:sub(1, room):gsub("%-+$", "")
-  end
+  -- cut at a word boundary of the title, so that the date fits
+  local base = require("tasks_nvim.mutate").slugify(title, M.MAX_SLUG - #date - 1)
   return base .. "-" .. date
 end
 

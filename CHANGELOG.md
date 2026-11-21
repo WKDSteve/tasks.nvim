@@ -11,11 +11,13 @@ the version is not tagged yet (the repository is not published).
 
 ### Changed
 
+- A slug made of a title (`new`, `plan-new`, `project-new`, `path-new`, meetings, the key of a promoted point) is cut at a word boundary of the title: whole words as long as they fit, a hyphenated word like `Web-Variante` counts as one. Before, it was cut after 60 characters, inside a word (`…-und-webvari`).
 - `tasks index <area> --staged` says when the working tree keeps an index file that is not the staged one (`tree_differs` on the result): `check` reads the tree and calls it `index-stale` although the commit holds the right one, which read as "`--staged` did nothing" in a linked worktree of the vault. Covered in a linked worktree; its staging area is the one written, the main checkout's stays untouched.
 - `reminders.on_start` is opt-in now: the one line at startup about due reminders no longer shows unless `setup({ reminders = { on_start = true } })` asks for it.
 
 ### Added
 
+- `tasks project-new <area> "<title>"` makes a project file from the command line (the options of `plan-new`); `plan-new`, `project-new` and `path-new` name `--slug=` in their usage and `--help` (it was taken already but not shown), and `path-new` accepts `--no-index` like the other writing commands (a new path is in no index).
 - `tasks reopen <id> [--status=]` and `:Tasks reopen <id> [status=] [--yes]`: a finished task back to `ROADMAP/tasks` through the operation `reopen` of `tasks-ops/1` (the Backlog README row goes, the index is written, a reached milestone goes back to `doing`). The CLI takes the id or the name of the finished file; `already-open` (exit 0) for an open task. The editor asks first and completes over the finished tasks only.
 - `tasks-export/1` (additive, capability `finished_ci`): `finished` takes `ci`, a list of `pending`, `green`, `red` and `none`, and keeps the finished tasks whose CI state is one of them; `total` of `["pending", "red"]` is what an overview shows as "finished, CI open or red". Golden `finished-ci`.
 - `milestone_set` refuses `status` `planning` or `doing` on a milestone whose members are all done while it keeps `close: auto` (decision 2026-11-21): the next closing write would reach it again at once. The error carries `details.hint` (`set close: manual to keep it open`; the schema names `hint`); `close: manual` in the same patch keeps it open.

@@ -126,7 +126,7 @@ end
 ---@param title string
 ---@return string
 local function free_key(tree, title)
-  local base = mutate.slugify(title):sub(1, 48):gsub("%-+$", "")
+  local base = mutate.slugify(title, 48)
   if base == "" or not lernbaum.valid_key(base) then
     base = "punkt"
   end

@@ -72,6 +72,24 @@ return function(H)
   for title in pairs(slugs) do
     ok(require("tasks_nvim.vault").valid_slug(mutate.slugify(title)), "valid slug for " .. title)
   end
+  -- a long title is cut at a word boundary: a hyphenated word is one word, never cut inside
+  eq(
+    mutate.slugify("Wie die App-Familie gebaut ist: Rust, Svelte, Tauri und die Web-Variante"),
+    "wie-die-app-familie-gebaut-ist-rust-svelte-tauri-und-die",
+    "the hyphenated last word is dropped whole"
+  )
+  eq(
+    mutate.slugify("Wie die App-Familie gebaut ist: Rust, Svelte, Tauri und Webvariantenkonzept"),
+    "wie-die-app-familie-gebaut-ist-rust-svelte-tauri-und",
+    "a long last word is dropped whole, not cut to webvari"
+  )
+  eq(mutate.slugify("Kurz und gut", 9), "kurz-und", "max names the limit")
+  eq(
+    mutate.slugify("Donaudampfschiff-Kapitaensmuetze", 20),
+    "donaudampfschiff",
+    "one long word: at its hyphen"
+  )
+  eq(mutate.slugify(("x"):rep(30), 10), ("x"):rep(10), "one word without a hyphen: cut inside")
 
   -- ── template ────────────────────────────────────────────────────────────
   local tpl = mutate.template({ today = TODAY })

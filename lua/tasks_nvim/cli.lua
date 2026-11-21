@@ -92,11 +92,15 @@ commands:
         --sheet: the state of the test-sheet block testing.nvim wrote into the task, its worst sheet (inbox:
         green and waiting for your judgement), any: a task with the block, none: a task without it; nothing is run;
         --claimed: own: a valid claim of this name (`claim`), foreign: of somebody else, none: free or expired)
-  plan-new <area> <title> [--areas=a,b] [--target=<id>] [--phases=a,b,c] [--gate=hard] [--summary=text] [--links=url,url] [--icon=<emoji|assets/x.svg|word>] [--cover=assets/x.png] [--template=learning]
-                                          create ROADMAP/plans/<slug>.md; tasks join it with plan=<id> phase=<word>
-  path-new <area> <title> [--areas=a,b] [--target=<id>] [--project=<id>] [--status=planning|doing|parked] [--summary=text] [--links=url,url] [--icon=...] [--cover=assets/x.png] [--template=learning]
+  plan-new <area> <title> [--slug=s] [--areas=a,b] [--target=<id>] [--phases=a,b,c] [--gate=hard] [--summary=text] [--links=url,url] [--icon=<emoji|assets/x.svg|word>] [--cover=assets/x.png] [--template=learning]
+                                          create ROADMAP/plans/<slug>.md; tasks join it with plan=<id> phase=<word>;
+                                          without --slug the slug is the title, cut at a word boundary
+  project-new <area> <title> [--slug=s] [options as plan-new]
+                                          create ROADMAP/projects/<slug>.md; plans join it with project=<id>
+  path-new <area> <title> [--slug=s] [--areas=a,b] [--target=<id>] [--project=<id>] [--status=planning|doing|parked] [--summary=text] [--links=url,url] [--icon=...] [--cover=assets/x.png] [--template=learning] [--no-index]
                                           create the learning path ROADMAP/paths/<slug>.md (no stages; its tree goes
-                                          into ## Lernpunkte); --template=learning writes the sections of a learning path
+                                          into ## Lernpunkte); --template=learning writes the sections of a learning path;
+                                          --no-index is accepted (a new path changes no index)
   milestone-new <area> <title> [--due=YYYY-MM-DD] [--includes=<id>,<id>] [--close=manual] [--status=planning|doing|parked] [--summary=text] [--slug=]
                                           create the milestone ROADMAP/milestones/<slug>.md over tasks, plans,
                                           projects, paths and meetings of this vault; reached when they are all done
@@ -416,6 +420,23 @@ local SPECS = {
     },
     flag = {},
   },
+  ["project-new"] = {
+    value = {
+      "areas",
+      "target",
+      "phases",
+      "gate",
+      "status",
+      "summary",
+      "slug",
+      "title",
+      "links",
+      "icon",
+      "cover",
+      "template",
+    },
+    flag = {},
+  },
   ["path-new"] = {
     value = {
       "areas",
@@ -430,7 +451,8 @@ local SPECS = {
       "project",
       "template",
     },
-    flag = {},
+    -- `--no-index` for scripts that pass it to every writing command: a new path changes no index
+    flag = { "no-index" },
   },
   ["plan-close"] = { value = {}, flag = {} },
   ["milestone-new"] = {
@@ -1306,59 +1328,35 @@ function commands.lists(ctx)
   return entry.run(ctx, args.pos[2], args.pos[3])
 end
 
-commands["plan-new"] = function(ctx)
+---The usage line of `plan-new`, `project-new` and `path-new`.
+---@type table<string, string>
+local NEW_FILE_USAGE = {
+  plan = 'plan-new <area> "<title>" [--slug=s] [--areas=a,b] [--target=id] [--phases=a,b,c] [--gate=hard] [--template=learning]',
+  project = 'project-new <area> "<title>" [--slug=s] [--areas=a,b] [--target=id] [--phases=a,b,c] [--gate=hard] [--template=learning]',
+  path = 'path-new <area> "<title>" [--slug=s] [--areas=a,b] [--target=id] [--project=id] [--template=learning] [--no-index]',
+}
+
+---`plan-new`, `project-new` and `path-new`: make the file (`plans.new` with `kind`) and say its id.
+---@param ctx Tasks.CliCtx
+---@param kind "plan"|"project"|"path"
+---@return integer code
+local function new_file_command(ctx, kind)
   local args, eo = ctx.args, ctx.eo
   local area = args.pos[1]
   local title = args.pos[2] or args.opt.title
   if not area or not title or #args.pos > 2 then
-    ctx.warn(
-      'error: usage: plan-new <area> "<title>" [--areas=a,b] [--target=id] [--phases=a,b,c] [--gate=hard]'
-    )
+    ctx.warn("error: usage: " .. NEW_FILE_USAGE[kind])
     return 2
   end
   local res, err = require("tasks_nvim.plans").new(area, {
     root = eo.root,
     today = eo.today,
+    kind = kind ~= "plan" and kind or nil,
     title = title,
     areas = args.opt.areas --[[@as string|nil]],
     target = args.opt.target --[[@as string|nil]],
     phases = args.opt.phases --[[@as string|nil]],
     gate = args.opt.gate --[[@as string|nil]],
-    status = args.opt.status --[[@as string|nil]],
-    summary = args.opt.summary --[[@as string|nil]],
-    slug = args.opt.slug --[[@as string|nil]],
-    web_links = args.opt.links --[[@as string|nil]],
-    icon = args.opt.icon --[[@as string|nil]],
-    cover = args.opt.cover --[[@as string|nil]],
-    template = args.opt.template --[[@as "learning"|nil]],
-  })
-  if not res then
-    ctx.warn("error: " .. tostring(err))
-    return 1
-  end
-  ctx.say(("created\t%s\t%s"):format(res.id, res.path))
-  if res.ambiguous then
-    ctx.warn("warn: " .. require("tasks_nvim.wikilinks").ambiguity_message(res.ambiguous))
-  end
-  return 0
-end
-
-commands["path-new"] = function(ctx)
-  local args, eo = ctx.args, ctx.eo
-  local area = args.pos[1]
-  local title = args.pos[2] or args.opt.title
-  if not area or not title or #args.pos > 2 then
-    ctx.warn(
-      'error: usage: path-new <area> "<title>" [--areas=a,b] [--target=id] [--project=id] [--template=learning]'
-    )
-    return 2
-  end
-  local res, err = require("tasks_nvim.paths").new(area, {
-    root = eo.root,
-    today = eo.today,
-    title = title,
-    areas = args.opt.areas --[[@as string|nil]],
-    target = args.opt.target --[[@as string|nil]],
     status = args.opt.status --[[@as string|nil]],
     summary = args.opt.summary --[[@as string|nil]],
     slug = args.opt.slug --[[@as string|nil]],
@@ -1377,6 +1375,18 @@ commands["path-new"] = function(ctx)
     ctx.warn("warn: " .. require("tasks_nvim.wikilinks").ambiguity_message(res.ambiguous))
   end
   return 0
+end
+
+commands["plan-new"] = function(ctx)
+  return new_file_command(ctx, "plan")
+end
+
+commands["project-new"] = function(ctx)
+  return new_file_command(ctx, "project")
+end
+
+commands["path-new"] = function(ctx)
+  return new_file_command(ctx, "path")
 end
 
 -- ── meetings ─────────────────────────────────────────────────────────────────
