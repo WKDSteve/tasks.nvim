@@ -86,22 +86,6 @@ function M.setup(opts)
       require("tasks_nvim.ui.reminder_hint").schedule()
     end)
   end
-  -- The head of every document of the write door names the commit of the engine; git is asked for it in the
-  -- background once the editor has started, so the first `:Tasks meeting new` (or any `ops.run`) does not wait for
-  -- it. Only the editor calls `setup`: the CLI and `tasks-host` ask when they need it.
-  local prewarm = function()
-    vim.schedule(function()
-      pcall(function()
-        require("tasks_nvim.contract").prewarm()
-      end)
-    end)
-  end
-  local group = vim.api.nvim_create_augroup("TasksPrewarm", { clear = true })
-  if vim.v.vim_did_enter == 1 then
-    prewarm()
-  else
-    vim.api.nvim_create_autocmd("VimEnter", { group = group, once = true, callback = prewarm })
-  end
   -- The vault in a tree view: entries at lib.nvim's registry, read by filetree.nvim's own tree when there is one.
   -- Registering loads no front end and reads no file; `tree = false` takes the entries out again.
   local tree = config.get().tree

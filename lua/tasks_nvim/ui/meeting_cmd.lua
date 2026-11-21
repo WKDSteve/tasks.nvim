@@ -108,6 +108,8 @@ end
 ---@param op table
 ---@return table|nil entry
 local function run_op(op)
+  -- the head of the answer names the engine's commit: asked in the background, the editor never waits for git
+  require("tasks_nvim.contract").prewarm()
   local doc, err = require("tasks_nvim.ops").run({ ops = { op } }, {})
   if not doc then
     notify.error(tostring(type(err) == "table" and err.message or err))

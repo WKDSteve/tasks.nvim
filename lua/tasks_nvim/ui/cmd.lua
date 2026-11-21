@@ -39,6 +39,12 @@ local view = require("tasks_nvim.ui.view")
 
 local M = {}
 
+---Before a write through the door (`ops.run`): the head of its answer names the engine's commit, which git is asked for
+---in the background (`contract.prewarm`), so the editor never waits for it.
+local function write_door_prewarm()
+  require("tasks_nvim.contract").prewarm()
+end
+
 ---Dashboard seam. `:Tasks list` calls it instead of delivering a table
 ---when neither `--to=` nor `--format=` was given. It receives the filtered,
 ---sorted open tasks; with `--stale=refs` a replaced hook is called once the
@@ -2866,6 +2872,7 @@ function M.task_reopen(ctx, confirm_fn)
     return
   end
   local function run()
+    write_door_prewarm()
     local doc, err = require("tasks_nvim.ops").run(
       { ops = { { op = "reopen", id = id, status = status } } },
       { root = root }
@@ -3462,6 +3469,7 @@ local function review_came_back(task, job, confirm_fn, create)
         notify.info("agent: the review was not added; it stays in this buffer")
         return
       end
+      write_door_prewarm()
       local ok, err = review.adopt(task.id, block)
       if not ok then
         notify.error("agent: " .. tostring(err))
@@ -3541,6 +3549,7 @@ local function decision_came_back(task, job, confirm_fn)
         return
       end
       local blocks, added = review.decision_blocks(fsio.read(task.path) or "", parts)
+      write_door_prewarm()
       local wrote, err = review.write(task.id, blocks)
       if not wrote then
         notify.error("agent: " .. tostring(err))
