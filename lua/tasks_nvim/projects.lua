@@ -131,6 +131,79 @@ function M.plans_of(project_id, files)
   return out
 end
 
+---The open learning paths of a project (`project: <id>` in the path file).
+---@param project_id string
+---@param files Tasks.PlanFile[]  # Open path files (`paths.all`).
+---@return Tasks.PlanFile[]
+function M.paths_of(project_id, files)
+  return M.plans_of(project_id, files)
+end
+
+---@class Tasks.PathRow
+---@field id string
+---@field title string
+---@field status string
+---@field points integer     # Leaves of `## Lernpunkte`, dropped ones included (0 for a finished path).
+---@field open integer       # Open (and blocked) leaves.
+---@field percent integer    # The progress (`lernlevel.percent`); 100 for a finished path.
+---@field done boolean       # Finished (closed into the Backlog).
+
+---One row of a learning path: what `tasks paths` lists and a project's overview shows.
+---@param f Tasks.PlanFile  # An open path file (`paths.find`, `paths.area`).
+---@return Tasks.PathRow
+function M.path_row(f)
+  local tree = f.tree
+  local points, open, percent = 0, 0, 0
+  if tree then
+    points, open = tree.progress.total, tree.progress.open
+    percent = require("tasks_nvim.lernlevel").percent(tree)
+  end
+  return {
+    id = f.id,
+    title = f.title,
+    status = f.status or "-",
+    points = points,
+    open = open,
+    percent = percent,
+    done = false,
+  }
+end
+
+---The rows of the paths of a project: its open paths (`ctx.paths`), then the finished ones of the Backlogs
+---(`closed_kind: path`, at 100 %), in id order each.
+---@param project_id string
+---@param path_files Tasks.PlanFile[]
+---@param finished Tasks.Task[]
+---@return Tasks.PathRow[]
+function M.path_rows(project_id, path_files, finished)
+  local rows = {}
+  for _, f in ipairs(M.paths_of(project_id, path_files)) do
+    rows[#rows + 1] = M.path_row(f)
+  end
+  table.sort(rows, function(a, b)
+    return a.id < b.id
+  end)
+  local done = {}
+  for _, item in ipairs(finished) do
+    if item.project == project_id and M.finished_kind(item) == "path" then
+      done[#done + 1] = {
+        id = item.id,
+        title = item.title,
+        status = "done",
+        points = 0,
+        open = 0,
+        percent = 100,
+        done = true,
+      }
+    end
+  end
+  table.sort(done, function(a, b)
+    return a.id < b.id
+  end)
+  vim.list_extend(rows, done)
+  return rows
+end
+
 ---The open tasks that belong to a project itself (`project: <id>`), not through a plan.
 ---@param project_id string
 ---@param tasks Tasks.Task[]
@@ -239,12 +312,16 @@ end
 ---@field own_open integer      # Open tasks that name the project itself (`project:`).
 ---@field days_open number      # Their effort in days (what carries an effort).
 ---@field plan_ids string[]     # The ids of the open plans of the project, sorted.
+---@field paths_total? integer  # Its learning paths, open and finished (only when `ctx.paths` was given).
+---@field paths_done? integer   # The finished ones.
+---@field paths_percent? integer  # The mean progress of its paths (a finished one counts 100 %); 0 without paths.
 
 ---What a project amounts to: its plans (open files, closed ones in the Backlogs) and the tasks of those plans plus its
 ---own. `ctx.plans` are the open plan files and `ctx.open` the open tasks of the whole vault; `ctx.finished` the finished
 ---items of the Backlogs (`finished_items`, made here when not given: pass it when rolling up several projects).
+---`ctx.paths` (the open path files) adds its learning paths (`paths_total`, `paths_done`, `paths_percent`).
 ---@param project Tasks.PlanFile
----@param ctx { plans: Tasks.PlanFile[], open: Tasks.Task[], finished?: Tasks.Task[], root?: string }
+---@param ctx { plans: Tasks.PlanFile[], open: Tasks.Task[], finished?: Tasks.Task[], root?: string, paths?: Tasks.PlanFile[] }
 ---@return Tasks.ProjectRollup
 function M.rollup(project, ctx)
   local finished = ctx.finished or M.finished_items({ root = ctx.root })
@@ -293,6 +370,16 @@ function M.rollup(project, ctx)
   end
   out.days_open = days
   out.plan_ids = plan_ids
+  if ctx.paths then
+    local rows = M.path_rows(project.id, ctx.paths, finished)
+    local sum, done = 0, 0
+    for _, r in ipairs(rows) do
+      sum = sum + r.percent
+      done = done + (r.done and 1 or 0)
+    end
+    out.paths_total, out.paths_done = #rows, done
+    out.paths_percent = #rows > 0 and math.floor(sum / #rows) or 0
+  end
   return out
 end
 
@@ -304,10 +391,12 @@ local function cell(text)
 end
 
 ---The overview of a project as the body of a marker block: its plans in the order of its stages (a plan of no listed
----stage last), each with status and what is open, then the tasks of the project itself. Open plans come from the plan
----files, finished ones from the Backlogs. Pure given its inputs.
+---stage last), each with status and what is open, then its learning paths (`ctx.paths`, the open path files: points,
+---open ones, progress; finished ones at 100 %), then the tasks of the project itself. Open plans come from the plan
+---files, finished ones from the Backlogs. A project with paths and no plans shows no table of plans. Pure given its
+---inputs.
 ---@param project Tasks.PlanFile
----@param ctx { plans: Tasks.PlanFile[], open: Tasks.Task[], finished?: Tasks.Task[], root?: string }
+---@param ctx { plans: Tasks.PlanFile[], open: Tasks.Task[], finished?: Tasks.Task[], root?: string, paths?: Tasks.PlanFile[] }
 ---@return string
 function M.overview(project, ctx)
   local finished = ctx.finished or M.finished_items({ root = ctx.root })
@@ -363,19 +452,41 @@ function M.overview(project, ctx)
     lines[#lines + 1] = ""
     lines[#lines + 1] = "Done when: " .. cell(project.target)
   end
-  vim.list_extend(lines, { "", "| Stage | Plan | Status | Open | Days |", "|---|---|---|---|---|" })
-  for _, r in ipairs(rows) do
-    lines[#lines + 1] = ("| %s | `%s` %s | %s | %d | %s |"):format(
-      cell(r.phase or "-"),
-      cell(r.id),
-      cell(r.title),
-      cell(r.status),
-      r.open,
-      r.days > 0 and require("tasks_nvim.estimate").fmt_days(r.days) or "-"
+  local path_rows = ctx.paths and M.path_rows(project.id, ctx.paths, finished) or {}
+  if #rows > 0 or #path_rows == 0 then
+    vim.list_extend(
+      lines,
+      { "", "| Stage | Plan | Status | Open | Days |", "|---|---|---|---|---|" }
     )
+    for _, r in ipairs(rows) do
+      lines[#lines + 1] = ("| %s | `%s` %s | %s | %d | %s |"):format(
+        cell(r.phase or "-"),
+        cell(r.id),
+        cell(r.title),
+        cell(r.status),
+        r.open,
+        r.days > 0 and require("tasks_nvim.estimate").fmt_days(r.days) or "-"
+      )
+    end
+    if #rows == 0 then
+      lines[#lines + 1] = "| - | no plans yet | - | 0 | - |"
+    end
   end
-  if #rows == 0 then
-    lines[#lines + 1] = "| - | no plans yet | - | 0 | - |"
+  if #path_rows > 0 then
+    vim.list_extend(
+      lines,
+      { "", "| Learning path | Status | Points | Open | Progress |", "|---|---|---|---|---|" }
+    )
+    for _, r in ipairs(path_rows) do
+      lines[#lines + 1] = ("| `%s` %s | %s | %s | %s | %d %% |"):format(
+        cell(r.id),
+        cell(r.title),
+        cell(r.status),
+        r.done and "-" or tostring(r.points),
+        r.done and "-" or tostring(r.open),
+        r.percent
+      )
+    end
   end
   local own = M.members(project.id, ctx.open)
   lines[#lines + 1] = ""

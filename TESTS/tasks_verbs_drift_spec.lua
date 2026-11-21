@@ -39,6 +39,8 @@ return function(H)
     -- `path` prints the XP overview of a learning path for a person planning it in a shell; the editor shows XP and
     -- levels in `:Tasks learn`
     "path",
+    -- `paths` lists the learning paths with their progress for a shell, like `plans` and `projects`
+    "paths",
     "plan-new",
     "plans",
     -- `project-new` makes a project file like `plan-new`; the editor makes neither

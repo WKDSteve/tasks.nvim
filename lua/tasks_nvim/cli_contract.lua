@@ -297,7 +297,7 @@ local function ratio(done, total)
 end
 
 ---The TSV line of a project: the file's cells, then what it adds up to (plans finished/all, tasks finished/all, days
----still open).
+---still open, learning paths finished/all with their mean progress).
 ---@param f Tasks.PlanFile
 ---@param r Tasks.ProjectRollup
 ---@return string
@@ -307,6 +307,7 @@ local function project_line(f, r)
     "plans " .. ratio(r.plans_done, r.plans_total),
     "tasks " .. ratio(r.tasks_done, r.tasks_done + r.tasks_open),
     ("%s d open"):format(require("tasks_nvim.estimate").fmt_days(r.days_open)),
+    ("paths %s %d %%"):format(ratio(r.paths_done or 0, r.paths_total or 0), r.paths_percent or 0),
   }, "\t")
 end
 
@@ -327,6 +328,7 @@ local function project_rows(ctx, set, plan_files)
   end
   local finished
   local rows = {}
+  local path_files = require("tasks_nvim.paths").all({ root = ctx.eo.root }) or {}
   for _, f in ipairs(files) do
     local own_area = set == nil or set[f.area] == true
     local has_plan_here = false
@@ -339,7 +341,10 @@ local function project_rows(ctx, set, plan_files)
       finished = finished or projects.finished_items({ root = ctx.eo.root })
       rows[#rows + 1] = {
         file = f,
-        rollup = projects.rollup(f, { plans = plan_files, open = open, finished = finished }),
+        rollup = projects.rollup(
+          f,
+          { plans = plan_files, open = open, finished = finished, paths = path_files }
+        ),
       }
     end
   end

@@ -105,6 +105,10 @@ commands:
   path <area>/<slug> [--format=text|json]  the XP overview of a learning path: points (all, open, without XP), XP in
                                           all and per stage (a root of ## Lernpunkte), and for each level the point
                                           at which it is reached when the points are learned in their order
+  paths [<area>] [--project=<id>] [--format=tsv|json]
+                                          the learning paths: id, status, points, open points, progress in percent
+                                          (of the XP, else of the points), title; --project: the paths of a project,
+                                          the finished ones too (status done, 100 %)
   milestone-new <area> <title> [--due=YYYY-MM-DD] [--includes=<id>,<id>] [--close=manual] [--status=planning|doing|parked] [--summary=text] [--slug=]
                                           create the milestone ROADMAP/milestones/<slug>.md over tasks, plans,
                                           projects, paths and meetings of this vault; reached when they are all done
@@ -140,7 +144,8 @@ commands:
   plans [<area>] [--tree]                 the plan files: id, status, location, title (--tree: under their project,
                                           indented, projects first with what they add up to)
   projects [<area>]                       the project files: id, status, location, title, plans finished/all, tasks
-                                          finished/all, days still open
+                                          finished/all, days still open, learning paths finished/all and their mean
+                                          progress (paths 1/4 40 %)
   estimate [<area>] [--for=<id>] [filters as for list]   sums of effort and value, what is missing, quick wins
   list|plan|estimate @<name> [more options]   run a named list (see `lists`); options you give override its own
   lists [save <name>|delete <name>|rename <old> <new>|show <name>] [filters] [--sort=] [--area=] [--desc=]
@@ -447,6 +452,7 @@ local SPECS = {
     flag = {},
   },
   path = { value = { "format" }, flag = {} },
+  paths = { value = { "project", "format" }, flag = {} },
   ["path-new"] = {
     value = {
       "areas",
@@ -1506,6 +1512,83 @@ commands.path = function(ctx)
   end
   for _, pt in ipairs(st.without_xp) do
     ctx.say(("without-xp\tstage %d\t%s"):format(pt.stage, name(pt)))
+  end
+  return 0
+end
+
+---`paths [<area>] [--project=<id>] [--format=tsv|json]`: the open learning paths (and, with `--project`, the finished
+---ones of that project) with their progress: id, status, points, open points, percent, title.
+---@param ctx Tasks.CliCtx
+---@return integer code
+commands.paths = function(ctx)
+  local args, eo = ctx.args, ctx.eo
+  local format = args.opt.format or "tsv"
+  if format ~= "tsv" and format ~= "json" then
+    ctx.warn("error: usage: paths [<area>] [--project=<id>] [--format=tsv|json]")
+    return 2
+  end
+  local area, area_ok = area_arg(ctx, "paths")
+  if not area_ok then
+    return 2
+  end
+  local paths_mod = require("tasks_nvim.paths")
+  local projects = require("tasks_nvim.projects")
+  local root, rerr = vault.root(eo)
+  if not root then
+    ctx.warn("error: " .. tostring(rerr))
+    return 1
+  end
+  local files, err = paths_mod.all({ root = root })
+  if not files then
+    ctx.warn("error: " .. tostring(err))
+    return 1
+  end
+  -- an area group stands for its member areas
+  local scope = area and vault.area_scope(root, area) or nil
+  local in_area = area and (scope and scope.set or { [area] = true }) or nil
+  local rows
+  local project = args.opt.project
+  if project ~= nil then
+    local pid, perr = require("tasks_nvim.wikilinks").typed_id(
+      tostring(project),
+      "project",
+      require("tasks_nvim.wikilinks").resolver(root)
+    )
+    if not pid then
+      ctx.warn("error: " .. tostring(perr))
+      return 2
+    end
+    if not projects.find(pid, { root = root }) then
+      ctx.warn("error: no such open project: " .. pid)
+      return 1
+    end
+    rows = projects.path_rows(pid, files, projects.finished_items({ root = root }))
+  else
+    rows = {}
+    for _, f in ipairs(files) do
+      rows[#rows + 1] = projects.path_row(f)
+    end
+  end
+  if in_area then
+    rows = vim.tbl_filter(function(r)
+      return in_area[r.id:match("^([^/]+)/")] == true
+    end, rows)
+  end
+  if format == "json" then
+    ctx.say(vim.json.encode({ paths = rows }))
+    return 0
+  end
+  for _, r in ipairs(rows) do
+    ctx.say(
+      ("%s\t%s\tpoints %d\topen %d\t%d %%\t%s"):format(
+        clean(r.id),
+        clean(r.status),
+        r.points,
+        r.open,
+        r.percent,
+        clean(r.title or "")
+      )
+    )
   end
   return 0
 end

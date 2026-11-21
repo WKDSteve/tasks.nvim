@@ -240,6 +240,23 @@ local function as_xp(lv, possible)
   return nil
 end
 
+---The progress of a tree in percent, rounded down: of the XP when it has any, else of its points (learned one, seen
+---one half, dropped out). The second value is what 100 % stands for (XP, or points).
+---@param tree Tasks.LernTree
+---@return integer percent
+---@return integer unit_possible
+function M.percent(tree)
+  local x = tree.xp
+  local p = tree.progress
+  if tree.has_xp then
+    return x.possible > 0 and math.floor(x.earned * 100 / x.possible) or 0, x.possible
+  end
+  -- without XP every point weighs one: learned 1, seen one half, dropped out
+  local unit_possible = p.total - p.dropped
+  return unit_possible > 0 and math.floor((p.learned + p.seen / 2) * 100 / unit_possible) or 0,
+    unit_possible
+end
+
 ---Evaluate the levels against a tree (`lernbaum.parse`, with the task XP given): the level reached, the next one with
 ---what is missing, and the rewards reached but not granted.
 ---@param lv Tasks.Levels
@@ -248,16 +265,7 @@ end
 function M.evaluate(lv, tree)
   local x = tree.xp
   local p = tree.progress
-  local percent
-  local unit_possible
-  if tree.has_xp then
-    unit_possible = x.possible
-    percent = x.possible > 0 and math.floor(x.earned * 100 / x.possible) or 0
-  else
-    -- without XP every point weighs one: learned 1, seen one half, dropped out
-    unit_possible = p.total - p.dropped
-    percent = unit_possible > 0 and math.floor((p.learned + p.seen / 2) * 100 / unit_possible) or 0
-  end
+  local percent, unit_possible = M.percent(tree)
   local finished = p.total > 0 and p.open == 0
   ---@type Tasks.LevelState
   local st = {

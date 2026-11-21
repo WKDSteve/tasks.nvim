@@ -439,7 +439,13 @@ function M.overview_body(id, root, sh)
       ),
     }
   end
-  return { body = projects.overview(project, { plans = sh.files, open = sh.open, root = root }) }
+  local path_files = require("tasks_nvim.paths").all({ root = root }) or {}
+  return {
+    body = projects.overview(
+      project,
+      { plans = sh.files, open = sh.open, root = root, paths = path_files }
+    ),
+  }
 end
 
 ---The Markdown of a loaded scope, as a block body.
