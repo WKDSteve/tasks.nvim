@@ -536,6 +536,8 @@ M.TEMPLATES = {
       "",
       "## Zeitplan",
       "",
+      "<!-- Fester Takt (Wochen, Sitzungen): {h=8} oder {h=8-10} an den Sitzungen im Baum (eine Ebene unter den Stufen), {done_h=…} die gebrauchte Zeit; tasks path <id> --schedule --write erzeugt diese Tabelle aus dem Baum. -->",
+      "",
       "| Sitzung | Dauer | Ergebnis |",
       "| --- | --- | --- |",
       "",

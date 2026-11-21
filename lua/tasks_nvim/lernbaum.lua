@@ -16,8 +16,8 @@
 --- none closed: open; else partial), and it is closed when every leaf is. Progress is always counted apart: learned,
 --- seen, dropped, open (blocked ones counted as open and once more as blocked).
 ---
---- A node line reads `<label>[ → <id>][ – Grund: <reason>][ {xp=N}][ {optional}][ {#key}]`; key, XP and the optional
---- mark come last (in any order), the reason after the label (also `Reason:`, and `—` or `-` as the dash), the arrow names the task the node
+--- A node line reads `<label>[ → <id>][ – Grund: <reason>][ {xp=N}][ {h=N}][ {done_h=N}][ {optional}][ {#key}]`; the
+--- marks in braces come last (in any order), the reason after the label (also `Reason:`, and `—` or `-` as the dash), the arrow names the task the node
 --- was promoted to. An arrow is a reference only when an id `<area>/<slug>` follows it and nothing but the marks after
 --- that; any other arrow (`Test rot → grün`) is text of the label. A `> ` line indented
 --- below a node is its note. Every other line of the section (prose, blank lines, comments, code fences) is kept as it
@@ -28,6 +28,11 @@
 --- A promoted leaf counts the `xp:` of its task when the caller gives it (`set_task_xp`), else its own. A parent sums
 --- its children; an `{xp=N}` on a parent is a problem (`path-bad-xp`) and counts nothing. A tree without any XP works
 --- as before (`has_xp = false`).
+---
+--- Hours (optional, for a path with a fixed rhythm, `tasks_nvim.path_schedule`): `{h=N}` or `{h=N-M}` the hours a
+--- point is planned for, `{done_h=N}` the hours it took (`LP-10`); whole numbers or one decimal (`1.5`), up to
+--- `MAX_HOURS`. Any node may carry them; nothing sums them up the tree. A value that is no such number is
+--- `path-bad-hours`.
 ---
 --- Optional (`{optional}` on a node, mostly a group such as the books of a path): the node and its subtree count for
 --- nothing that says how far the path is: `tree.progress` and `tree.xp` hold the other points only (progress, percent
@@ -83,6 +88,45 @@ function M.to_xp(v)
   end
   local n = tonumber(v)
   return (n and n <= M.MAX_XP) and n or nil
+end
+
+---The most hours one point may carry (planned or taken).
+M.MAX_HOURS = 1000
+
+---Hours as written in `{h=…}` / `{done_h=…}`: a whole number or one with one decimal (`1.5`, also `1,5`), 0 to
+---`MAX_HOURS`; nil for anything else.
+---@param v string
+---@return number|nil
+function M.to_hours(v)
+  if type(v) ~= "string" then
+    return nil
+  end
+  local t = v:gsub(",", ".")
+  if not (t:match("^%d%d?%d?%d?$") or t:match("^%d%d?%d?%d?%.%d$")) then
+    return nil
+  end
+  local n = tonumber(t)
+  return (n and n <= M.MAX_HOURS) and n or nil
+end
+
+---The planned hours of `{h=…}`: `8` (8 to 8) or a span `8-10` (also with an en dash); nil when it is none.
+---@param v string
+---@return number|nil min
+---@return number|nil max
+function M.to_hours_span(v)
+  local a, b = v:match("^%s*([%d.,]+)%s*%-%s*([%d.,]+)%s*$")
+  if not a then
+    a, b = v:match("^%s*([%d.,]+)%s*\226\128\147%s*([%d.,]+)%s*$")
+  end
+  if a then
+    local lo, hi = M.to_hours(a), M.to_hours(b)
+    if lo and hi and lo <= hi then
+      return lo, hi
+    end
+    return nil
+  end
+  local n = M.to_hours(vim.trim(v))
+  return n, n
 end
 
 ---The XP a suggestion gives per effort size.
@@ -157,6 +201,11 @@ end
 ---@field xp_raw? string         # The text of an `{xp=…}` that is no XP (kept as written).
 ---@field xp_from? "point"|"task"
 ---@field xp_progress Tasks.LernXp
+---@field h_raw? string          # The text of `{h=…}` as written.
+---@field h_min? number          # Planned hours (`{h=8}`: 8, `{h=8-10}`: 8); nil without or when it is no number.
+---@field h_max? number
+---@field done_h_raw? string     # The text of `{done_h=…}` as written.
+---@field done_h? number         # The hours it took.
 ---@field optional? boolean      # `{optional}` on its own line.
 ---@field in_optional boolean     # It, or a node above it, is optional.
 ---@field opt_progress Tasks.LernProgress  # The part of `progress` that is optional.
@@ -244,18 +293,24 @@ end
 
 ---Split the text after the mark into label, arrow, reason and key.
 ---@param text string
----@return { label: string, key?: string, xp?: integer, xp_raw?: string, optional?: boolean, reason?: string, promoted?: string, arrow_bad?: string }
+---@return { label: string, key?: string, xp?: integer, xp_raw?: string, h_raw?: string, done_h_raw?: string, optional?: boolean, reason?: string, promoted?: string, arrow_bad?: string }
 function M.split(text)
   local rest = text:gsub("%s+$", "")
   local out = {}
-  -- the key, the XP and the optional mark at the end, in any order, each once
-  for _ = 1, 3 do
+  -- the key, the XP, the hours and the optional mark at the end, in any order, each once
+  for _ = 1, 5 do
     local before, key = rest:match("^(.-)%s*{#([^{}%s]+)}$")
     local b3 = rest:match("^(.-)%s*{optional}$")
+    local b4, h = rest:match("^(.-)%s*{h=([^{}]*)}$")
+    local b5, dh = rest:match("^(.-)%s*{done_h=([^{}]*)}$")
     if before and not out.key then
       rest, out.key = before, key
     elseif b3 and not out.optional then
       rest, out.optional = b3, true
+    elseif b4 and not out.h_raw then
+      rest, out.h_raw = b4, h
+    elseif b5 and not out.done_h_raw then
+      rest, out.done_h_raw = b5, dh
     else
       local b2, raw = rest:match("^(.-)%s*{xp=([^{}]*)}$")
       if b2 and out.xp == nil and out.xp_raw == nil then
@@ -501,6 +556,8 @@ function M.parse(body)
             xp_from = parts.xp and "point" or nil,
             xp_progress = zero_xp(),
             optional = parts.optional,
+            h_raw = parts.h_raw,
+            done_h_raw = parts.done_h_raw,
             in_optional = false,
             opt_progress = zero(),
             opt_xp = zero_xp(),
@@ -548,6 +605,34 @@ function M.parse(body)
               ("{xp=%s} is no XP (a whole number from 0 to %d)"):format(parts.xp_raw, M.MAX_XP),
               parts.key
             )
+          end
+          if parts.h_raw then
+            node.h_min, node.h_max = M.to_hours_span(parts.h_raw)
+            if not node.h_min then
+              problem(
+                "path-bad-hours",
+                i,
+                ("{h=%s} is no hours (8, 1.5 or a span 8-10, up to %d)"):format(
+                  parts.h_raw,
+                  M.MAX_HOURS
+                ),
+                parts.key
+              )
+            end
+          end
+          if parts.done_h_raw then
+            node.done_h = M.to_hours(vim.trim(parts.done_h_raw))
+            if not node.done_h then
+              problem(
+                "path-bad-hours",
+                i,
+                ("{done_h=%s} is no hours (8 or 1.5, up to %d)"):format(
+                  parts.done_h_raw,
+                  M.MAX_HOURS
+                ),
+                parts.key
+              )
+            end
           end
           if parts.arrow_bad then
             -- a hint, not a problem: the arrow is read as text
@@ -627,6 +712,12 @@ local function line_of(node)
     parts[#parts + 1] = " {xp=" .. node.xp_own .. "}"
   elseif node.xp_raw then
     parts[#parts + 1] = " {xp=" .. node.xp_raw .. "}"
+  end
+  if node.h_raw then
+    parts[#parts + 1] = " {h=" .. node.h_raw .. "}"
+  end
+  if node.done_h_raw then
+    parts[#parts + 1] = " {done_h=" .. node.done_h_raw .. "}"
   end
   if node.optional then
     parts[#parts + 1] = " {optional}"

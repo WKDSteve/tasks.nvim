@@ -274,6 +274,33 @@ local function edit_body(id, opts, change)
   return result, nil
 end
 
+---Write the schedule of an open path (`## Zeitplan`, `tasks_nvim.path_schedule`) from its tree: the points with
+---`{h=…}`, under the lock of the file, every other byte as it was. Refused for a path without hours or without the
+---section (`invalid_argument`).
+---@param id string
+---@param opts? { root?: string, today?: string, if_match?: string, dry_run?: boolean }
+---@return { id: string, path: string, etag_before: string, etag_after: string, changed: boolean, rows: integer }|nil result
+---@return string|nil err
+---@return table|nil info
+function M.write_schedule(id, opts)
+  local sched = require("tasks_nvim.path_schedule")
+  return edit_body(id, opts or {}, function(body, result)
+    local rows = sched.rows(lernbaum.parse(body))
+    local lines = sched.render(rows)
+    if not lines then
+      return nil,
+        "no point carries {h=…}: nothing to put in ## Zeitplan",
+        { code = "invalid_argument" }
+    end
+    result.rows = #rows
+    local new, perr = sched.place(body, lines)
+    if not new then
+      return nil, perr, { code = "invalid_argument" }
+    end
+    return new
+  end)
+end
+
 ---Change one learning point of an open path: its state and reason (`lernbaum.set_state`), its XP (`opts.xp`,
 ---`lernbaum.set_xp`; `""` removes it) and/or its note (`opts.note`, `lernbaum.set_note`; an empty text removes it),
 ---under the lock of the file, every other byte as it was. `ref` is a key (`syntax`, `#syntax`) or a position (`#3`).

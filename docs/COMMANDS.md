@@ -626,7 +626,24 @@ lines walk the points in their order and count each as learned in full (a droppe
 at the first point where the sum comes to its threshold (a percent of the possible XP; a path without XP counts its
 points). `at the start` is a threshold of 0, `not reachable` one the path cannot reach (more XP than it has, or XP on a
 path without any). `without-xp` lines name the points that carry no XP. `--format=json` gives the same as one object
-(`points`, `xp`, `stages`, `levels` with `at { index, line, key, label, stage }`, `without_xp`).
+(`points`, `xp`, `optional`, `stages`, `levels` with `at { index, line, key, label, stage }`, `without_xp`). Optional
+points (`{optional}`) stand apart in a line `optional` and count in none of the other lines.
+
+`path <area>/<slug> --schedule` prints the table of `## Zeitplan` made from the tree, for a path with a fixed rhythm:
+each point (one level below a stage, or a stage itself) with planned hours `{h=8}` or `{h=8-10}` is a row, with the
+hours it took when it carries `{done_h=9}`, its result (the text of its first child `Nachweis:`, `Aufgabe:` or
+`Ergebnis:`) and its state (`offen`, `teilweise n/m`, `erledigt`); a last row sums the hours. `--write` puts it into
+the file between `<!-- GENERATED:schedule start -->` and `<!-- GENERATED:schedule end -->` (the first time in place of
+the hand-kept table of the section) and prints `schedule\t<id>\t<n> rows\twritten` (or `unchanged`). A path without
+`{h=…}` has no schedule (exit 1); nothing asks for one.
+
+```
+| Sitzung | Dauer | Ergebnis | Stand |
+| --- | --- | --- | --- |
+| Woche 1: Prozesse | 8–10 h (gebraucht 9 h) | `fork`-Experimente. | erledigt |
+| Woche 2: Nebenläufigkeit | 8–10 h | Producer/Consumer mit POSIX-Threads | teilweise 1/3 |
+| Summe | 16–20 h (gebraucht 9 h) | | 1/2 erledigt |
+```
 
 Headless `paths [<area>] [--project=<id>] [--format=tsv|json]` lists the open learning paths, one TSV line each: id,
 status, `points <n>` (leaves of `## Lernpunkte`), `open <n>` and the progress in percent (of the XP when the path has

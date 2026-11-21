@@ -599,6 +599,18 @@ the XP (or percent) missing, `open_rewards` the rewards reached but not granted.
 `level-bad-mark`, `level-order` (thresholds that do not rise), `level-badge-outside`, `level-badge-missing`
 (warnings) and, for a path with levels, the hint `xp-missing` (points without XP count nothing towards them).
 
+#### Hours and the schedule
+
+A path with a fixed rhythm (weeks, sessions) keeps its sessions as points of the tree and its schedule made from them,
+not twice. `{h=N}` or `{h=N-M}` on a point (beside `{xp=…}`, any order; whole hours or one decimal, up to 1000) are
+the hours it is planned for, `{done_h=N}` the hours it took (`LP-10`); any node may carry them, nothing sums them up
+the tree, a value that is no such number is `path-bad-hours`. `tasks_nvim.path_schedule` makes the table of
+`## Zeitplan` from the points with hours one level below a stage (or a stage itself): `Sitzung`, `Dauer` (planned,
+and taken), `Ergebnis` (the first child `Nachweis:`, `Aufgabe:` or `Ergebnis:`), `Stand` (`offen`, `teilweise n/m`,
+`erledigt`), and a row that sums the hours. `tasks path <id> --schedule --write` (`paths.write_schedule`) writes it
+between `<!-- GENERATED:schedule start -->` and `<!-- GENERATED:schedule end -->`; the first time it takes the place
+of the hand-kept table of the section. A path without hours has no schedule and no finding about it.
+
 #### Optional subtrees
 
 `{optional}` on a node (beside `{xp=N}` and `{#key}`, in any order; mostly the group of books, `LP-11`) makes it and
@@ -966,7 +978,8 @@ nvim --headless -u NONE -l scripts/tasks.lua check
 | `estimate [area] [--for=id] [filters]` | the estimate line, `quick wins:`, `unestimated:` |
 | `path-new <area> <title> [--slug --areas --target --project --tags --status --summary --links --icon --cover --template=learning] [--no-index]` | create a learning path under `ROADMAP/paths/` through `paths.new` (no stages: `--phases` is no option); the editor's `:Tasks path-new` makes it and opens it. `--no-index` is accepted for scripts and changes nothing: a new path is in no index |
 | `path-new <area> --from=<draft.md> [--slug=s] [--dry-run]` | a whole learning path from one draft file (`tasks_nvim.path_draft`): the slug as `path-new` gives the draft's title, `status`/`created`/`updated` added when missing, then `check.path_file_findings` on the text as if it were in place. Any error or warning refuses it before anything is written: one stderr line per finding with the draft's line and the code, `refused`, exit 1; a hint does not refuse. `--dry-run` prints `would-create` and writes nothing |
-| `path <area>/<slug> [--format=text\|json]` | the XP overview of an open learning path (`path_stats`): points (all, open, learned, seen, dropped, without XP), XP (in all, earned, open), one line per stage (a root of `## Lernpunkte`), one per level with the point at which it is reached when the points are learned in order, and the points without XP |
+| `path <area>/<slug> [--format=text\|json]` | the XP overview of an open learning path (`path_stats`): points (all, open, learned, seen, dropped, without XP), XP (in all, earned, open), the optional points apart, one line per stage (a root of `## Lernpunkte`), one per level with the point at which it is reached when the points are learned in order, and the points without XP |
+| `path <area>/<slug> --schedule [--write]` | the table of `## Zeitplan` made from the points with `{h=…}` (`path_schedule`); `--write` puts it between `<!-- GENERATED:schedule start/end -->` |
 | `milestone-new <area> <title> [--due --includes --close --status --summary --slug]` | create a milestone under `ROADMAP/milestones/` (`milestones.new`); the members must exist in this vault |
 | `milestones [<area>] [--format=tsv\|json]` | the milestones: id, status, due, members done/all (and `overdue`), title |
 | `plan-new <area> <title> [--slug --areas --target --phases --gate --summary --template=learning]` | create a plan file under `ROADMAP/plans/`; `--template=learning` writes the sections of a learning plan and proposes the stages `orientieren, grundlagen, vertiefen, anwenden, festigen` (stages given win). `paths.new` takes the same template: goal and competence level, access, schedule, sources (with the column `Geprüft`: the date a source was opened, or `ungeprüft`), `## Lernpunkte` (its hints name the stages `orientieren` … `festigen` as top points and the literature group with its line `Fehlt im Bestand`), `## Level` (a commented example; optional), self-check, open questions, repetition, `## Ergebnis schreiben` |

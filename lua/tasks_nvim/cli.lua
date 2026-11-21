@@ -116,6 +116,11 @@ commands:
                                           at which it is reached when the points are learned in their order; the
                                           optional points ({optional} on a node) apart: they count for no level in
                                           percent and not for the path being done, their XP once earned do
+  path <area>/<slug> --schedule [--write]
+                                          the table of ## Zeitplan made from the tree: each point with planned hours
+                                          ({h=8} or {h=8-10}; {done_h=9} the hours it took), its result (the child
+                                          Nachweis:/Aufgabe:/Ergebnis:) and its state; --write puts it into the file
+                                          between <!-- GENERATED:schedule start/end --> (a hand-kept table gives way)
   paths [<area>] [--project=<id>] [--format=tsv|json]
                                           the learning paths: id, status, points, open points, progress in percent
                                           (of the XP, else of the points), title; --project: the paths of a project,
@@ -467,7 +472,7 @@ local SPECS = {
     },
     flag = {},
   },
-  path = { value = { "format" }, flag = {} },
+  path = { value = { "format" }, flag = { "schedule", "write" } },
   paths = { value = { "project", "format" }, flag = {} },
   ["path-new"] = {
     value = {
@@ -1506,15 +1511,58 @@ commands["path-new"] = function(ctx)
 end
 
 ---`path <area>/<slug> [--format=text|json]`: the XP overview of an open learning path (`path_stats`).
+---`--schedule [--write]`: the table of `## Zeitplan` made from the tree (`path_schedule`), shown or written.
 ---@param ctx Tasks.CliCtx
 ---@return integer code
 commands.path = function(ctx)
   local args, eo = ctx.args, ctx.eo
   local id = args.pos[1]
   local format = args.opt.format or "text"
-  if not id or #args.pos > 1 or (format ~= "text" and format ~= "json") then
-    ctx.warn("error: usage: path <area>/<slug> [--format=text|json]")
+  local schedule, write = args.opt.schedule == true, args.opt.write == true
+  if
+    not id
+    or #args.pos > 1
+    or (format ~= "text" and format ~= "json")
+    or (write and not schedule)
+    or (schedule and args.opt.format ~= nil)
+  then
+    ctx.warn(
+      "error: usage: path <area>/<slug> [--format=text|json]  |  path <area>/<slug> --schedule [--write]"
+    )
     return 2
+  end
+  if schedule then
+    local sched = require("tasks_nvim.path_schedule")
+    if write then
+      local res, werr =
+        require("tasks_nvim.paths").write_schedule(id, { root = eo.root, today = eo.today })
+      if not res then
+        ctx.warn("error: " .. tostring(werr))
+        return 1
+      end
+      ctx.say(
+        ("schedule\t%s\t%d rows\t%s"):format(
+          res.id,
+          res.rows,
+          res.changed and "written" or "unchanged"
+        )
+      )
+      return 0
+    end
+    local sfile, serr = require("tasks_nvim.paths").find(id, { root = eo.root })
+    if not sfile then
+      ctx.warn("error: " .. tostring(serr))
+      return 1
+    end
+    local lines = sched.render(sched.rows(sfile.tree or require("tasks_nvim.lernbaum").parse("")))
+    if not lines then
+      ctx.warn("error: no point carries {h=…}: nothing to put in ## Zeitplan")
+      return 1
+    end
+    for _, l in ipairs(lines) do
+      ctx.say(l)
+    end
+    return 0
   end
   local file, err = require("tasks_nvim.paths").find(id, { root = eo.root })
   if not file then
