@@ -67,6 +67,11 @@ return {
       expect = [[vim.fn.filereadable(_G.root .. "/lib.nvim/ROADMAP/TASKS.md") == 0]],
       note = "the working tree stays as it was",
     },
+    {
+      expect = [[_G.out:find("keeps its lib.nvim/ROADMAP/TASKS.md", 1, true) ~= nil
+        and _G.out:find("Do not `git add` it now", 1, true) ~= nil]],
+      note = "it says the tree keeps another index file and warns against staging that one over the new index",
+    },
   },
   judge = {},
   manual = {},
