@@ -122,4 +122,26 @@ return function(H)
     )
   )
   eq(by_path_ok, 0, "a commit with paths and a matching index passes: " .. by_path_ok_err)
+
+  -- A tasks.nvim from before the check (found first, e.g. a shared checkout not pulled yet) ends with a usage error:
+  -- that is no verdict, so the commit goes through with a note instead of every commit of the vault being refused.
+  local old = H.tmpdir() .. "/old-tasks.nvim"
+  H.write(old .. "/scripts/tasks.lua", 'io.stderr:write("error: unknown option\\n") os.exit(2)\n')
+  F.task(H, root, "lib.nvim", "six", F.meta("Six", "open"))
+  git({ "add", "--", "lib.nvim/ROADMAP/tasks/six.md" })
+  local with_old = vim
+    .system(
+      vim.list_extend({ "git", "-C", root }, vim.list_extend(vim.deepcopy(commit), { "-m", "six" })),
+      { text = true, env = { TASKS_NVIM_DIR = old } }
+    )
+    :wait()
+  eq(
+    with_old.code,
+    0,
+    "an engine without the check lets the commit pass: " .. tostring(with_old.stderr)
+  )
+  ok(
+    tostring(with_old.stderr):find("does not know index --staged --check", 1, true),
+    "and says why: " .. tostring(with_old.stderr)
+  )
 end
