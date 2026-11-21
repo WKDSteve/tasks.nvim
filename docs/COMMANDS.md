@@ -783,6 +783,7 @@ their claim, and the dashboard marks a claimed line (`[claim: mine]`, `[claim: <
 nvim --headless -u NONE -l scripts/tasks.lua agent-brief                          # Markdown
 nvim --headless -u NONE -l scripts/tasks.lua agent-brief --by=ai-desktop:job-42   # the claim name of the examples
 nvim --headless -u NONE -l scripts/tasks.lua agent-brief --format=json            # tasks-agent-brief/1
+nvim --headless -u NONE -l scripts/tasks.lua agent-brief --repo=<dir> --format=json   # with the checks of that repository
 ```
 
 The text an agent (ai-desktop, ai.nvim) gets as a tool description when a job comes from the tasks family: the workflow
@@ -791,8 +792,27 @@ is a stop), the allowed values of every field and the command reference. Nothing
 from the engine's model and the reference is the `--help` text of this CLI, so a new command or category reaches the
 brief without an edit. It names `brief_version`, the contract version (`contract_schema`, as in `call hello`) and the
 engine version; `--format=json` carries the same Markdown in `markdown` next to those numbers, in canonical key order, so
-a caller compares the versions of the brief it holds and asks for a new one. `--by` (default `ai-desktop:<job>`, one
-word up to 80 characters) only fills the examples. It reads no vault.
+a caller compares the versions of the brief it holds and asks for a new one. `--by` (default `ai-desktop:<job>`, a
+claim name of up to 64 characters) only fills the examples. It reads no vault. Every brief names the staging rule of a
+shared checkout: only own files by path, never `git add -A`, `git add .` or `git commit -a`.
+
+`--repo=<dir>` (the checkout the agent works in) adds the section "Checking": how that repository is checked before
+commit and push, never invented.
+
+- With a `.testing.lua` (testing.nvim): after every commit `scripts/test.sh ci commit <sha> --quick -- --cached` (the
+  verdict on the first line: `CLEAN`, `KNOWN-RED`, `FLAKY` go on, `REGRESSION` is fixed at once); before the push
+  `git pull --rebase origin main`, `git log origin/main..HEAD` and once the final run
+  `scripts/test.sh ci commit HEAD --base=origin/main --wsl -- --cached` (`--wsl` on Windows only), then
+  `git push origin HEAD:main`. With `ci.workflow.land = true` `scripts/test.sh ci land` replaces the final run and the
+  push (the hosted CI checks it, main moves only when green). Without `scripts/test.sh` the commands start with
+  `testing`. The file is loaded in an empty environment (no `vim`, `os`, `io`, `require`) with an instruction budget, so
+  building the brief starts nothing; a file that needs more is read as text for `land = true`.
+- Without it: the commands of the fenced blocks in the section "Vor jedem Commit" (or "Before every commit") of the
+  repository's `CLAUDE.md`, then pull, `git log origin/main..HEAD` and the push. Without such a section: no checks.
+
+`--format=json` then carries `checks`: `source` (`testing`, `claude-md` or `none`), `land`, `per_commit` (with `<sha>`
+to fill in), `before_push`, `commands` (from `CLAUDE.md`), `sync`, `review` and `push`, the exact command lines, for a
+caller that allows its agent to run just these. Neither the Markdown nor `checks` names the directory.
 
 ### `:Tasks claim <id>` and `:Tasks unclaim <id>`
 

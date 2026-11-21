@@ -217,9 +217,11 @@ commands:
                                           the AI's answer; shown only, written with --yes
   check [<area>]                          rule check; exit 1 on any error
   template [--title=t] [--kind=k] [--prio=n] [--effort=e] [--tags=a,b] [--lang=de|en] [--with-plan]
-  agent-brief [--format=md|json] [--by=<claim name>]   the brief for an AI agent: workflow (claim, set, new, done),
-                                          allowed values and this command reference, with the contract version;
-                                          --by is the claim name in its examples (default ai-desktop:<job>); no vault
+  agent-brief [--format=md|json] [--by=<claim name>] [--repo=<dir>]   the brief for an AI agent: workflow (claim,
+                                          set, new, done), allowed values and this command reference, with the
+                                          contract version; --by is the claim name in its examples (default
+                                          ai-desktop:<job>); --repo adds how that repository is checked before
+                                          commit and push (its .testing.lua, else its CLAUDE.md); no vault
   ci [--strict] [--no-lint] [--md-lint=<file>] [--trust-vault-lint]   CI gate: check + index --check + md_lint of the
                                           generated indexes; exit 0/1 (--strict: warnings fail too).
                                           md_lint is a script RUN from the vault (TOOLS/scripts/md_lint.lua): it runs only with
@@ -518,7 +520,7 @@ local SPECS = {
     value = { "title", "kind", "prio", "effort", "tags", "lang" },
     flag = { "with-plan" },
   },
-  ["agent-brief"] = { value = { "format", "by" }, flag = {} },
+  ["agent-brief"] = { value = { "format", "by", "repo" }, flag = {} },
   areas = { value = { "format" }, flag = {} },
   export = { value = { "top", "link-prefix" }, flag = { "no-links" } },
   import = { value = { "from-rules", "lang" }, flag = { "apply", "dry-run" } },
@@ -2709,8 +2711,9 @@ function commands.ci(ctx)
   return res.code
 end
 
----`agent-brief [--format=md|json] [--by=<name>]`: the tasks-family brief for an AI agent (`tasks_nvim.agent_brief`),
----built from this file's USAGE so the command reference is never written twice. Reads no vault.
+---`agent-brief [--format=md|json] [--by=<name>] [--repo=<dir>]`: the tasks-family brief for an AI agent
+---(`tasks_nvim.agent_brief`), built from this file's USAGE so the command reference is never written twice; `--repo`
+---adds the checks of that repository. Reads no vault.
 commands["agent-brief"] = function(ctx)
   local opt = ctx.args.opt
   if #ctx.args.pos > 0 then
@@ -2727,7 +2730,16 @@ commands["agent-brief"] = function(ctx)
     ctx.warn("error: " .. berr)
     return 2
   end
-  local brief_opts = { usage = USAGE, by = by }
+  local checks ---@type tasks.AgentBriefChecks|nil
+  if opt.repo ~= nil then
+    local cerr
+    checks, cerr = agent_brief.checks(opt.repo --[[@as string]])
+    if not checks then
+      ctx.warn("error: " .. cerr)
+      return 2
+    end
+  end
+  local brief_opts = { usage = USAGE, by = by, checks = checks }
   ctx.out(format == "json" and agent_brief.json(brief_opts) or agent_brief.markdown(brief_opts))
   return 0
 end
