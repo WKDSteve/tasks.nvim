@@ -17,6 +17,13 @@ return function(H)
 
   eq(select(1, vault.root({ root = root })), root, "explicit opts.root wins")
   eq(select(1, vault.root({ root = root .. "/" })), root, "trailing slash stripped")
+  -- a root relative to the working directory (`--vault=.`, `--vault=../vault`) is the absolute folder
+  local cwd = vim.fn.getcwd()
+  vim.fn.chdir(root)
+  eq(select(1, vault.root({ root = "." })), root, "'.' is the working directory")
+  vim.fn.chdir(root .. "/lib.nvim")
+  eq(select(1, vault.root({ root = ".." })), root, "'..' is folded")
+  vim.fn.chdir(cwd)
   eq(select(1, vault.root({ root = (root:gsub("/", "\\")) })), root, "backslashes normalised")
 
   local none, err = vault.root({ root = root .. "/does-not-exist" })

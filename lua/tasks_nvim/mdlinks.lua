@@ -214,21 +214,11 @@ function M.shift(text)
   return table.concat(parts), count
 end
 
----The file a relative target names, below `dir`: without `#anchor` and `?query`, percent-escapes decoded.
----@param dir string
----@param target string
----@return string|nil path  # nil: the target names no file (only an anchor or a query)
-function M.resolve(dir, target)
-  local t = target:gsub("[#?].*$", "")
-  if t == "" then
-    return nil
-  end
-  t = t:gsub("%%(%x%x)", function(hex)
-    return string.char(tonumber(hex, 16))
-  end)
-  -- `..` is folded by the text, not by the file system: Linux cannot climb out of a folder that is not there yet
-  -- (`paths/../tasks/x.md` of a draft whose `paths/` is not made), Windows can. The answer is the same on both.
-  local joined = dir .. "/" .. t
+---`.` dropped and `..` folded by the text, not by the file system: Linux cannot climb out of a folder that is not there
+---yet (`paths/../tasks/x.md` of a draft whose `paths/` is not made), Windows can. The answer is the same on both.
+---@param joined string  # `/` separated
+---@return string
+local function fold(joined)
   local lead = joined:match("^%a:/") or joined:match("^/+") or ""
   local parts = {}
   for seg in joined:sub(#lead + 1):gmatch("[^/]+") do
@@ -243,15 +233,39 @@ function M.resolve(dir, target)
   return lead .. table.concat(parts, "/")
 end
 
+---The file a relative target names, below `dir`: without `#anchor` and `?query`, percent-escapes decoded.
+---@param dir string
+---@param target string
+---@return string|nil path  # nil: the target names no file (only an anchor or a query)
+function M.resolve(dir, target)
+  local t = target:gsub("[#?].*$", "")
+  if t == "" then
+    return nil
+  end
+  t = t:gsub("%%(%x%x)", function(hex)
+    return string.char(tonumber(hex, 16))
+  end)
+  return fold(dir .. "/" .. t)
+end
+
 ---The first folder outside `root` that `path` lies in: the neighbour repo a link out of the vault leads into
 ---(`../../../../Literatur/x.md` of a path names `<parent of the vault>/Literatur`). Both are absolute, `/` separated
----(`resolve` gives such a path). nil when `path` is inside `root` or no folder of it can be named.
+---(`resolve` gives such a path). A relative `root` or `path` (`--vault=.`) counts from the working directory: both are
+---made absolute first, else `.` has no parent to climb to. nil when `path` is inside `root` or no folder of it can be
+---named.
 ---@param root string
 ---@param path string
 ---@return string|nil folder  # The folder on this machine (to look whether it is there).
 ---@return string|nil label   # The same folder as seen from `root` (`../Literatur`): no path of this machine.
 function M.outside_folder(root, path)
-  root = fsio.norm(root)
+  local function absolute(p)
+    p = fsio.norm(p)
+    if not (p:match("^/") or p:match("^%a:/")) then
+      p = fsio.norm(vim.fn.getcwd()) .. "/" .. p
+    end
+    return fold(p)
+  end
+  root, path = absolute(root), absolute(path)
   local function under(base)
     return path:sub(1, #base + 1) == base .. "/"
   end

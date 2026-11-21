@@ -260,6 +260,12 @@ function M.root(opts)
     return nil, "vault path holds a NUL byte"
   end
   candidate = fsio.norm(candidate)
+  -- A root given relative to the working directory (`--vault=.`) is made absolute here, once: every path built from it,
+  -- the redaction of the contract's documents, the vault's id and the folders outside the vault (`check`) need the
+  -- real folder, not `.`.
+  if not (candidate:match("^/") or candidate:match("^%a:/")) then
+    candidate = fsio.norm(vim.fs.normalize(vim.fn.fnamemodify(candidate, ":p")))
+  end
   if not fsio.is_dir(candidate) then
     return nil, "vault is not a directory: " .. candidate
   end

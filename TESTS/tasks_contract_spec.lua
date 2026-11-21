@@ -1214,6 +1214,21 @@ return function(H)
     "payload_too_large",
     "a request over 256 KiB"
   )
+  -- a vault given relative to the working directory (`--vault=.`) answers as the absolute one does: the files stay
+  -- below the vault, the redaction does not eat the dots of a message
+  do
+    local cwd = vim.fn.getcwd()
+    vim.fn.chdir(root)
+    local rel_text = api.call("snapshot", nil, { root = "." })
+    vim.fn.chdir(cwd)
+    local abs_text = api.call("snapshot", nil, { root = root })
+    local function strip(t)
+      local d = vim.json.decode(t)
+      d.generated_at, d.digest = nil, nil
+      return d
+    end
+    eq(strip(rel_text), strip(abs_text), "root '.' is the same vault as its absolute path")
+  end
   local missing = api.call("snapshot", nil, { root = root .. "/no-such-folder" })
   eq(vim.json.decode(missing).code, "not_found", "no vault")
   lacks(missing, root, "...and its message does not name the path")

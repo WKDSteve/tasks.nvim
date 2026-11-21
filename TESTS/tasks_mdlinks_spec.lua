@@ -280,5 +280,29 @@ return function(H)
     )
   )
   ok(not hint.message:find(parent, 1, true), "the hint names no path of this machine")
+  -- the vault given relative to the working directory (`--vault=.`): the same hint, the same warning
+  local cwd = vim.fn.getcwd()
+  vim.fn.chdir(root)
+  eq(
+    { mdlinks.outside_folder(".", "../" .. absent .. "/x.md") },
+    { parent .. "/" .. absent, "../" .. absent }
+  )
+  local rres = check.run({ root = ".", today = F.TODAY })
+  vim.fn.chdir(cwd)
+  local rel_hints, rel_warn = 0, 0
+  for _, h in ipairs(rres.hints) do
+    rel_hints = rel_hints + (h.code == "link-repo-absent" and 1 or 0)
+  end
+  for _, f in ipairs(rres.findings) do
+    if f.code == "path-link-missing" or f.code == "link-missing" then
+      ok(
+        not f.message:find(absent, 1, true),
+        "root '.': no warning names the absent repo: " .. f.message
+      )
+      rel_warn = rel_warn + (f.message:find(present, 1, true) and 1 or 0)
+    end
+  end
+  eq(rel_hints, 1, "root '.': one hint for the absent repo")
+  eq(rel_warn, 1, "root '.': the missing file of the repo that is there stays a warning")
   vim.fn.delete(parent .. "/" .. present, "rf")
 end

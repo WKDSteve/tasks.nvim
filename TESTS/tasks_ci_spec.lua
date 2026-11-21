@@ -184,6 +184,13 @@ return function(H)
   res = ci.run({ root = root, strict = true, run_lint = runner(0) })
   eq(res.code, 0, "an absent neighbour repo is no warning: " .. table.concat(res.lines, "\n"))
   lacks(table.concat(res.lines, "\n"), "link-missing")
+  -- the same with the vault given relative to the working directory (`--vault=.`, as a user or a hook calls it)
+  local cwd = vim.fn.getcwd()
+  vim.fn.chdir(root)
+  res = ci.run({ root = ".", strict = true, run_lint = runner(0) })
+  vim.fn.chdir(cwd)
+  eq(res.code, 0, "--vault=. sees the absent repo too: " .. table.concat(res.lines, "\n"))
+  lacks(table.concat(res.lines, "\n"), "link-missing")
   -- the repo is there but the file is not: a warning again, and --strict fails on it
   vim.fn.mkdir(neighbour, "p")
   res = ci.run({ root = root, strict = true, run_lint = runner(0) })
@@ -260,6 +267,30 @@ return function(H)
     eq(ccode, 0, cout)
     has(cout, "tasks-ci: OK")
     has(cout, "md_lint: 2 index file(s) clean")
+    -- `--vault=.` from inside the vault: a link into a neighbour repo that is not checked out is no warning
+    local beta = root .. "/cascade.nvim/ROADMAP/tasks/beta.md"
+    local beta_text = H.read(beta)
+    H.write(
+      beta,
+      beta_text .. "\nSee [book](../../../../absent-" .. vim.fs.basename(root) .. "/book.md).\n"
+    )
+    local rel = vim
+      .system({
+        vim.v.progpath,
+        "--headless",
+        "-u",
+        "NONE",
+        "-l",
+        script_dir .. "/scripts/tasks-ci.lua",
+        "--vault=.",
+        "--strict",
+        "--md-lint=" .. own,
+      }, { text = true, cwd = root, env = { LIB_NVIM_DIR = lib } })
+      :wait(60000)
+    local rel_out = (rel.stdout or "") .. (rel.stderr or "")
+    eq(rel.code, 0, "--vault=. --strict: " .. rel_out)
+    lacks(rel_out, "link-missing")
+    H.write(beta, beta_text)
 
     H.write(
       root .. "/cascade.nvim/ROADMAP/TASKS.md",
