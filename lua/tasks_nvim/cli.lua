@@ -68,7 +68,7 @@ usage: nvim --headless -u NONE -l scripts/tasks.lua <command> [args]
 commands:
   list [<area>] [--status=a,b] [--prio=1,2|<=2] [--effort=S,M|<=M] [--kind=k] [--tag=t]
        [--category=c,d] [--severity=high,critical] [--value=4,5|>=4] [--actor=cdx,me,pair,none]
-       [--waits-for=key,key|none] [--outcome=learned,seen,not-applicable|none]
+       [--waits-for=key,key|none] [--outcome=learned,seen,not-applicable|none] [--ci=pending,green,red|none]
        [--stale=<days>|refs] [--stale-refs] [--blocked] [--reminders] [--ready|--waiting] [--unestimated] [--quick-win]
        [--overdue] [--due-before=YYYY-MM-DD] [--starts-after=YYYY-MM-DD]
        [--sheet=red,stale,never,inbox,manual,green,unknown|any|none]
@@ -182,6 +182,8 @@ commands:
                                           [--no-next] [--unblock] [--last]  (--commits adds to the task's own `commits`)
                                           [--outcome=learned|seen|not-applicable] [--reason=text]  how it ended:
                                           seen and not-applicable need a reason (or the task's own outcome_reason)
+                                          [--ci=pending|green|red]  the CI state of the commits (later:
+                                          set <id> ci=green, on the finished task too)
                                           finish: move to Backlog/; prints the tasks it freed and what to start
                                           next; --unblock sets the freed tasks that still say blocked to open;
                                           a routine (`repeat: 8w`) starts its next round (--last: it ends for good)
@@ -272,6 +274,7 @@ local SPECS = {
       "severity",
       "waits-for",
       "outcome",
+      "ci",
       "value",
       "actor",
       "stale",
@@ -503,7 +506,7 @@ local SPECS = {
   unpromote = { value = {}, flag = { "dry-run", "no-index" } },
   ["migrate-actor"] = { value = {}, flag = { "write", "no-index" } },
   done = {
-    value = { "done-in", "commits", "date", "remind", "by", "note", "outcome", "reason" },
+    value = { "done-in", "commits", "ci", "date", "remind", "by", "note", "outcome", "reason" },
     flag = { "no-index", "no-next", "unblock", "last", "force" },
   },
   -- `latest` is both: `--latest` (the configured screenshot folders) and `--latest=<folder>`.
@@ -626,6 +629,7 @@ local function filter_option_map(opt)
     severity = opt.severity --[[@as string|nil]],
     waits_for = opt["waits-for"] --[[@as string|nil]],
     outcome = opt.outcome --[[@as string|nil]],
+    ci = opt.ci --[[@as string|nil]],
     value = opt.value --[[@as string|nil]],
     actor = opt.actor --[[@as string|nil]],
     stale = opt.stale --[[@as string|nil]],
@@ -2241,7 +2245,7 @@ function commands.done(ctx)
   local id = args.pos[1]
   if not id or #args.pos > 1 then
     ctx.warn(
-      "error: usage: done <area>/<slug> [--commits=repo@sha,...] [--done-in=text] [--date=YYYY-MM-DD] [--remind=7d|YYYY-MM-DD] [--outcome=learned|seen|not-applicable] [--reason=text]"
+      "error: usage: done <area>/<slug> [--commits=repo@sha,...] [--done-in=text] [--date=YYYY-MM-DD] [--remind=7d|YYYY-MM-DD] [--outcome=learned|seen|not-applicable] [--reason=text] [--ci=pending|green|red]"
     )
     return 2
   end
@@ -2252,6 +2256,7 @@ function commands.done(ctx)
     commits = args.opt.commits --[[@as string|nil]],
     outcome = args.opt.outcome --[[@as string|nil]],
     outcome_reason = args.opt.reason --[[@as string|nil]],
+    ci = args.opt.ci --[[@as string|nil]],
     remind = args.opt.remind
         and (args.opt.remind:match("^%d+[dw]$") and "+" .. args.opt.remind or args.opt.remind)
       or nil,

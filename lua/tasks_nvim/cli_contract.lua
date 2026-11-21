@@ -242,6 +242,7 @@ local function run_show(ctx)
   field("icon", t.icon and ("%s (%s)"):format(t.icon.value, t.icon.kind) or nil)
   field("cover", t.cover)
   field("commits", t.commits)
+  field("ci", t.ci)
   field("open_questions", t.open_questions)
   if t.sheets then
     field("sheets", require("tasks_nvim.sheets").describe(t.sheets))
@@ -577,8 +578,13 @@ function M.list_done(ctx, filter, area, format, helpers)
     else
       ctx.say(table.concat({
         fsio.clean(t.id),
-        -- how it ended rides on the status (`done:seen`): a task without an outcome reads as it always did
-        helpers.cellv(t.outcome and (tostring(t.status) .. ":" .. t.outcome) or t.status),
+        -- how it ended rides on the status (`done:seen`), and so does the CI state of its commits (`done ci=red`): a
+        -- task without either reads as it always did
+        helpers.cellv(
+          (t.outcome or t.ci)
+              and ((t.outcome and (tostring(t.status) .. ":" .. t.outcome) or tostring(t.status)) .. (t.ci and (" ci=" .. t.ci) or ""))
+            or t.status
+        ),
         helpers.cellv(t.prio),
         helpers.cellv(t.effort),
         helpers.cellv(t.kind),

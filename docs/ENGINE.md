@@ -671,6 +671,21 @@ The Backlog row names it after the date (`(2026-11-19, seen: no Mac)`), `list --
 `done_preview` and the result of `done` carry `outcome` and `outcome_reason`. The next round of a routine starts
 without them. The contract (`tasks.finished`, `donepreview`) does not carry the fields yet.
 
+#### The CI state of the commits (`ci`)
+
+`commits` names what was pushed for a task, not whether the CI of those commits passed. The optional key `ci` says it:
+`pending` (pushed, no verdict yet: the hosted CI still runs or waits for a runner), `green` (the CI passed on every
+system) or `red` (it failed). No `ci` reads as "not known", as for every task finished before the key existed.
+
+`tasks done <id> --commits=... --ci=pending` writes it with the finish (an agent finishes so as long as the CI has not
+answered); without `--ci` the task's own `ci` stays as it is. The verdict follows later with `tasks set <id> ci=green`
+(or `red`, or `ci=` to take it away): `ci` is bookkeeping like `remind`, so `set` changes it on the finished task in
+`Backlog/` too, without touching `updated` (`mutate.BOOKKEEPING`). `list --done` shows it on the status (`done ci=red`,
+`done:seen ci=green`) and filters with `--ci=pending,green,red|none`: `tasks list --done --ci=pending,red` lists what
+still waits for a verdict or is red. `show` prints `ci:`. The next round of a routine starts without it. `check` refuses
+another word (`unknown-ci`). The contract carries it on task entries and on `tasks.finished` (capability `ci`); the
+write door's `done` takes `ci`, its `set` takes `ci` in the patch.
+
 ### The marker file `tasks-vault.json`
 
 An optional file in the vault root marks a folder as a tasks vault. Without it every folder works as before; with it the
@@ -731,6 +746,7 @@ file that is there (also not a refused one). Nobody else writes it: a person edi
 | `ui-tag-without-ux` (warning) | an open task has a UI tag (`ui`, `ui-kit`, `webui`, `page`, `overlays`, `dashboard`; `check.UI_TAGS`) but not the category `ux`: the category is the one source for "touches the surface", a tag only says which part |
 | `ui-word-without-ux` (hint) | a word of `check.UI_WORDS` (Fenster, Knopf, Button, Dialog, Ansicht, Oberfläche, UI, view, window; German nouns also at the end of a compound) is in the title of an open task with neither the category `ux` nor a UI tag. A hint is never an error or a warning: it is in `result.hints`, shown by `:Tasks index --check` and the CLI `check` as `info`, and not in the document `tasks.check`. `setup({ check = { ui_words_off = { "<vault name or folder>" } } })` switches it off for a vault |
 | `severity-without-bug-or-security` (warning) | `severity` on a task that is neither `kind: bug` nor in the bug / security category |
+| `unknown-ci` (error) | `ci` is none of `pending`, `green`, `red` |
 | `invalid-waits-for` (error) | `waits_for` is not one key: a lower-case word of a-z, 0-9 and `-`, at most 40 characters, not `none` |
 | `waits-for-without-parked` (warning) | `waits_for` on a task that is not `parked`: only a parked task waits (the engine drops the key when the status leaves `parked`; this is a file edited by hand) |
 | `unknown-outcome` (error) | `outcome` is none of `learned`, `seen`, `not-applicable` |

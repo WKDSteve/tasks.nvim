@@ -54,6 +54,7 @@
 ---@field sheets? Tasks.SheetsSummary  # The test-sheet block of testing.nvim (`tasks_nvim.sheets`); nil without the block.
 ---@field done_in? string
 ---@field commits string[]            # Every commit made for the task, `repo@sha` each (empty without the key).
+---@field ci? string                  # The CI state of those commits (`model.CI_STATES`); nil: none written, or an unknown word (see `errors`).
 ---@field summary string             # Frontmatter `summary`, else the first body paragraph; "" when neither.
 ---@field icon? Tasks.Icon           # Frontmatter `icon`: an emoji, a file below `assets/` or a word (`model.icon_of`).
 ---@field cover? string             # Frontmatter `cover`: a large picture below `assets/` of the task folder.
@@ -78,6 +79,7 @@
 ---@field effort_max? string           # Matches an effort of at most this (sizes and days on one scale; no effort never matches).
 ---@field severity? string|string[]    # Matches the written severity (a task without severity never matches).
 ---@field outcome? string|string[]     # How a finished task ended (`model.OUTCOMES`); `none`: no outcome written.
+---@field ci? string|string[]          # The CI state of the task's commits (`model.CI_STATES`); `none`: no `ci` written.
 ---@field waits_for? string|string[]   # Parked tasks that wait for one of these keys; `none`: parked without a reason.
 ---@field value? integer|integer[]     # Matches the written value (a task without value never matches).
 ---@field value_min? integer           # Matches value >= value_min (a task without value never matches).

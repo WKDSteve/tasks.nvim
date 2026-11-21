@@ -342,6 +342,10 @@ export type PlanAssets = string[];
  */
 export type PlanAssetsTruncated = true;
 /**
+ * The CI state of a task's commits beside `commits` (capability `ci`): pending (pushed, no verdict yet), green (the CI passed on every system) or red (it failed). Absent: not known.
+ */
+export type Ci = "pending" | "green" | "red";
+/**
  * How a finished task ended beside `status: done` (capability `outcome`): learned, seen (looked at, not done) or not-applicable. Absent: done as meant.
  */
 export type Outcome = "learned" | "seen" | "not-applicable";
@@ -1376,6 +1380,7 @@ export interface TaskEntry {
    * The task has more meetings than `meetings` names.
    */
   meetings_truncated?: true;
+  ci?: Ci;
   outcome?: Outcome;
   /**
    * Why it ended so (required by the engine for `seen` and `not-applicable`). Capability `outcome`.
@@ -1680,6 +1685,7 @@ export interface FinishedItem {
   phase?: string;
   done_in?: string;
   commits?: string[];
+  ci?: Ci;
   outcome?: Outcome;
   /**
    * Why it ended so (required by the engine for `seen` and `not-applicable`). Capability `outcome`.

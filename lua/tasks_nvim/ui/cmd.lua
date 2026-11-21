@@ -2464,6 +2464,7 @@ local function finish_task(id, opts)
       or nil,
     outcome = opts.outcome,
     outcome_reason = opts.outcome_reason,
+    ci = opts.ci,
   })
   if not flow then
     notify.error(tostring(err))
@@ -2689,6 +2690,7 @@ function M.task_done(ctx)
     remind = ctx.kv.remind,
     outcome = ctx.kv.outcome,
     outcome_reason = ctx.kv.reason,
+    ci = ctx.kv.ci,
   }
   local task = scan.find(id)
   if not task or ctx.flags.yes then

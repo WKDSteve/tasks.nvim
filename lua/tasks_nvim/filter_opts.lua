@@ -47,7 +47,7 @@ end
 ---words the same way. Unknown words are an error, never silently ignored.
 ---`stale` may be a number, a digit string or `refs` (same as `stale_refs`: a
 ---file named in `refs` changed since `updated`); `today` is passed through.
----@param opt { plan?: string, project?: string, phase?: string, status?: string, prio?: string|integer, effort?: string, kind?: string, tag?: string, category?: string, severity?: string, outcome?: string, waits_for?: string, value?: string|integer, actor?: string, stale?: string|integer, stale_refs?: boolean, blocked?: boolean, reminders?: boolean, overdue?: boolean, due_before?: string, starts_after?: string, unestimated?: boolean, quick_win?: boolean, sheet?: string, claimed?: string, today?: string }
+---@param opt { plan?: string, project?: string, phase?: string, status?: string, prio?: string|integer, effort?: string, kind?: string, tag?: string, category?: string, severity?: string, outcome?: string, ci?: string, waits_for?: string, value?: string|integer, actor?: string, stale?: string|integer, stale_refs?: boolean, blocked?: boolean, reminders?: boolean, overdue?: boolean, due_before?: string, starts_after?: string, unestimated?: boolean, quick_win?: boolean, sheet?: string, claimed?: string, today?: string }
 ---@return Tasks.Filter|nil filter
 ---@return string|nil err
 function M.parse(opt)
@@ -182,6 +182,20 @@ function M.parse(opt)
     do
       if v ~= "none" and not model.is_outcome(v) then
         return nil, "unknown outcome in --outcome: " .. v
+      end
+    end
+  end
+  if opt.ci then
+    -- the CI state of the task's commits; `none`: no `ci` written
+    f.ci = M.split_commas(opt.ci)
+    if #f.ci == 0 then
+      return nil, "--ci needs a value (" .. table.concat(model.CI_STATES, ", ") .. ", none)"
+    end
+    for _, v in
+      ipairs(f.ci --[[@as string[] ]])
+    do
+      if v ~= "none" and not model.is_ci(v) then
+        return nil, "unknown ci state in --ci: " .. v
       end
     end
   end

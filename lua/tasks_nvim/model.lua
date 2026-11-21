@@ -335,6 +335,17 @@ function M.is_outcome(s)
   return type(s) == "string" and vim.tbl_contains(M.OUTCOMES, s)
 end
 
+---The CI state of a task's commits, beside `commits`: `pending` (pushed, no verdict yet), `green` (the CI of every
+---system passed), `red` (it failed). No `ci` reads as "not known".
+---@type string[]
+M.CI_STATES = { "pending", "green", "red" }
+
+---@param s any
+---@return boolean
+function M.is_ci(s)
+  return type(s) == "string" and vim.tbl_contains(M.CI_STATES, s)
+end
+
 ---A `point` reference: `<area>/<slug>#<key>`, the learning point (of a path, or of a task's `## Lernpunkte`) a task
 ---was promoted from. Answers the container id and the key, or nil.
 ---@param s any
@@ -1458,6 +1469,19 @@ function M.parse_text(text, ctx)
     end
     task.outcome_reason = as_text(meta.outcome_reason, "outcome_reason", bad)
 
+    -- the CI state of the task's commits
+    local ci = as_text(meta.ci, "ci", bad)
+    if ci then
+      if M.is_ci(ci) then
+        task.ci = ci
+      else
+        bad(
+          "unknown-ci",
+          ("unknown ci '%s' (expected %s)"):format(ci, table.concat(M.CI_STATES, ", "))
+        )
+      end
+    end
+
     -- what a parked task waits for from outside; only `parked` gives the key a meaning
     local waits_for = as_text(meta.waits_for, "waits_for", bad)
     if waits_for then
@@ -2108,6 +2132,7 @@ function M.filter(tasks, f)
   local category = to_set(f.category)
   local effort, severity = to_set(f.effort), to_set(f.severity)
   local outcome = to_set(f.outcome)
+  local ci = to_set(f.ci)
   local value, actor = to_set(f.value), to_set(f.actor)
   local waits_for = to_set(f.waits_for)
   local plan_set, phase_set = to_set(f.plan), to_set(f.phase)
@@ -2176,6 +2201,9 @@ function M.filter(tasks, f)
       keep = false
     end
     if keep and outcome and not outcome[t.outcome or "none"] then
+      keep = false
+    end
+    if keep and ci and not ci[t.ci or "none"] then
       keep = false
     end
     if keep and value and not (t.value and value[t.value]) then

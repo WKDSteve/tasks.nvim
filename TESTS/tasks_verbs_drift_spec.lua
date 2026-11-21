@@ -66,6 +66,8 @@ return function(H)
       composer = { "yes" },
       cli = {
         "by",
+        -- `ci=` is a key=value word of `:Tasks done`, as `commits=` and `remind=` are
+        "ci",
         "commits",
         "date",
         "done-in",
@@ -91,6 +93,8 @@ return function(H)
       cli = {
         "all",
         "by",
+        -- goes with `--done`, which only the CLI lists
+        "ci",
         "done",
         "due-before",
         "limit",

@@ -558,6 +558,7 @@ local function start_next_round(routine, opts)
     { "status", "open" },
     { "waits_for", mutate.REMOVE },
     { "commits", mutate.REMOVE },
+    { "ci", mutate.REMOVE },
     { "done_in", mutate.REMOVE },
     { "outcome", mutate.REMOVE },
     { "outcome_reason", mutate.REMOVE },

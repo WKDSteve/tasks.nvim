@@ -210,6 +210,8 @@ mutate("a plan comparison with a value that lacks its sum", "plancompare", (d) =
 mutate("a plan comparison with a due day that is no date", "plancompare", (d) => (d.plans[0].target_due = "soon"));
 mutate("a body without its etag", "bodies-page", (d) => delete d.items[0].etag);
 mutate("a body page with a field nobody defined", "bodies-page", (d) => (d.items[0].path = "x"));
+mutate("a ci state nobody defined", "task-finished", (d) => (d.task.ci = "yellow"));
+mutate("a ci state of a finished entry nobody defined", "finished-plan", (d) => (d.items[0].ci = "passed"));
 mutate("a waits_for that is no key", "list-waits-for", (d) => (d.items[0].waits_for = "My Mac"));
 mutate("a waits_for of the filter word none", "list-waits-for", (d) => (d.items[0].waits_for = "none"));
 mutate("a waits_for that is a list of keys", "list-waits-for", (d) => (d.items[0].waits_for = ["mac", "licence"]));

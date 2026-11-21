@@ -32,8 +32,10 @@ return function(H)
 
   -- the workflow uses the default claim name of ai-desktop in every example
   has(r.out, "tasks claim <id> --by=ai-desktop:<job>")
-  has(r.out, "tasks done <id> --commits=repo@sha,...")
-  has(r.out, "--by=ai-desktop:<job>`.\n   It frees the claim.")
+  has(r.out, "tasks done <id> --commits=repo@sha,... --ci=pending --done-in=")
+  has(r.out, "the verdict is written later with `tasks set <id> ci=green|red`, on the finished")
+  has(r.out, "--by=ai-desktop:<job>`.\n   `--ci=pending`")
+  has(r.out, "task too. It frees the claim.")
   has(r.out, "tasks unclaim <id> --by=ai-desktop:<job>")
   has(r.out, "never pass it with `--force`", "a foreign claim is a stop, not a force")
 

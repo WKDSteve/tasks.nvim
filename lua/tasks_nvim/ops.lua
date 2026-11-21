@@ -212,6 +212,7 @@ local FIELDS = {
     remind = "string",
     outcome = "string",
     outcome_reason = "string",
+    ci = "string",
   },
   move_area = { id = "string", to_area = "string", if_match = "string" },
   tick_step = {
@@ -695,9 +696,15 @@ local function do_set(op, ctx)
   end
   local task, ferr = mutate.find_open(id, ctx.root, drafts_of(ctx))
   if not task then
-    -- A reminder may be set and taken away on a finished task (it is bookkeeping); nothing else of it may change.
-    local only_remind = next(op.patch) == "remind" and next(op.patch, "remind") == nil
-    task = only_remind and scan.find_done(id, { root = ctx.root }) or nil
+    -- A reminder and the CI state of the commits may be set and taken away on a finished task (bookkeeping,
+    -- `mutate.BOOKKEEPING`); nothing else of it may change.
+    local only_bookkeeping = next(op.patch) ~= nil
+    for key in pairs(op.patch) do
+      if not mutate.BOOKKEEPING[key] then
+        only_bookkeeping = false
+      end
+    end
+    task = only_bookkeeping and scan.find_done(id, { root = ctx.root }) or nil
     if not task then
       return fail(ctx, ferr)
     end
@@ -1432,6 +1439,12 @@ local function do_done(op, ctx)
   if has_control(op.outcome_reason) then
     return refuse("invalid_argument", "outcome_reason contains a control character")
   end
+  if op.ci ~= nil and not model.is_ci(op.ci) then
+    return refuse(
+      "invalid_argument",
+      ("unknown ci '%s' (expected %s)"):format(tostring(op.ci), table.concat(model.CI_STATES, ", "))
+    )
+  end
   if ctx.dry then
     local pv, err, info = done_flow.preview(op.id, {
       root = ctx.root,
@@ -1484,6 +1497,7 @@ local function do_done(op, ctx)
     remind = op.remind,
     outcome = op.outcome,
     outcome_reason = op.outcome_reason,
+    ci = op.ci,
     pick_next = false,
   })
   if not flow then

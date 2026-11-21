@@ -1132,6 +1132,7 @@
           "description": "The task has more meetings than `meetings` names.",
           "const": true
         },
+        "ci": { "$ref": "#/$defs/Ci" },
         "outcome": { "$ref": "#/$defs/Outcome" },
         "outcome_reason": { "type": "string", "description": "Why it ended so (required by the engine for `seen` and `not-applicable`). Capability `outcome`." },
         "point": { "$ref": "#/$defs/Point" },
@@ -3338,6 +3339,7 @@
         "phase": { "type": "string" },
         "done_in": { "type": "string" },
         "commits": { "type": "array", "items": { "type": "string" } },
+        "ci": { "$ref": "#/$defs/Ci" },
         "outcome": { "$ref": "#/$defs/Outcome" },
         "outcome_reason": { "type": "string", "description": "Why it ended so (required by the engine for `seen` and `not-applicable`). Capability `outcome`." },
         "point": { "$ref": "#/$defs/Point" },
@@ -4015,6 +4017,10 @@
         "value": { "type": "string", "minLength": 1 }
       },
       "additionalProperties": false
+    },
+    "Ci": {
+      "description": "The CI state of a task's commits beside `commits` (capability `ci`): pending (pushed, no verdict yet), green (the CI passed on every system) or red (it failed). Absent: not known.",
+      "enum": ["pending", "green", "red"]
     },
     "Outcome": {
       "description": "How a finished task ended beside `status: done` (capability `outcome`): learned, seen (looked at, not done) or not-applicable. Absent: done as meant.",

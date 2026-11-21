@@ -358,10 +358,14 @@ function M.markdown(opts)
       by
     ),
     "   a hand-written file.",
-    ('5. Finish, after the push: `tasks done <id> --commits=repo@sha,... --done-in="<what was done>" --by=%s`.'):format(
+    ('5. Finish, after the push: `tasks done <id> --commits=repo@sha,... --ci=pending --done-in="<what was done>" --by=%s`.'):format(
       by
     ),
-    ("   It frees the claim. Giving it back unfinished: `tasks unclaim <id> --by=%s`."):format(by),
+    "   `--ci=pending`: the hosted CI of the commits has no verdict yet (`--ci=green` only when it has passed on every",
+    "   system, as after a landing); the verdict is written later with `tasks set <id> ci=green|red`, on the finished",
+    ("   task too. It frees the claim. Giving it back unfinished: `tasks unclaim <id> --by=%s`."):format(
+      by
+    ),
     "",
     "Never write `status: done` by hand, never edit `ROADMAP/TASKS.md` or `Backlog/README.md`, never delete a task",
     "file. Commit the task file together with its area's `ROADMAP/TASKS.md`.",

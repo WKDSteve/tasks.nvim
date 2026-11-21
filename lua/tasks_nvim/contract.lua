@@ -66,6 +66,7 @@ M.CAPABILITIES = {
   "attach",
   "bodies",
   "check",
+  "ci",
   "claims",
   "done_preview",
   "eff_prio",
@@ -370,6 +371,8 @@ local function task_entry(root, task, node, rank, meeting_ids)
     done_in = task.done_in,
     -- only when the task lists commits, so a document without them reads as before
     commits = (task.commits and #task.commits > 0) and vim.list_slice(task.commits, 1) or nil,
+    -- the CI state of those commits; only when the file says so (capability `ci`)
+    ci = model.is_ci(task.ci) and task.ci or nil,
     tags = vim.list_slice(task.tags or {}, 1),
     category = model.categories(task),
     -- only when the task names a known scope, so a document without one reads as before (an unknown word of a
@@ -2453,6 +2456,8 @@ function M.finished(params, opts)
       phase = t.phase,
       done_in = t.done_in,
       commits = (t.commits and #t.commits > 0) and vim.list_slice(t.commits, 1) or nil,
+      -- the CI state of those commits (capability `ci`); only when the file says so
+      ci = model.is_ci(t.ci) and t.ci or nil,
       -- how it ended (capability `outcome`); only when the file says so
       outcome = model.is_outcome(t.outcome) and t.outcome or nil,
       outcome_reason = t.outcome_reason,

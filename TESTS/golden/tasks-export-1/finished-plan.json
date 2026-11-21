@@ -1,5 +1,5 @@
 {
-  "digest": "sha256:f647b3a5cb9d4aa9",
+  "digest": "sha256:b1bb5f010e61408a",
   "engine": {
     "git": "0000000",
     "nvim": "0.0.0",
@@ -10,6 +10,7 @@
   "items": [
     {
       "area": "lib.nvim",
+      "ci": "green",
       "commits": [
         "lib.nvim@def5678",
         "buffer-ctx.nvim@1234abc"

@@ -781,6 +781,7 @@ local SETTABLE = {
   "rules",
   "done_in",
   "commits",
+  "ci",
   "outcome",
   "outcome_reason",
   "point",
@@ -989,6 +990,7 @@ local FIELD_NORMALIZERS = {
   end,
   severity = one_of("severity", model.is_severity, model.SEVERITIES),
   outcome = one_of("outcome", model.is_outcome, model.OUTCOMES),
+  ci = one_of("ci", model.is_ci, model.CI_STATES),
   point = function(value)
     if not model.parse_point(value) then
       return nil, ("point '%s' is not <area>/<slug>#<key>"):format(tostring(value))
@@ -1789,7 +1791,13 @@ local function precondition(task, text, opts)
   return nil, nil
 end
 
----Change frontmatter keys of an open task and set `updated`.
+---The keys `set` may change on a finished task in `Backlog/` (when no open task has the id): bookkeeping about the
+---finished work, not the work itself.
+---@type table<string, boolean>
+M.BOOKKEEPING = { remind = true, remind_at = true, remind_to = true, ci = true }
+
+---Change frontmatter keys of an open task and set `updated`. The keys of `M.BOOKKEEPING` may also be changed on a
+---finished task (its `updated` stays).
 ---
 ---`patch` maps key -> value (`REMOVE` deletes). Nothing is written, and
 ---`updated` stays as it was, when the patch would not change the file.
@@ -1818,15 +1826,15 @@ function M.set(id, patch, opts)
   end
   local task, ferr = M.find_open(id, root, opts.drafts)
   if not task then
-    -- A reminder is bookkeeping, not a change of what was finished: it may be set and taken away on a finished task,
-    -- and nothing else may.
-    local only_remind = next(patch) ~= nil
+    -- A reminder and the CI state of the commits are bookkeeping, not a change of what was finished: they may be set
+    -- and taken away on a finished task (the CI answers after `done`), and nothing else may.
+    local only_bookkeeping = next(patch) ~= nil
     for key in pairs(patch) do
-      if key ~= "remind" and key ~= "remind_at" and key ~= "remind_to" then
-        only_remind = false
+      if not M.BOOKKEEPING[key] then
+        only_bookkeeping = false
       end
     end
-    local finished = only_remind and scan.find_done(id, { root = root }) or nil
+    local finished = only_bookkeeping and scan.find_done(id, { root = root }) or nil
     if not finished then
       return nil, ferr
     end
@@ -2656,6 +2664,7 @@ end
 ---@field remind? string             # A date or `+<n>d` / `+<n>w`: when to look at the finished task again.
 ---@field outcome? string            # How it ended (`model.OUTCOMES`); nil: as the task says (none: done as meant).
 ---@field outcome_reason? string     # Why; required for `seen` and `not-applicable` unless the task has one already.
+---@field ci? string                 # The CI state of the commits (`model.CI_STATES`); nil: the task's own `ci` stays.
 ---@field date? string               # `YYYY-MM-DD` filename prefix (default: today).
 ---@field today? string              # Sets `updated` (default: today).
 ---@field index? boolean             # Regenerate the area index (default true).
@@ -2813,6 +2822,17 @@ local function plan_done(id, opts)
     if #merged > 0 then
       patch[#patch + 1] = { "commits", merged }
     end
+  end
+  if opts.ci ~= nil then
+    if not model.is_ci(opts.ci) then
+      return nil,
+        ("unknown ci '%s' (expected %s)"):format(
+          tostring(opts.ci),
+          table.concat(model.CI_STATES, ", ")
+        ),
+        { code = "invalid_argument" }
+    end
+    patch[#patch + 1] = { "ci", opts.ci }
   end
   if opts.remind ~= nil then
     local remind_date, remind_err = model.resolve_remind(opts.remind, today)

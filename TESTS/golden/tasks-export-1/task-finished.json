@@ -1,7 +1,7 @@
 {
   "body": "\n## Akzeptanz\n\n- [x] it ships\n",
   "body_truncated": false,
-  "digest": "sha256:8768777c23b764b3",
+  "digest": "sha256:86d2531e82b12d9b",
   "engine": {
     "git": "0000000",
     "nvim": "0.0.0",
@@ -12,7 +12,7 @@
   "kind": "tasks.task",
   "plugin": "tasks.nvim",
   "questions": [],
-  "rev": "rev:745218",
+  "rev": "rev:6ba8bc",
   "schema": 1,
   "steps": [],
   "task": {
@@ -20,12 +20,13 @@
     "area": "lib.nvim",
     "blocked_by": [],
     "category": [],
+    "ci": "red",
     "commits": [
       "lib.nvim@bbb2222"
     ],
     "created": "2026-01-01",
     "done_in": "lib.nvim@bbb2222",
-    "etag": "sha256:2f349e2d5cb52c86",
+    "etag": "sha256:5b6ab29fc3c1e36b",
     "file": "lib.nvim/Backlog/FEATURES/2026-01-09_shipped.md",
     "folder": false,
     "id": "lib.nvim/shipped",

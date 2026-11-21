@@ -693,6 +693,7 @@ local function set_kv()
     scope = model.SCOPES,
     severity = model.SEVERITIES,
     outcome = model.OUTCOMES,
+    ci = model.CI_STATES,
     prio = { "1", "2", "3" },
     effort = model.EFFORTS,
     value = { "1", "2", "3", "4", "5" },
@@ -707,6 +708,7 @@ local function set_kv()
     rules = "Rule ids a ruleset task brings code in line with",
     done_in = "Commit(s) that delivered the task",
     commits = "Every commit made for the task, repo@sha each (replaces the list)",
+    ci = "CI state of those commits: pending, green or red (on a finished task too)",
     created = "Creation date, YYYY-MM-DD",
     remind = "Look at the task again on this date (YYYY-MM-DD, or +7d / +2w from today)",
     remind_at = "Hour the reminder of that day is sent (HH:MM, needs remind)",
@@ -1039,6 +1041,12 @@ local function nested_routes()
           type = "STRING",
           values = model.OUTCOMES,
           desc = "How it ended: learned, seen or not-applicable (default: done as meant)",
+        },
+        {
+          key = "ci",
+          type = "STRING",
+          values = model.CI_STATES,
+          desc = "CI state of its commits: pending (no verdict yet), green or red",
         },
         {
           key = "reason",

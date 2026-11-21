@@ -90,6 +90,7 @@ return function(H)
     "answer",
     "append_note",
     "attach",
+    "ci",
     "claims",
     "eff_prio",
     "etag",

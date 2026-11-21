@@ -295,7 +295,8 @@ G.cases = {
   },
   {
     -- a finished task read from its area's Backlog (capability `task_finished`): its commits and done_in, its body,
-    -- `finished`, no readiness and no rounds; how it ended and the learning point it came from (capability `outcome`)
+    -- `finished`, no readiness and no rounds; how it ended and the learning point it came from (capability `outcome`);
+    -- the CI state of its commits (capability `ci`)
     name = "task-finished",
     method = "task",
     fresh = true,
@@ -305,7 +306,7 @@ G.cases = {
       local fh = assert(io.open(path, "wb"))
       fh:write(
         "---\ntitle: Shipped\nstatus: done\nkind: feature\ndone_in: lib.nvim@bbb2222\n"
-          .. "commits: [lib.nvim@bbb2222]\noutcome: seen\noutcome_reason: only chapter 1\n"
+          .. "commits: [lib.nvim@bbb2222]\nci: red\noutcome: seen\noutcome_reason: only chapter 1\n"
           .. "point: lib.nvim/lua-path#cc\ncreated: 2026-01-01\nupdated: 2026-01-09\n---\n\n"
           .. "## Akzeptanz\n\n- [x] it ships\n"
       )
