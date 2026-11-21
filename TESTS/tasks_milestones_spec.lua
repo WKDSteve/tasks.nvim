@@ -139,6 +139,23 @@ return function(H)
   local again = done("lib.nvim/beta")
   eq(again.milestones_reached, { "lib.nvim/release-1" }, "reached a second time")
 
+  -- decision 2026-11-21: a complete milestone of close: auto is not kept open by hand
+  local keep_open =
+    run({ { op = "milestone_set", id = "lib.nvim/release-1", patch = { status = "doing" } } })
+  eq(keep_open.ok, false, vim.inspect(keep_open))
+  eq(keep_open.error.code, "invalid_argument")
+  eq(keep_open.error.details.hint, "set close: manual to keep it open")
+  has(H.read(file_of("lib.nvim/release-1")), "status: done\n", "nothing written")
+  local manual_open = run({
+    {
+      op = "milestone_set",
+      id = "lib.nvim/release-1",
+      patch = { status = "doing", close = "manual" },
+    },
+  })
+  eq(manual_open.outcome, "changed", "with close: manual it may be opened")
+  eq(manual_open.milestones_reached, nil, "and stays open")
+
   -- ── close: manual ────────────────────────────────────────────────────────────
   F.task(H, root, "lib.nvim", "delta", F.meta("Delta", "open"))
   local manual = run({

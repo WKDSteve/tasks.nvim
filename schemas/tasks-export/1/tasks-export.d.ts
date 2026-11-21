@@ -2676,6 +2676,10 @@ export interface OperationError {
   retryable: boolean;
   details?: {
     /**
+     * What to do instead, in words (`milestone_set` that would keep a complete milestone of `close: auto` open: set `close: manual`).
+     */
+    hint?: string;
+    /**
      * A word that must be kebab-case (a phase, an entry of the phases) was not: the field it was given for (`phase`).
      */
     field?: string;

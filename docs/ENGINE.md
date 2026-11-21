@@ -635,6 +635,8 @@ reached: 2026-12-12      # written by the engine
   `tasks-ops/1`) runs `milestones.settle`: a milestone of `close: auto` whose members are all done gets
   `status: done`, `reached` and a line in `## Verlauf`. `close: manual` waits for `milestone_set` with `status: done`
   (refused while a member is open). A milestone without members is never reached; a parked one is left alone.
+  A complete milestone of `close: auto` cannot be set back to `planning` or `doing` by hand (decision 2026-11-21:
+  refused with `details.hint`); `close: manual` in the same patch keeps it open.
 - **Opened again**: a member of a reached milestone that is open again (`reopen`) sets it back to `doing`; `reached`
   stays as its history and `## Verlauf` says which member. A member that exists nowhere holds a milestone open but
   never opens a reached one (that is a `check` error, not a silent change).

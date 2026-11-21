@@ -875,7 +875,9 @@ end
 
 ---Change the frontmatter of a milestone (`SET_KEYS`); `nil`, `vim.NIL`, an empty text or list removes a key (not
 ---`title` and `status`). `status: done` reaches it by hand: refused while a member is not done (`details.holding`),
----else `reached` is today and `## Verlauf` gets a line. `reached` is the engine's; it is never set here.
+---else `reached` is today and `## Verlauf` gets a line. `planning` or `doing` on a milestone whose members are all done
+---and that keeps `close: auto` is refused (`details.hint`: set `close: manual`). `reached` is the engine's; it is
+---never set here.
 ---@param id string
 ---@param patch table<string, any>
 ---@param opts? { root?: string, today?: string, if_match?: string, dry_run?: boolean }
@@ -977,6 +979,43 @@ function M.set(id, patch, opts)
       )
     end
     pairs_[#pairs_ + 1] = { "reached", today }
+  end
+  -- decision 2026-11-21: a complete milestone of `close: auto` is not kept open by hand (`planning`, `doing`): the
+  -- next closing write would reach it again at once; `close: manual` (or `parked`) is the way to keep it open
+  local status_after, close_after, includes_after = m.status, m.close, m.includes
+  for _, kv in ipairs(pairs_) do
+    if kv[1] == "status" then
+      status_after = kv[2]
+    elseif kv[1] == "close" then
+      close_after = kv[2] == fm.REMOVE and "auto" or kv[2]
+    elseif kv[1] == "includes" then
+      includes_after = kv[2]
+    end
+  end
+  if
+    patch.status ~= nil
+    and status_after ~= "done"
+    and status_after ~= "parked"
+    and close_after == "auto"
+    and #includes_after > 0
+  then
+    local cache = M.cache(root)
+    local complete = true
+    for _, mid in ipairs(includes_after) do
+      if M.member(mid, cache).state ~= "done" then
+        complete = false
+        break
+      end
+    end
+    if complete then
+      return invalid(
+        ("%s has every member done and close: auto: status %s would be reached again at once"):format(
+          m.id,
+          tostring(status_after)
+        ),
+        { hint = "set close: manual to keep it open" }
+      )
+    end
   end
   local result = { id = m.id, path = m.path }
   local ok, werr, winfo = fsio.with_lock(m.path, function()

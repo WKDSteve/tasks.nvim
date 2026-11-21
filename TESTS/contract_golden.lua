@@ -451,6 +451,8 @@ G.cases = {
           },
           { op = "milestone_set", id = "lib.nvim/release-1", patch = { status = "done" } },
           { op = "milestone_set", id = "lib.nvim/release-1", patch = { due = "2026-03-01" } },
+          -- reached at once by op 1: kept open by hand only with close: manual (details.hint)
+          { op = "milestone_set", id = "cascade.nvim/altlast", patch = { status = "doing" } },
         },
       })
     end,
