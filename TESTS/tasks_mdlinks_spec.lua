@@ -224,4 +224,61 @@ return function(H)
     nil,
     "./ and %-escapes name the image already: " .. vim.inspect(per_code)
   )
+
+  -- ── a link into a neighbour repo that is not checked out: one hint per repo, not a warning per link ──
+  eq(mdlinks.outside_folder("/r/vault", "/r/vault/a/x.md"), nil, "inside the vault")
+  eq({ mdlinks.outside_folder("/r/vault", "/r/Lit/b/x.md") }, { "/r/Lit", "../Lit" })
+  eq({ mdlinks.outside_folder("/r/vault", "/Other/x.md") }, { "/Other", "../../Other" })
+  eq({ mdlinks.outside_folder("E:/r/vault", "E:/r/Lit/x.md") }, { "E:/r/Lit", "../Lit" })
+  local parent = vim.fs.dirname(root)
+  local absent = "absent-" .. vim.fn.fnamemodify(root, ":t")
+  local present = "present-" .. vim.fn.fnamemodify(root, ":t")
+  ok(not H.exists(parent .. "/" .. absent), "the absent repo is not there")
+  vim.fn.mkdir(parent .. "/" .. present, "p")
+  local nb = assert(paths.new(A, vim.tbl_extend("force", opts, { title = "Nachbarn" })))
+  -- `<root>/<area>/ROADMAP/paths/<slug>.md`: four folders up is the folder that holds the vault
+  H.write(
+    nb.path,
+    H.read(nb.path)
+      .. ("\n[a](../../../../%s/eins.md) [b](../../../../%s/sub/zwei.md)\n"):format(absent, absent)
+      .. ("[c](../../../../%s/fehlt.md)\n"):format(present)
+  )
+  H.write(t2.path, H.read(t2.path) .. ("[d](../../../../%s/drei.md)\n"):format(absent))
+  local first_line
+  for i, line in ipairs(vim.split(H.read(nb.path), "\n")) do
+    if not first_line and line:find("[a](", 1, true) then
+      first_line = i
+    end
+  end
+  local nres = check.run(opts)
+  local nb_warn, repo_hints = {}, {}
+  for _, f in ipairs(nres.findings) do
+    if f.path == nb.path and f.code == "path-link-missing" then
+      nb_warn[#nb_warn + 1] = f.message
+    end
+    ok(
+      not (f.message or ""):find(absent, 1, true),
+      "no warning names the absent repo: " .. f.message
+    )
+  end
+  for _, h in ipairs(nres.hints) do
+    if h.code == "link-repo-absent" then
+      repo_hints[#repo_hints + 1] = h
+    end
+  end
+  eq(#nb_warn, 1, "the repo that is there: its missing file stays a warning")
+  ok((nb_warn[1] or ""):find(present .. "/fehlt.md", 1, true), tostring(nb_warn[1]))
+  eq(#repo_hints, 1, "one hint for the repo that is not there")
+  local hint = repo_hints[1] or { message = "" }
+  eq(hint.severity, "info")
+  eq(hint.path, nb.path, "on the first file (by path) that links into the repo")
+  eq(
+    hint.message,
+    ("repo ../%s is not checked out: 3 link(s) in 2 file(s) unchecked (line %d: the first in this file)"):format(
+      absent,
+      first_line
+    )
+  )
+  ok(not hint.message:find(parent, 1, true), "the hint names no path of this machine")
+  vim.fn.delete(parent .. "/" .. present, "rf")
 end

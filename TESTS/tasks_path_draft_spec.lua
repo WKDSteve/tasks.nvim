@@ -134,6 +134,26 @@ return function(H)
   lacks(out, "created")
   ok(H.read(path_file("kaputter-entwurf")) == nil, "a refused draft writes nothing")
 
+  -- a link into a neighbour repo that is not checked out is a hint, not a fault: the draft is written
+  local absent = "absent-" .. vim.fn.fnamemodify(root, ":t")
+  local neighbour = draft("neighbour.md", {
+    "---", -- 1
+    "title: Mit Nachbar", -- 2
+    "---", -- 3
+    "", -- 4
+    "## Lernpunkte", -- 5
+    "", -- 6
+    ("- [ ] [Buch](../../../../%s/buch.md) {#n}"):format(absent), -- 7
+  })
+  code, out, err = run({ "path-new", A, "--from=" .. neighbour, "--dry-run" })
+  eq(code, 0, err)
+  has(
+    err,
+    ("hint\tlink-repo-absent\tline 7: repo ../%s is not checked out: 1 link(s)"):format(absent)
+  )
+  lacks(err, "path-link-missing")
+  has(out, "would-create\t")
+
   -- a fault of the frontmatter names the line of its key
   local staged = draft("staged.md", {
     "---",

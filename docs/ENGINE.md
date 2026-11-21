@@ -569,7 +569,8 @@ write: `path-reason-missing`, `path-duplicate-key`, `path-bad-key`, `path-bad-ma
 `path-image-outside`, `path-arrow-dangling` (an arrow to no task), `path-image-missing`, `path-cycle` (promotions
 that run in a circle over the `## Lernpunkte` of the tasks they name) and `path-link-missing` (a relative link, to a
 book or file next to the vault say, that leads to nothing; the same exceptions as `link-missing`, and the images and
-badges the two findings above already cover). An arrow before a word that has the form of an id but is none
+badges the two findings above already cover; a link into a neighbour repo that is not checked out here is the hint
+`link-repo-absent`, one per repo, not a warning per link). An arrow before a word that has the form of an id but is none
 (`→ tasks/Großschreibung`) is a hint, `path-bad-arrow`: the arrow is read as text. `path-stray-line` (a warning, also
 for the `## Lernpunkte` of a task) names a line of the section that is no point, no `> ` note below one and not empty,
 with the `{xp=…}` / `{#…}` on it: the tree skips it, so a point whose link label broke across two lines loses its
@@ -879,6 +880,7 @@ file that is there (also not a refused one). Nobody else writes it: a person edi
 | `slug-conflict` | the same slug exists as a file and as a folder task |
 | `asset-dangling` (warning) | a folder task links `assets/<file>` that is not there |
 | `link-missing` (warning) | a relative Markdown link or image of an open task leads to no file (with its line); not checked: links in code, `http(s):`, `mailto:` and other schemes, `#anchor`, and a folder task's `assets/` links (`asset-dangling`) |
+| `link-repo-absent` (hint) | links of the files above and of learning paths (`path-link-missing`) lead out of the vault into a folder that is not there at all: the first folder outside the vault they name, a neighbour repo (`../Literatur`) not checked out on this machine. They are no warnings; one hint per folder counts them, "repo ../Literatur is not checked out: n link(s) in m file(s) unchecked (line N: the first in this file)", on the first file (by path). The folder is named from the vault, never as a path of the machine. When the folder is there and only the file is missing, it stays `link-missing` / `path-link-missing`. A hint never fails `tasks ci`, not even with `--strict` |
 | `plan-link-missing`, `project-link-missing`, `meeting-link-missing` (warnings) | the same for a plan, project or meeting file, with its line; the `cover` and `icon` asset it names are left to `cover-missing` / `icon-missing` (`meeting-image-missing`, `meeting-icon-missing`). A block indented by four spaces counts as text, not code: in the vault such lines are the continuation of a list item and hold real links |
 | `asset-unused` (warning) | a folder task has an image in `assets/` that its text never mentions |
 | `view-invalid` (warning) | a file of a saved view (`<area>/ROADMAP/views/*.md`) is no view: a field or value the engine does not have, no frontmatter, a symbolic link, or a folder of views that leads out of the vault (the reason is in the message; `tasks.views` lists it under `problems`) |

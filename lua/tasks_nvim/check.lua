@@ -37,6 +37,10 @@
 ---    `#anchor`; a folder task's `assets/` links are `asset-dangling`'s) leads to no file, with its line;
 ---    `plan-link-missing`, `project-link-missing`, `meeting-link-missing` (warnings) the same for those files (their
 ---    cover and icon asset are `cover-missing` / `icon-missing`)
+---  - `link-repo-absent` (hint, severity `info`): links of these files and of learning paths (`path-link-missing`) out
+---    of the vault into a folder that is not there at all (the first folder outside the vault: a neighbour repo not
+---    checked out here) are no warnings; one hint per such folder counts them ("repo ../X is not checked out: n
+---    link(s) in m file(s) unchecked"). A folder that is there, missing only the file, stays a warning
 ---  - `asset-unused` (warning): a folder task has an image in `assets/` that its text never mentions
 ---  - `bad-icon`, `bad-cover` (errors): `icon` is no emoji, no image below `assets/` and no word of `model.ICON_WORDS`,
 ---    `cover` no image below `assets/` (task, plan, project, path); `icon-missing`, `cover-missing` (warnings): the
@@ -98,7 +102,8 @@
 ---    `path-bad-xp`, `path-bad-hours`, `path-stray-line` (warnings, the last also for a task's own tree): the tree of
 ---    `## Lernpunkte` (`path-stray-line`: a line that is no point, no note and not empty); `path-bad-arrow` (a hint): an arrow before a word that
 ---    looks like an id but is none, read as text; `path-link-missing`
----    (warning): a relative link of the path that leads to no file (as `link-missing`); `level-bad-line`,
+---    (warning): a relative link of the path that leads to no file (as `link-missing`; into a neighbour repo that
+---    is not checked out: `link-repo-absent`); `level-bad-line`,
 ---    `level-bad-mark`, `level-order`, `level-badge-outside`, `level-badge-missing` (warnings): the levels of
 ---    `## Level`; `xp-missing` (a hint): points without XP in a path with levels
 ---  - milestones (`<area>/ROADMAP/milestones/`, `tasks_nvim.milestones`): a broken file (`milestone-bad-status`,
@@ -486,27 +491,93 @@ local function dangling_assets(task)
   return missing
 end
 
+---The links of one run that lead into a folder outside the vault which is not there at all (a neighbour repo that is
+---not checked out on this machine), per folder: `link_findings` counts them, `repo_hints` turns them into one hint
+---per folder.
+---@class Tasks.AbsentRepos
+---@field root string
+---@field there table<string, boolean>  # Folder on this machine -> whether it exists (one stat per folder).
+---@field by table<string, { links: integer, files: table<string, boolean>, first: { area: string, path: string, id?: string }, line: integer }>
+
+---@param root string  # The vault.
+---@return Tasks.AbsentRepos
+local function absent_repos(root)
+  return { root = root, there = {}, by = {} }
+end
+
+---`link-repo-absent` (hint, severity `info`): per folder of `repos`, "repo ../X is not checked out: n link(s) in m
+---file(s) unchecked (line N: the first in this file)", on the first file (by path) that links into it. The folder is
+---named as seen from the vault, never as a path of this machine.
+---@param hints Tasks.Finding[]
+---@param repos Tasks.AbsentRepos
+local function repo_hints(hints, repos)
+  local labels = vim.tbl_keys(repos.by)
+  table.sort(labels)
+  for _, label in ipairs(labels) do
+    local r = repos.by[label]
+    hints[#hints + 1] = {
+      code = "link-repo-absent",
+      severity = "info",
+      area = r.first.area,
+      path = r.first.path,
+      id = r.first.id,
+      message = ("repo %s is not checked out: %d link(s) in %d file(s) unchecked (line %d: the first in this file)"):format(
+        label,
+        r.links,
+        vim.tbl_count(r.files),
+        r.line
+      ),
+    }
+  end
+end
+
 ---`link-missing` / `path-link-missing` (warnings): a relative Markdown link of the file (`tasks_nvim.mdlinks`: not in
 ---code, not `http(s):`, `mailto:` or `#anchor`) whose file is not there, with its line. `skip` leaves out the links
----another finding already covers (`asset-dangling`, `path-image-missing`, `level-badge-missing`).
+---another finding already covers (`asset-dangling`, `path-image-missing`, `level-badge-missing`). With `repos`, a link
+---out of the vault into a folder that is not there at all (the first folder outside the vault it names: a neighbour
+---repo that is not checked out) is no warning; it is counted there for one hint per folder (`repo_hints`). A link into
+---a folder that is there, to a file that is not, stays a warning.
 ---@param findings Tasks.Finding[]
 ---@param item { area: string, path: string, id?: string }
 ---@param code string
 ---@param skip? fun(link: Tasks.MdLink): boolean
 ---@param text? string  # The file's text when it is not on disk yet (a draft); its links are judged from `item.path`.
-local function link_findings(findings, item, code, skip, text)
+---@param repos? Tasks.AbsentRepos
+local function link_findings(findings, item, code, skip, text, repos)
   text = text or fsio.read(item.path)
   if not text then
     return
   end
-  for _, l in ipairs(mdlinks.missing(text, fsio.dirname(item.path), skip)) do
-    add(
-      findings,
-      "warn",
-      code,
-      item,
-      ("line %d: the link %s leads to nothing"):format(l.line, l.target)
-    )
+  local dir = fsio.dirname(item.path)
+  for _, l in ipairs(mdlinks.missing(text, dir, skip)) do
+    local folder, label
+    if repos then
+      local path = mdlinks.resolve(dir, l.target)
+      folder, label = mdlinks.outside_folder(repos.root, path or "")
+      if folder and repos.there[folder] == nil then
+        repos.there[folder] = fsio.stat(folder) ~= nil
+      end
+    end
+    if folder and label and not repos.there[folder] then
+      local r = repos.by[label]
+      if not r then
+        r = { links = 0, files = {}, first = item, line = l.line }
+        repos.by[label] = r
+      end
+      r.links = r.links + 1
+      r.files[item.path] = true
+      if item.path < r.first.path or (item.path == r.first.path and l.line < r.line) then
+        r.first, r.line = item, l.line
+      end
+    else
+      add(
+        findings,
+        "warn",
+        code,
+        item,
+        ("line %d: the link %s leads to nothing"):format(l.line, l.target)
+      )
+    end
   end
 end
 
@@ -515,11 +586,12 @@ end
 ---@param findings Tasks.Finding[]
 ---@param item { area: string, path: string, id?: string, icon?: Tasks.Icon, cover?: string }
 ---@param code string
-local function file_link_findings(findings, item, code)
+---@param repos? Tasks.AbsentRepos
+local function file_link_findings(findings, item, code, repos)
   local icon = item.icon and item.icon.kind == "asset" and item.icon.value or nil
   link_findings(findings, item, code, function(l)
     return l.target == item.cover or l.target == icon
-  end)
+  end, nil, repos)
 end
 
 ---Images in a folder task's `assets/`, and in the folders of the kinds below it (`assets/images/`,
@@ -664,7 +736,8 @@ end
 ---@param names string[]
 ---@param scan_opts { root: string }
 ---@param is_finished fun(id: string): boolean
-local function plan_file_findings(findings, open_ids, names, scan_opts, is_finished)
+---@param repos? Tasks.AbsentRepos
+local function plan_file_findings(findings, open_ids, names, scan_opts, is_finished, repos)
   local checked = {}
   for _, n in ipairs(names) do
     checked[n] = true
@@ -678,7 +751,7 @@ local function plan_file_findings(findings, open_ids, names, scan_opts, is_finis
         add(findings, "error", file.error_codes[i] or "frontmatter-invalid", file, msg)
       end
       picture_findings(findings, file)
-      file_link_findings(findings, file, "plan-link-missing")
+      file_link_findings(findings, file, "plan-link-missing", repos)
       for _, p in ipairs(file.link_problems or {}) do
         add(findings, "error", p.code, file, link_problem_message(p))
       end
@@ -766,7 +839,17 @@ end
 ---@param scan_opts table
 ---@param is_finished fun(id: string): boolean
 ---@param today string
-local function meeting_findings(findings, hints, open_ids, names, scan_opts, is_finished, today)
+---@param repos? Tasks.AbsentRepos
+local function meeting_findings(
+  findings,
+  hints,
+  open_ids,
+  names,
+  scan_opts,
+  is_finished,
+  today,
+  repos
+)
   local function hint(code, m, message)
     hints[#hints + 1] =
       { code = code, severity = "info", area = m.area, path = m.path, id = m.id, message = message }
@@ -834,7 +917,7 @@ local function meeting_findings(findings, hints, open_ids, names, scan_opts, is_
         end
       end
       picture_findings(findings, m, "meeting-")
-      file_link_findings(findings, m, "meeting-link-missing")
+      file_link_findings(findings, m, "meeting-link-missing", repos)
       if m.image_alias then
         hint(
           "meeting-image-alias",
@@ -1061,6 +1144,7 @@ end
 ---@field is_finished fun(id: string): boolean
 ---@field scan_opts table
 ---@field text? string  # The path's text when it is not on disk yet (a draft, `tasks_nvim.path_draft`).
+---@field repos? Tasks.AbsentRepos  # The run's count of links into absent neighbour repos; without it the path gives its own `link-repo-absent` hints.
 
 ---The findings of ONE learning path (`Tasks.PlanFile` of kind `path`), as `check` reports them for an area: a broken
 ---file with its codes (errors), an id another file of the area has (error), and as warnings the problems of the tree
@@ -1217,10 +1301,15 @@ function M.path_file_findings(findings, hints, p, c)
       cover(l.badge)
     end
   end
+  -- a run counts the links into absent neighbour repos over all files; a path alone (a draft) gives its own hints
+  local repos = c.repos or absent_repos(scan_opts.root)
   link_findings(findings, p, "path-link-missing", function(l)
     local key = mdlinks.key(l.target)
     return key ~= nil and covered[key] == true
-  end, c.text)
+  end, c.text, repos)
+  if not c.repos then
+    repo_hints(hints, repos)
+  end
   -- a cycle of promotions: the path, the tasks its arrows name, the tasks theirs name, back to one seen on the way
   local state, stack, reported = {}, {}, false
   local function visit(id, arrows)
@@ -1269,9 +1358,9 @@ end
 ---@param scan_opts table
 ---@param is_finished fun(id: string): boolean
 ---@param hints Tasks.Finding[]
-local function path_findings(findings, open_ids, names, scan_opts, is_finished, hints)
+local function path_findings(findings, open_ids, names, scan_opts, is_finished, hints, repos)
   local paths_mod = require("tasks_nvim.paths")
-  local c = { open_ids = open_ids, is_finished = is_finished, scan_opts = scan_opts }
+  local c = { open_ids = open_ids, is_finished = is_finished, scan_opts = scan_opts, repos = repos }
   for _, name in ipairs(names) do
     local list, errs = paths_mod.area(name, scan_opts)
     for _, e in ipairs(type(errs) == "table" and errs or {}) do
@@ -1434,7 +1523,8 @@ end
 ---@param names string[]
 ---@param scan_opts { root: string }
 ---@param is_finished fun(id: string): boolean
-local function project_findings(findings, open_ids, names, scan_opts, is_finished)
+---@param repos? Tasks.AbsentRepos
+local function project_findings(findings, open_ids, names, scan_opts, is_finished, repos)
   local checked = {}
   for _, n in ipairs(names) do
     checked[n] = true
@@ -1466,7 +1556,7 @@ local function project_findings(findings, open_ids, names, scan_opts, is_finishe
         add(findings, "error", file.error_codes[i] or "frontmatter-invalid", file, msg)
       end
       picture_findings(findings, file)
-      file_link_findings(findings, file, "project-link-missing")
+      file_link_findings(findings, file, "project-link-missing", repos)
       for _, p in ipairs(file.link_problems or {}) do
         add(findings, "error", p.code, file, link_problem_message(p))
       end
@@ -1779,6 +1869,8 @@ function M.run(opts)
   end
   -- one index of the vault's slugs for every bare `[[slug]]` wikilink of this run, not one per area
   local scan_opts = { root = root, link_resolver = wikilinks.resolver(root) }
+  -- links into neighbour repos that are not checked out: one hint per repo at the end, not a warning per link
+  local repos = absent_repos(root)
   -- every finished-id question of this run: one listing per area's Backlog, not a walk per id
   local is_finished = scan.finished_lookup(scan_opts)
 
@@ -1862,7 +1954,7 @@ function M.run(opts)
       local text = fsio.read(t.path)
       link_findings(findings, t, "link-missing", function(l)
         return t.folder == true and mdlinks.is_asset(l.target)
-      end, text)
+      end, text, repos)
       -- a task's own `## Lernpunkte` (category learning or a tree promoted into it)
       if text and has_tree_heading(text) then
         local parsed = require("lib.nvim.markdown.frontmatter").parse(text)
@@ -2039,10 +2131,10 @@ function M.run(opts)
       end
     end
   end
-  plan_file_findings(findings, open_ids, names, scan_opts, is_finished)
-  project_findings(findings, open_ids, names, scan_opts, is_finished)
-  meeting_findings(findings, hints, open_ids, names, scan_opts, is_finished, today)
-  path_findings(findings, open_ids, names, scan_opts, is_finished, hints)
+  plan_file_findings(findings, open_ids, names, scan_opts, is_finished, repos)
+  project_findings(findings, open_ids, names, scan_opts, is_finished, repos)
+  meeting_findings(findings, hints, open_ids, names, scan_opts, is_finished, today, repos)
+  path_findings(findings, open_ids, names, scan_opts, is_finished, hints, repos)
   milestone_findings(findings, open_ids, names, scan_opts, is_finished, today)
   promote_findings(findings, open_ids, names, scan_opts, is_finished, finished_by_area)
   view_findings(findings, root, names)
@@ -2051,6 +2143,7 @@ function M.run(opts)
     marker_findings(findings, root)
   end
   claim_findings(findings, root, open_ids, names, opts.today or model.today())
+  repo_hints(hints, repos)
 
   table.sort(findings, finding_less)
   table.sort(hints, finding_less)

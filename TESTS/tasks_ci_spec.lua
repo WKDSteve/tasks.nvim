@@ -173,6 +173,24 @@ return function(H)
   eq(res.code, 1, "an explicit false is not a flag: the file still counts")
   H.write(marker.path(root), marker.render({}))
 
+  -- ── a link into a neighbour repo that is not checked out: a hint, so even --strict stays green ──
+  root = green_vault()
+  local neighbour = vim.fs.dirname(root) .. "/neighbour-" .. vim.fn.fnamemodify(root, ":t")
+  local alpha = root .. "/lib.nvim/ROADMAP/tasks/alpha.md"
+  H.write(
+    alpha,
+    H.read(alpha) .. "\nSee [book](../../../../" .. vim.fs.basename(neighbour) .. "/book.md).\n"
+  )
+  res = ci.run({ root = root, strict = true, run_lint = runner(0) })
+  eq(res.code, 0, "an absent neighbour repo is no warning: " .. table.concat(res.lines, "\n"))
+  lacks(table.concat(res.lines, "\n"), "link-missing")
+  -- the repo is there but the file is not: a warning again, and --strict fails on it
+  vim.fn.mkdir(neighbour, "p")
+  res = ci.run({ root = root, strict = true, run_lint = runner(0) })
+  has(table.concat(res.lines, "\n"), "link-missing")
+  eq(res.code, 1, "a missing file in a repo that is there stays a warning")
+  vim.fn.delete(neighbour, "rf")
+
   -- ── no vault ────────────────────────────────────────────────────────────
   res = ci.run({ root = root .. "/missing" })
   eq(res.code, 1)

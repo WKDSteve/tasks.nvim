@@ -243,6 +243,36 @@ function M.resolve(dir, target)
   return lead .. table.concat(parts, "/")
 end
 
+---The first folder outside `root` that `path` lies in: the neighbour repo a link out of the vault leads into
+---(`../../../../Literatur/x.md` of a path names `<parent of the vault>/Literatur`). Both are absolute, `/` separated
+---(`resolve` gives such a path). nil when `path` is inside `root` or no folder of it can be named.
+---@param root string
+---@param path string
+---@return string|nil folder  # The folder on this machine (to look whether it is there).
+---@return string|nil label   # The same folder as seen from `root` (`../Literatur`): no path of this machine.
+function M.outside_folder(root, path)
+  root = fsio.norm(root)
+  local function under(base)
+    return path:sub(1, #base + 1) == base .. "/"
+  end
+  if path == root or under(root) then
+    return nil
+  end
+  local base, up = root, 0
+  while not under(base) do
+    local parent = fsio.dirname(base)
+    if parent == base or parent == "." then
+      return nil
+    end
+    base, up = parent, up + 1
+  end
+  local first = path:sub(#base + 2):match("^[^/]+")
+  if not first then
+    return nil
+  end
+  return base .. "/" .. first, ("../"):rep(up) .. first
+end
+
 ---The file a relative target names, as a key to compare two spellings: `./assets/x.svg`, `assets/x.svg` and
 ---`assets/%78.svg` give the same key (without `#anchor` and `?query`, percent-escapes decoded, `.` dropped, `..` folded
 ---into the segment before it). A `..` with nothing before it stays: `../x` and `x` are two files. nil: the target names
