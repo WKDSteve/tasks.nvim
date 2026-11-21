@@ -380,7 +380,10 @@ end
 function M.set_levels(id, spec, opts)
   return edit_body(id, opts or {}, function(body, result)
     result.before = lernlevel.spec_of(lernlevel.parse(body))
-    local out, err = lernlevel.write(body, spec)
+    -- the words of the lines: the section's own, else the language the vault's marker file names
+    local root = (opts or {}).root or require("tasks_nvim.vault").root(opts or {})
+    local marker = root and require("tasks_nvim.vault_marker").read(root)
+    local out, err = lernlevel.write(body, spec, { lang = marker and marker.lang or nil })
     if not out then
       return nil, err, { code = "invalid_argument" }
     end

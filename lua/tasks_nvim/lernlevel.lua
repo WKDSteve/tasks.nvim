@@ -28,6 +28,12 @@ local DONE_WORDS = { ["pfad fertig"] = true, ["path done"] = true, ["pfad abgesc
 
 local MIDDOT = "\194\183" -- U+00B7
 
+---The words `render` writes, by language: the reader takes both (`parse`).
+M.WORDS = {
+  de = { done = "Pfad fertig", reward = "Belohnung:" },
+  en = { done = "Path done", reward = "Reward:" },
+}
+
 ---@class Tasks.Level
 ---@field number? integer        # 1, 2, … in file order; nil for the path line.
 ---@field ref string             # `"1"`, `"2"`, … or `"done"`: what `set_reward` takes.
@@ -452,9 +458,11 @@ end
 ---The lines of a section's levels from a spec (without line endings, the bullet `- ` and the mark included), or why
 ---the spec cannot be written. What it renders reads back the same (`parse`, `spec_of`).
 ---@param spec any  # `Tasks.LevelsSpec`
+---@param lang? "de"|"en"  # The words of the lines (`M.WORDS`); German without one.
 ---@return string[]|nil lines
 ---@return string|nil err
-function M.render(spec)
+function M.render(spec, lang)
+  local words = M.WORDS[lang or "de"] or M.WORDS.de
   if type(spec) ~= "table" or vim.islist(spec) and next(spec) ~= nil then
     return nil, "levels must be an object { list, done? }"
   end
@@ -534,7 +542,7 @@ function M.render(spec)
     local parts = { unit == "xp" and ("%d XP"):format(th) or ("%d %%"):format(th) }
     parts[#parts + 1] = name
     parts[#parts + 1] = badge and ("Badge " .. badge) or nil
-    parts[#parts + 1] = reward and ("Belohnung: " .. reward) or nil
+    parts[#parts + 1] = reward and (words.reward .. " " .. reward) or nil
     out[#out + 1] = ("- [%s] %s"):format(
       (given and reward) and "x" or " ",
       table.concat(parts, " " .. MIDDOT .. " ")
@@ -558,9 +566,10 @@ function M.render(spec)
     if gerr then
       return nil, gerr
     end
-    out[#out + 1] = ("- [%s] Pfad fertig%s"):format(
+    out[#out + 1] = ("- [%s] %s%s"):format(
       (given and reward) and "x" or " ",
-      reward and (" " .. MIDDOT .. " Belohnung: " .. reward) or ""
+      words.done,
+      reward and (" " .. MIDDOT .. " " .. words.reward .. " " .. reward) or ""
     )
   end
   return out
@@ -626,16 +635,47 @@ local function locate(lines)
   return heading, heading and #lines or nil, items
 end
 
+---The language of the words of a body's level lines: `en` when they say `Path done` or `Reward:` and none says
+---`Pfad fertig` or `Belohnung:`, `de` the other way round; nil when they say neither (or both).
+---@param body string
+---@return "de"|"en"|nil
+function M.lang_of(body)
+  local lines = vim.split(body or "", "\n", { plain = true })
+  local heading, _, items = locate(lines)
+  if not heading then
+    return nil
+  end
+  local seen = {}
+  for _, i in ipairs(items) do
+    for lang, w in pairs(M.WORDS) do
+      if lines[i]:find(w.done, 1, true) or lines[i]:find(w.reward, 1, true) then
+        seen[lang] = true
+      end
+    end
+  end
+  if seen.en and not seen.de then
+    return "en"
+  elseif seen.de and not seen.en then
+    return "de"
+  end
+  return nil
+end
+
 ---The body with its `## Level` section written from a spec: the level lines of the section are replaced by the
 ---rendered ones (where the first of them stood), any other text of the section stays; without a section one is added
 ---at the end. An empty spec (no levels, no `done`) removes the level lines, and the whole section when nothing else is
 ---in it. The rest of the body stays byte for byte and keeps its line ending.
+---The words are the ones the section's level lines use already (`lang_of`), else `opts.lang` (the vault's), else
+---German.
 ---@param body string
 ---@param spec any  # `Tasks.LevelsSpec`
+---@param opts? { lang?: string }
 ---@return string|nil body
 ---@return string|nil err
-function M.write(body, spec)
-  local new, err = M.render(spec)
+function M.write(body, spec, opts)
+  local want = opts and opts.lang
+  local lang = M.lang_of(body) or (want and M.WORDS[want] and want) or "de"
+  local new, err = M.render(spec, lang)
   if not new then
     return nil, err
   end

@@ -225,4 +225,44 @@ return function(H)
       one({ op = "path_levels", id = ID, levels = { list = {}, done = { reward = text } } })
     eq(d2.error.code, "invalid_argument")
   end
+
+  -- ── the words of the lines: the section's own, else the vault's language, else German ──
+  local EN_BODY = "\n## Level\n\n- [ ] 10 XP " .. M .. " Reward: ice cream\n- [ ] Path done\n"
+  eq(ll.lang_of(EN_BODY), "en")
+  eq(ll.lang_of("\n## Level\n\n- [ ] 10 XP " .. M .. " Belohnung: Eis\n"), "de")
+  eq(ll.lang_of("\n## Level\n\n- [ ] 10 XP\n"), nil, "no word: no language")
+  eq(ll.lang_of("\n## Lernpunkte\n\n- [ ] Reward: x\n"), nil, "outside the section nothing counts")
+  local en_out = assert(ll.write(EN_BODY, NEW))
+  has(en_out, "- [ ] 15 XP " .. M .. " Neu\n- [ ] Path done " .. M .. " Reward: Kino\n")
+  ok(not en_out:find("Belohnung", 1, true), "an English section stays English")
+  -- the section's own words win over the vault's
+  has(assert(ll.write(EN_BODY, NEW, { lang = "de" })), "Path done")
+  -- a new section: the vault's language, else German; an unknown one is German
+  has(
+    assert(ll.write("\n## Lernpunkte\n", NEW, { lang = "en" })),
+    "- [ ] Path done " .. M .. " Reward: Kino"
+  )
+  has(assert(ll.write("\n## Lernpunkte\n", NEW)), "Pfad fertig " .. M .. " Belohnung: Kino")
+  has(assert(ll.write("\n## Lernpunkte\n", NEW, { lang = "fr" })), "Pfad fertig")
+  -- and what it writes in English reads back the same
+  local spec_en = ll.spec_of(ll.parse(en_out))
+  eq(spec_en.done, { reward = "Kino" })
+
+  -- through the write door in an English vault: the marker file names the language
+  local root_en = F.vault(H)
+  H.write(
+    root_en .. "/tasks-vault.json",
+    require("tasks_nvim.vault_marker").render({ lang = "en" })
+  )
+  local file_en = root_en .. "/lib.nvim/ROADMAP/paths/lv-en.md"
+  H.write(
+    file_en,
+    "---\ntitle: Lv en\nstatus: doing\nupdated: 2026-11-01\n---\n\n## Lernpunkte\n\n- [ ] a {xp=20}\n"
+  )
+  local doc_en = ops.run(
+    { ops = { { op = "path_levels", id = "lib.nvim/lv-en", levels = NEW } } },
+    { root = root_en, today = TODAY }
+  )
+  eq(doc_en.results[1].ok, true, vim.inspect(doc_en.results[1]))
+  has(H.read(file_en), "- [ ] Path done " .. M .. " Reward: Kino\n")
 end

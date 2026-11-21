@@ -7,6 +7,7 @@ the version is not tagged yet (the repository is not published).
 
 ### Fixed
 
+- `path_levels` writes the words of the level lines in the language they use already (`Path done`, `Reward:` stay English), else in the language of the vault's marker file (`tasks-vault.json`, `lang`), else German (`lernlevel.lang_of`, `lernlevel.WORDS`).
 - A dry run of `tasks-ops/1` reserves the ids earlier operations of the request take, for `new`, `plan_new`, `project_new` and `path_new` alike: a second plan of the same title (or a task and a plan of one slug) gets `-2` in the dry run as in the real run.
 - An open learning path of a project (`project:` in the path file, status other than `parked`) is open work of it: `check` no longer calls a curriculum of open paths `project-no-open-work`, and `project-close` / `project_close` refuse while such a path is open (it is named in the message and in `details.holding`), as for an open plan. A finish by `done` does not close such a project either.
 - `path-link-missing` / `link-missing` fold `..` of a relative link by the text, the same on every system: on Linux a link out of a folder that is not there yet (`../tasks/x.md` of a draft whose `ROADMAP/paths/` is not made) counted as dead, on Windows it did not.
