@@ -7,6 +7,7 @@ the version is not tagged yet (the repository is not published).
 
 ### Fixed
 
+- A dry run of `tasks-ops/1` reserves the ids earlier operations of the request take, for `new`, `plan_new`, `project_new` and `path_new` alike: a second plan of the same title (or a task and a plan of one slug) gets `-2` in the dry run as in the real run.
 - An open learning path of a project (`project:` in the path file, status other than `parked`) is open work of it: `check` no longer calls a curriculum of open paths `project-no-open-work`, and `project-close` / `project_close` refuse while such a path is open (it is named in the message and in `details.holding`), as for an open plan. A finish by `done` does not close such a project either.
 - `path-link-missing` / `link-missing` fold `..` of a relative link by the text, the same on every system: on Linux a link out of a folder that is not there yet (`../tasks/x.md` of a draft whose `ROADMAP/paths/` is not made) counted as dead, on Windows it did not.
 - `check` names the line of the file for the findings of a learning path's tree and levels (`path-duplicate-key`, `path-bad-mark`, `path-arrow-dangling`, `path-image-missing`, `level-*`, the lines of `xp-missing`), also the line a message points at ("already on line 10"). It named the line of the body, the frontmatter block not counted. The findings of one path are `check.path_file_findings` now.

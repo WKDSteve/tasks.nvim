@@ -629,6 +629,8 @@ end
 
 ---@class Tasks.NewPlanOpts
 ---@field root? string
+---@field reserved? table<string, true>   # A dry run of `tasks-ops/1`: ids earlier operations of the request take.
+---@field pending_files? table<string, Tasks.PendingFile> # A dry run: plans and projects earlier operations would create.
 ---@field title string
 ---@field areas? string[]|string
 ---@field target? string          # A task id or a wikilink to it (`[[<slug>]]`, `[[<area>/<slug>]]`, a vault path).
@@ -956,6 +958,8 @@ function M.new(area, opts)
       -- a folder of that name (the folder form of a plan or project, or a leftover) would hold a second file
       or fsio.is_dir(dir_of(root, area) .. "/" .. slug)
       or (opts.dry_run and (fsio.is_file(path) or fsio.is_dir(path)))
+      -- a dry run: the ids earlier operations of the same request take (`tasks-ops/1`), as the real run has them
+      or (opts.reserved ~= nil and opts.reserved[area .. "/" .. slug] ~= nil)
     if not held and opts.dry_run then
       return {
         id = area .. "/" .. slug,

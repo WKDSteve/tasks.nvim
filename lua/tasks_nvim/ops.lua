@@ -604,8 +604,26 @@ local function etag_of_file(path)
   return text and fsio.etag(text) or nil
 end
 
----The resolver of bare `[[slug]]` wikilinks for an operation: in a dry run it also knows the tasks earlier `new`
----operations of the request would create (the real run has made them by then); nil otherwise (the vault's own).
+---The ids earlier operations of a dry run would take (tasks of `new`, plans, projects and paths of `plan_new`,
+---`project_new`, `path_new`): one namespace per area, so a later operation does not pick the same slug; nil in a real
+---run (the files are on disk by then).
+---@param ctx Tasks.OpsCtx
+---@return table<string, true>|nil
+local function reserved_ids(ctx)
+  if not ctx.dry then
+    return nil
+  end
+  local ids = {}
+  for _, pending in ipairs({ ctx.created, ctx.files }) do
+    for id in pairs(pending) do
+      ids[id] = true
+    end
+  end
+  return ids
+end
+
+---The resolver of bare `[[slug]]` wikilinks for an operation: in a dry run it also knows the tasks, plans and projects
+---earlier operations of the request would create (the real run has made them by then); nil otherwise (the vault's own).
 ---@param ctx Tasks.OpsCtx
 ---@return Tasks.LinkResolver|nil
 local function link_resolver(ctx)
@@ -1360,7 +1378,7 @@ local function do_new(op, ctx)
     body = op.body,
     dry_run = ctx.dry,
     -- a dry run: the ids and slugs earlier `new` ops of the request take, as the real run has them on disk by then
-    reserved = ctx.dry and ctx.created or nil,
+    reserved = reserved_ids(ctx),
     link_resolver = link_resolver(ctx),
     relations_judged = true,
   })
@@ -1796,6 +1814,8 @@ local function new_file(op, ctx, kind)
     template = op.template,
     dry_run = ctx.dry,
     pending_files = ctx.dry and ctx.files or nil,
+    -- the ids earlier operations of the request take: a second plan of the same title gets `-2`, as in the real run
+    reserved = reserved_ids(ctx),
     link_resolver = link_resolver(ctx),
   })
   if not r then

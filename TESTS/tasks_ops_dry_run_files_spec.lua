@@ -145,4 +145,26 @@ return function(H)
   })
   eq(dry[2].ok, true, vim.inspect(dry[2]))
   eq(dry[3].ok, true, vim.inspect(dry[3]))
+
+  -- one namespace per area: a second plan of the same title, a task, a project and a path of that slug take the next
+  -- free slug in the dry run as in the real one (`same` compares the ids op for op)
+  dry = same("one slug, five operations", {
+    { op = "plan_new", area = "lib.nvim", title = "Twin" },
+    { op = "plan_new", area = "lib.nvim", title = "Twin" },
+    { op = "new", area = "lib.nvim", title = "Twin" },
+    { op = "project_new", area = "lib.nvim", title = "Twin" },
+    { op = "path_new", area = "lib.nvim", title = "Twin" },
+  })
+  eq(
+    vim.tbl_map(function(r)
+      return r.id
+    end, dry),
+    { "lib.nvim/twin", "lib.nvim/twin-2", "lib.nvim/twin-3", "lib.nvim/twin-4", "lib.nvim/twin-5" }
+  )
+  -- and a task first, then a plan of its slug
+  dry = same("task then plan", {
+    { op = "new", area = "lib.nvim", title = "Pair" },
+    { op = "plan_new", area = "lib.nvim", title = "Pair" },
+  })
+  eq(dry[2].id, "lib.nvim/pair-2")
 end
