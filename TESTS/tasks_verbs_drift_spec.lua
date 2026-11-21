@@ -32,6 +32,10 @@ return function(H)
     -- `meetings` lists a window of meetings for a script or a hub; the editor picks one with `:Tasks meeting list`
     "meetings",
     "migrate-actor",
+    -- `milestone-new` and `milestones` are the headless door to the milestones; the editor's view of them is task
+    -- tasks.nvim/meilensteine-im-editor-zeile-nach-done-tasks-projects-zeigt
+    "milestone-new",
+    "milestones",
     "plan-new",
     "plans",
     "projects",
