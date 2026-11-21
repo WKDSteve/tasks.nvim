@@ -1,0 +1,93 @@
+{
+  "body": "\nDie erste Ausgabe.\n\n## Verlauf\n\n- 2025-12-20 reached\n- 2025-12-21 opened again: lib.nvim/beta is open\n",
+  "body_truncated": false,
+  "digest": "sha256:9968a9eba6eea8c0",
+  "engine": {
+    "git": "0000000",
+    "nvim": "0.0.0",
+    "version": "0.1.0-test"
+  },
+  "generated_at": "2026-01-01T00:00:00Z",
+  "history": [
+    "2025-12-20 reached",
+    "2025-12-21 opened again: lib.nvim/beta is open"
+  ],
+  "kind": "tasks.milestone",
+  "members": [
+    {
+      "done": 1,
+      "id": "lib.nvim/the-plan",
+      "kind": "plan",
+      "state": "open",
+      "title": "The plan",
+      "total": 3
+    },
+    {
+      "done": 0,
+      "id": "lib.nvim/beta",
+      "kind": "task",
+      "state": "open",
+      "title": "Beta waits for alpha",
+      "total": 1
+    },
+    {
+      "done": 1,
+      "id": "lib.nvim/old-done",
+      "kind": "task",
+      "state": "done",
+      "title": "Old and done",
+      "total": 1
+    },
+    {
+      "done": 0,
+      "id": "cascade.nvim/zeta",
+      "kind": "task",
+      "state": "open",
+      "title": "Zeta builds",
+      "total": 1
+    }
+  ],
+  "milestone": {
+    "area": "lib.nvim",
+    "close": "auto",
+    "complete": false,
+    "created": "2025-12-01",
+    "due": "2026-01-01",
+    "etag": "sha256:fa6baaad8c82bffa",
+    "file": "lib.nvim/ROADMAP/milestones/release-1.md",
+    "id": "lib.nvim/release-1",
+    "includes": [
+      "lib.nvim/the-plan",
+      "lib.nvim/beta",
+      "lib.nvim/old-done",
+      "cascade.nvim/zeta"
+    ],
+    "overdue": true,
+    "problems": [],
+    "progress": {
+      "done": 2,
+      "members": 4,
+      "members_done": 1,
+      "total": 6
+    },
+    "reached": "2025-12-20",
+    "slug": "release-1",
+    "status": "doing",
+    "summary": "Die erste Ausgabe.",
+    "title": "Release 1",
+    "updated": "2025-12-21",
+    "valid": true
+  },
+  "overlaps": [
+    {
+      "id": "cascade.nvim/zeta",
+      "via": "lib.nvim/the-plan"
+    }
+  ],
+  "plugin": "tasks.nvim",
+  "rev": "rev:209ea5",
+  "schema": 1,
+  "vault": {
+    "id": "vault"
+  }
+}

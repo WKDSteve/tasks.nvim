@@ -97,6 +97,10 @@ commands:
   path-new <area> <title> [--areas=a,b] [--target=<id>] [--project=<id>] [--status=planning|doing|parked] [--summary=text] [--links=url,url] [--icon=...] [--cover=assets/x.png] [--template=learning]
                                           create the learning path ROADMAP/paths/<slug>.md (no stages; its tree goes
                                           into ## Lernpunkte); --template=learning writes the sections of a learning path
+  milestone-new <area> <title> [--due=YYYY-MM-DD] [--includes=<id>,<id>] [--close=manual] [--status=planning|doing|parked] [--summary=text] [--slug=]
+                                          create the milestone ROADMAP/milestones/<slug>.md over tasks, plans,
+                                          projects, paths and meetings of this vault; reached when they are all done
+  milestones [<area>] [--format=tsv|json]  the milestones: id, status, due, progress (members done/all), title
   meeting new <area> <title> --date=YYYY-MM-DD [--time=HH:MM] [--end=HH:MM|--duration=45m] [--location=]
               [--online=url] [--tasks=a/b,c/d] [--notify=-15m,-1d@18:00] [--tags=] [--quick="<line>"] [--dry-run]
                                           make <area>/MEETINGS/<slug>.md (slug: title and date); --quick reads one
@@ -425,6 +429,11 @@ local SPECS = {
     flag = {},
   },
   ["plan-close"] = { value = {}, flag = {} },
+  ["milestone-new"] = {
+    value = { "due", "includes", "close", "status", "summary", "slug", "title" },
+    flag = {},
+  },
+  milestones = { value = { "format" }, flag = {} },
   ["project-close"] = { value = {}, flag = {} },
   meeting = {
     value = {
@@ -1631,6 +1640,89 @@ commands.meetings = function(ctx)
   return 0
 end
 
+---Say which milestones a write reached or opened again, one line each (`milestone-reached`, `milestone-reopened`).
+---@param ctx table
+---@param reached? string[]
+---@param reopened? string[]
+local function say_milestones(ctx, reached, reopened)
+  for _, id in ipairs(reached or {}) do
+    ctx.say(("milestone-reached\t%s"):format(id))
+  end
+  for _, id in ipairs(reopened or {}) do
+    ctx.say(("milestone-reopened\t%s"):format(id))
+  end
+end
+
+---`tasks milestone-new <area> "<title>" [--due= --includes= --close= --status= --summary= --slug=]`.
+---@param ctx Tasks.CliCtx
+---@return integer code
+commands["milestone-new"] = function(ctx)
+  local args, eo = ctx.args, ctx.eo
+  local area = args.pos[1]
+  local title = args.pos[2] or args.opt.title
+  if not area or not title or #args.pos > 2 then
+    ctx.warn(
+      'error: usage: milestone-new <area> "<title>" [--due=YYYY-MM-DD] [--includes=a/b,c/d] [--close=manual]'
+    )
+    return 2
+  end
+  local res, err, info = require("tasks_nvim.milestones").new(area, {
+    root = eo.root,
+    today = eo.today,
+    title = title,
+    due = args.opt.due --[[@as string|nil]],
+    includes = args.opt.includes --[[@as string|nil]],
+    close = args.opt.close --[[@as string|nil]],
+    status = args.opt.status --[[@as string|nil]],
+    summary = args.opt.summary --[[@as string|nil]],
+    slug = args.opt.slug --[[@as string|nil]],
+  })
+  if not res then
+    ctx.warn("error: " .. tostring(err))
+    for _, p in ipairs(info and info.details and info.details.problems or {}) do
+      ctx.warn(("  %s\t%s"):format(p.code, p.target))
+    end
+    return info and info.code == "invalid_argument" and 2 or 1
+  end
+  ctx.say(("created\t%s\t%s"):format(res.id, res.path))
+  -- made over members that are all done already: reached at once
+  local settled = require("tasks_nvim.milestones").settle({ root = eo.root, today = eo.today })
+  say_milestones(ctx, settled.reached, settled.reopened)
+  return 0
+end
+
+---`tasks milestones [area] [--format=tsv|json]`: the milestones with status, due and progress (`tasks.milestones`).
+---@param ctx Tasks.CliCtx
+---@return integer code
+commands.milestones = function(ctx)
+  local doc, err = contract.milestones(
+    { area = ctx.args.pos[1] },
+    { root = ctx.eo.root, today = ctx.eo.today }
+  )
+  if not doc then
+    ctx.warn("error: " .. tostring(type(err) == "table" and err.message or err))
+    return type(err) == "table" and err.code == "not_found" and 2 or 1
+  end
+  if ctx.args.opt.format == "json" then
+    ctx.out(vim.json.encode(doc) .. "\n")
+    return 0
+  end
+  for _, m in ipairs(doc.items or {}) do
+    ctx.say(
+      ("%s\t%s\t%s\t%d/%d%s\t%s"):format(
+        m.id,
+        m.status or "?",
+        m.due or "-",
+        m.progress.members_done,
+        m.progress.members,
+        m.overdue and " overdue" or "",
+        m.title
+      )
+    )
+  end
+  return 0
+end
+
 ---Say what a hand-made close did, one line each.
 ---@param ctx table
 ---@param plans_closed string[]
@@ -1692,6 +1784,7 @@ local function close_by_hand(ctx, kind)
     return 1
   end
   say_closed(ctx, res.plans_closed, res.plan_summaries, res.projects)
+  say_milestones(ctx, res.milestones_reached)
   return 0
 end
 
@@ -2302,6 +2395,7 @@ function commands.done(ctx)
       )
     )
   end
+  say_milestones(ctx, flow.milestones_reached, flow.milestones_reopened)
   for _, doc in ipairs(flow.docs_refreshed) do
     ctx.say(("refreshed\t%s"):format(doc))
   end

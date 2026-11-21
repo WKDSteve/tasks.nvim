@@ -111,6 +111,10 @@ mutate(
 mutate("a vault id that is not a string", "snapshot", (d) => (d.vault.id = 7));
 mutate("a views_rev that is no rev", "snapshot", (d) => (d.views_rev = "views:3"));
 mutate("schema 2", "hello", (d) => (d.schema = 2));
+mutate("a milestone member of a kind the engine does not have", "milestone", (d) => (d.members[0].kind = "epic"));
+mutate("a milestone without its progress", "milestones", (d) => delete d.items[0].progress);
+mutate("a milestone closed in a way the engine does not have", "milestones", (d) => (d.items[0].close = "vote"));
+mutate("a milestone reached on no date", "milestone", (d) => (d.milestone.reached = "soon"));
 mutate("a list with an option the engine does not have", "lists-builtin", (d) => (d.lists[0].options.colour = "red"));
 mutate("a list from a source of its own", "lists-builtin", (d) => (d.lists[0].source = "cloud"));
 // every option a stored list can carry (lists.FIELD_ORDER) is one the schema takes

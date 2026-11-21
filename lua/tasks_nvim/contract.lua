@@ -52,7 +52,7 @@ M.PLUGIN = "tasks.nvim"
 M.ENGINE_VERSION = "0.1.0-dev"
 
 ---What this engine can answer; an app shows only what is listed here. Sorted.
----`ops` is the write door (`set`, `new`, `reorder`, `done`, `move_area`, `plan_new`, `plan_set`, `plan_close`, `project_new`, `project_set`, `project_close`, `tick_step`, `add_steps`, `answer`, `append_note`, `reopen`, `set_body`, `set_section`, `view_save`, `view_delete`, `attach`), `if_match` the compare-and-set on a task's
+---`ops` is the write door (`set`, `new`, `reorder`, `done`, `move_area`, `plan_new`, `plan_set`, `plan_close`, `project_new`, `project_set`, `project_close`, `milestone_new`, `milestone_set`, `tick_step`, `add_steps`, `answer`, `append_note`, `reopen`, `set_body`, `set_section`, `view_save`, `view_delete`, `attach`), `if_match` the compare-and-set on a task's
 ---`etag`, `done_preview` what `done` needs first, `reorder` a move inside a group, `move_area_preview` the report of a
 ---move to another area (the move itself is not there yet). `waits_for` says that a task carries what it waits for
 ---(`set` and `new` take the key, `list` and `order` filter by it), `waits` is the overview of those keys.
@@ -89,6 +89,10 @@ M.CAPABILITIES = {
   "meeting_parse",
   "meeting_series",
   "meetings",
+  "milestone",
+  "milestone_new",
+  "milestone_set",
+  "milestones",
   "move_area",
   "move_area_preview",
   "next",
@@ -3527,6 +3531,188 @@ function M.path(id, opts)
     end
     local rev_lines = { f.id .. "\t" .. fsio.etag(text) }
     vim.list_extend(rev_lines, task_xp_lines(f))
+    return seal(doc, builder.rev_of(rev_lines)), nil
+  end)
+end
+
+-- ── milestones ───────────────────────────────────────────────────────────────
+
+---A milestone as the documents carry it (`tasks.milestones` items, `tasks.milestone`): the head of its file, its
+---progress over its members, whether it is overdue (a `due` before today, not reached, not parked), its version.
+---@param root string
+---@param m Tasks.Milestone
+---@param text? string  # The file as read (its `etag`).
+---@param p Tasks.MilestoneProgress
+---@param today string
+---@return table
+local function milestone_entry(root, m, text, p, today)
+  local statuses = require("tasks_nvim.milestones").STATUSES
+  local status = vim.tbl_contains(statuses, m.status) and m.status or nil
+  return json.object({
+    id = m.id,
+    area = m.area,
+    slug = m.slug,
+    title = clip(m.title, M.LIMITS.title),
+    status = status,
+    due = m.due,
+    reached = m.reached,
+    close = m.close,
+    includes = vim.list_slice(m.includes, 1),
+    progress = json.object({
+      members = p.members,
+      members_done = p.members_done,
+      done = p.done,
+      total = p.total,
+    }),
+    complete = p.complete,
+    overdue = m.due ~= nil and status ~= "done" and status ~= "parked" and m.due < today,
+    summary = clip(m.summary or "", M.LIMITS.summary),
+    created = m.created,
+    updated = m.updated,
+    folder = m.folder or nil,
+    file = relative(root, m.path) or vim.fs.basename(m.path),
+    etag = text and fsio.etag(text) or nil,
+    valid = m.valid ~= false and #(m.errors or {}) == 0,
+    problems = vim.tbl_map(function(e)
+      return redact(root, tostring(e))
+    end, m.errors or {}),
+  })
+end
+
+---The lines a milestone's `rev` takes from outside its file: the kind and state of each member and what it counts, so
+---that a member finished or reopened elsewhere gives a new `rev`.
+---@param m Tasks.Milestone
+---@param cache Tasks.MilestoneCache
+---@param counts Tasks.MilestoneCounts
+---@return string[]
+local function milestone_member_lines(m, cache, counts)
+  local mod = require("tasks_nvim.milestones")
+  local out = {}
+  for _, id in ipairs(m.includes) do
+    local member = mod.member(id, cache)
+    local u = mod.units(member, counts)
+    out[#out + 1] = ("member:%s\t%s\t%s\t%d/%d"):format(
+      id,
+      member.kind,
+      member.state or "-",
+      u.done,
+      u.total
+    )
+  end
+  return out
+end
+
+---`tasks.milestones`: the milestones of the vault or of one area (an area group stands for its members), each with its
+---progress. The `rev` covers the files and the state of their members.
+---@param params? { area?: string }
+---@param opts? { root?: string, today?: string }
+---@return table|nil doc
+---@return Tasks.ContractError|string|nil err
+function M.milestones(params, opts)
+  params = params or {}
+  return fsio.read_scope(function()
+    local root, rerr = vault.root(opts)
+    if not root then
+      return nil, rerr
+    end
+    local names
+    if params.area ~= nil then
+      local scope = vault.area_scope(root, params.area)
+      if not scope then
+        return nil,
+          {
+            code = "not_found",
+            message = "unknown area: " .. tostring(params.area),
+            retryable = false,
+          }
+      end
+      names = scope.areas
+    else
+      names = vim.tbl_map(function(a)
+        return a.name
+      end, vault.areas(root))
+    end
+    local mod = require("tasks_nvim.milestones")
+    local today = (opts and opts.today) or model.today()
+    local items, lines, incomplete = {}, {}, {}
+    local cache, counts
+    for _, name in ipairs(names) do
+      local list, errs = mod.area(name, { root = root })
+      for _, e in ipairs(type(errs) == "table" and errs or {}) do
+        incomplete[#incomplete + 1] = redact(root, tostring(e))
+      end
+      for _, m in ipairs(list or {}) do
+        -- the members are read once per document, and only when there is a milestone at all
+        cache = cache or mod.cache(root)
+        counts = counts or mod.counts(root)
+        local text = fsio.read(m.path)
+        local entry = milestone_entry(root, m, text, mod.progress(m, cache, counts), today)
+        items[#items + 1] = entry
+        lines[#lines + 1] = m.id .. "\t" .. (entry.etag or "")
+        vim.list_extend(lines, milestone_member_lines(m, cache, counts))
+      end
+    end
+    local doc = M.head("tasks.milestones", root)
+    doc.items = items
+    doc.incomplete = incomplete
+    return seal(doc, builder.rev_of(lines)), nil
+  end)
+end
+
+---`tasks.milestone`: one milestone with its body (cut at `body_bytes`), its members (kind, state, title, what each
+---counts), its history (the lines of `## Verlauf`) and the members that are in it twice (`overlaps`).
+---@param id string
+---@param opts? { root?: string, today?: string }
+---@return table|nil doc
+---@return Tasks.ContractError|string|nil err
+function M.milestone(id, opts)
+  local area, slug, perr = vault.parse_id(tostring(id))
+  if not area or not slug then
+    return nil, bad_argument(perr or "expected <area>/<slug>")
+  end
+  return fsio.read_scope(function()
+    local root, rerr = vault.root(opts)
+    if not root then
+      return nil, rerr
+    end
+    local mod = require("tasks_nvim.milestones")
+    local m, err = mod.find(id, { root = root })
+    if not m then
+      return nil, { code = "not_found", message = redact(root, tostring(err)), retryable = false }
+    end
+    local text = fsio.read(m.path) or ""
+    local parsed = require("lib.nvim.markdown.frontmatter").parse(text)
+    local body = parsed and parsed.body or ""
+    local truncated = #body > M.LIMITS.body_bytes
+    if truncated then
+      body = body:sub(1, M.LIMITS.body_bytes)
+    end
+    local cache, counts = mod.cache(root), mod.counts(root)
+    local today = (opts and opts.today) or model.today()
+    local doc = M.head("tasks.milestone", root)
+    doc.milestone = milestone_entry(root, m, text, mod.progress(m, cache, counts), today)
+    doc.body = body
+    doc.body_truncated = truncated
+    doc.members = vim.tbl_map(function(mid)
+      local member = mod.member(mid, cache)
+      local u = mod.units(member, counts)
+      return json.object({
+        id = mid,
+        kind = member.kind,
+        state = member.state,
+        title = member.title and clip(member.title, M.LIMITS.title) or nil,
+        done = u.done,
+        total = u.total,
+      })
+    end, m.includes)
+    doc.history = vim.tbl_map(function(line)
+      return clip(line, M.LIMITS.summary)
+    end, m.history)
+    doc.overlaps = vim.tbl_map(function(o)
+      return json.object({ id = o.id, via = o.via })
+    end, mod.overlaps(m, cache))
+    local rev_lines = { m.id .. "\t" .. fsio.etag(text) }
+    vim.list_extend(rev_lines, milestone_member_lines(m, cache, counts))
     return seal(doc, builder.rev_of(rev_lines)), nil
   end)
 end

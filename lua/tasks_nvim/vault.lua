@@ -145,6 +145,13 @@ function M.vault_names()
   return out
 end
 
+---The folder of the configured vault `name` (`setup({ vaults })`), `nil` for a name that is none.
+---@param name string
+---@return string|nil
+function M.named_root(name)
+  return named[name]
+end
+
 ---The name of the active vault, `nil` when it is a plain path, `$TASKS_VAULT` or none.
 ---@return string|nil
 function M.active_name()
@@ -537,12 +544,25 @@ function M.path_path(root, area, slug)
   return M.paths_dir(root, area) .. "/" .. slug .. ".md"
 end
 
----The folder of a plan file (`kind` `plan`), a project file (`project`) or a learning path (`path`), whichever form it
----has: `plans/<slug>.md`, or `plans/<slug>/<slug>.md` once something was attached to it (its assets lie in that folder).
----@param kind "plan"|"project"|"path"
+---`<area>/ROADMAP/milestones`: the milestones of the area (optional, `tasks_nvim.milestones`). A milestone is a dated
+---bundle of ids (plans, projects, tasks, meetings, learning paths); it stays in its folder when it is reached.
+---@param root string
+---@param area string
+---@return string
+function M.milestones_dir(root, area)
+  return root .. "/" .. area .. "/ROADMAP/milestones"
+end
+
+---The folder of a plan file (`kind` `plan`), a project file (`project`), a learning path (`path`) or a milestone
+---(`milestone`), whichever form it has: `plans/<slug>.md`, or `plans/<slug>/<slug>.md` once something was attached to
+---it (its assets lie in that folder).
+---@param kind "plan"|"project"|"path"|"milestone"
 ---@return fun(root: string, area: string): string
 local function dir_of(kind)
-  return (kind == "project" and M.projects_dir) or (kind == "path" and M.paths_dir) or M.plans_dir
+  return (kind == "project" and M.projects_dir)
+    or (kind == "path" and M.paths_dir)
+    or (kind == "milestone" and M.milestones_dir)
+    or M.plans_dir
 end
 M.file_kind_dir = dir_of
 
@@ -618,14 +638,14 @@ function M.resolve_meeting(root, area, slug)
   return nil, ("no such meeting: %s/%s"):format(area, slug)
 end
 
----Whether an open plan file, a project file, a learning path or a meeting of this slug is in the area, in either form
----(one id namespace: a task, a plan, a project, a path and a meeting never share an id).
+---Whether an open plan file, a project file, a learning path, a milestone or a meeting of this slug is in the area, in
+---either form (one id namespace: a task, a plan, a project, a path, a milestone and a meeting never share an id).
 ---@param root string
 ---@param area string
 ---@param slug string
 ---@return boolean
 function M.has_plan_or_project(root, area, slug)
-  for _, kind in ipairs({ "plan", "project", "path" }) do
+  for _, kind in ipairs({ "plan", "project", "path", "milestone" }) do
     local file = M.file_kind_path(kind, root, area, slug)
     if fsio.is_file(file) or fsio.is_file(M.plan_folder_path(root, kind, area, slug)) then
       return true

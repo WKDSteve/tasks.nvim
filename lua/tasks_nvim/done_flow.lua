@@ -57,6 +57,8 @@ local M = {}
 ---@field plans_closed string[]      # Ids of plan files closed because their last member is done.
 ---@field projects_closed string[]   # Ids of project files closed because their last plan and own task is done (a parked plan does not hold a project open).
 ---@field project_summaries table<string, Tasks.ProjectSummary>  # What each closed project amounted to.
+---@field milestones_reached string[]   # Milestones this finish reached (`milestones.settle`).
+---@field milestones_reopened string[]  # Reached milestones set back to `doing` (a member open again).
 ---@field docs_refreshed string[]    # Generated plan blocks that were refreshed.
 ---@field next_round? { id: string, due: string, path: string }  # The next round of a routine that was started.
 ---@field meetings_ticked? string[]  # Meetings whose follow-up line of this task was ticked.
@@ -257,6 +259,7 @@ end
 ---@field plan_summaries table<string, Tasks.PlanSummary>
 ---@field projects Tasks.ClosedProjects       # The projects finished with it (a plan close: the one the plan was the last of).
 ---@field notes string[]                      # Steps that said something on the way.
+---@field milestones_reached string[]         # Milestones reached by it (`milestones.settle`).
 ---@field dry_run? boolean                    # Nothing was written: `plans_closed` / `projects` say what would be.
 
 ---Finish a plan or a project by hand (the CLI's `plan-close` / `project-close`, `:Tasks plan-close` / `project-close`):
@@ -276,6 +279,7 @@ function M.close_by_hand(kind, id, opts)
     plan_summaries = {},
     projects = { closed = {}, summaries = {}, refused = {}, notes = {} },
     notes = {},
+    milestones_reached = {},
     dry_run = opts.dry_run or nil,
   }
   local finder = kind == "project" and projects.find or plans.find
@@ -300,6 +304,8 @@ function M.close_by_hand(kind, id, opts)
     if #res.closed == 0 then
       out.holding = res.refused[id]
       out.err = out.holding == nil and (id .. " was not closed") or nil
+    elseif not opts.dry_run then
+      M.settle_milestones(out, opts)
     end
     return out
   end
@@ -322,7 +328,22 @@ function M.close_by_hand(kind, id, opts)
   end
   out.projects = M.close_projects(project_ids, run)
   M.refresh_marker_docs({ root = opts.root, closed = res.summaries })
+  M.settle_milestones(out, opts)
   return out
+end
+
+---The milestones after a close by hand: reached ones into `out.milestones_reached`, a failure into `out.notes`.
+---@param out { milestones_reached: string[], notes: string[] }
+---@param opts { root?: string, today?: string }
+function M.settle_milestones(out, opts)
+  local ran, res =
+    pcall(require("tasks_nvim.milestones").settle, { root = opts.root, today = opts.today })
+  if ran then
+    out.milestones_reached = res.reached
+    vim.list_extend(out.notes, res.notes)
+  else
+    out.notes[#out.notes + 1] = "reaching milestones: " .. tostring(res)
+  end
 end
 
 ---@class Tasks.ProjectSummary
@@ -728,6 +749,8 @@ function M.run(id, opts)
     plan_summaries = {},
     projects_closed = {},
     project_summaries = {},
+    milestones_reached = {},
+    milestones_reopened = {},
     docs_refreshed = {},
     notes = {},
   }
@@ -835,6 +858,16 @@ function M.run(id, opts)
       for project_id, summary in pairs(res.summaries) do
         flow.project_summaries[project_id] = summary
       end
+    end)
+  end
+
+  -- b2b. the milestones: reached when this was the last member (a batch does this once at its end)
+  if not opts.defer_plan_close then
+    step("reaching milestones", function()
+      local res = require("tasks_nvim.milestones").settle({ root = opts.root, today = opts.today })
+      flow.milestones_reached = res.reached
+      flow.milestones_reopened = res.reopened
+      vim.list_extend(flow.notes, res.notes)
     end)
   end
 

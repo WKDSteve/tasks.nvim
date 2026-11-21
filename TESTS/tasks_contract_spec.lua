@@ -99,6 +99,8 @@ return function(H)
     "if_match",
     "meeting_ops",
     "meeting_series",
+    "milestone_new",
+    "milestone_set",
     "move_area",
     "move_area_preview",
     "next_not_category",

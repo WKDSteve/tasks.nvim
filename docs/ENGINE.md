@@ -76,6 +76,7 @@ TESTS/              specs (run with scripts/test.sh, i.e. testing.nvim)
 | `tasks_nvim.lernbaum` | The learning tree of `## Lernpunkte`, see [Learning paths](#learning-paths-roadmappaths): nodes with marks, keys, reasons, arrows, notes and images; the parent rule, progress counted apart, the problems of one file; `render` gives the text back byte for byte. Pure. | `parse`, `render`, `set_state`, `set_xp`, `set_task_xp`, `suggest_xp`, `to_xp`, `node`, `progress_text`, `promoted_ids` |
 | `tasks_nvim.lernlevel` | The levels of a learning path (`## Level`), see [XP, levels and rewards](#xp-levels-and-rewards-optional): thresholds in XP or percent, badges, rewards; the level reached, the next, the rewards not granted; `set_reward` writes back byte for byte. Pure. | `parse`, `evaluate`, `set_reward` |
 | `tasks_nvim.paths` | Learning paths, `<area>/ROADMAP/paths/<slug>.md` (read by `plans` with `kind = "path"`): list, make, change, finish, change one learning point on disk, give the promoted points the XP of their tasks and mark a reward granted. | `from_file`, `area`, `all`, `find`, `new`, `set`, `close`, `point`, `set_reward`, `task_xp`, `with_xp` |
+| `tasks_nvim.milestones` | Milestones, `<area>/ROADMAP/milestones/<slug>.md` (or the folder form), see [Milestones](#milestones-roadmapmilestones): a dated bundle of ids (`includes`) of tasks, plans, projects, paths and meetings. `parse` / `from_file` always return a milestone (a broken one carries errors), `area` / `all` / `find` read them, `member` resolves an id (kind, done or open), `progress` / `units` count, `overlaps` names a member that is in it twice, `settle` reaches and opens them again after a write, `new` / `set` write them under the file lock. | `parse`, `from_file`, `area`, `all`, `find`, `member`, `complete`, `progress`, `overlaps`, `settle`, `new`, `set` |
 | `tasks_nvim.plan_scope` | The impure edge of the plan: one scan of the open tasks, finished ids looked up in the Backlogs when a blocker is not open, the scope cut like the commands do (area, `--for`, filters); `filter_readiness` serves `list --ready|--waiting`. `shared` is ONE pass over the vault (open tasks, finished ids, plan files, which file a ref means) that `load`, `filter_readiness` and the dashboard reuse. The marker blocks of documents: `refresh_document` (every block of a file, after a finish), `write_block` (`plan --write`), `marker_attrs`, `resolve_block`. | `shared`, `load`, `index`, `filter_readiness`, `refresh_document`, `write_block`, `marker_attrs`, `resolve_block` |
 | `tasks_nvim.plan_view` | A plan as Markdown (ready now, decisions by leverage, stages, critical path, warnings, the estimate line), `tsv` or `ids`; the `next` lines and the dialog text; the marker blocks of a document (`parse_blocks`, `replace_blocks`: fence-aware, per-line endings kept, the start marker carries attributes; `start_line`, `parse_start`). | `markdown`, `tsv`, `ids`, `next_lines`, `next_message`, `empty_text`, `parse_blocks`, `replace_blocks`, `replace_block`, `start_line`, `parse_start` |
 | `tasks_nvim.estimate` | Sums over tasks: effort days with how many tasks they are made of, a range (every size at its low and its high end), value, roi over the tasks with both numbers, quick wins, the split by actor, progress from finished tasks. A task without an estimate is missing, never 0. | `rollup`, `describe`, `fmt_days` |
@@ -603,6 +604,48 @@ while it is not blocked or `[ ]` while it is, or not the state of its outcome wh
 `point:` that is not `<area>/<slug>#<key>` is the error `bad-point`. In the editor: `:Tasks promote` / `unpromote`
 (the point under the cursor, or `<id>#<key>`) and the tree view `:Tasks learn` ([COMMANDS.md](COMMANDS.md)).
 
+### Milestones (`ROADMAP/milestones/`)
+
+A milestone is a fixed set of things to finish by a day: its own level beside plans and projects (decision
+2026-11-21), not a project with a date. The file is `<area>/ROADMAP/milestones/<slug>.md` (or `<slug>/<slug>.md`);
+the id `<area>/<slug>` shares the namespace of the area with tasks, plans, projects, paths and meetings. It never moves
+to the Backlog: a reached milestone is an event with a date.
+
+```markdown
+---
+title: "Release 1.0 der Handy-App"
+status: doing            # planning, doing, parked, done
+due: 2026-12-15          # the day aimed at
+includes: [tasks-desktop/meetings-mobile, tasks-desktop/abnahme, Learning/livecompare]
+close: auto              # auto (default): the engine reaches it; manual: milestone_set status=done
+reached: 2026-12-12      # written by the engine
+---
+
+## Verlauf
+
+- 2026-12-12 reached
+```
+
+- **Members** are ids of the same vault: tasks, plans, projects, learning paths, meetings. A member is done when it is
+  finished (a task, plan, project or path in the Backlog; a meeting `done` or `cancelled`). No tags or filters: the
+  scope is fixed, so the milestone is something to measure against.
+- **Progress**: members done of all, and the units below them: a plan or project counts its tasks (open and finished;
+  one without any counts as one), a task, a meeting and a path one each.
+- **Reached**: every write that can finish a member (`tasks done`, `plan-close`, `project-close`, the operations of
+  `tasks-ops/1`) runs `milestones.settle`: a milestone of `close: auto` whose members are all done gets
+  `status: done`, `reached` and a line in `## Verlauf`. `close: manual` waits for `milestone_set` with `status: done`
+  (refused while a member is open). A milestone without members is never reached; a parked one is left alone.
+- **Opened again**: a member of a reached milestone that is open again (`reopen`) sets it back to `doing`; `reached`
+  stays as its history and `## Verlauf` says which member. A member that exists nowhere holds a milestone open but
+  never opens a reached one (that is a `check` error, not a silent change).
+- **One vault**: an id of another vault is refused when written and an error in `check`; nothing is read there.
+- `check`: `milestone-include-unknown`, `milestone-include-foreign`, `milestone-bad-include`, `milestone-nested`,
+  `milestone-id-taken`, `milestone-bad-status`, `milestone-bad-close` (errors); `milestone-include-overlap` (a member
+  already in it through a plan or project it names), `milestone-drift` (its status behind its members, e.g. after a
+  hand edit), `milestone-overdue`, `milestone-empty` (warnings).
+- Headless: `tasks milestone-new <area> "<title>" [--due= --includes=a/b,c/d --close=manual]`, `tasks milestones
+  [<area>]`; `tasks done` says `milestone-reached <id>`.
+
 ### Folder tasks
 
 A task is a file `tasks/<slug>.md` **or** a folder `tasks/<slug>/<slug>.md` (same name) that
@@ -870,6 +913,8 @@ nvim --headless -u NONE -l scripts/tasks.lua check
 | `next [area] [--n=3] [--actor=cdx\|me\|pair\|none] [--format=json]` | `next: <id> <title> <reason>`, `then: ...`, `freed:`, `cdx:`, `empty:` and `remind:` lines; `remind: <id>\t<title>\t<date>` lists the open tasks whose reminder is due (oldest first, judged by `--today`, which must be a date), a last `remind: N finished task(s) with a reminder due (`list --done --reminders`)` counts the finished ones; `--format=json` is the `tasks.next` document (no `remind:` there) |
 | `estimate [area] [--for=id] [filters]` | the estimate line, `quick wins:`, `unestimated:` |
 | `path-new <area> <title> [--areas --target --project --status --summary --links --icon --cover --template=learning]` | create a learning path under `ROADMAP/paths/` through `paths.new` (no stages: `--phases` is no option); the editor's `:Tasks path-new` makes it and opens it |
+| `milestone-new <area> <title> [--due --includes --close --status --summary --slug]` | create a milestone under `ROADMAP/milestones/` (`milestones.new`); the members must exist in this vault |
+| `milestones [<area>] [--format=tsv\|json]` | the milestones: id, status, due, members done/all (and `overdue`), title |
 | `plan-new <area> <title> [--areas --target --phases --gate --summary --template=learning]` | create a plan file under `ROADMAP/plans/`; `--template=learning` writes the sections of a learning plan and proposes the stages `orientieren, grundlagen, vertiefen, anwenden, festigen` (stages given win). `paths.new` takes the same template: goal and competence level, access, schedule, sources, `## Lernpunkte`, self-check, open questions, repetition |
 | `migrate-actor [area] [--write]` | propose `actor=me` for tasks that wait for you (status decision, tag needs-user), leave the rest empty; dry run unless `--write` |
 | `attach <area>/<slug> <file> [--name=n] [--no-index]` | copy a file to `<slug>/assets/` (a plain task becomes a folder task), print the Markdown link |

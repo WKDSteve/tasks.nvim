@@ -67,6 +67,15 @@
 ---    nothing is attached: a name the task has already is `exists`, in a dry run too (a file sent again after its
 ---    answer was lost arrives once)
 ---
+---  - `milestone_new` { area, title, due?, includes?, close?, status?, summary?, slug? }: make a milestone under
+---    `ROADMAP/milestones/` (`tasks_nvim.milestones`); `includes` must name tasks, plans, projects, paths or meetings of
+---    this vault (`details.problems` names the others)
+---  - `milestone_set` { id, patch, if_match? }: change `title`, `status`, `due`, `includes`, `close`, `summary`; `status`
+---    `done` reaches it by hand (refused while a member is not done, `details.holding`); the answer has an `inverse`
+---  - every operation that can finish or open a member of a milestone (`done`, `reopen`, `plan_close`, `project_close`,
+---    `path_close`, `meeting_close`, `meeting_set`, `milestone_new`, `milestone_set`) brings the milestones in line
+---    afterwards (`milestones.settle`): `milestones_reached` and `milestones_reopened` in its entry name what changed
+---
 ---  - `meeting_new`, `meeting_set`, `meeting_close`, `meeting_capture`, `meeting_attend`, `meeting_followups`,
 ---    `board_save`: the meetings (`tasks_nvim.meeting_write`, docs/CONTRACT.md); `tick_step`, `add_steps`
 ---    (`section`), `append_note`, `set_section`, `set_body` and `attach` take a meeting id as well
@@ -172,6 +181,21 @@ M.OPS = {
   "promote",
   "unpromote",
   "path_reward",
+  "milestone_new",
+  "milestone_set",
+}
+
+---The operations after which the milestones are brought in line (`milestones.settle`); `done` does it in its flow.
+---@type table<string, boolean>
+local SETTLES = {
+  reopen = true,
+  plan_close = true,
+  project_close = true,
+  path_close = true,
+  meeting_close = true,
+  meeting_set = true,
+  milestone_new = true,
+  milestone_set = true,
 }
 
 ---Longest `client_op_id`.
@@ -321,6 +345,17 @@ local FIELDS = {
     if_match = "string",
   },
   path_reward = { id = "string", level = "string", given = "boolean", if_match = "string" },
+  milestone_new = {
+    area = "string",
+    title = "string",
+    due = "string",
+    includes = "strings",
+    close = "string",
+    status = "string",
+    summary = "string",
+    slug = "string",
+  },
+  milestone_set = { id = "string", patch = "object", if_match = "string" },
   promote = {
     container = "string",
     point = "string",
@@ -1526,6 +1561,8 @@ local function do_done(op, ctx)
   if flow.point and flow.point.changed then
     changed[#changed + 1] = flow.point.container
   end
+  vim.list_extend(changed, flow.milestones_reached)
+  vim.list_extend(changed, flow.milestones_reopened)
   local notes = {}
   for _, note in ipairs(flow.notes) do
     notes[#notes + 1] = contract.redact(ctx.root, note)
@@ -1539,6 +1576,9 @@ local function do_done(op, ctx)
     steps_ticked = flow.steps_ticked,
     plans_closed = flow.plans_closed,
     projects_closed = flow.projects_closed,
+    -- capability `milestones`: only when the finish reached or opened one
+    milestones_reached = #flow.milestones_reached > 0 and flow.milestones_reached or nil,
+    milestones_reopened = #flow.milestones_reopened > 0 and flow.milestones_reopened or nil,
     -- the learning point the task was promoted from, set to the finish's state (capability `outcome`)
     point = flow.point and {
       container = flow.point.container,
@@ -2943,8 +2983,153 @@ local function do_board_save(op, ctx)
   }
 end
 
+-- ── milestones ───────────────────────────────────────────────────────────────
+
+---`milestone_new`: make a milestone file.
+---@param op table
+---@param ctx Tasks.OpsCtx
+---@return table entry
+local function do_milestone_new(op, ctx)
+  if op.area == nil or op.title == nil then
+    return refuse("invalid_argument", "milestone_new needs area and title")
+  end
+  for _, key in ipairs({ "area", "title", "due", "close", "status", "summary", "slug", "includes" }) do
+    if has_control(op[key]) then
+      return refuse("invalid_argument", key .. " contains a control character")
+    end
+  end
+  local over = over_limit("title", op.title)
+    or over_limit("area", op.area)
+    or (op.slug and over_limit("slug", op.slug))
+    or (op.summary and over_limit("summary", op.summary))
+    or (op.includes and over_limit("includes", op.includes))
+  if over then
+    return refuse("payload_too_large", over)
+  end
+  local r, err, info = require("tasks_nvim.milestones").new(op.area, {
+    root = ctx.root,
+    today = ctx.today,
+    title = op.title,
+    due = op.due,
+    includes = op.includes,
+    close = op.close,
+    status = op.status,
+    summary = op.summary,
+    slug = op.slug,
+    dry_run = ctx.dry,
+  })
+  if not r then
+    if info and info.code == "invalid_argument" then
+      return refuse("invalid_argument", tostring(err), info.details)
+    end
+    return mutate_failure(ctx, err, info)
+  end
+  return {
+    ok = true,
+    id = r.id,
+    outcome = ctx.dry and "would_create" or "created",
+    file = rel(ctx, r.path),
+    slug = r.slug,
+    renamed = r.renamed,
+    changed_ids = ctx.dry and {} or { r.id },
+  }
+end
+
+---`milestone_set`: change the frontmatter of a milestone; the answer has an `inverse`.
+---@param op table
+---@param ctx Tasks.OpsCtx
+---@return table entry
+local function do_milestone_set(op, ctx)
+  if op.id == nil or op.patch == nil then
+    return refuse("invalid_argument", "milestone_set needs id and patch")
+  end
+  for key, value in pairs(op.patch) do
+    if has_control(key) or has_control(value) then
+      return refuse("invalid_argument", "the patch contains a control character")
+    end
+    local over = over_limit(key, value)
+    if over then
+      return refuse("payload_too_large", over)
+    end
+  end
+  local r, err, info = require("tasks_nvim.milestones").set(op.id, op.patch, {
+    root = ctx.root,
+    today = ctx.today,
+    if_match = op.if_match,
+    dry_run = ctx.dry,
+  })
+  if not r then
+    if info and info.code == "invalid_argument" then
+      return refuse("invalid_argument", tostring(err), info.details)
+    end
+    if info and info.code == "not_found" then
+      return refuse("not_found", tostring(err))
+    end
+    return mutate_failure(ctx, err, info)
+  end
+  local entry = {
+    ok = true,
+    id = r.id,
+    outcome = r.changed and (ctx.dry and "would_change" or "changed") or "unchanged",
+    file = rel(ctx, r.path),
+    etag_before = r.etag_before,
+    etag_after = (not ctx.dry) and r.etag_after or nil,
+    changed_ids = (r.changed and not ctx.dry) and { r.id } or {},
+  }
+  if r.changed and not ctx.dry then
+    entry.inverse = json.object({
+      op = "milestone_set",
+      id = r.id,
+      patch = json.object(r.before),
+      if_match = r.etag_after,
+    })
+  end
+  return entry
+end
+
+---Bring the milestones in line after an operation of `SETTLES` that wrote something: what it reached or opened again
+---goes into its entry (and into `changed_ids`). A failure is a note; the operation stands.
+---@param name string
+---@param entry table
+---@param ctx Tasks.OpsCtx
+---@return table entry
+local function settle_after(name, entry, ctx)
+  if ctx.dry or not SETTLES[name] or type(entry) ~= "table" or not entry.ok then
+    return entry
+  end
+  if #(entry.changed_ids or {}) == 0 then
+    return entry
+  end
+  local ran, res =
+    pcall(require("tasks_nvim.milestones").settle, { root = ctx.root, today = ctx.today })
+  if not ran then
+    entry.notes = entry.notes or {}
+    entry.notes[#entry.notes + 1] =
+      contract.redact(ctx.root, "reaching milestones: " .. tostring(res))
+    return entry
+  end
+  if #res.reached > 0 then
+    entry.milestones_reached = res.reached
+  end
+  if #res.reopened > 0 then
+    entry.milestones_reopened = res.reopened
+  end
+  for _, id in ipairs(vim.list_extend(vim.list_slice(res.reached, 1), res.reopened)) do
+    if not vim.tbl_contains(entry.changed_ids, id) then
+      entry.changed_ids[#entry.changed_ids + 1] = id
+    end
+  end
+  for _, note in ipairs(res.notes) do
+    entry.notes = entry.notes or {}
+    entry.notes[#entry.notes + 1] = contract.redact(ctx.root, note)
+  end
+  return entry
+end
+
 ---@type table<string, fun(op: table, ctx: Tasks.OpsCtx): table>
 local HANDLERS = {
+  milestone_new = do_milestone_new,
+  milestone_set = do_milestone_set,
   meeting_new = do_meeting_new,
   meeting_set = do_meeting_set,
   meeting_close = do_meeting_close,
@@ -3008,10 +3193,9 @@ for _, name in ipairs(M.OPS) do
           return fail(ctx, gitbusy.message(what, where), { code = "locked", retryable = true })
         end
       end
-      return claims.with_identity(
-        { by = op.by, force = op.force, note = op.note },
-        handler,
-        op,
+      return settle_after(
+        name,
+        claims.with_identity({ by = op.by, force = op.force, note = op.note }, handler, op, ctx),
         ctx
       )
     end,

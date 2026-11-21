@@ -68,6 +68,72 @@ local function write_learning_paths(root)
   )
 end
 
+---Three milestones for the golden cases `milestones`, `milestone` and `result-milestone`: one over a plan, a task, a
+---finished task and a task of another area with a `due` passed and a history; one of `close: manual` reached by hand;
+---one broken (a bad status, a member that exists nowhere).
+---@param root string
+local function write_milestones(root)
+  local dir = root .. "/lib.nvim/ROADMAP/milestones"
+  vim.fn.mkdir(dir, "p")
+  local function put(path, text)
+    local fh = assert(io.open(path, "wb"))
+    fh:write(text)
+    fh:close()
+  end
+  put(
+    dir .. "/release-1.md",
+    table.concat({
+      "---",
+      'title: "Release 1"',
+      "status: doing",
+      "due: 2026-01-01",
+      "includes: [lib.nvim/the-plan, lib.nvim/beta, lib.nvim/old-done, cascade.nvim/zeta]",
+      "reached: 2025-12-20",
+      "created: 2025-12-01",
+      "updated: 2025-12-21",
+      "---",
+      "",
+      "Die erste Ausgabe.",
+      "",
+      "## Verlauf",
+      "",
+      "- 2025-12-20 reached",
+      "- 2025-12-21 opened again: lib.nvim/beta is open",
+      "",
+    }, "\n")
+  )
+  put(
+    dir .. "/abnahme.md",
+    table.concat({
+      "---",
+      'title: "Abnahme"',
+      "status: done",
+      "includes: [lib.nvim/old-done]",
+      "close: manual",
+      "reached: 2026-01-02",
+      "created: 2025-12-01",
+      "updated: 2026-01-02",
+      "---",
+      "",
+      "## Verlauf",
+      "",
+      "- 2026-01-02 reached (closed by hand)",
+      "",
+    }, "\n")
+  )
+  put(
+    dir .. "/kaputt.md",
+    table.concat({
+      "---",
+      'title: "Kaputt"',
+      "status: someday",
+      "includes: [lib.nvim/nowhere]",
+      "---",
+      "",
+    }, "\n")
+  )
+end
+
 ---A learning path with XP and levels, and the promoted task it names with its own `xp:`, for the golden cases
 ---`path-xp` and `result-path-xp`.
 ---@param root string
@@ -334,6 +400,59 @@ G.cases = {
     request = function(root)
       write_learning_paths(root)
       return '{"params":{"id":"lib.nvim/lua-lernen"}}'
+    end,
+  },
+  {
+    -- the milestones with their progress (capability `milestones`): a plan counted by its tasks, a finished task, a
+    -- passed `due` (overdue), one reached by hand (`close: manual`), one broken
+    name = "milestones",
+    method = "milestones",
+    fresh = true,
+    request = function(root)
+      write_milestones(root)
+      return '{"params":{}}'
+    end,
+  },
+  {
+    -- one milestone with its members (kind, state, what each counts), its history and its body (capability
+    -- `milestone`)
+    name = "milestone",
+    method = "milestone",
+    fresh = true,
+    request = function(root)
+      write_milestones(root)
+      return '{"params":{"id":"lib.nvim/release-1"}}'
+    end,
+  },
+  {
+    -- writing milestones (capabilities `milestone_new`, `milestone_set`): one made over a finished task is reached
+    -- at once (`milestones_reached`), one refused for a member that exists nowhere, a `status: done` by hand refused
+    -- while a member is open (`details.holding`), a change with its inverse
+    name = "result-milestone",
+    method = "ops",
+    fresh = true,
+    request = function(root)
+      write_milestones(root)
+      return encode({
+        client_op_id = "golden-milestone",
+        ops = {
+          {
+            op = "milestone_new",
+            area = "cascade.nvim",
+            title = "Altlast",
+            due = "2026-02-01",
+            includes = { "lib.nvim/old-done" },
+          },
+          {
+            op = "milestone_new",
+            area = "cascade.nvim",
+            title = "Nirgends",
+            includes = { "lib.nvim/nowhere" },
+          },
+          { op = "milestone_set", id = "lib.nvim/release-1", patch = { status = "done" } },
+          { op = "milestone_set", id = "lib.nvim/release-1", patch = { due = "2026-03-01" } },
+        },
+      })
     end,
   },
   {

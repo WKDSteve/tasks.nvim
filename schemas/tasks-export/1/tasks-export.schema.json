@@ -86,6 +86,12 @@
       "$ref": "#/$defs/PathDocument"
     },
     {
+      "$ref": "#/$defs/Milestones"
+    },
+    {
+      "$ref": "#/$defs/MilestoneDocument"
+    },
+    {
       "$ref": "#/$defs/DonePreview"
     },
     {
@@ -452,6 +458,104 @@
         }
       },
       "unevaluatedProperties": false
+    },
+    "Milestones": {
+      "description": "tasks.milestones: the milestones of the vault or of an area (`<area>/ROADMAP/milestones/`), each with its progress over its members. Capability `milestones`.",
+      "allOf": [{ "$ref": "#/$defs/Head" }],
+      "type": "object",
+      "required": ["kind", "rev", "digest", "items", "incomplete"],
+      "properties": {
+        "kind": { "const": "tasks.milestones" },
+        "rev": { "$ref": "#/$defs/Rev" },
+        "digest": { "$ref": "#/$defs/Digest" },
+        "items": { "type": "array", "items": { "$ref": "#/$defs/MilestoneEntry" } },
+        "incomplete": { "type": "array", "items": { "type": "string" } }
+      },
+      "unevaluatedProperties": false
+    },
+    "MilestoneDocument": {
+      "description": "tasks.milestone: one milestone with its body, its members (kind, state, what each counts), the lines of its `## Verlauf` and the members that are in it twice. Capability `milestone`.",
+      "allOf": [{ "$ref": "#/$defs/Head" }],
+      "type": "object",
+      "required": ["kind", "rev", "digest", "milestone", "body", "body_truncated", "members", "history", "overlaps"],
+      "properties": {
+        "kind": { "const": "tasks.milestone" },
+        "rev": { "$ref": "#/$defs/Rev" },
+        "digest": { "$ref": "#/$defs/Digest" },
+        "milestone": { "$ref": "#/$defs/MilestoneEntry" },
+        "body": { "type": "string", "description": "The file after the frontmatter, untrusted text." },
+        "body_truncated": { "type": "boolean" },
+        "members": {
+          "description": "The members in the order of `includes`.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "kind", "done", "total"],
+            "properties": {
+              "id": { "type": "string" },
+              "kind": {
+                "description": "What the id names: a member (`task`, `plan`, `project`, `path`, `meeting`) or a fault (`milestone`: another milestone; `unknown`: nothing; `foreign`: an id of another vault; `bad`: no `<area>/<slug>`).",
+                "enum": ["task", "plan", "project", "path", "meeting", "milestone", "unknown", "foreign", "bad"]
+              },
+              "state": { "description": "Only for a member: finished or not.", "enum": ["open", "done"] },
+              "title": { "type": "string" },
+              "done": { "type": "integer", "minimum": 0, "description": "What it counts as done (a plan or project: its finished tasks)." },
+              "total": { "type": "integer", "minimum": 0, "description": "What it counts in all (a plan or project: its tasks, at least one; a fault: 0)." }
+            },
+            "additionalProperties": false
+          }
+        },
+        "history": { "description": "The lines of `## Verlauf` (`YYYY-MM-DD reached`, `YYYY-MM-DD opened again: ...`), without the dash.", "type": "array", "items": { "type": "string" } },
+        "overlaps": {
+          "description": "Members that are in it twice: `id` is already part of `via`, a plan or project it names too.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "via"],
+            "properties": { "id": { "type": "string" }, "via": { "type": "string" } },
+            "additionalProperties": false
+          }
+        }
+      },
+      "unevaluatedProperties": false
+    },
+    "MilestoneEntry": {
+      "description": "A milestone (`<area>/ROADMAP/milestones/<slug>.md`): the head of its file, its progress, whether it is overdue, its version.",
+      "type": "object",
+      "required": ["id", "area", "slug", "title", "close", "includes", "progress", "complete", "overdue", "summary", "file", "valid", "problems"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[^/]+/[^/]+$" },
+        "area": { "type": "string" },
+        "slug": { "type": "string" },
+        "title": { "type": "string" },
+        "status": { "enum": ["planning", "doing", "parked", "done"] },
+        "due": { "$ref": "#/$defs/Date" },
+        "reached": { "$ref": "#/$defs/Date", "description": "The day it was reached last; it stays when a member is opened again (status `doing`)." },
+        "close": { "enum": ["auto", "manual"], "description": "`auto`: reached by the engine when the last member is done; `manual`: by `milestone_set` status `done`." },
+        "includes": { "type": "array", "items": { "type": "string" } },
+        "progress": {
+          "type": "object",
+          "required": ["members", "members_done", "done", "total"],
+          "properties": {
+            "members": { "type": "integer", "minimum": 0 },
+            "members_done": { "type": "integer", "minimum": 0 },
+            "done": { "type": "integer", "minimum": 0, "description": "Units done: a plan or project counts its tasks, the others one each." },
+            "total": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": false
+        },
+        "complete": { "type": "boolean", "description": "Every member is done (a milestone without members never is)." },
+        "overdue": { "type": "boolean", "description": "`due` is before today and it is neither done nor parked." },
+        "summary": { "type": "string" },
+        "created": { "$ref": "#/$defs/Date" },
+        "updated": { "$ref": "#/$defs/Date" },
+        "folder": { "type": "boolean" },
+        "file": { "type": "string" },
+        "etag": { "$ref": "#/$defs/Etag" },
+        "valid": { "type": "boolean" },
+        "problems": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false
     },
     "Paths": {
       "description": "tasks.paths: the open learning paths of the vault or of an area, each with its progress; no tree (that is tasks.path). Capability `paths`.",
@@ -4099,7 +4203,7 @@
       "required": ["op", "id"],
       "properties": {
         "op": {
-          "enum": ["set", "reorder", "tick_step", "answer", "set_body", "set_section", "move_area", "view_save", "view_delete", "plan_set", "project_set", "meeting_set", "meeting_attend", "path_set", "node_set", "unpromote", "path_reward"]
+          "enum": ["set", "reorder", "tick_step", "answer", "set_body", "set_section", "move_area", "view_save", "view_delete", "plan_set", "project_set", "meeting_set", "meeting_attend", "path_set", "node_set", "unpromote", "path_reward", "milestone_set"]
         },
         "xp": {
           "description": "`node_set` that wrote XP: the XP the point had (capability `xp`).",
@@ -4309,7 +4413,7 @@
           "minimum": 1
         },
         "op": {
-          "enum": ["set", "new", "reorder", "done", "move_area", "plan_new", "plan_set", "plan_close", "project_new", "project_set", "project_close", "tick_step", "add_steps", "answer", "append_note", "reopen", "set_body", "set_section", "view_save", "view_delete", "attach", "claim", "release", "history_record", "meeting_new", "meeting_set", "meeting_close", "meeting_capture", "meeting_attend", "meeting_followups", "board_save", "path_new", "path_set", "path_close", "node_set", "promote", "unpromote", "path_reward"]
+          "enum": ["set", "new", "reorder", "done", "move_area", "plan_new", "plan_set", "plan_close", "project_new", "project_set", "project_close", "tick_step", "add_steps", "answer", "append_note", "reopen", "set_body", "set_section", "view_save", "view_delete", "attach", "claim", "release", "history_record", "meeting_new", "meeting_set", "meeting_close", "meeting_capture", "meeting_attend", "meeting_followups", "board_save", "path_new", "path_set", "path_close", "node_set", "promote", "unpromote", "path_reward", "milestone_new", "milestone_set"]
         },
         "id": {
           "type": "string"
@@ -4520,6 +4624,16 @@
             "type": "string"
           },
           "description": "The projects this finish closed after the plan (capability `projects`)."
+        },
+        "milestones_reached": {
+          "description": "The milestones this operation reached: their last member was finished by it (capability `milestones`; only when there is one).",
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "milestones_reopened": {
+          "description": "The reached milestones this operation set back to `doing`: a member of theirs is open again; `reached` stays (capability `milestones`; only when there is one).",
+          "type": "array",
+          "items": { "type": "string" }
         },
         "point": {
           "description": "`done`: the learning point the task was promoted from, set to the state of the finish (capability `outcome`).",

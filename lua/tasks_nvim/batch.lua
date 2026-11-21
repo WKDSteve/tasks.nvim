@@ -540,6 +540,7 @@ end
 ---@field projects_closed string[]       # Project files finished because their last plan or own task was among these.
 ---@field project_summaries table<string, Tasks.ProjectSummary>
 ---@field docs_refreshed string[]        # Documents whose generated blocks changed.
+---@field milestones_reached string[]    # Milestones the stack reached (`milestones.settle`, once at the end).
 ---@field notes string[]                 # Follow-up steps that did not work (the finishes stand).
 
 ---Finish tasks (rule R6) one after the other, the index regenerated once per area at the end.
@@ -561,6 +562,7 @@ function M.done_many(ids, opts)
     projects_closed = {},
     project_summaries = {},
     docs_refreshed = {},
+    milestones_reached = {},
     notes = {},
   }
   local moved, plan_ids, project_ids = {}, {}, {}
@@ -624,6 +626,10 @@ function M.done_many(ids, opts)
     else
       res.notes[#res.notes + 1] = "closing the projects: " .. tostring(closed)
     end
+  end
+  if #moved > 0 then
+    -- the milestones once for the whole stack, after its plans and projects
+    done_flow.settle_milestones(res, opts)
   end
   res.areas = areas_of(moved)
   res.index_errors = reindex(res.areas, opts.root)

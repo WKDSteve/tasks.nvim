@@ -91,6 +91,12 @@
 ---    `path-image-missing`, `path-cycle`, `path-bad-xp` (warnings): the tree of `## Lernpunkte`; `level-bad-line`,
 ---    `level-bad-mark`, `level-order`, `level-badge-outside`, `level-badge-missing` (warnings): the levels of
 ---    `## Level`; `xp-missing` (a hint): points without XP in a path with levels
+---  - milestones (`<area>/ROADMAP/milestones/`, `tasks_nvim.milestones`): a broken file (`milestone-bad-status`,
+---    `milestone-bad-close`, `milestone-too-many`, `bad-date`, ...); `milestone-include-unknown`,
+---    `milestone-include-foreign`, `milestone-bad-include`, `milestone-nested`, `milestone-id-taken` (errors): a member
+---    that exists nowhere, one of another vault, a malformed one, another milestone, the id of another file;
+---    `milestone-include-overlap`, `milestone-drift`, `milestone-overdue`, `milestone-empty` (warnings): a member in it
+---    twice (through a plan or project it names), a status behind its members, a `due` passed, no members
 ---  - `bad-xp`: the `xp:` of a task is no whole number from 0 to `lernbaum.MAX_XP`
 ---  - promoted learning points (`tasks_nvim.promote`, warnings): `promote-point-dangling` (a task's `point:` names no
 ---    open path or task, or no point there whose arrow names the task), `promote-state-drift` (the mark of the point
@@ -808,6 +814,128 @@ local function meeting_findings(findings, hints, open_ids, names, scan_opts, is_
           break
         end
         hint("meeting-overlap", b, ("at the same time as %s (%s)"):format(a.id, a.start))
+      end
+    end
+  end
+end
+
+---The milestones of the areas `names` (`tasks_nvim.milestones`): a broken file with its own codes, the members it
+---names (unknown, of another vault, malformed, another milestone: errors; one already in through a plan or project it
+---names: a warning), its id taken by another file of the area, its status behind its members (`milestone-drift`), a
+---`due` passed (`milestone-overdue`), no members (`milestone-empty`).
+---@param findings Tasks.Finding[]
+---@param open_ids table<string, Tasks.Task>
+---@param names string[]
+---@param scan_opts table
+---@param is_finished fun(id: string): boolean
+---@param today string
+local function milestone_findings(findings, open_ids, names, scan_opts, is_finished, today)
+  local mod = require("tasks_nvim.milestones")
+  local root = scan_opts.root
+  local cache
+  for _, name in ipairs(names) do
+    local list, errs = mod.area(name, { root = root })
+    for _, e in ipairs(type(errs) == "table" and errs or {}) do
+      add(
+        findings,
+        "error",
+        "unreadable",
+        { area = name, path = vault.milestones_dir(root, name) },
+        e
+      )
+    end
+    for _, m in ipairs(list or {}) do
+      cache = cache or mod.cache(root)
+      for i, msg in ipairs(m.errors) do
+        add(findings, "error", m.error_codes[i] or "frontmatter-invalid", m, msg)
+      end
+      -- one id namespace: a task (open or finished), plan, project, path or meeting of the same id
+      local area, slug = m.area, m.slug
+      local clash = open_ids[m.id] ~= nil or is_finished(m.id)
+      for _, kind in ipairs({ "plan", "project", "path" }) do
+        clash = clash or vault.resolve_plan(root, kind, area, slug) ~= nil
+      end
+      clash = clash or vault.resolve_meeting(root, area, slug) ~= nil
+      if clash then
+        add(
+          findings,
+          "error",
+          "milestone-id-taken",
+          m,
+          "a task (open or finished), plan, project, path or meeting of the area has the same id: "
+            .. m.id
+        )
+      end
+      local CODES = {
+        unknown = {
+          "milestone-include-unknown",
+          "exists nowhere (no task, plan, project, path or meeting)",
+        },
+        foreign = {
+          "milestone-include-foreign",
+          "is an id of another vault: a milestone names ids of its own vault",
+        },
+        bad = { "milestone-bad-include", "is no <area>/<slug>" },
+        milestone = {
+          "milestone-nested",
+          "is a milestone: a milestone does not include another one",
+        },
+      }
+      for _, id in ipairs(m.includes) do
+        local member = mod.member(id, cache)
+        local code = CODES[member.kind]
+        if code then
+          add(findings, "error", code[1], m, ("includes %s: %s"):format(id, code[2]))
+        end
+      end
+      for _, o in ipairs(mod.overlaps(m, cache)) do
+        add(
+          findings,
+          "warn",
+          "milestone-include-overlap",
+          m,
+          ("includes %s, which is already in it through %s (it counts twice)"):format(o.id, o.via)
+        )
+      end
+      if m.valid and #m.includes == 0 then
+        add(
+          findings,
+          "warn",
+          "milestone-empty",
+          m,
+          "includes names no members: it is never reached"
+        )
+      end
+      if m.valid and m.status ~= "parked" and #m.includes > 0 then
+        local complete, open_id = mod.complete(m, cache)
+        if m.status == "done" and open_id then
+          add(
+            findings,
+            "warn",
+            "milestone-drift",
+            m,
+            ("status is done but %s is open (the next closing write sets it to doing)"):format(
+              open_id
+            )
+          )
+        elseif m.status ~= "done" and complete and m.close == "auto" then
+          add(
+            findings,
+            "warn",
+            "milestone-drift",
+            m,
+            "every member is done but it is not reached (the next closing write reaches it)"
+          )
+        end
+      end
+      if m.valid and m.due and m.status ~= "done" and m.status ~= "parked" and m.due < today then
+        add(
+          findings,
+          "warn",
+          "milestone-overdue",
+          m,
+          ("due %s is before today (%s) and it is not reached"):format(m.due, today)
+        )
       end
     end
   end
@@ -1678,6 +1806,7 @@ function M.run(opts)
   project_findings(findings, open_ids, names, scan_opts, is_finished)
   meeting_findings(findings, hints, open_ids, names, scan_opts, is_finished, today)
   path_findings(findings, open_ids, names, scan_opts, is_finished, hints)
+  milestone_findings(findings, open_ids, names, scan_opts, is_finished, today)
   promote_findings(findings, open_ids, names, scan_opts, is_finished, finished_by_area)
   view_findings(findings, root, names)
   if not opts.area then

@@ -1,0 +1,97 @@
+{
+  "client_op_id": "golden-milestone",
+  "digest": "sha256:4dd40ed84ddd652e",
+  "dry_run": false,
+  "engine": {
+    "git": "0000000",
+    "nvim": "0.0.0",
+    "version": "0.1.0-test"
+  },
+  "generated_at": "2026-01-01T00:00:00Z",
+  "kind": "tasks.result",
+  "ok": false,
+  "plugin": "tasks.nvim",
+  "results": [
+    {
+      "changed_ids": [
+        "cascade.nvim/altlast"
+      ],
+      "file": "cascade.nvim/ROADMAP/milestones/altlast.md",
+      "id": "cascade.nvim/altlast",
+      "milestones_reached": [
+        "cascade.nvim/altlast"
+      ],
+      "n": 1,
+      "ok": true,
+      "op": "milestone_new",
+      "outcome": "created",
+      "renamed": false,
+      "slug": "altlast"
+    },
+    {
+      "changed_ids": [],
+      "error": {
+        "code": "invalid_argument",
+        "details": {
+          "problems": [
+            {
+              "code": "milestone-include-unknown",
+              "message": "lib.nvim/nowhere exists nowhere (no task, plan, project, path or meeting)",
+              "target": "lib.nvim/nowhere"
+            }
+          ]
+        },
+        "message": "lib.nvim/nowhere exists nowhere (no task, plan, project, path or meeting)",
+        "retryable": false
+      },
+      "n": 2,
+      "ok": false,
+      "op": "milestone_new",
+      "outcome": "failed"
+    },
+    {
+      "changed_ids": [],
+      "error": {
+        "code": "invalid_argument",
+        "details": {
+          "holding": [
+            "lib.nvim/the-plan",
+            "lib.nvim/beta",
+            "cascade.nvim/zeta"
+          ]
+        },
+        "message": "lib.nvim/release-1 still has 3 members that are not done",
+        "retryable": false
+      },
+      "n": 3,
+      "ok": false,
+      "op": "milestone_set",
+      "outcome": "failed"
+    },
+    {
+      "changed_ids": [
+        "lib.nvim/release-1"
+      ],
+      "etag_after": "sha256:d42686d2f81435b7",
+      "etag_before": "sha256:fa6baaad8c82bffa",
+      "file": "lib.nvim/ROADMAP/milestones/release-1.md",
+      "id": "lib.nvim/release-1",
+      "inverse": {
+        "id": "lib.nvim/release-1",
+        "if_match": "sha256:d42686d2f81435b7",
+        "op": "milestone_set",
+        "patch": {
+          "due": "2026-01-01"
+        }
+      },
+      "n": 4,
+      "ok": true,
+      "op": "milestone_set",
+      "outcome": "changed"
+    }
+  ],
+  "schema": 1,
+  "vault": {
+    "id": "vault"
+  }
+}

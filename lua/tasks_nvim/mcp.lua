@@ -31,6 +31,10 @@ M.TOOLS = {
     .. "(learned, seen, dropped, open, blocked); optionally of one `area`.",
   path = "One learning path by id: its body and its tree of learning points as a flat list "
     .. "(state, derived state, progress per point, key, reason, the task a point was promoted to).",
+  milestones = "The milestones (`<area>/ROADMAP/milestones/`): due date, reached date, status and the "
+    .. "progress over their members (tasks, plans, projects, paths, meetings); optionally of one `area`.",
+  milestone = "One milestone by id: its members with kind, state and what each counts, its history "
+    .. "(reached, opened again) and its body.",
 }
 
 ---The server over the vault `opts.root` (nil: `$TASKS_VAULT`, as the command line).

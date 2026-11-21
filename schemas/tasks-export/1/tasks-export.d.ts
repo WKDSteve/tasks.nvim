@@ -31,6 +31,8 @@ export type TasksExport =
   | MeetingParse
   | Paths
   | PathDocument
+  | Milestones
+  | MilestoneDocument
   | DonePreview
   | Result
   | Error;
@@ -1088,6 +1090,64 @@ export type PathDocument = Head & {
     line: number;
     key?: string;
     message: string;
+  }[];
+};
+/**
+ * tasks.milestones: the milestones of the vault or of an area (`<area>/ROADMAP/milestones/`), each with its progress over its members. Capability `milestones`.
+ */
+export type Milestones = Head & {
+  kind: "tasks.milestones";
+  rev: Rev;
+  digest: Digest;
+  items: MilestoneEntry[];
+  incomplete: string[];
+};
+/**
+ * tasks.milestone: one milestone with its body, its members (kind, state, what each counts), the lines of its `## Verlauf` and the members that are in it twice. Capability `milestone`.
+ */
+export type MilestoneDocument = Head & {
+  kind: "tasks.milestone";
+  rev: Rev;
+  digest: Digest;
+  milestone: MilestoneEntry;
+  /**
+   * The file after the frontmatter, untrusted text.
+   */
+  body: string;
+  body_truncated: boolean;
+  /**
+   * The members in the order of `includes`.
+   */
+  members: {
+    id: string;
+    /**
+     * What the id names: a member (`task`, `plan`, `project`, `path`, `meeting`) or a fault (`milestone`: another milestone; `unknown`: nothing; `foreign`: an id of another vault; `bad`: no `<area>/<slug>`).
+     */
+    kind: "task" | "plan" | "project" | "path" | "meeting" | "milestone" | "unknown" | "foreign" | "bad";
+    /**
+     * Only for a member: finished or not.
+     */
+    state?: "open" | "done";
+    title?: string;
+    /**
+     * What it counts as done (a plan or project: its finished tasks).
+     */
+    done: number;
+    /**
+     * What it counts in all (a plan or project: its tasks, at least one; a fault: 0).
+     */
+    total: number;
+  }[];
+  /**
+   * The lines of `## Verlauf` (`YYYY-MM-DD reached`, `YYYY-MM-DD opened again: ...`), without the dash.
+   */
+  history: string[];
+  /**
+   * Members that are in it twice: `id` is already part of `via`, a plan or project it names too.
+   */
+  overlaps: {
+    id: string;
+    via: string;
   }[];
 };
 /**
@@ -2222,6 +2282,51 @@ export interface PathLevel {
   reached: boolean;
 }
 /**
+ * A milestone (`<area>/ROADMAP/milestones/<slug>.md`): the head of its file, its progress, whether it is overdue, its version.
+ */
+export interface MilestoneEntry {
+  id: string;
+  area: string;
+  slug: string;
+  title: string;
+  status?: "planning" | "doing" | "parked" | "done";
+  due?: Date;
+  /**
+   * A calendar day, YYYY-MM-DD.
+   */
+  reached?: string;
+  /**
+   * `auto`: reached by the engine when the last member is done; `manual`: by `milestone_set` status `done`.
+   */
+  close: "auto" | "manual";
+  includes: string[];
+  progress: {
+    members: number;
+    members_done: number;
+    /**
+     * Units done: a plan or project counts its tasks, the others one each.
+     */
+    done: number;
+    total: number;
+  };
+  /**
+   * Every member is done (a milestone without members never is).
+   */
+  complete: boolean;
+  /**
+   * `due` is before today and it is neither done nor parked.
+   */
+  overdue: boolean;
+  summary: string;
+  created?: Date;
+  updated?: Date;
+  folder?: boolean;
+  file: string;
+  etag?: Etag;
+  valid: boolean;
+  problems: string[];
+}
+/**
  * What happened to one operation of a request, in the order they were sent. A failed operation does not stop the others.
  */
 export interface ResultEntry {
@@ -2264,7 +2369,9 @@ export interface ResultEntry {
     | "node_set"
     | "promote"
     | "unpromote"
-    | "path_reward";
+    | "path_reward"
+    | "milestone_new"
+    | "milestone_set";
   id?: string;
   /**
    * `meeting_close`: the meeting has no `## Ergebnis` afterwards (allowed: a hint for the front end).
@@ -2402,6 +2509,14 @@ export interface ResultEntry {
    */
   projects_closed?: string[];
   /**
+   * The milestones this operation reached: their last member was finished by it (capability `milestones`; only when there is one).
+   */
+  milestones_reached?: string[];
+  /**
+   * The reached milestones this operation set back to `doing`: a member of theirs is open again; `reached` stays (capability `milestones`; only when there is one).
+   */
+  milestones_reopened?: string[];
+  /**
    * `done`: the learning point the task was promoted from, set to the state of the finish (capability `outcome`).
    */
   point?: {
@@ -2456,7 +2571,8 @@ export interface Inverse {
     | "path_set"
     | "node_set"
     | "unpromote"
-    | "path_reward";
+    | "path_reward"
+    | "milestone_set";
   /**
    * `node_set` that wrote XP: the XP the point had (capability `xp`).
    */

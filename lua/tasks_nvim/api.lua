@@ -10,7 +10,8 @@
 --- is `unsupported_schema`; `params` may be left out too. A parameter the method does not know is `invalid_argument`:
 --- a request that is silently half-understood is worse than one that is refused. A request is at most 256 KiB.
 ---
---- Read methods (`hello`, `snapshot`, `list`, `task`, `next`, `areas`, `finished`, `history`, `links`, `groupings`, `waits`, `meetings`, `meeting`, `meeting_parse`, `done_preview`) and the write door `ops`
+--- Read methods (`hello`, `snapshot`, `list`, `task`, `next`, `areas`, `finished`, `history`, `links`, `groupings`, `waits`, `meetings`, `meeting`, `meeting_parse`,
+--- `paths`, `path`, `milestones`, `milestone`, `done_preview`) and the write door `ops`
 --- (`tasks_nvim.ops`: the fields of the request are its own, `null` is kept because it means "remove" in a patch).
 ---
 --- Not its job: building a document (`contract`), the command line (`cli`: `tasks call`, `--format=json`).
@@ -241,6 +242,20 @@ local methods = {
     required = { "id" },
     run = function(params, opts)
       return contract.path(params.id, opts)
+    end,
+  },
+  milestones = {
+    params = { area = "string" },
+    required = {},
+    run = function(params, opts)
+      return contract.milestones(params, opts)
+    end,
+  },
+  milestone = {
+    params = { id = "string" },
+    required = { "id" },
+    run = function(params, opts)
+      return contract.milestone(params.id, opts)
     end,
   },
   done_preview = {
