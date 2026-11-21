@@ -955,6 +955,9 @@ end
 ---@field area? string
 ---@field title? string
 ---@field actor? string
+---@field tags? string     # More tags (comma list); the container's machine tags come along anyway.
+---@field after? string    # Ids the task comes after (comma list).
+---@field effort? string
 ---@field dry_run? boolean
 ---@field index? boolean
 ---@field open? boolean    # Open the new task (default true).
@@ -970,6 +973,9 @@ function M.promote_ref(container, ref, opts)
     area = opts.area,
     title = opts.title,
     actor = opts.actor,
+    tags = opts.tags,
+    after = opts.after,
+    effort = opts.effort,
     dry_run = opts.dry_run,
     index = opts.index,
   })
@@ -1201,6 +1207,9 @@ function M.cmd_promote(ctx)
     area = ctx.flags.area,
     title = ctx.flags.title,
     actor = ctx.flags.actor,
+    tags = ctx.flags.tags,
+    after = ctx.flags.after,
+    effort = ctx.flags.effort,
     dry_run = ctx.flags["dry-run"] == true,
     index = not ctx.flags["no-index"],
   }

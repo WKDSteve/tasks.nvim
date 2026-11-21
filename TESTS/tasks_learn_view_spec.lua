@@ -390,8 +390,16 @@ return function(H)
   eq(scan.find("lib.nvim/c-compiler", { root = root }), nil, "the task file is gone")
   -- and under the cursor
   at(16)
-  learn.cmd_promote({ args = {}, rest = {}, flags = { title = "Compiler bauen" }, kv = {} })
-  ok(scan.find("lib.nvim/compiler-bauen", { root = root }), "--title names the task")
+  learn.cmd_promote({
+    args = {},
+    rest = {},
+    flags = { title = "Compiler bauen", tags = "c,lernen", effort = "S" },
+    kv = {},
+  })
+  local built = scan.find("lib.nvim/compiler-bauen", { root = root })
+  ok(built, "--title names the task")
+  eq(built.tags, { "c", "lernen" }, "--tags reaches the task")
+  eq(built.effort, "S", "--effort reaches the task")
   vim.api.nvim_set_current_buf(buf)
   at(16)
   learn.cmd_unpromote({ args = {}, rest = {}, flags = {}, kv = {} })

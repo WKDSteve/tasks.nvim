@@ -1343,6 +1343,11 @@ local function nested_routes()
         },
         { name = "project", type = "STRING", desc = "The project the path belongs to (area/slug)" },
         {
+          name = "tags",
+          type = "STRING",
+          desc = "Tags (comma list); on-/not-on-workstation go to every task promoted from the path",
+        },
+        {
           name = "status",
           type = "STRING",
           enum = { "planning", "doing", "parked" },
@@ -1678,6 +1683,21 @@ local function nested_routes()
           type = "STRING",
           enum = { "cdx", "me", "pair" },
           desc = "Who works on the new task",
+        },
+        {
+          name = "tags",
+          type = "STRING",
+          desc = "More tags (comma list); on-/not-on-workstation of the path come along anyway",
+        },
+        {
+          name = "after",
+          type = "STRING",
+          desc = "Tasks the new one comes after (comma list of ids)",
+        },
+        {
+          name = "effort",
+          type = "STRING",
+          desc = "Effort of the new task (XS..XL or days like 0.5d)",
         },
         { name = "dry-run", bool = true, desc = "Say what would happen, write nothing" },
         { name = "no-index", bool = true, desc = "Leave the area indexes as they are" },

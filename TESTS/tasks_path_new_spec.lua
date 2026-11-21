@@ -153,7 +153,17 @@ return function(H)
     "the new path is opened: " .. vim.api.nvim_buf_get_name(0)
   )
   has(table.concat(told, "\n"), "created learning path " .. A .. "/go-lernen")
-  cmd.path_new({ args = { area = A }, rest = {}, flags = { title = "Zig lernen" }, kv = {} })
+  cmd.path_new({
+    args = { area = A },
+    rest = {},
+    flags = { title = "Zig lernen", tags = "not-on-workstation" },
+    kv = {},
+  })
+  eq(
+    assert(paths.find(A .. "/zig-lernen", { root = root })).tags,
+    { "not-on-workstation" },
+    "--tags reaches the path"
+  )
   ok(H.read(root .. "/" .. A .. "/ROADMAP/paths/zig-lernen.md") ~= nil, "--title names it")
   told = {}
   cmd.path_new({ args = { area = A }, rest = {}, flags = {}, kv = {} })

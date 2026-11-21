@@ -667,6 +667,7 @@ function M.path_new(ctx)
     icon = flags.icon,
     cover = flags.cover,
     template = flags.template,
+    tags = flags.tags,
   })
   if not res then
     notify.error(tostring(err))
