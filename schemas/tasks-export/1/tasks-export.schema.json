@@ -95,6 +95,9 @@
       "$ref": "#/$defs/LearnEvidence"
     },
     {
+      "$ref": "#/$defs/LearnHistory"
+    },
+    {
       "$ref": "#/$defs/Competences"
     },
     {
@@ -504,7 +507,7 @@
       "additionalProperties": false
     },
     "LearnNext": {
-      "description": "tasks.learn_next: for every running learning path (stage `doing`, or `idle` with its project's `status: doing`) the first `n` points (default 3) that may be learned now, in document order: open (not blocked), not optional, on the machine when one is asked for. Only paths with such a point; `doing` before `idle`, then the most recently updated first, then by id. Capability `learn_next`.",
+      "description": "tasks.learn_next: for every running learning path (stage `doing`, or `idle` with its project's `status: doing`) the first `n` points (default 3) that may be learned now, in document order: open (not blocked), not optional, on the machine when one is asked for. Only paths with such a point; `doing` before `idle`, then the most recently active first (the last day the series of the learning figures saw a change, else `updated`), then by id. Capability `learn_next`.",
       "allOf": [{ "$ref": "#/$defs/Head" }],
       "type": "object",
       "required": ["kind", "rev", "digest", "items", "incomplete"],
@@ -687,6 +690,132 @@
           }
         },
         "incomplete": { "type": "array", "items": { "type": "string" } }
+      },
+      "unevaluatedProperties": false
+    },
+    "LearnStepFigures": {
+      "description": "What changed in a step: points learned, seen and dropped, XP earned and hours done (differences of the series, may be negative when a mark was taken back).",
+      "type": "object",
+      "required": ["learned", "seen", "dropped", "xp", "done_h"],
+      "properties": {
+        "learned": { "type": "integer" },
+        "seen": { "type": "integer" },
+        "dropped": { "type": "integer" },
+        "xp": { "type": "integer" },
+        "done_h": { "type": "number" }
+      }
+    },
+    "LearnHistory": {
+      "description": "tasks.learn_history: what the series of the learning figures (`_Telemetry/history/learn-YYYY-MM.jsonl`, one row per day and path, written by `history_record`, `tasks history record` and `tasks index`) says over a window `since`..`until` in steps of a `day`, `week` (from Monday) or `month`. The series exists from the day it was introduced: a step before its first day (`first`) is absent, never 0; without any row there are no `points`, no `first`, no `streak`. A path's first row on the first day of the series is where it starts (nothing learned that day); a path that appears later counts from nothing. Capability `learn_history`.",
+      "allOf": [{ "$ref": "#/$defs/Head" }],
+      "type": "object",
+      "required": ["kind", "rev", "digest", "since", "until", "step", "points", "paths", "incomplete"],
+      "properties": {
+        "kind": { "const": "tasks.learn_history" },
+        "rev": { "$ref": "#/$defs/Rev" },
+        "digest": { "$ref": "#/$defs/Digest" },
+        "since": { "type": "string", "format": "date" },
+        "until": { "type": "string", "format": "date" },
+        "step": { "enum": ["day", "week", "month"] },
+        "first": { "type": "string", "format": "date", "description": "The first day of the series in the scope." },
+        "streak": {
+          "description": "Learning days in a row (a day on which a point was learned or seen): `current` the run that ends on `until` or the day before (today not learned yet keeps it), `longest` the longest run since `first`, `last_day` the last learning day.",
+          "type": "object",
+          "required": ["current", "longest"],
+          "properties": {
+            "current": { "type": "integer", "minimum": 0 },
+            "longest": { "type": "integer", "minimum": 0 },
+            "last_day": { "type": "string", "format": "date" }
+          },
+          "additionalProperties": false
+        },
+        "points": {
+          "description": "One per step from the step of `first` on, `date` its first day: the sums over the paths, `days` the learning days of the step, `paths` the paths that changed in it (with the level reached at its end).",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "allOf": [{ "$ref": "#/$defs/LearnStepFigures" }],
+            "required": ["date", "days", "paths"],
+            "properties": {
+              "date": { "type": "string", "format": "date" },
+              "days": { "type": "integer", "minimum": 0 },
+              "paths": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "allOf": [{ "$ref": "#/$defs/LearnStepFigures" }],
+                  "required": ["id"],
+                  "properties": {
+                    "id": { "type": "string", "pattern": "^[^/]+/[^/]+$" },
+                    "level": { "type": "integer", "minimum": 0 }
+                  },
+                  "unevaluatedProperties": false
+                }
+              }
+            },
+            "unevaluatedProperties": false
+          }
+        },
+        "paths": {
+          "description": "Every path of the scope with a row, by id: its first row, the last day something changed (up to `until`), the level at `until`, the day each level was first reached (`ref` as `PathLevel.ref`) and each reward first granted, and once the series reaches four weeks back the pace of those weeks (`points` closed and `hours` done per week) and `forecast_weeks`: the weeks the open points (and open hours, `hours_min`/`hours_max`) of an open path take at that pace (absent at a pace of 0).",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "area", "first", "levels", "rewards"],
+            "properties": {
+              "id": { "type": "string", "pattern": "^[^/]+/[^/]+$" },
+              "area": { "type": "string" },
+              "title": { "type": "string", "description": "The title of the path as it is now (open or finished); absent when it is gone." },
+              "first": { "type": "string", "format": "date" },
+              "last_active": { "type": "string", "format": "date" },
+              "level": { "type": "integer", "minimum": 0 },
+              "levels": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["ref", "reached_on"],
+                  "properties": {
+                    "ref": { "type": "string" },
+                    "reached_on": { "type": "string", "format": "date" }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "rewards": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["ref", "given_on"],
+                  "properties": {
+                    "ref": { "type": "string" },
+                    "given_on": { "type": "string", "format": "date" }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "pace": {
+                "type": "object",
+                "required": ["points", "hours"],
+                "properties": {
+                  "points": { "type": "number", "minimum": 0 },
+                  "hours": { "type": "number", "minimum": 0 }
+                },
+                "additionalProperties": false
+              },
+              "forecast_weeks": {
+                "type": "object",
+                "properties": {
+                  "points": { "type": "integer", "minimum": 0 },
+                  "hours_min": { "type": "integer", "minimum": 0 },
+                  "hours_max": { "type": "integer", "minimum": 0 }
+                },
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "incomplete": { "type": "array", "items": { "type": "string" }, "description": "Lines and files of the series that were skipped, relative to the vault." }
       },
       "unevaluatedProperties": false
     },
@@ -5009,6 +5138,15 @@
           "type": "integer",
           "minimum": 0,
           "description": "`history_record`: the rows written into the series (a dry run: that would be written)."
+        },
+        "learn_rows": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "`history_record`: the rows written into the series of the learning paths (`_Telemetry/history/learn-YYYY-MM.jsonl`; a dry run: that would be written). Capability `learn_history`."
+        },
+        "learn_file": {
+          "type": "string",
+          "description": "`history_record`: the month file of the learning series, relative to the vault. Capability `learn_history`."
         },
         "to": {
           "type": "string"

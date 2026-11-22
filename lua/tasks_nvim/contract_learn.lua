@@ -153,7 +153,8 @@ end
 
 ---`tasks.learn_next`: for every running learning path (stage `doing`, or `idle` with its project begun, i.e. the
 ---project's `status: doing`) the first `n` points that may be learned now (`learn.next_points`), on the machine when
----one is named. Paths with such a point only; `doing` before `idle`, then the most recently updated first, then by id.
+---one is named. Paths with such a point only; `doing` before `idle`, then the most recently active first (the last day
+---the series of the learning figures saw a change, else `updated`), then by id.
 ---@param params? { area?: string, paths?: string[], machine?: string, n?: integer }
 ---@param opts? { root?: string }
 ---@return table|nil doc
@@ -207,11 +208,23 @@ function M.next(params, opts)
     end
     -- what the paths wait for: a requirement finished elsewhere changes whether a path runs
     vim.list_extend(lines, contract.requires_rev_lines(files, idx))
+    -- the day a path was last active: from the series of the learning figures, else its `updated`
+    local lh = require("tasks_nvim.learn_history")
+    local series = lh.read(root)
+    local lists = lh.by_path(series.rows)
+    local first = series.rows[1] and series.rows[1].day or nil
+    for _, rel in ipairs(series.files) do
+      lines[#lines + 1] = rel .. "\t" .. fsio.etag(series.texts[rel])
+    end
+    local function active(f)
+      local list = lists[f.id]
+      return (list and first and lh.last_active(list, first, "9999-12-31")) or f.updated or ""
+    end
     table.sort(chosen, function(a, b)
       if a.stage ~= b.stage then
         return a.stage == "doing"
       end
-      local ua, ub = a.f.updated or "", b.f.updated or ""
+      local ua, ub = active(a.f), active(b.f)
       if ua ~= ub then
         return ua > ub
       end
@@ -475,6 +488,261 @@ function M.evidence(params, opts)
     doc.competence = params.competence
     doc.items = json.array(items)
     doc.incomplete = incomplete
+    return contract.seal(doc, contract.doc.rev_of(lines)), nil
+  end)
+end
+
+---The most points `tasks.learn_history` hands out (steps of the window).
+M.MAX_HISTORY_POINTS = 800
+
+---The weeks the pace of `forecast_weeks` is taken over.
+M.PACE_WEEKS = 4
+
+---The window when the caller names none: steps, by step.
+M.DEFAULT_STEPS = { day = 30, week = 12, month = 12 }
+
+---`tasks.learn_history`: what the series of the learning figures (`learn_history`) says over a window: per step
+---(day, week, month) what was learned, seen, dropped, the XP and hours earned, the learning days, and per path; the
+---first day of the series, the streak of learning days, and per path the day each level was reached and each reward
+---granted, the last active day, the pace of the last weeks and the weeks it would take to finish at that pace. Before
+---the first day of the series a step is absent, never 0.
+---@param params? { since?: string, until?: string, step?: string, area?: string, areas?: string[], paths?: string[] }
+---@param opts? { root?: string, today?: string }
+---@return table|nil doc
+---@return Tasks.ContractError|string|nil err
+function M.history(params, opts)
+  params = params or {}
+  opts = opts or {}
+  local model = require("tasks_nvim.model")
+  local lh = require("tasks_nvim.learn_history")
+  local today = opts.today or model.today()
+  if not model.is_date(today) then
+    return nil, bad_argument("today is not a date (YYYY-MM-DD)")
+  end
+  for _, name in ipairs({ "since", "until" }) do
+    if params[name] ~= nil and not model.is_date(params[name]) then
+      return nil, bad_argument(name .. " must be a day, YYYY-MM-DD")
+    end
+  end
+  local step = params.step or "day"
+  if not M.DEFAULT_STEPS[step] then
+    return nil, bad_argument("step must be day, week or month")
+  end
+  local until_ = params["until"] or today
+  local since = params.since
+  if not since then
+    local start = lh.step_start(until_, step)
+    for _ = 2, M.DEFAULT_STEPS[step] do
+      local prev = model.add_days(start, -1)
+      start = prev and lh.step_start(prev, step) or start
+    end
+    since = start
+  end
+  if since > until_ then
+    return nil, bad_argument("since is after until")
+  end
+  local starts = {}
+  local s = lh.step_start(since, step)
+  while s <= until_ do
+    starts[#starts + 1] = s
+    if #starts > M.MAX_HISTORY_POINTS then
+      return nil,
+        bad_argument(
+          ("the window holds more than %d steps: ask for weeks or months, or a shorter window"):format(
+            M.MAX_HISTORY_POINTS
+          )
+        )
+    end
+    s = lh.next_step(s, step)
+  end
+  return fsio.read_scope(function()
+    local root, rerr = vault.root(opts)
+    if not root then
+      return nil, rerr
+    end
+    -- the scope: areas (a group stands for its members) and paths
+    local area_set
+    if params.area ~= nil or params.areas ~= nil then
+      area_set = {}
+      local asked = params.areas and vim.list_slice(params.areas, 1) or {}
+      if params.area ~= nil then
+        table.insert(asked, 1, params.area)
+      end
+      for _, a in ipairs(asked) do
+        local scope = vault.area_scope(root, a)
+        if not scope then
+          return nil,
+            { code = "not_found", message = "unknown area: " .. tostring(a), retryable = false }
+        end
+        for _, n in ipairs(scope.areas) do
+          area_set[n] = true
+        end
+      end
+    end
+    local wanted
+    if params.paths ~= nil then
+      wanted = {}
+      for _, id in ipairs(params.paths) do
+        wanted[id] = true
+      end
+    end
+    local read = lh.read(root)
+    local rows = {}
+    for _, row in ipairs(read.rows) do
+      if (not area_set or area_set[row.area]) and (not wanted or wanted[row.path]) then
+        rows[#rows + 1] = row
+      end
+    end
+    local lines = {}
+    for _, rel in ipairs(read.files) do
+      lines[#lines + 1] = rel .. "\t" .. fsio.etag(read.texts[rel])
+    end
+    local doc = contract.head("tasks.learn_history", root)
+    doc.since, doc["until"], doc.step = since, until_, step
+    doc.incomplete = read.problems
+    local lists = lh.by_path(rows)
+    local ids = vim.tbl_keys(lists)
+    table.sort(ids)
+    local first = rows[1] and rows[1].day or nil
+    -- the paths as they are now: their title, and what is left of them (for the forecast)
+    local now = {}
+    for _, f in ipairs(lh.path_files(root)) do
+      now[f.id] = f
+    end
+    ---Whether something was learned or seen on a day, over the paths of the scope.
+    ---@param day string
+    ---@return boolean
+    local function learning_day(day)
+      local before = model.add_days(day, -1) or day
+      for _, id in ipairs(ids) do
+        if lh.learns(lh.delta(lists[id], before, day, first)) then
+          return true
+        end
+      end
+      return false
+    end
+    local points = {}
+    if first then
+      for i, start in ipairs(starts) do
+        local lo = start < since and since or start
+        local hi = starts[i + 1] and model.add_days(starts[i + 1], -1) or until_
+        if hi > until_ then
+          hi = until_
+        end
+        if hi >= first then
+          local from = model.add_days(lo, -1) or lo
+          local sum = { learned = 0, seen = 0, dropped = 0, xp = 0, done_h = 0 }
+          local per = {}
+          for _, id in ipairs(ids) do
+            local d = lh.delta(lists[id], from, hi, first)
+            if
+              d
+              and (d.learned ~= 0 or d.seen ~= 0 or d.dropped ~= 0 or d.xp ~= 0 or d.done_h ~= 0)
+            then
+              for _, k in ipairs(lh.DELTAS) do
+                sum[k] = sum[k] + d[k]
+              end
+              local last = lh.at(lists[id], hi)
+              per[#per + 1] = json.object({
+                id = id,
+                learned = d.learned,
+                seen = d.seen,
+                dropped = d.dropped,
+                xp = d.xp,
+                done_h = d.done_h,
+                level = last and last.level or nil,
+              })
+            end
+          end
+          local days = 0
+          local day = lo < first and first or lo
+          while day and day <= hi do
+            if learning_day(day) then
+              days = days + 1
+            end
+            day = model.add_days(day, 1)
+          end
+          points[#points + 1] = json.object({
+            date = start,
+            learned = sum.learned,
+            seen = sum.seen,
+            dropped = sum.dropped,
+            xp = sum.xp,
+            done_h = math.floor(sum.done_h * 100 + 0.5) / 100,
+            days = days,
+            paths = json.array(per),
+          })
+        end
+      end
+      doc.first = first
+      doc.streak = json.object(lh.streak(lists, first, until_))
+    end
+    doc.points = json.array(points)
+    -- per path: levels and rewards by date, the last active day, the pace and the forecast
+    local entries = {}
+    local pace_from = model.add_days(until_, -(7 * M.PACE_WEEKS)) or until_
+    for _, id in ipairs(ids) do
+      local list = lists[id]
+      local reached_on, given_on = lh.dates(list)
+      local function dated(map, key)
+        local refs = vim.tbl_keys(map)
+        table.sort(refs, function(a, b)
+          local na, nb = tonumber(a), tonumber(b)
+          if na and nb then
+            return na < nb
+          end
+          return na ~= nil
+        end)
+        return json.array(vim.tbl_map(function(ref)
+          return json.object({ ref = ref, [key] = map[ref] })
+        end, refs))
+      end
+      local last = lh.at(list, until_)
+      local entry = {
+        id = id,
+        area = list[1].area,
+        title = now[id] and now[id].title or nil,
+        first = list[1].day,
+        last_active = lh.last_active(list, first, until_),
+        level = last and last.level or nil,
+        levels = dated(reached_on, "reached_on"),
+        rewards = dated(given_on, "given_on"),
+      }
+      -- the pace of the last weeks (only once the series reaches that far back)
+      if first and first <= pace_from then
+        local d = lh.delta(list, pace_from, until_, first)
+        if d then
+          local closed = d.learned + d.seen + d.dropped
+          local pts = math.floor(closed / M.PACE_WEEKS * 100 + 0.5) / 100
+          local hrs = math.floor(d.done_h / M.PACE_WEEKS * 100 + 0.5) / 100
+          entry.pace = json.object({ points = pts, hours = hrs })
+          local f = now[id]
+          if f and f.location ~= "backlog" and f.tree then
+            local open = f.tree.progress.open
+            local fc = {}
+            if open == 0 then
+              fc.points = 0
+            elseif pts > 0 then
+              fc.points = math.ceil(open / pts)
+            end
+            local h = require("tasks_nvim.learn").hours(f.tree)
+            if h and hrs > 0 then
+              fc.hours_min = math.ceil(h.open_min / hrs)
+              fc.hours_max = math.ceil(h.open_max / hrs)
+            end
+            if next(fc) then
+              entry.forecast_weeks = json.object(fc)
+            end
+          end
+        end
+      end
+      entries[#entries + 1] = json.object(entry)
+      local f = now[id]
+      if f then
+        lines[#lines + 1] = "path:" .. id .. "\t" .. fsio.etag(fsio.read(f.path) or "")
+      end
+    end
+    doc.paths = json.array(entries)
     return contract.seal(doc, contract.doc.rev_of(lines)), nil
   end)
 end

@@ -84,6 +84,7 @@ M.CAPABILITIES = {
   "intent",
   "late_blockers",
   "learn_evidence",
+  "learn_history",
   "learn_next",
   "learn_notes",
   "links",

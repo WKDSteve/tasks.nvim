@@ -1,6 +1,6 @@
 {
   "client_op_id": "golden-dry",
-  "digest": "sha256:fcf917da3b72422f",
+  "digest": "sha256:bf707574c6fb7d96",
   "dry_run": true,
   "engine": {
     "git": "0000000",
@@ -102,6 +102,8 @@
     {
       "changed_ids": [],
       "file": "_Telemetry/history/2026-01.jsonl",
+      "learn_file": "_Telemetry/history/learn-2026-01.jsonl",
+      "learn_rows": 0,
       "n": 8,
       "ok": true,
       "op": "history_record",

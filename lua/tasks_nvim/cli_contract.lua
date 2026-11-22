@@ -661,6 +661,9 @@ local function history_record(ctx)
     ctx.warn("warn: skipped " .. p)
   end
   ctx.say(("history\t%d row(s)%s\t%s"):format(res.rows, dry and " (dry run)" or "", res.file))
+  ctx.say(
+    ("learn\t%d row(s)%s\t%s"):format(res.learn_rows, dry and " (dry run)" or "", res.learn_file)
+  )
   return 0
 end
 

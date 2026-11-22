@@ -1,0 +1,139 @@
+{
+  "digest": "sha256:3d63660c1dcfa072",
+  "engine": {
+    "git": "0000000",
+    "nvim": "0.0.0",
+    "version": "0.1.0-test"
+  },
+  "first": "2026-01-02",
+  "generated_at": "2026-01-01T00:00:00Z",
+  "incomplete": [
+    "_Telemetry/history/learn-2026-01.jsonl:6: no JSON object"
+  ],
+  "kind": "tasks.learn_history",
+  "paths": [
+    {
+      "area": "lib.nvim",
+      "first": "2026-01-02",
+      "id": "lib.nvim/prozesse",
+      "last_active": "2026-01-05",
+      "level": 1,
+      "levels": [
+        {
+          "reached_on": "2026-01-03",
+          "ref": "1"
+        }
+      ],
+      "rewards": [
+        {
+          "given_on": "2026-01-05",
+          "ref": "1"
+        }
+      ],
+      "title": "Prozesse"
+    },
+    {
+      "area": "lib.nvim",
+      "first": "2026-01-04",
+      "id": "lib.nvim/signale",
+      "last_active": "2026-01-05",
+      "levels": [],
+      "rewards": [],
+      "title": "Signale"
+    }
+  ],
+  "plugin": "tasks.nvim",
+  "points": [
+    {
+      "date": "2026-01-02",
+      "days": 0,
+      "done_h": 0,
+      "dropped": 0,
+      "learned": 0,
+      "paths": [],
+      "seen": 0,
+      "xp": 0
+    },
+    {
+      "date": "2026-01-03",
+      "days": 1,
+      "done_h": 2,
+      "dropped": 0,
+      "learned": 1,
+      "paths": [
+        {
+          "done_h": 2,
+          "dropped": 0,
+          "id": "lib.nvim/prozesse",
+          "learned": 1,
+          "level": 1,
+          "seen": 0,
+          "xp": 5
+        }
+      ],
+      "seen": 0,
+      "xp": 5
+    },
+    {
+      "date": "2026-01-04",
+      "days": 0,
+      "done_h": 0,
+      "dropped": 0,
+      "learned": 0,
+      "paths": [],
+      "seen": 0,
+      "xp": 0
+    },
+    {
+      "date": "2026-01-05",
+      "days": 1,
+      "done_h": 1.5,
+      "dropped": 0,
+      "learned": 2,
+      "paths": [
+        {
+          "done_h": 1.5,
+          "dropped": 0,
+          "id": "lib.nvim/prozesse",
+          "learned": 1,
+          "level": 1,
+          "seen": 1,
+          "xp": 20
+        },
+        {
+          "done_h": 0,
+          "dropped": 0,
+          "id": "lib.nvim/signale",
+          "learned": 1,
+          "seen": 0,
+          "xp": 0
+        }
+      ],
+      "seen": 1,
+      "xp": 20
+    },
+    {
+      "date": "2026-01-06",
+      "days": 0,
+      "done_h": 0,
+      "dropped": 0,
+      "learned": 0,
+      "paths": [],
+      "seen": 0,
+      "xp": 0
+    }
+  ],
+  "rev": "rev:e7a43f",
+  "schema": 1,
+  "since": "2026-01-01",
+  "step": "day",
+  "streak": {
+    "current": 1,
+    "last_day": "2026-01-05",
+    "longest": 1
+  },
+  "until": "2026-01-06",
+  "vault": {
+    "id": "vault"
+  }
+}

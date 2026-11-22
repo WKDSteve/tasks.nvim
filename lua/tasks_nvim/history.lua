@@ -583,7 +583,9 @@ end
 ---@field rows integer        # Rows written (a dry run: that would be written).
 ---@field areas string[]      # Their areas, sorted.
 ---@field file string         # The month file, relative to the vault.
----@field problems string[]   # What the reader skipped.
+---@field problems string[]   # What the reader skipped (of both series).
+---@field learn_rows integer  # Rows of the learning series written (`tasks_nvim.learn_history`).
+---@field learn_file string   # Its month file, relative to the vault.
 
 ---Write down the figures of today: a row for every area whose figures changed since its last row.
 ---@param view Tasks.ContractView
@@ -609,11 +611,23 @@ function M.record(view, opts)
       return nil, err
     end
   end
+  -- the learning figures of every path, in a series of their own (`tasks_nvim.learn_history`): whoever writes down
+  -- the figures of the day (`history record`, `index`, the hub) writes them too
+  local learned, lerr = require("tasks_nvim.learn_history").record(
+    view.root,
+    { today = today, at = at, dry_run = opts.dry_run }
+  )
+  if not learned then
+    return nil, lerr
+  end
+  local problems = vim.list_extend(vim.list_slice(read.problems, 1), learned.problems)
   return {
     rows = #rows,
     areas = areas,
     file = M.DIR .. "/" .. today:sub(1, 7) .. ".jsonl",
-    problems = read.problems,
+    learn_rows = learned.rows,
+    learn_file = learned.file,
+    problems = problems,
   }
 end
 

@@ -10,6 +10,8 @@
 ---    with the finished paths
 ---  - `learn evidence [<area>] [--competence=<id>] [--paths=id,id] [--done] [--format=tsv|json]`: the evidence of all
 ---    paths (`tasks.learn_evidence`), `--done` with the finished paths (the portfolio)
+---  - `learn history [<area>] [--since=…] [--until=…] [--step=day|week|month] [--paths=id,id] [--format=tsv|json]`: what
+---    the series of the learning figures says (`tasks.learn_history`), a line per step
 ---
 --- Read only. `cli.lua` registers it (`register`).
 
@@ -17,6 +19,9 @@ local contract = require("tasks_nvim.contract")
 local fsio = require("tasks_nvim.fsio")
 
 local M = {}
+
+M.USAGE_HISTORY =
+  "learn history [<area>] [--since=YYYY-MM-DD] [--until=YYYY-MM-DD] [--step=day|week|month] [--paths=id,id] [--format=tsv|json]"
 
 M.USAGE_EVIDENCE =
   "learn evidence [<area>] [--competence=<id>] [--paths=id,id] [--done] [--format=tsv|json]"
@@ -275,8 +280,64 @@ local function learn_evidence(ctx)
   return 0
 end
 
+---@param ctx Tasks.CliCtx
+---@return integer
+local function learn_history(ctx)
+  local args, opt = ctx.args, ctx.args.opt
+  local format = opt.format or "tsv"
+  if (format ~= "tsv" and format ~= "json") or #args.pos > 2 then
+    ctx.warn("error: usage: " .. M.USAGE_HISTORY)
+    return 2
+  end
+  local doc, err = require("tasks_nvim.contract_learn").history({
+    area = args.pos[2],
+    since = opt.since ~= nil and tostring(opt.since) or nil,
+    ["until"] = opt["until"] ~= nil and tostring(opt["until"]) or nil,
+    step = opt.step ~= nil and tostring(opt.step) or nil,
+    paths = list_opt(opt.paths),
+  }, { root = ctx.eo.root, today = ctx.eo.today })
+  if format == "json" then
+    return emit_json(ctx, doc, err)
+  end
+  if not doc then
+    return fail(ctx, err)
+  end
+  if not doc.first then
+    ctx.say("# no series yet: tasks history record writes it down from today on")
+  else
+    ctx.say(
+      ("# since %s, streak %d (longest %d)"):format(
+        doc.first,
+        doc.streak.current,
+        doc.streak.longest
+      )
+    )
+    ctx.say("# date\tlearned\tseen\tdropped\txp\tdone_h\tdays")
+    for _, p in ipairs(doc.points) do
+      ctx.say(table.concat({
+        p.date,
+        tostring(p.learned),
+        tostring(p.seen),
+        tostring(p.dropped),
+        tostring(p.xp),
+        ("%g"):format(p.done_h),
+        tostring(p.days),
+      }, "\t"))
+    end
+  end
+  for _, e in ipairs(doc.incomplete) do
+    ctx.warn("warn: skipped " .. fsio.clean(e))
+  end
+  return 0
+end
+
 ---The subcommands of `learn`.
-local SUBS = { next = learn_next, notes = learn_notes, evidence = learn_evidence }
+local SUBS = {
+  next = learn_next,
+  notes = learn_notes,
+  evidence = learn_evidence,
+  history = learn_history,
+}
 
 ---@param ctx Tasks.CliCtx
 ---@return integer
@@ -293,7 +354,19 @@ end
 ---@param specs table<string, Tasks.CliSpec>
 function M.register(commands, specs)
   specs.learn = {
-    value = { "machine", "n", "paths", "format", "kind", "area", "limit", "competence" },
+    value = {
+      "machine",
+      "n",
+      "paths",
+      "format",
+      "kind",
+      "area",
+      "limit",
+      "competence",
+      "since",
+      "until",
+      "step",
+    },
     flag = { "done" },
   }
   commands.learn = run

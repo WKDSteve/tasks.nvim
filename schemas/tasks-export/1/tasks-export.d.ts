@@ -34,6 +34,7 @@ export type TasksExport =
   | LearnNext
   | LearnNotes
   | LearnEvidence
+  | LearnHistory
   | Competences
   | Milestones
   | MilestoneDocument
@@ -1158,7 +1159,7 @@ export type PathDocument = Head & {
   }[];
 };
 /**
- * tasks.learn_next: for every running learning path (stage `doing`, or `idle` with its project's `status: doing`) the first `n` points (default 3) that may be learned now, in document order: open (not blocked), not optional, on the machine when one is asked for. Only paths with such a point; `doing` before `idle`, then the most recently updated first, then by id. Capability `learn_next`.
+ * tasks.learn_next: for every running learning path (stage `doing`, or `idle` with its project's `status: doing`) the first `n` points (default 3) that may be learned now, in document order: open (not blocked), not optional, on the machine when one is asked for. Only paths with such a point; `doing` before `idle`, then the most recently active first (the last day the series of the learning figures saw a change, else `updated`), then by id. Capability `learn_next`.
  */
 export type LearnNext = Head & {
   kind: "tasks.learn_next";
@@ -1272,6 +1273,75 @@ export type LearnEvidence = Head & {
       level: CompetenceLevel;
     };
   }[];
+  incomplete: string[];
+};
+/**
+ * tasks.learn_history: what the series of the learning figures (`_Telemetry/history/learn-YYYY-MM.jsonl`, one row per day and path, written by `history_record`, `tasks history record` and `tasks index`) says over a window `since`..`until` in steps of a `day`, `week` (from Monday) or `month`. The series exists from the day it was introduced: a step before its first day (`first`) is absent, never 0; without any row there are no `points`, no `first`, no `streak`. A path's first row on the first day of the series is where it starts (nothing learned that day); a path that appears later counts from nothing. Capability `learn_history`.
+ */
+export type LearnHistory = Head & {
+  kind: "tasks.learn_history";
+  rev: Rev;
+  digest: Digest;
+  since: string;
+  until: string;
+  step: "day" | "week" | "month";
+  /**
+   * The first day of the series in the scope.
+   */
+  first?: string;
+  /**
+   * Learning days in a row (a day on which a point was learned or seen): `current` the run that ends on `until` or the day before (today not learned yet keeps it), `longest` the longest run since `first`, `last_day` the last learning day.
+   */
+  streak?: {
+    current: number;
+    longest: number;
+    last_day?: string;
+  };
+  /**
+   * One per step from the step of `first` on, `date` its first day: the sums over the paths, `days` the learning days of the step, `paths` the paths that changed in it (with the level reached at its end).
+   */
+  points: (LearnStepFigures & {
+    date: string;
+    days: number;
+    paths: (LearnStepFigures & {
+      id: string;
+      level?: number;
+    })[];
+  })[];
+  /**
+   * Every path of the scope with a row, by id: its first row, the last day something changed (up to `until`), the level at `until`, the day each level was first reached (`ref` as `PathLevel.ref`) and each reward first granted, and once the series reaches four weeks back the pace of those weeks (`points` closed and `hours` done per week) and `forecast_weeks`: the weeks the open points (and open hours, `hours_min`/`hours_max`) of an open path take at that pace (absent at a pace of 0).
+   */
+  paths: {
+    id: string;
+    area: string;
+    /**
+     * The title of the path as it is now (open or finished); absent when it is gone.
+     */
+    title?: string;
+    first: string;
+    last_active?: string;
+    level?: number;
+    levels: {
+      ref: string;
+      reached_on: string;
+    }[];
+    rewards: {
+      ref: string;
+      given_on: string;
+    }[];
+    pace?: {
+      points: number;
+      hours: number;
+    };
+    forecast_weeks?: {
+      points?: number;
+      hours_min?: number;
+      hours_max?: number;
+    };
+  }[];
+  /**
+   * Lines and files of the series that were skipped, relative to the vault.
+   */
   incomplete: string[];
 };
 /**
@@ -2708,6 +2778,16 @@ export interface LearnPoint {
   machine?: ["private" | "workstation" | "wsl", ...("private" | "workstation" | "wsl")[]];
 }
 /**
+ * What changed in a step: points learned, seen and dropped, XP earned and hours done (differences of the series, may be negative when a mark was taken back).
+ */
+export interface LearnStepFigures {
+  learned: number;
+  seen: number;
+  dropped: number;
+  xp: number;
+  done_h: number;
+}
+/**
  * Stages aimed at, in theory (`t`) and practice (`p`); a target written as one stage holds for both.
  */
 export interface CompetenceTarget1 {
@@ -2935,6 +3015,14 @@ export interface ResultEntry {
    * `history_record`: the rows written into the series (a dry run: that would be written).
    */
   rows?: number;
+  /**
+   * `history_record`: the rows written into the series of the learning paths (`_Telemetry/history/learn-YYYY-MM.jsonl`; a dry run: that would be written). Capability `learn_history`.
+   */
+  learn_rows?: number;
+  /**
+   * `history_record`: the month file of the learning series, relative to the vault. Capability `learn_history`.
+   */
+  learn_file?: string;
   to?: string;
   steps_ticked?: number;
   plans_closed?: string[];

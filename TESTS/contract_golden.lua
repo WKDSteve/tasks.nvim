@@ -361,6 +361,56 @@ function G.write_learn_paths(root)
   )
 end
 
+---A series of the learning figures for the golden case `learn-history` (and the spec): `prozesse` from the first day
+---of the series (where it starts), a level reached and a reward granted; `signale` appearing later; one broken line.
+---@param root string
+function G.write_learn_series(root)
+  local dir = root .. "/_Telemetry/history"
+  vim.fn.mkdir(dir, "p")
+  local function row(day, path, fields)
+    local obj = vim.tbl_extend("force", {
+      v = 1,
+      day = day,
+      path = path,
+      area = "lib.nvim",
+      at = day .. "T20:00:00Z",
+      learned = 0,
+      seen = 0,
+      dropped = 0,
+      open = 0,
+      total = 0,
+      xp = 0,
+      done_h = 0,
+    }, fields)
+    return require("tasks_nvim.learn_history").encode_row(obj)
+  end
+  local lines = {
+    row("2026-01-02", "lib.nvim/prozesse", { learned = 1, open = 6, total = 7, xp = 10 }),
+    row(
+      "2026-01-03",
+      "lib.nvim/prozesse",
+      { learned = 2, open = 5, total = 7, xp = 15, done_h = 2, level = 1, reached = { "1" } }
+    ),
+    row("2026-01-04", "lib.nvim/signale", { open = 2, total = 2 }),
+    row("2026-01-05", "lib.nvim/prozesse", {
+      learned = 3,
+      seen = 1,
+      open = 3,
+      total = 7,
+      xp = 35,
+      done_h = 3.5,
+      level = 1,
+      reached = { "1" },
+      given = { "1" },
+    }),
+    row("2026-01-05", "lib.nvim/signale", { learned = 1, open = 1, total = 2 }),
+    "{broken",
+  }
+  local fh = assert(io.open(dir .. "/learn-2026-01.jsonl", "wb"))
+  fh:write(table.concat(lines, "\n") .. "\n")
+  fh:close()
+end
+
 ---Write the meetings of the golden cases `meetings`, `meeting` and `task-with-meetings` into `root`.
 ---@param root string
 function G.write_meetings(root)
@@ -773,6 +823,19 @@ G.cases = {
     request = function(root)
       G.write_learn_paths(root)
       return '{"params":{"include_done":true}}'
+    end,
+  },
+  {
+    -- the series of the learning figures (capability `learn_history`): no step before its first day, the first row of
+    -- a path on that day is where it starts, a path that appears later counts from nothing; the streak, a level
+    -- reached and a reward granted by date, a broken line named
+    name = "learn-history",
+    method = "learn_history",
+    fresh = true,
+    request = function(root)
+      G.write_learn_paths(root)
+      G.write_learn_series(root)
+      return '{"params":{"since":"2026-01-01","until":"2026-01-06","step":"day"}}'
     end,
   },
   {

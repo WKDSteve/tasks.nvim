@@ -73,7 +73,20 @@ return function(H)
     -- all paths (`tasks.learn_next`), a query for a shell or a script, not a change in a buffer
     ["learn"] = {
       composer = {},
-      cli = { "area", "competence", "done", "format", "kind", "limit", "machine", "n", "paths" },
+      cli = {
+        "area",
+        "competence",
+        "done",
+        "format",
+        "kind",
+        "limit",
+        "machine",
+        "n",
+        "paths",
+        "since",
+        "step",
+        "until",
+      },
     },
     ["answer"] = { composer = {}, cli = { "no-index" } },
     ["attach"] = {

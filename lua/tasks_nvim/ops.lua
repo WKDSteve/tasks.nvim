@@ -2794,7 +2794,8 @@ end
 
 ---`history_record` {}: write down the figures of today in the series of the vault (`tasks_nvim.history`): a row for
 ---every area whose figures changed since its last row; the folder is made on the first run. `rows` says how many
----(a dry run: how many it would be), `file` the month file. No task changes, so no `id` and no `inverse`.
+---(a dry run: how many it would be), `file` the month file; `learn_rows` and `learn_file` the same for the series of the
+---learning paths (`tasks_nvim.learn_history`). No task changes, so no `id` and no `inverse`.
 ---@param _ table
 ---@param ctx Tasks.OpsCtx
 ---@return table entry
@@ -2808,10 +2809,19 @@ local function do_history_record(_, ctx)
     return fail(ctx, err)
   end
   local outcome = "unchanged"
-  if r.rows > 0 then
+  if r.rows > 0 or r.learn_rows > 0 then
     outcome = ctx.dry and "would_change" or "changed"
   end
-  return { ok = true, outcome = outcome, changed_ids = {}, rows = r.rows, file = r.file }
+  return {
+    ok = true,
+    outcome = outcome,
+    changed_ids = {},
+    rows = r.rows,
+    file = r.file,
+    -- capability `learn_history`: the series of the learning paths, written by the same operation
+    learn_rows = r.learn_rows,
+    learn_file = r.learn_file,
+  }
 end
 
 -- ── meetings ─────────────────────────────────────────────────────────────────

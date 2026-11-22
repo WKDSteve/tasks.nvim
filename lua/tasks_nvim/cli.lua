@@ -146,6 +146,12 @@ commands:
                                           Nachweis:, Aufgabe: or Ergebnis: ({for=t4}: the stage it proves); --done
                                           adds the finished paths; a line per point (path, #key, state, stage, label,
                                           link)
+  learn history [<area>] [--since=YYYY-MM-DD] [--until=YYYY-MM-DD] [--step=day|week|month] [--paths=id,id] [--format=tsv|json]
+                                          what the series of the learning figures says (written by history record
+                                          and index into _Telemetry/history/learn-YYYY-MM.jsonl, from its first day
+                                          on): per step points learned, seen, dropped, XP, hours and learning days,
+                                          and the streak of learning days; --format=json adds per path the day each
+                                          level was reached and each reward granted, the pace and the forecast
   competences [<area>] [--format=tsv|json]
                                           the competences (<area>/ROADMAP/competences/<slug>.md): id, stage in
                                           theory (T) and practice (P), targets in 12 and 24 months, the learning
@@ -224,6 +230,7 @@ commands:
                                           the overview figures over time (open, ready, with value, ...; default: the
                                           last 90 days); '-' is a day before the first row, '*' a day with a row
   history record [--dry-run]              write down the figures of today: one row per area whose figures changed
+                                          (and one per learning path whose figures changed, learn-YYYY-MM.jsonl)
                                           (<vault>/_Telemetry/history/YYYY-MM.jsonl, made on the first run)
   history backfill [--since=..] [--until=..] [--dry-run]
                                           fill the days before today that have a commit and no row from the history

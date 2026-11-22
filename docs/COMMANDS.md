@@ -1112,6 +1112,11 @@ contract: `tasks.learn_next`, `tasks.learn_notes`, `tasks.competences`, [CONTRAC
   whose label starts with `Nachweis:`, `Aufgabe:` or `Ergebnis:`; `{for=t4}` (or `{for=p3.5}`) on such a point names
   the stage of the competence scale it proves. `--competence` keeps the paths that serve it, `--done` adds the
   finished paths.
+- `tasks learn history [<area>] [--since=…] [--until=…] [--step=day|week|month] [--paths=id,id]`: what the series of the
+  learning figures says: per step the points learned, seen, dropped, the XP, hours and learning days, and the streak
+  of learning days (`--format=json` adds per path the day each level was reached and each reward granted, the pace
+  and the forecast). The series (`_Telemetry/history/learn-YYYY-MM.jsonl`) is written by `tasks history record` and
+  `tasks index`, a row per path whose figures changed; it starts the day it is first written, nothing before it.
 - `tasks competences [<area>]`: the competences of the vault, one file per field of knowledge in
   `<area>/ROADMAP/competences/<slug>.md`:
 
