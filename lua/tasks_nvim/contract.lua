@@ -745,8 +745,8 @@ function M.icon_entry(icon)
 end
 
 ---What a path or project builds on, as the documents carry it (capability `requires`): `requires`
----(`{ id, gate, kind, met }` in the file's order: `kind` `path`, `project` or `unknown`, `met` the requirement is
----finished), `requires_gate` (the file's gate) and `waiting_on` (`{ id, via? }`: the open HARD requirements, its own
+---(`{ id, gate, kind, met }` in the file's order: `kind` `path`, `project`, `unknown`, `foreign` (an id of another
+---vault) or `bad` (a broken entry, as written), `met` the requirement is finished), `requires_gate` (the file's gate) and `waiting_on` (`{ id, via? }`: the open HARD requirements, its own
 ---and, for a path, its project's with `via` the project; empty: it may be finished). A file that names nothing and
 ---inherits nothing gets no field, so such an entry reads as before.
 ---@param st? Tasks.RequiresState

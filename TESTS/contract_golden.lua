@@ -70,7 +70,8 @@ end
 
 ---Learning paths and projects that build on each other, for the golden cases `paths-requires`, `snapshot-requires`
 ---and `result-requires`: a path that waits under the hard gate (levels, the line of the whole path held open), one
----whose requirement is finished, one naming an id that exists nowhere, and a project that waits for another.
+---whose requirement is finished, one naming an id that exists nowhere, an id of another vault and a broken entry, and a
+---project that waits for another.
 ---@param root string
 local function write_requires(root)
   local function put(path, text)
@@ -110,7 +111,7 @@ local function write_requires(root)
   )
   put(
     paths_dir .. "/weiter.md",
-    "---\ntitle: Weiter\nstatus: planning\nrequires: [lib.nvim/grundlagen, lib.nvim/nirgends]\n"
+    '---\ntitle: Weiter\nstatus: planning\nrequires: [lib.nvim/grundlagen, lib.nvim/nirgends, "work:lib.nvim/x", kein id]\n'
       .. "created: 2026-01-03\nupdated: 2026-01-03\n---\n\nNoch kein Baum.\n"
   )
   -- the finished requirement: a path closed into the Backlog

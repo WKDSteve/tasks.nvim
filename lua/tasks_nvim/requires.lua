@@ -23,8 +23,22 @@ local M = {}
 ---@type string[]
 M.GATES = { "soft", "hard" }
 
+---The longest text an entry of `requires` that is no id of this vault keeps (`foreign`, `bad`).
+M.ENTRY_MAX = 200
+
+---Whether an entry of `requires` names an id of another vault: `<vault>:<area>/<slug>` or `<vault>/<area>/<slug>`
+---(the forms a milestone's `includes` calls foreign, `milestones.member`).
+---@param value string
+---@return boolean
+function M.is_foreign(value)
+  local _, slashes = value:gsub("/", "")
+  return value:find(":", 1, true) ~= nil or slashes >= 2
+end
+
 ---Read `requires` and `requires_gate` of a path or project file into `plan` (`requires`, `requires_raw`,
----`requires_gate`, `link_problems`). A plan file must have neither (`plan-requires`). `bad` takes the codes with the
+---`requires_entries`, `requires_gate`, `link_problems`). `requires_entries` is the list in the file's order with the
+---entries no requirement can be made of kept as `{ id = <as written>, kind = "foreign"|"bad" }` (the documents show
+---them; the file's fault stays `plan-bad-requires`); a resolved one is `{ id = <id> }`. A plan file must have neither (`plan-requires`). `bad` takes the codes with the
 ---`plan-` prefix (`plans.parse` turns them into `path-...` / `project-...`).
 ---@param meta table
 ---@param plan Tasks.PlanFile
@@ -43,14 +57,23 @@ function M.read(meta, plan, bad, resolver)
     return
   end
   local list = model.field_list(meta.requires, "requires", bad)
-  plan.requires, plan.requires_raw = {}, {}
+  plan.requires, plan.requires_raw, plan.requires_entries = {}, {}, {}
   local seen = {}
+  ---An entry no requirement can be made of, kept for the documents: once, as written (one line, clipped).
+  local function keep(odd, text)
+    text = vim.trim(fsio.clean(text)):sub(1, M.ENTRY_MAX)
+    if text ~= "" and not seen[text] then
+      seen[text] = true
+      plan.requires_entries[#plan.requires_entries + 1] = { id = text, kind = odd }
+    end
+  end
   for _, raw in ipairs(list) do
     raw = vim.trim(raw)
     local kind, value = wikilinks.read(raw)
     local id
     if kind == "bad" then
       bad("plan-bad-requires", "requires: " .. value)
+      keep("bad", raw)
     elseif kind == "slug" then
       local ids = resolver and resolver.candidates(value) or {}
       if #ids == 1 then
@@ -71,6 +94,11 @@ function M.read(meta, plan, bad, resolver)
           "plan-bad-requires",
           "requires: " .. (err or ("expected <area>/<slug>, got " .. fsio.clean(value)))
         )
+        if M.is_foreign(value) then
+          keep("foreign", value)
+        else
+          keep("bad", raw)
+        end
       else
         id = value
       end
@@ -82,6 +110,7 @@ function M.read(meta, plan, bad, resolver)
         seen[id] = true
         plan.requires[#plan.requires + 1] = id
         plan.requires_raw[#plan.requires_raw + 1] = raw
+        plan.requires_entries[#plan.requires_entries + 1] = { id = id }
       end
     end
   end
@@ -199,7 +228,7 @@ end
 ---@class Tasks.RequiresState
 ---@field requires string[]          # The ids the file names, in its order.
 ---@field gate "soft"|"hard"         # The gate of the file's own requirements.
----@field requirements { id: string, kind: "path"|"project"|"unknown", gate: "soft"|"hard", met: boolean, title?: string }[]
+---@field requirements { id: string, kind: "path"|"project"|"unknown"|"foreign"|"bad", gate: "soft"|"hard", met: boolean, title?: string }[]
 ---@field waiting_on string[]        # The open HARD requirements, its own and those of its project (ids).
 ---@field waiting { id: string, via?: string }[]  # The same, `via` the project a requirement is inherited from.
 ---@field open_soft string[]         # Its own open requirements under the soft gate: a hint, never a wait.
@@ -215,6 +244,11 @@ end
 ---@return Tasks.RequiresState|nil
 function M.state(file, idx)
   local own = file.requires or {}
+  -- the entries in the file's order: the resolved ids and those that are no id of this vault (`foreign`, `bad`)
+  local entries = file.requires_entries
+    or vim.tbl_map(function(id)
+      return { id = id }
+    end, own)
   local parent
   if file.kind == "path" and file.project then
     local it = idx.items[file.project]
@@ -223,7 +257,7 @@ function M.state(file, idx)
       parent = nil
     end
   end
-  if #own == 0 and not parent then
+  if #entries == 0 and not parent then
     return nil
   end
   local gate = file.requires_gate or M.GATES[1]
@@ -237,9 +271,13 @@ function M.state(file, idx)
     unknown = {},
   }
   local listed = {}
-  for _, id in ipairs(own) do
-    local it = idx.items[id]
-    if not it or id == file.id then
+  for _, e in ipairs(entries) do
+    local id = e.id
+    local it = not e.kind and idx.items[id] or nil
+    if e.kind then
+      -- an id of another vault or a broken entry: a box of the map, never a wait (the file's fault says the rest)
+      st.requirements[#st.requirements + 1] = { id = id, kind = e.kind, gate = gate, met = false }
+    elseif not it or id == file.id then
       st.unknown[#st.unknown + 1] = id
       st.requirements[#st.requirements + 1] =
         { id = id, kind = "unknown", gate = gate, met = false }
@@ -292,11 +330,6 @@ function M.stage(f, st, finished)
   return "idle"
 end
 
----The circles of `requires` among the open paths and projects (a finished one ends every chain), the hard requirements
----a path inherits from its project included: each once, starting at its smallest id, in id order. A file that names
----itself is a circle of one.
----@param idx Tasks.RequiresIndex
----@return string[][]
 ---What an open file waits on as edges of the graph: its own requirements, and for a path of a project the hard
 ---requirements of that project (inherited, `state`), never the path itself.
 ---@param idx Tasks.RequiresIndex
@@ -320,6 +353,11 @@ local function edges_of(idx, it)
   return out
 end
 
+---The circles of `requires` among the open paths and projects (a finished one ends every chain), the hard requirements
+---a path inherits from its project included: each once, starting at its smallest id, in id order. A file that names
+---itself is a circle of one.
+---@param idx Tasks.RequiresIndex
+---@return string[][]
 function M.cycles(idx)
   local ids = vim.tbl_keys(idx.items)
   table.sort(ids)
@@ -488,7 +526,7 @@ end
 function M.any(...)
   for _, files in ipairs({ ... }) do
     for _, f in ipairs(files or {}) do
-      if f.requires and #f.requires > 0 then
+      if (f.requires and #f.requires > 0) or (f.requires_entries and #f.requires_entries > 0) then
         return true
       end
     end

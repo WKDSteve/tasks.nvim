@@ -61,6 +61,7 @@ M.STATUSES = { "planning", "doing", "parked", "done" }
 ---@field gate? string                # `hard` or nil.
 ---@field requires? string[]          # A path or project: the paths and projects it builds on (ids; `tasks_nvim.requires`).
 ---@field requires_raw? string[]      # `requires` as the file writes them (ids or wikilinks).
+---@field requires_entries? { id: string, kind?: "foreign"|"bad" }[]  # `requires` in the file's order, entries that are no id of this vault kept (`requires.read`).
 ---@field requires_gate? "soft"|"hard"  # What an unmet requirement does (absent: `soft`).
 ---@field competence? string[]       # A path: the competences it serves (`tasks_nvim.competences`).
 ---@field competence_target? Tasks.CompetenceTarget  # A path: the stages it aims at.

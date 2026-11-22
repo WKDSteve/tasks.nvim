@@ -1,5 +1,5 @@
 {
-  "digest": "sha256:c03a6319cea6b340",
+  "digest": "sha256:345642efc11fc614",
   "done_projects": [],
   "engine": {
     "git": "0000000",
@@ -91,12 +91,15 @@
       "area": "lib.nvim",
       "areas": [],
       "created": "2026-01-03",
-      "etag": "sha256:084dbbb1e8c4c46f",
+      "etag": "sha256:c01224de5cf1dc5e",
       "file": "lib.nvim/ROADMAP/paths/weiter.md",
       "has_tree": false,
       "id": "lib.nvim/weiter",
       "points": 0,
-      "problems": [],
+      "problems": [
+        "requires: invalid area name: work:lib.nvim",
+        "requires: invalid area name: kein id"
+      ],
       "progress": {
         "blocked": 0,
         "dropped": 0,
@@ -117,6 +120,18 @@
           "id": "lib.nvim/nirgends",
           "kind": "unknown",
           "met": false
+        },
+        {
+          "gate": "soft",
+          "id": "work:lib.nvim/x",
+          "kind": "foreign",
+          "met": false
+        },
+        {
+          "gate": "soft",
+          "id": "kein id",
+          "kind": "bad",
+          "met": false
         }
       ],
       "requires_gate": "soft",
@@ -126,7 +141,7 @@
       "summary": "Noch kein Baum.",
       "title": "Weiter",
       "updated": "2026-01-03",
-      "valid": true,
+      "valid": false,
       "waiting_on": []
     },
     {
@@ -159,7 +174,7 @@
   "kind": "tasks.paths",
   "plugin": "tasks.nvim",
   "requires_cycles": [],
-  "rev": "rev:ee0a5b",
+  "rev": "rev:7db8dd",
   "schema": 1,
   "vault": {
     "id": "vault"

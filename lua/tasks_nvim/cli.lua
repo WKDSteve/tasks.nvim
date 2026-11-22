@@ -1805,14 +1805,14 @@ commands.path = function(ctx)
     )
   end
   for _, r in ipairs(rst and rst.requirements or {}) do
-    ctx.say(
-      ("requires\t%s\t%s\t%s\t%s"):format(
-        r.id,
-        r.kind == "unknown" and "unknown" or (r.met and "done" or "open"),
-        r.gate,
-        clean(r.title or "")
-      )
-    )
+    ctx.say(("requires\t%s\t%s\t%s\t%s"):format(
+      r.id,
+      -- `unknown`, `foreign` (an id of another vault), `bad` (a broken entry): never met
+      (r.kind == "unknown" or r.kind == "foreign" or r.kind == "bad") and r.kind
+        or (r.met and "done" or "open"),
+      r.gate,
+      clean(r.title or "")
+    ))
   end
   if rst then
     ctx.say(("gate\t%s\t%s"):format(rst.gate, req.waiting_text(rst) or "nothing open"))

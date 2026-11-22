@@ -402,4 +402,57 @@ return function(H)
   )
   found = codes_of(assert(check.run({ root = root, area = A })))
   eq(found["plan-requires"], { plan.id })
+
+  -- ── an id of another vault and a broken entry: entries of the list (`foreign`, `bad`), never a wait ──
+  local odd = new_path("Fremd und kaputt")
+  H.write(
+    odd.path,
+    (
+      H.read(odd.path):gsub(
+        "\ntitle:",
+        '\nrequires: ["tricentis-vault:Learning/sap", lib.nvim/a/b, kein id, kein id, '
+          .. first.id
+          .. "]\nrequires_gate: hard\ntitle:",
+        1
+      )
+    )
+  )
+  local of = assert(paths.find(odd.id, o))
+  eq(of.requires, { first.id }, "the graph knows only the ids of this vault")
+  ok(vim.tbl_contains(of.error_codes, "path-bad-requires"), "still a fault of the file")
+  local odoc = call("path", { id = odd.id })
+  eq(odoc.path.requires, {
+    { id = "tricentis-vault:Learning/sap", gate = "hard", kind = "foreign", met = false },
+    { id = "lib.nvim/a/b", gate = "hard", kind = "foreign", met = false },
+    { id = "kein id", gate = "hard", kind = "bad", met = false },
+    { id = first.id, gate = "hard", kind = "path", met = false },
+  }, "in the file's order, a broken entry once")
+  eq(odoc.path.waiting_on, { { id = first.id } }, "only the open requirement of this vault holds")
+  code, out = run_cli({ "path", odd.id })
+  eq(code, 0)
+  has(out, "requires\tkein id\tbad\thard")
+  has(out, "requires\ttricentis-vault:Learning/sap\tforeign\thard")
+  -- only entries that are no id: listed, nothing held, the stage as without them
+  local only = new_path("Nur fremd")
+  H.write(
+    only.path,
+    (
+      H.read(only.path)
+        :gsub("\ntitle:", '\nrequires: ["work:lib.nvim/x"]\nrequires_gate: hard\ntitle:', 1)
+    )
+  )
+  for _, item in ipairs(call("paths", { area = A }).items) do
+    if item.id == only.id then
+      eq(
+        item.requires,
+        { { id = "work:lib.nvim/x", gate = "hard", kind = "foreign", met = false } }
+      )
+      eq(item.waiting_on, {}, "a foreign entry holds no gate")
+      eq(item.stage, "idle")
+    end
+  end
+  assert(paths.close(only.id, o))
+  found = codes_of(assert(check.run({ root = root, area = A })))
+  eq(found["requires-unknown"], { x.id }, "no requires-unknown for them: their fault is the file's")
+  ok(vim.tbl_contains(found["path-bad-requires"] or {}, odd.id), vim.inspect(found))
 end

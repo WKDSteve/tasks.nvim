@@ -356,12 +356,12 @@ export type PlanAssetsTruncated = true;
  */
 export type RequiresGate = "soft" | "hard";
 /**
- * What this path or project builds on (`requires:`), in the order of the file: `id`, `gate` (the file's `requires_gate`), `kind` (`path`, `project`, or `unknown`: no learning path or project of that id, `check` says `requires-unknown`) and `met` (the requirement is finished, closed into a Backlog). Only when the file names some. Capability `requires`.
+ * What this path or project builds on (`requires:`), in the order of the file: `id`, `gate` (the file's `requires_gate`), `kind` (`path`, `project`; `unknown`: no learning path or project of that id, `check` says `requires-unknown`; `foreign`: an id of another vault, `<vault>:<area>/<slug>` or `<vault>/<area>/<slug>`, `id` as written; `bad`: a broken entry, `id` the text as written; the last two are the file's fault `path-bad-requires` / `project-bad-requires`, never met, never in `waiting_on`) and `met` (the requirement is finished, closed into a Backlog). Only when the file names some. Capability `requires`.
  */
 export type Requires = {
   id: string;
   gate: RequiresGate;
-  kind: "path" | "project" | "unknown";
+  kind: "path" | "project" | "unknown" | "foreign" | "bad";
   met: boolean;
 }[];
 /**
