@@ -61,7 +61,6 @@ return function(H)
     "learn",
     "open",
     "planfile",
-    "point",
     "preview",
     -- `xp` and `reward` work on the point (and the path) in the buffer under the cursor; tasks-ops/1 `node_set` (`xp`)
     -- and `path_reward` are the headless way
@@ -77,11 +76,15 @@ return function(H)
     -- the editor asks before it finishes; the CLI never asks
     -- the editor shows them in a float; `--format=json` is for a script
     ["milestones"] = { composer = {}, cli = { "format" } },
+    -- the editor asks the reason and the ack; the command takes them as options
+    ["point"] = { composer = {}, cli = { "ack", "reason", "state" } },
     ["plan-close"] = { composer = { "yes" }, cli = {} },
     ["project-close"] = { composer = { "yes" }, cli = {} },
     ["done"] = {
       composer = { "yes" },
       cli = {
+        -- the editor asks before it closes a point under `{safety}`; the CLI is told with `--ack`
+        "ack",
         "by",
         -- `ci=` is a key=value word of `:Tasks done`, as `commits=` and `remind=` are
         "ci",
