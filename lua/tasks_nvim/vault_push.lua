@@ -173,6 +173,37 @@ local function solve_conflicts(wt, prefix, areas, side)
   return nil
 end
 
+---A pick without conflicts that still has to be committed (or that `--continue` just failed to commit). Only a
+---pick that leaves nothing staged is skipped (the remote has the change already); any other failure (signing, a
+---hook, a lock) is an error, never a silent skip.
+---@param wt string
+---@param sha string
+---@param continued boolean|nil  `--continue` was already tried
+---@return boolean ok
+---@return string|nil err
+local function finish_pick(wt, sha, continued)
+  local err, code
+  if not continued then
+    local _, e, c = run(wt, { "cherry-pick", "--continue" })
+    err, code = e, c
+    if code == 0 then
+      return true
+    end
+  end
+  local _, _, staged = run(wt, { "diff", "--cached", "--quiet" })
+  if staged == 0 then
+    run(wt, { "cherry-pick", "--skip" })
+    return true
+  end
+  local text = err
+  if not text or text == "" then
+    local _, e2 = git(wt, { "cherry-pick", "--continue" })
+    text = e2 or "git cherry-pick --continue failed"
+  end
+  run(wt, { "cherry-pick", "--abort" })
+  return false, ("cherry-pick of %s could not be committed: %s"):format(sha:sub(1, 9), text)
+end
+
 ---Cherry-pick `sha` onto the worktree's HEAD.
 ---@param wt string
 ---@param prefix string
@@ -188,12 +219,7 @@ local function pick(wt, prefix, sha, areas)
   for _ = 1, 8 do
     local unmerged = git(wt, { "diff", "--name-only", "--diff-filter=U" }) or ""
     if unmerged == "" then
-      local _, _, c = run(wt, { "cherry-pick", "--continue" })
-      if c ~= 0 then
-        -- nothing left to commit: the remote has the change already
-        run(wt, { "cherry-pick", "--skip" })
-      end
-      return true
+      return finish_pick(wt, sha)
     end
     local bad = solve_conflicts(wt, prefix, areas, "theirs")
     if bad then
@@ -205,8 +231,7 @@ local function pick(wt, prefix, sha, areas)
       return true
     end
     if (git(wt, { "diff", "--name-only", "--diff-filter=U" }) or "") == "" then
-      run(wt, { "cherry-pick", "--skip" })
-      return true
+      return finish_pick(wt, sha, true)
     end
   end
   run(wt, { "cherry-pick", "--abort" })
@@ -441,13 +466,27 @@ function M.push(o)
       fail = ierr
       break
     end
+    -- the list before the push: the push itself moves `remote_ref`
+    local going = lines_of(run(wt, { "rev-list", "--reverse", remote_ref .. "..HEAD" }))
+    if #going == 0 then
+      -- every pick was skipped: the remote has all of it already
+      res.head = run(wt, { "rev-parse", "HEAD" })
+      res.notes[#res.notes + 1] = "nothing new landed: "
+        .. res.head:sub(1, 9)
+        .. " is already on "
+        .. remote_ref
+      break
+    end
     local _, perr, pcode = run(wt, { "push", remote, "HEAD:" .. branch })
     if pcode == 0 then
       res.head = run(wt, { "rev-parse", "HEAD" })
-      res.pushed = lines_of(run(wt, { "rev-list", "--reverse", remote_ref .. "..HEAD" }))
-      if #res.pushed == 0 then
-        res.pushed = { res.head }
+      run(wt, { "fetch", "-q", remote, branch })
+      local _, _, anc = run(wt, { "merge-base", "--is-ancestor", res.head, remote_ref })
+      if anc ~= 0 then
+        fail = "git push said ok, but " .. res.head:sub(1, 9) .. " is not on " .. remote_ref
+        break
       end
+      res.pushed = going
       break
     end
     if not retryable(perr) then

@@ -58,4 +58,29 @@ return function(H)
     eq(code, 1, "a refusing hook ends the push")
     ok(said:find("refused-by-hook", 1, true), "with its words, no retry loop: " .. said)
   end
+
+  -- 5. A pick that cannot be committed (signing fails) is an error, never "pushed" ------------------------------------
+  do
+    local root, other, bare = setup_remote()
+    add_task(root, "lib.nvim", "unsigned")
+    -- the remote has moved on, so the pick has to make a new commit (it cannot reuse the old one)
+    add_task(other, "cascade.nvim", "elsewhere")
+    git(other, { "push", "-q", "origin", "main" })
+    local before = git(bare, { "rev-parse", "main" })
+    local signer = H.tmpdir() .. "/failing-gpg.sh"
+    H.write(signer, "#!/bin/sh\necho signing-is-broken >&2\nexit 1\n")
+    vim.uv.fs_chmod(signer, tonumber("755", 8))
+    git(root, { "config", "commit.gpgsign", "true" })
+    -- whatever format the machine uses, its signing program is this one
+    for _, key in ipairs({ "gpg.program", "gpg.ssh.program" }) do
+      git(root, { "config", key, signer })
+    end
+    git(root, { "config", "gpg.format", "ssh" })
+    git(root, { "config", "user.signingkey", signer })
+    local code, said = run(root, { "push", "--no-sync" })
+    eq(code, 1, "a failed commit ends the push: " .. said)
+    ok(not said:find("pushed", 1, true), "and nothing is reported as pushed: " .. said)
+    ok(said:find("could not be committed", 1, true), "the reason is named: " .. said)
+    eq(git(bare, { "rev-parse", "main" }), before, "the remote did not move")
+  end
 end
