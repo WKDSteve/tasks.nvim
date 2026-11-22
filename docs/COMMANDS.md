@@ -533,8 +533,8 @@ picture is never attached by guess. Without `name=` the copy is called `<slug>-Y
 `pngpaste` on macOS, `wl-paste` or `xclip` on Linux); with none, or without an image on the clipboard, you get a message
 and nothing is created. Example: take a screenshot, then `:Tasks attach lib.nvim/my-task from=clipboard`; the link lands
 at the cursor. The editor does not wait for the clipboard tool (on Windows a PowerShell start): the attach and
-its message follow when the image is there, and a second `from=clipboard` before that replaces the first (only one
-image is attached). It needs lib.nvim with `clipboard_image.save_async`; with an older one the editor waits as before.
+its message follow when the image is there, and a second `from=clipboard` to the same task before that replaces the
+first (only one image is attached). It needs lib.nvim with `clipboard_image.save_async`; with an older one the editor waits as before.
 
 ```lua
 require("tasks_nvim").setup({ attach = { screenshot_dirs = { "~/Pictures/Screenshots" }, max_age_s = 120 } })

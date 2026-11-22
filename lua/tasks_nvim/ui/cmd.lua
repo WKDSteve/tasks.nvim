@@ -2642,8 +2642,10 @@ local function insert_at_cursor(path, text)
   return false
 end
 
----The number of the newest `:Tasks attach <id> from=clipboard`: an older one whose image comes later is dropped.
-local clipboard_attach_seq = 0
+---Task id -> the number of its newest `:Tasks attach <id> from=clipboard`: an older one for the same task whose image
+---comes later is dropped. The token belongs to the task: an attach to another task meanwhile is a wish of its own.
+---@type table<string, integer>
+local clipboard_attach_seq = {}
 
 ---Say what an attach did, and put its link where it can be pasted: at the cursor of the task when it is open in a
 ---window, else into the `+` register.
@@ -2680,8 +2682,8 @@ end
 ---cursor of the task when it is open in a window, else into the `+` register, and say so.
 ---
 ---`from=clipboard` does not wait for the clipboard program (on Windows a PowerShell start): the attach and its
----report follow when the image is there. A newer `from=clipboard` drops an older one still waiting (nothing of it
----is written), and the vault is the one of the call, also when it was switched meanwhile.
+---report follow when the image is there. A newer `from=clipboard` to the same task drops an older one still waiting
+---(nothing of it is written), and the vault is the one of the call, also when it was switched meanwhile.
 ---@param ctx table
 function M.task_attach(ctx)
   if #ctx.rest > 0 then
@@ -2718,8 +2720,9 @@ function M.task_attach(ctx)
     end
     if from == "clipboard" then
       local source = require("tasks_nvim.attach_source")
-      clipboard_attach_seq = clipboard_attach_seq + 1
-      local seq = clipboard_attach_seq
+      local target = ctx.args.id
+      local seq = (clipboard_attach_seq[target] or 0) + 1
+      clipboard_attach_seq[target] = seq
       -- `M.attach_opts`: the seam of the specs (a fake clipboard, the vault).
       local base = M.attach_opts or {}
       source.attach_async(
@@ -2730,7 +2733,7 @@ function M.task_attach(ctx)
           kind = kind,
           root = base.root or vault.root(),
           cancelled = function()
-            return seq ~= clipboard_attach_seq
+            return seq ~= clipboard_attach_seq[target]
           end,
         }),
         function(cres, cerr)

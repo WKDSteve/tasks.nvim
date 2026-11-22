@@ -181,10 +181,22 @@ return function(H)
       eq(#shots_of(t6.id), 1, "the older call attached nothing")
       eq(select(2, said():gsub("attached " .. t6.id:gsub("%p", "%%%0"), "")), 1, "said once")
 
+      -- the token belongs to the task: a call for another task meanwhile drops nothing
+      local t8 = new_task("Clipboard first task")
+      local t9 = new_task("Clipboard second task")
+      notes = {}
+      from_clipboard(t8.id)
+      from_clipboard(t9.id)
+      eq(#spawned, 5, "one program per call")
+      spawned[4].on_exit({ code = 0, stdout = PNG })
+      spawned[5].on_exit({ code = 0, stdout = PNG })
+      ok(attached_said(t8.id) and attached_said(t9.id), "both tasks get their image: " .. said())
+      eq(#shots_of(t8.id) + #shots_of(t9.id), 2, "one screenshot each")
+
       -- an empty clipboard is said, later
       notes = {}
       from_clipboard(t6.id)
-      spawned[4].on_exit({ code = 1, stdout = "" })
+      spawned[6].on_exit({ code = 1, stdout = "" })
       vim.wait(1000, function()
         return said():find("no image", 1, true) ~= nil
       end, 5)
