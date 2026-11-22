@@ -15,6 +15,9 @@ return {
     ["TESTS/tasks_tree_drive_spec.lua"] = "script",
     ["*"] = "h",
   },
+  -- The specs of `tasks push` / the merge driver run a dozen git processes each against a bare remote; git on
+  -- Windows takes 1-2 s per call under load, so the default 60 s per file is too tight on the Windows leg.
+  timeouts = { file_ms = 120000 },
   -- Dependencies (directory names) put on the runtimepath: $<NAME>_DIR, .deps/<name>, ../<name>,
   -- stdpath('data')/lazy/<name>.
   deps = { "lib.nvim" },

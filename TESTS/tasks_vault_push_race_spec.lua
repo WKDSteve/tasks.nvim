@@ -18,9 +18,11 @@ return function(H)
     -- the pre-push hook of the shared repository (worktrees use it too) pushes the other session's commit once,
     -- right before the first push goes out
     local marker = H.tmpdir() .. "/raced.once"
+    local where = H.tmpdir() .. "/hook.pwd"
     H.write(
       git(root, { "rev-parse", "--path-format=absolute", "--git-common-dir" }) .. "/hooks/pre-push",
-      ("#!/bin/sh\nif [ ! -f '%s' ]; then : > '%s'; env -u GIT_DIR -u GIT_INDEX_FILE -u GIT_WORK_TREE -u GIT_COMMON_DIR git -C '%s' push -q origin main; fi\nexit 0\n"):format(
+      ("#!/bin/sh\npwd > '%s'\nif [ ! -f '%s' ]; then : > '%s'; env -u GIT_DIR -u GIT_INDEX_FILE -u GIT_WORK_TREE -u GIT_COMMON_DIR git -C '%s' push -q origin main; fi\nexit 0\n"):format(
+        where,
         marker,
         marker,
         other
@@ -33,6 +35,13 @@ return function(H)
     local res, err = vault_push.push({ root = root, pause_ms = 10 })
     ok(res, "push: " .. tostring(err))
     eq(res.attempt, 2, "the second attempt got through")
+    -- the gate runs in a folder next to the repository (a trusted root), never in the temp folder
+    local ran_in = vim.trim(H.read(where))
+    eq(
+      vim.fs.dirname(ran_in),
+      vim.fs.dirname(root),
+      "the hook ran next to the repository: " .. ran_in
+    )
     local check = remote_indexes_fresh(bare, "two")
     ok(H.read(check .. "/cascade.nvim/ROADMAP/tasks/mine-two.md"), "own task on the remote")
     ok(H.read(check .. "/lib.nvim/ROADMAP/tasks/raced.md"), "the raced task is still there")

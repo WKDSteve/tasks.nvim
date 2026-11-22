@@ -7,7 +7,8 @@
 ---
 --- This puts the commits on a worktree of its own that sits on `origin/main`, so the hook (and `git push`) sees
 --- only what goes out, never the files of another session:
----  1. `git worktree add --detach <tmp> origin/main`
+---  1. `git worktree add --detach <next to the repository> origin/main` (a folder the pre-push gate trusts: it
+---     refuses one in the temp folder)
 ---  2. cherry-pick the commits; a conflict in a generated file is solved, never merged by hand: `TASKS.md` is
 ---     rendered anew (`tasks index`), `Backlog/README.md` and the `_Telemetry/history/*.jsonl` series keep the
 ---     lines of both sides; a conflict in any other file ends the push and names the file
@@ -401,7 +402,13 @@ function M.push(o)
     return res
   end
 
-  local wt = fsio.norm(vim.fn.tempname()) .. "-tasks-push"
+  -- next to the repository, not in the temp folder: the pre-push gate runs the project's own specs and only does
+  -- that in a folder it trusts (`TESTING_TRUST_ROOTS` lists the folder that holds the checkouts)
+  local wt = ("%s/.tasks-push-%s-%x"):format(
+    vim.fs.dirname(top),
+    vim.fs.basename(top),
+    vim.uv.hrtime() % 0xffffff
+  )
   local _, werr = git(top, { "worktree", "add", "-q", "--detach", wt, remote_ref })
   if werr then
     return nil, werr
