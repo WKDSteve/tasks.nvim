@@ -164,6 +164,46 @@ return function(H)
   eq(select(2, call({ since = "2000-01-01", ["until"] = "2026-01-01" })), "invalid_argument")
   eq(select(2, call({ areas = { "nope" } })), "not_found")
 
+  -- the last active day in one pass: a long series of a path costs no lookup per row (it was quadratic: 0.5 s for
+  -- 60 paths over three years)
+  do
+    local list, n = {}, 0
+    local day = "2024-01-01"
+    while day <= "2024-12-31" do
+      n = n + 1
+      list[#list + 1] = {
+        day = day,
+        path = "a/p",
+        area = "a",
+        at = day .. "T00:00:00Z",
+        learned = n,
+        seen = 0,
+        dropped = 0,
+        open = 0,
+        total = 400,
+        xp = 0,
+        done_h = 0,
+      }
+      day = require("tasks_nvim.model").add_days(day, 1)
+    end
+    list[#list + 1] = vim.tbl_extend("force", list[#list], { day = "2025-01-01" })
+    local calls, real_at = 0, lh.at
+    lh.at = function(...)
+      calls = calls + 1
+      return real_at(...)
+    end
+    local active = lh.last_active(list, "2024-01-01", "2025-06-30")
+    lh.at = real_at
+    eq(active, "2024-12-31", "the last row changed nothing")
+    eq(calls, 0, "no lookup per row")
+    eq(lh.last_active(list, "2024-01-01", "2024-01-01"), nil, "the first day is where it starts")
+    eq(
+      lh.last_active(list, "2023-12-01", "2024-01-01"),
+      "2024-01-01",
+      "a path that appears later counts"
+    )
+  end
+
   -- learn_next: the path active last first (from the series), before the one updated last
   local nxt = vim.json.decode((api.call("learn_next", { params = {} }, { root = root2 })))
   eq(nxt.items[1].path, "lib.nvim/prozesse")

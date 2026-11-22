@@ -683,17 +683,22 @@ end
 ---@param until_ string
 ---@return string|nil
 function M.last_active(list, first, until_)
-  local found
+  -- one pass: each row against the one before it (rows are one per day, in day order); the first row against nothing,
+  -- unless it is on the first day of the series (where the series starts, nothing learned)
+  local found, prev
   for i, row in ipairs(list) do
     if row.day > until_ then
       break
     end
-    local d = M.delta(list, model.add_days(row.day, -1) or row.day, row.day, first)
     if i > 1 or row.day ~= first then
-      if d and (d.learned ~= 0 or d.seen ~= 0 or d.dropped ~= 0 or d.xp ~= 0 or d.done_h ~= 0) then
-        found = row.day
+      for _, k in ipairs(M.DELTAS) do
+        if row[k] ~= (prev and prev[k] or 0) then
+          found = row.day
+          break
+        end
       end
     end
+    prev = row
   end
   return found
 end
