@@ -245,6 +245,79 @@ local function write_xp_path(root)
   )
 end
 
+---Learning paths for the golden cases of the learning views (`learn-next`, …): a running path with stages, hours,
+---XP, machine and safety marks, an optional subtree and a blocked point; an idle path of a begun project; an idle path
+---without one; a parked one.
+---@param root string
+function G.write_learn_paths(root)
+  local function put(path, text)
+    vim.fn.mkdir(vim.fs.dirname(path), "p")
+    local fh = assert(io.open(path, "wb"))
+    fh:write(text)
+    fh:close()
+  end
+  local dir = root .. "/lib.nvim/ROADMAP/paths"
+  put(
+    root .. "/lib.nvim/ROADMAP/projects/os.md",
+    "---\ntitle: Betriebssysteme\nstatus: doing\ncreated: 2026-01-01\nupdated: 2026-01-01\n---\n\nDas Projekt.\n"
+  )
+  put(
+    dir .. "/prozesse.md",
+    table.concat({
+      "---",
+      "title: Prozesse",
+      "status: doing",
+      "project: lib.nvim/os",
+      'icon: "\240\159\167\160"',
+      "created: 2026-01-01",
+      "updated: 2026-01-03",
+      "---",
+      "",
+      "## Lernpunkte",
+      "",
+      "- [ ] Stufe 1 \194\183 Grundlagen {#s1}",
+      "  - [x] Was ist ein Prozess {xp=10}",
+      "  - [!] Scheduler {#sched}",
+      "  - [ ] Woche 1: fork und exec {h=4-6} {xp=20} {#w1}",
+      "    - [ ] [man fork](https://man7.org/linux/man-pages/man2/fork.2.html) {xp=5}",
+      "      > Notiz: Rückgabewert prüfen.",
+      "    - [ ] Nachweis: eine Shell in C {for=p3} {#shell}",
+      "  - [ ] Treiber laden {machine=private} {safety} {#drv}",
+      "- [ ] Stufe 2 \194\183 Speicher {#s2}",
+      "  - [ ] Seitentabellen {h=2} {#pt}",
+      "  - [ ] Extras {optional}",
+      "    - [ ] Huge Pages",
+      "",
+    }, "\n")
+  )
+  put(
+    dir .. "/signale.md",
+    table.concat({
+      "---",
+      "title: Signale",
+      "status: planning",
+      "project: lib.nvim/os",
+      "created: 2026-01-01",
+      "updated: 2026-01-05",
+      "---",
+      "",
+      "## Lernpunkte",
+      "",
+      "- [ ] SIGTERM und SIGKILL {#term}",
+      "- [ ] Ergebnis: ein Handler {for=t2} {#handler}",
+      "",
+    }, "\n")
+  )
+  put(
+    dir .. "/spaeter.md",
+    "---\ntitle: Später\nstatus: planning\ncreated: 2026-01-01\nupdated: 2026-01-06\n---\n\n## Lernpunkte\n\n- [ ] Irgendwann\n"
+  )
+  put(
+    dir .. "/pause.md",
+    "---\ntitle: Pause\nstatus: parked\ncreated: 2026-01-01\nupdated: 2026-01-07\n---\n\n## Lernpunkte\n\n- [ ] Ruht\n"
+  )
+end
+
 ---Write the meetings of the golden cases `meetings`, `meeting` and `task-with-meetings` into `root`.
 ---@param root string
 function G.write_meetings(root)
@@ -611,6 +684,18 @@ G.cases = {
     request = function(root)
       write_xp_path(root)
       return '{"params":{"id":"lib.nvim/rust-lernen"}}'
+    end,
+  },
+  {
+    -- the next points of the running paths (capability `learn_next`): open, not blocked, not optional, on the
+    -- workstation (a point for the private machine is left out), two per path; an idle path of a begun project after
+    -- the running one; an idle path without a project and a parked one not at all
+    name = "learn-next",
+    method = "learn_next",
+    fresh = true,
+    request = function(root)
+      G.write_learn_paths(root)
+      return '{"params":{"machine":"workstation","n":2}}'
     end,
   },
   {

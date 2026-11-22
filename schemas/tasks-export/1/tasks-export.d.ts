@@ -31,6 +31,7 @@ export type TasksExport =
   | MeetingParse
   | Paths
   | PathDocument
+  | LearnNext
   | Milestones
   | MilestoneDocument
   | DonePreview
@@ -1130,6 +1131,31 @@ export type PathDocument = Head & {
     key?: string;
     message: string;
   }[];
+};
+/**
+ * tasks.learn_next: for every running learning path (stage `doing`, or `idle` with its project's `status: doing`) the first `n` points (default 3) that may be learned now, in document order: open (not blocked), not optional, on the machine when one is asked for. Only paths with such a point; `doing` before `idle`, then the most recently updated first, then by id. Capability `learn_next`.
+ */
+export type LearnNext = Head & {
+  kind: "tasks.learn_next";
+  rev: Rev;
+  digest: Digest;
+  /**
+   * The machine asked for; absent: every machine.
+   */
+  machine?: "private" | "workstation" | "wsl";
+  items: {
+    path: string;
+    area: string;
+    title: string;
+    icon?: Icon;
+    project?: string;
+    stage: "doing" | "idle";
+    /**
+     * @minItems 1
+     */
+    points: [LearnPoint, ...LearnPoint[]];
+  }[];
+  incomplete: string[];
 };
 /**
  * tasks.milestones: the milestones of the vault or of an area (`<area>/ROADMAP/milestones/`), each with its progress over its members. Capability `milestones`.
@@ -2409,6 +2435,52 @@ export interface PathLevel {
    */
   given: boolean;
   reached: boolean;
+}
+/**
+ * A learning point as the learning views over all paths carry it: where it stands, its stage (the root it stands below) and what its marks say.
+ */
+export interface LearnPoint {
+  /**
+   * Position in document order (`PathNode.index`); `#<index>` names the point where it has no key.
+   */
+  index: number;
+  key?: string;
+  /**
+   * As written (Markdown, untrusted).
+   */
+  label: string;
+  /**
+   * The `index` of the root it stands below (its own for a root).
+   */
+  stage_index: number;
+  /**
+   * The label of that root (untrusted).
+   */
+  stage_label: string;
+  link?: string;
+  /**
+   * The task the point was promoted to.
+   */
+  promoted?: string;
+  /**
+   * Planned hours (`{h=N}` or the lower end of `{h=N-M}`).
+   */
+  h_min?: number;
+  h_max?: number;
+  /**
+   * The XP the point counts (`PathNode.xp`).
+   */
+  xp?: number;
+  /**
+   * The point is `{safety}` or below one: closing it needs `ack`.
+   */
+  safety?: true;
+  /**
+   * The machines the point may be practised on; absent: every machine.
+   *
+   * @minItems 1
+   */
+  machine?: ["private" | "workstation" | "wsl", ...("private" | "workstation" | "wsl")[]];
 }
 /**
  * A milestone (`<area>/ROADMAP/milestones/<slug>.md`): the head of its file, its progress, whether it is overdue, its version.

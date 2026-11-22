@@ -244,6 +244,12 @@ local methods = {
       return contract.path(params.id, opts)
     end,
   },
+  learn_next = {
+    params = { area = "string", paths = "string_list", machine = "string", n = "integer" },
+    run = function(params, opts)
+      return require("tasks_nvim.contract_learn").next(params, opts)
+    end,
+  },
   milestones = {
     params = { area = "string" },
     required = {},

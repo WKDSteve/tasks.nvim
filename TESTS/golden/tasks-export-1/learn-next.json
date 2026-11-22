@@ -1,0 +1,71 @@
+{
+  "digest": "sha256:044b929917e8750d",
+  "engine": {
+    "git": "0000000",
+    "nvim": "0.0.0",
+    "version": "0.1.0-test"
+  },
+  "generated_at": "2026-01-01T00:00:00Z",
+  "incomplete": [],
+  "items": [
+    {
+      "area": "lib.nvim",
+      "icon": {
+        "kind": "emoji",
+        "value": "🧠"
+      },
+      "path": "lib.nvim/prozesse",
+      "points": [
+        {
+          "index": 5,
+          "label": "[man fork](https://man7.org/linux/man-pages/man2/fork.2.html)",
+          "link": "https://man7.org/linux/man-pages/man2/fork.2.html",
+          "stage_index": 1,
+          "stage_label": "Stufe 1 · Grundlagen",
+          "xp": 5
+        },
+        {
+          "index": 6,
+          "key": "shell",
+          "label": "Nachweis: eine Shell in C {for=p3}",
+          "stage_index": 1,
+          "stage_label": "Stufe 1 · Grundlagen"
+        }
+      ],
+      "project": "lib.nvim/os",
+      "stage": "doing",
+      "title": "Prozesse"
+    },
+    {
+      "area": "lib.nvim",
+      "path": "lib.nvim/signale",
+      "points": [
+        {
+          "index": 1,
+          "key": "term",
+          "label": "SIGTERM und SIGKILL",
+          "stage_index": 1,
+          "stage_label": "SIGTERM und SIGKILL"
+        },
+        {
+          "index": 2,
+          "key": "handler",
+          "label": "Ergebnis: ein Handler {for=t2}",
+          "stage_index": 2,
+          "stage_label": "Ergebnis: ein Handler {for=t2}"
+        }
+      ],
+      "project": "lib.nvim/os",
+      "stage": "idle",
+      "title": "Signale"
+    }
+  ],
+  "kind": "tasks.learn_next",
+  "machine": "workstation",
+  "plugin": "tasks.nvim",
+  "rev": "rev:eaad64",
+  "schema": 1,
+  "vault": {
+    "id": "vault"
+  }
+}

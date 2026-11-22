@@ -131,6 +131,12 @@ commands:
                                           ({h=8} or {h=8-10}; {done_h=9} the hours it took), its result (the child
                                           Nachweis:/Aufgabe:/Ergebnis:) and its state; --write puts it into the file
                                           between <!-- GENERATED:schedule start/end --> (a hand-kept table gives way)
+  learn next [<area>] [--machine=private|workstation|wsl|env] [--n=N] [--paths=id,id] [--format=tsv|json]
+                                          the next points of the running learning paths (status doing or a point
+                                          learned or seen; an idle one of a project with status doing too): per
+                                          path the first N (3) open points in their order that are not blocked, not
+                                          optional and, with --machine, may be practised there; a line per point
+                                          (path, #key, stage, label, safety)
   paths [<area>] [--project=<id>] [--format=tsv|json]
                                           the learning paths: id, status, points, open points, progress in percent
                                           (of the XP, else of the points), title; --project: the paths of a project,
@@ -4284,6 +4290,7 @@ contract_helpers.filter_from = filter_from
 contract_helpers.to_int = to_int
 contract_helpers.cellv = cellv
 contract_cli.register(commands, SPECS, contract_helpers)
+require("tasks_nvim.cli_learn").register(commands, SPECS)
 
 function M.run(argv, io)
   io = io or M.stdio

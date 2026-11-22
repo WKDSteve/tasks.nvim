@@ -82,6 +82,7 @@ M.CAPABILITIES = {
   "if_match",
   "intent",
   "late_blockers",
+  "learn_next",
   "links",
   "list",
   "lists",

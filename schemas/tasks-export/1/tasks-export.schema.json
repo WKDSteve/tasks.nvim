@@ -86,6 +86,9 @@
       "$ref": "#/$defs/PathDocument"
     },
     {
+      "$ref": "#/$defs/LearnNext"
+    },
+    {
       "$ref": "#/$defs/Milestones"
     },
     {
@@ -456,6 +459,57 @@
             "type": "string"
           }
         }
+      },
+      "unevaluatedProperties": false
+    },
+    "LearnPoint": {
+      "description": "A learning point as the learning views over all paths carry it: where it stands, its stage (the root it stands below) and what its marks say.",
+      "type": "object",
+      "required": ["index", "label", "stage_index", "stage_label"],
+      "properties": {
+        "index": { "type": "integer", "minimum": 1, "description": "Position in document order (`PathNode.index`); `#<index>` names the point where it has no key." },
+        "key": { "type": "string" },
+        "label": { "type": "string", "description": "As written (Markdown, untrusted)." },
+        "stage_index": { "type": "integer", "minimum": 1, "description": "The `index` of the root it stands below (its own for a root)." },
+        "stage_label": { "type": "string", "description": "The label of that root (untrusted)." },
+        "link": { "type": "string" },
+        "promoted": { "type": "string", "pattern": "^[^/]+/[^/]+$", "description": "The task the point was promoted to." },
+        "h_min": { "type": "number", "minimum": 0, "description": "Planned hours (`{h=N}` or the lower end of `{h=N-M}`)." },
+        "h_max": { "type": "number", "minimum": 0 },
+        "xp": { "type": "integer", "minimum": 0, "maximum": 100000, "description": "The XP the point counts (`PathNode.xp`)." },
+        "safety": { "const": true, "description": "The point is `{safety}` or below one: closing it needs `ack`." },
+        "machine": { "type": "array", "minItems": 1, "items": { "enum": ["private", "workstation", "wsl"] }, "description": "The machines the point may be practised on; absent: every machine." }
+      },
+      "additionalProperties": false
+    },
+    "LearnNext": {
+      "description": "tasks.learn_next: for every running learning path (stage `doing`, or `idle` with its project's `status: doing`) the first `n` points (default 3) that may be learned now, in document order: open (not blocked), not optional, on the machine when one is asked for. Only paths with such a point; `doing` before `idle`, then the most recently updated first, then by id. Capability `learn_next`.",
+      "allOf": [{ "$ref": "#/$defs/Head" }],
+      "type": "object",
+      "required": ["kind", "rev", "digest", "items", "incomplete"],
+      "properties": {
+        "kind": { "const": "tasks.learn_next" },
+        "rev": { "$ref": "#/$defs/Rev" },
+        "digest": { "$ref": "#/$defs/Digest" },
+        "machine": { "enum": ["private", "workstation", "wsl"], "description": "The machine asked for; absent: every machine." },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["path", "area", "title", "stage", "points"],
+            "properties": {
+              "path": { "type": "string", "pattern": "^[^/]+/[^/]+$" },
+              "area": { "type": "string" },
+              "title": { "type": "string" },
+              "icon": { "$ref": "#/$defs/Icon" },
+              "project": { "type": "string", "pattern": "^[^/]+/[^/]+$" },
+              "stage": { "enum": ["doing", "idle"] },
+              "points": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/LearnPoint" } }
+            },
+            "additionalProperties": false
+          }
+        },
+        "incomplete": { "type": "array", "items": { "type": "string" } }
       },
       "unevaluatedProperties": false
     },
