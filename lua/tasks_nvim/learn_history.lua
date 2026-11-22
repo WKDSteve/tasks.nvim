@@ -574,17 +574,22 @@ function M.by_path(rows)
   return out
 end
 
----The last row of a path up to a day (included); nil before its first row.
+---The last row of a path up to a day (included); nil before its first row. A binary search: the rows are in day order
+---(`by_path`), and the windows and the streak ask this for every day and path.
 ---@param list Tasks.LearnRow[]
 ---@param day string
 ---@return Tasks.LearnRow|nil
 function M.at(list, day)
+  local lo, hi = 1, #list
   local found
-  for _, row in ipairs(list) do
-    if row.day > day then
-      break
+  while lo <= hi do
+    local mid = math.floor((lo + hi) / 2)
+    if list[mid].day <= day then
+      found = list[mid]
+      lo = mid + 1
+    else
+      hi = mid - 1
     end
-    found = row
   end
   return found
 end

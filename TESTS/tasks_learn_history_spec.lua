@@ -204,6 +204,33 @@ return function(H)
     )
   end
 
+  -- the row of a day: a binary search over the rows of a path (the windows ask it for every day and path)
+  do
+    local reads = 0
+    local list = {}
+    local day = "2024-01-01"
+    for i = 1, 1024 do
+      list[i] = setmetatable({}, {
+        __index = function(_, k)
+          if k == "day" then
+            reads = reads + 1
+            return rawget(list, -i)
+          end
+        end,
+      })
+      rawset(list, -i, day)
+      day = require("tasks_nvim.model").add_days(day, 2)
+    end
+    eq(lh.at(list, "2023-12-31"), nil, "before the first row")
+    eq(lh.at(list, "2024-01-01"), list[1])
+    eq(lh.at(list, "2024-01-02"), list[1], "a day between two rows: the one before")
+    eq(lh.at(list, "2024-01-03"), list[2])
+    eq(lh.at(list, "2099-01-01"), list[1024], "after the last row")
+    reads = 0
+    lh.at(list, "2025-06-01")
+    ok(reads <= 12, ("%d reads of a day for 1024 rows: no linear search"):format(reads))
+  end
+
   -- learn_next: the path active last first (from the series), before the one updated last
   local nxt = vim.json.decode((api.call("learn_next", { params = {} }, { root = root2 })))
   eq(nxt.items[1].path, "lib.nvim/prozesse")
