@@ -313,12 +313,14 @@ commands:
                                           the sheet (testing sheets accept: only when it loads) or the bug task of
                                           the AI's answer; shown only, written with --yes
   check [<area>]                          rule check; exit 1 on any error
-  check --sources [<file|dir>] [--write] [--timeout=<s>]
+  check --sources [<file|dir>] [--write] [--fix] [--timeout=<s>]
                                           ask the web links of the `## Quellen` table of a learning path (all open
                                           paths without an argument) with HEAD (GET as fallback): dead (404),
                                           blocked (401/403/429), moved; exit 1 on a dead link. Needs the network, so
                                           only on this flag, never in the hook. --write puts date and answer into
-                                          the column Geprüft
+                                          the column Geprüft; --fix writes the target of a PERMANENT redirect
+                                          (301, 308) into the link (`fixed` lines; a temporary one, a front page,
+                                          or a step back to http stays: `kept`)
   relink [<area>] [--dry-run]             mend the dead relative links to .md files below ROADMAP/, Backlog/ and
                                           MEETINGS/: a link whose slug names one file (a task finished into the
                                           Backlog, a folder task, another area) is rewritten to it; ambiguous and
@@ -663,7 +665,7 @@ local SPECS = {
   folderize = { value = { "by", "note" }, flag = { "no-index", "force" } },
   ["sheet-run"] = { value = { "testing-cli" }, flag = { "dry-run" } },
   ["sheet-ai"] = { value = { "testing-cli", "from" }, flag = { "yes" } },
-  check = { value = { "timeout" }, flag = { "all", "sources", "write" } },
+  check = { value = { "timeout" }, flag = { "all", "fix", "sources", "write" } },
   relink = { value = {}, flag = { "dry-run" } },
   ci = { value = { "md-lint" }, flag = { "strict", "no-lint", "trust-vault-lint" } },
   template = {
@@ -3762,11 +3764,12 @@ local function check_sources(ctx)
   local sources = require("tasks_nvim.sources")
   local today = eo.today or model.today()
   local counts = { ok = 0, redirected = 0, blocked = 0, dead = 0, error = 0, unreachable = 0 }
-  local total = 0
+  local total, rewritten = 0, 0
   for _, path in ipairs(files) do
     local results, err = sources.check_file(path, {
       timeout = timeout,
       write = args.opt.write == true,
+      fix = args.opt.fix == true,
       today = today,
     })
     if not results then
@@ -3776,6 +3779,12 @@ local function check_sources(ctx)
     for _, r in ipairs(results) do
       total = total + 1
       counts[r.state] = counts[r.state] + 1
+      if r.fixed then
+        rewritten = rewritten + 1
+        ctx.say(("fixed\t%s:%d\t%s -> %s"):format(path, r.row.line, r.row.url, r.fixed))
+      elseif r.kept and args.opt.fix then
+        ctx.say(("kept\t%s:%d\t%s\t%s"):format(path, r.row.line, r.row.url, r.kept))
+      end
       if r.state ~= "ok" then
         local note = r.state == "redirected" and (" -> " .. r.final)
           or (r.timeout and " (timeout)" or "")
@@ -3802,7 +3811,8 @@ local function check_sources(ctx)
       counts.dead,
       counts.error,
       counts.unreachable,
-      args.opt.write and "; column Geprüft written" or ""
+      (args.opt.write and "; column Geprüft written" or "")
+        .. (args.opt.fix and ("; %d link(s) rewritten"):format(rewritten) or "")
     )
   )
   return counts.dead > 0 and 1 or 0
@@ -3812,8 +3822,8 @@ function commands.check(ctx)
   local args, eo = ctx.args, ctx.eo
   if args.opt.sources then
     return check_sources(ctx)
-  elseif args.opt.write or args.opt.timeout then
-    ctx.warn("error: --write and --timeout belong to --sources")
+  elseif args.opt.write or args.opt.timeout or args.opt.fix then
+    ctx.warn("error: --write, --fix and --timeout belong to --sources")
     return 2
   end
   if #args.pos > 1 then

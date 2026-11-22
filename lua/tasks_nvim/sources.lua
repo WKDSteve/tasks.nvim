@@ -37,6 +37,8 @@ local M = {}
 ---@class Tasks.SourceResult : Tasks.SourceProbe
 ---@field row Tasks.SourceRow
 ---@field state Tasks.SourceState
+---@field fixed? string      # `fix`: the address a permanent redirect (301, 308) leads to; the link is rewritten to it.
+---@field kept? string       # `fix`: why a moved link was left as it is.
 
 M.DEFAULT_TIMEOUT = 8
 M.CONCURRENCY = 6
@@ -208,9 +210,117 @@ function M.probe(url, timeout, done)
   end)
 end
 
+---The first hop of one address, not followed: its status and where it points (curl makes the address absolute).
+---@param url string
+---@param timeout integer
+---@param done fun(code: integer, location: string)
+local function hop(url, timeout, done)
+  local args = {
+    "curl",
+    "-sS",
+    "-I",
+    "--max-time",
+    tostring(timeout),
+    "--proto",
+    "=http,https",
+    "-A",
+    "tasks.nvim-sources-check",
+    "-o",
+    null_device(),
+    "-w",
+    "%{http_code} %{redirect_url}",
+    "--url",
+    url,
+  }
+  local ok = pcall(vim.system, args, { text = true }, function(res)
+    local code, loc = (res.stdout or ""):match("^(%d+) ?(.*)$")
+    done(tonumber(code) or 0, loc or "")
+  end)
+  if not ok then
+    done(0, "")
+  end
+end
+
+---Whether the address a redirect leads to may be written into the table in place of the old one: a plain `http(s)`
+---address without anything that would break a Markdown link or a table cell, no step back from `https` to `http`, and
+---not the front page of a site the old link went deeper into (that is usually a page that is gone).
+---@param old string
+---@param new string
+---@return boolean ok
+---@return string? reason
+function M.safe_target(old, new)
+  if not new:match("^https?://[%w%-._~:/?#%[%]@!$&*+,;=%%]+$") then
+    return false, "the target is not a plain address"
+  elseif old:match("^https://") and new:match("^http://") then
+    return false, "the target is http, the link is https"
+  end
+  local old_path = (old:match("^https?://[^/?#]*(.*)$") or ""):gsub("[#?].*$", "")
+  local new_path = (new:match("^https?://[^/?#]*(.*)$") or ""):gsub("[#?].*$", "")
+  if #old_path > 1 and #new_path <= 1 then
+    return false, "the target is the front page"
+  end
+  return true
+end
+
+---Follow an address by hand and return where its PERMANENT redirects (301, 308) lead: a temporary one (302, 303, 307)
+---ends the walk, as does a plain answer. At most 5 hops. nil: it is not moved for good.
+---@param url string
+---@param timeout integer
+---@param done fun(target: string|nil)
+function M.permanent_target(url, timeout, done)
+  local last, cur, left = nil, url, 5
+  local function step()
+    hop(cur, timeout, function(code, loc)
+      if (code == 301 or code == 308) and loc ~= "" and left > 0 then
+        left = left - 1
+        last, cur = loc, loc
+        step()
+      else
+        done(last)
+      end
+    end)
+  end
+  step()
+end
+
+---Mark what `fix` does for each moved link: `fixed` (the new address) or `kept` (the reason). Blocks until all asked.
+---@param results Tasks.SourceResult[]
+---@param timeout integer
+---@param resolve? fun(url: string, timeout: integer, done: fun(target: string|nil))
+local function resolve_moved(results, timeout, resolve)
+  resolve = resolve or M.permanent_target
+  for _, r in ipairs(results) do
+    if r.state == "redirected" then
+      local answered, target = false, nil
+      resolve(r.row.url, timeout, function(t)
+        target, answered = t, true
+      end)
+      vim.wait((timeout * 6 + 5) * 1000, function()
+        return answered
+      end, 20)
+      if not target then
+        r.kept = "no permanent redirect (301, 308)"
+      else
+        local frag = r.row.url:match("(#[^#]*)$")
+        if frag and not target:find("#", 1, true) then
+          target = target .. frag
+        end
+        local ok, why = M.safe_target(r.row.url, target)
+        if not ok then
+          r.kept = why
+        elseif target == r.row.url then
+          r.kept = "same address"
+        else
+          r.fixed = target
+        end
+      end
+    end
+  end
+end
+
 ---Ask about the web links of a path file's Quellen table (at most `M.CONCURRENCY` at a time). Blocks until all answered.
 ---@param text string
----@param opts? { timeout?: integer, probe?: fun(url: string, timeout: integer, done: fun(p: Tasks.SourceProbe)) }
+---@param opts? { timeout?: integer, fix?: boolean, resolve?: function, probe?: fun(url: string, timeout: integer, done: fun(p: Tasks.SourceProbe)) }
 ---@return Tasks.SourceResult[]
 function M.check_text(text, opts)
   opts = opts or {}
@@ -252,6 +362,9 @@ function M.check_text(text, opts)
         method = "HEAD",
       }
   end
+  if opts.fix then
+    resolve_moved(results, timeout, opts.resolve)
+  end
   return results
 end
 
@@ -275,25 +388,64 @@ function M.cell(r, today)
   return (r.timeout and "keine Antwort (Zeitlimit) " or "keine Antwort ") .. today
 end
 
----The text with the cell `Geprüft` of each answered row replaced; every other byte stays (line endings included).
+---`s` with every plain occurrence of `old` replaced by `new`.
+---@param s string
+---@param old string
+---@param new string
+---@return string
+local function replace_plain(s, old, new)
+  local out, from = {}, 1
+  while true do
+    local a, b = s:find(old, from, true)
+    if not a then
+      break
+    end
+    out[#out + 1] = s:sub(from, a - 1)
+    out[#out + 1] = new
+    from = b + 1
+  end
+  out[#out + 1] = s:sub(from)
+  return table.concat(out)
+end
+
+---The text with the rows changed that were asked about; every other byte stays (line endings included). With
+---`opts.write` the cell `Geprüft` of each answered row is replaced (the row is written anew from its cells); with
+---`opts.fix` the address of a row with a `fixed` target is replaced in the link (a row without `write` keeps its bytes).
+---@param text string
+---@param results Tasks.SourceResult[]
+---@param opts { today?: string, write?: boolean, fix?: boolean }
+---@return string
+function M.apply(text, results, opts)
+  local eol = text:find("\r\n", 1, true) and "\r\n" or "\n"
+  local lines = vim.split((text:gsub("\r\n", "\n")), "\n", { plain = true })
+  for _, r in ipairs(results) do
+    local fixed = opts.fix and r.fixed or nil
+    if opts.write then
+      local cells = vim.deepcopy(r.row.cells)
+      cells[r.row.col] = M.cell(r, opts.today or os.date("%Y-%m-%d"))
+      if fixed then
+        cells[1] = replace_plain(cells[1], r.row.url, fixed)
+      end
+      lines[r.row.line] = "| " .. table.concat(cells, " | ") .. " |"
+    elseif fixed then
+      lines[r.row.line] = replace_plain(lines[r.row.line], r.row.url, fixed)
+    end
+  end
+  return table.concat(lines, eol)
+end
+
+---The text with the cell `Geprüft` of each answered row replaced (`apply` with `write`).
 ---@param text string
 ---@param results Tasks.SourceResult[]
 ---@param today string
 ---@return string
 function M.write_text(text, results, today)
-  local eol = text:find("\r\n", 1, true) and "\r\n" or "\n"
-  local lines = vim.split((text:gsub("\r\n", "\n")), "\n", { plain = true })
-  for _, r in ipairs(results) do
-    local cells = vim.deepcopy(r.row.cells)
-    cells[r.row.col] = M.cell(r, today)
-    lines[r.row.line] = "| " .. table.concat(cells, " | ") .. " |"
-  end
-  return table.concat(lines, eol)
+  return M.apply(text, results, { write = true, today = today })
 end
 
 ---Ask about the links of one file and, with `write`, put the answers into it.
 ---@param path string
----@param opts? { timeout?: integer, write?: boolean, today?: string, probe?: function }
+---@param opts? { timeout?: integer, write?: boolean, fix?: boolean, today?: string, probe?: function, resolve?: function }
 ---@return Tasks.SourceResult[]|nil results
 ---@return string|nil err
 function M.check_file(path, opts)
@@ -303,7 +455,7 @@ function M.check_file(path, opts)
     return nil, ("cannot read %s: %s"):format(path, tostring(err))
   end
   local results = M.check_text(text, opts)
-  if opts.write and #results > 0 then
+  if (opts.write or opts.fix) and #results > 0 then
     -- the file is read again right before it is written: an edit made while the requests ran is not overwritten
     if fsio.read(path) ~= text then
       return nil,
@@ -311,8 +463,10 @@ function M.check_file(path, opts)
           path
         )
     end
-    local ok, werr =
-      fsio.write_atomic(path, M.write_text(text, results, opts.today or os.date("%Y-%m-%d")))
+    local ok, werr = fsio.write_atomic(
+      path,
+      M.apply(text, results, { write = opts.write, fix = opts.fix, today = opts.today })
+    )
     if not ok then
       return nil, ("cannot write %s: %s"):format(path, tostring(werr))
     end

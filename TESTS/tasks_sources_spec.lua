@@ -32,6 +32,14 @@ return function(H)
       local status, extra = "200 OK", ""
       if path == "/moved" then
         status, extra = "301 Moved Permanently", "Location: /ok\r\n"
+      elseif path == "/temp" then
+        status, extra = "302 Found", "Location: /ok\r\n"
+      elseif path == "/chain" then
+        status, extra = "308 Permanent Redirect", "Location: /moved\r\n"
+      elseif path == "/home" then
+        status, extra = "301 Moved Permanently", "Location: /\r\n"
+      elseif path == "/bad" then
+        status, extra = "301 Moved Permanently", "Location: /ok)x\r\n"
       elseif path == "/forbidden" then
         status = "403 Forbidden"
       elseif path == "/gone" then
@@ -156,7 +164,78 @@ return function(H)
   has(res.out, "0 link(s) in 1 file(s)")
   eq(#hits, count)
 
+  -- --fix: a permanent redirect (301, 308, also a chain of them) is written into the link, nothing else moves
+  local fixdoc = root .. "/fix.md"
+  H.write(fixdoc, table_doc({ "/moved", "/chain", "/temp", "/home", "/bad", "/ok", "/gone" }))
+  local fbefore = H.read(fixdoc)
+  res = run({ "check", "--sources", fixdoc, "--timeout=1" })
+  eq(H.read(fixdoc), fbefore, "without --fix the links stay")
+  lacks(res.out, "fixed\t")
+  res = run({ "check", "--sources", fixdoc, "--fix", "--timeout=1" })
+  eq(res.code, 1, "a dead link still fails the run: " .. res.err)
+  has(res.out, "fixed\t" .. fixdoc .. ":7\t" .. base .. "/moved -> " .. base .. "/ok")
+  has(
+    res.out,
+    "fixed\t" .. fixdoc .. ":8\t" .. base .. "/chain -> " .. base .. "/ok",
+    "a chain: the end"
+  )
+  has(res.out, "kept\t" .. fixdoc .. ":9\t" .. base .. "/temp\tno permanent redirect", "302 stays")
+  has(res.out, "kept\t" .. fixdoc .. ":10\t" .. base .. "/home\tthe target is the front page")
+  has(res.out, "kept\t" .. fixdoc .. ":11\t" .. base .. "/bad\tthe target is not a plain address")
+  has(res.out, "; 2 link(s) rewritten")
+  local ftext = H.read(fixdoc)
+  has(
+    ftext,
+    "| [/moved](" .. base .. "/ok) | Doku | x | frei | ungeprüft |",
+    "the target, the row as it was"
+  )
+  has(ftext, "| [/chain](" .. base .. "/ok) |")
+  has(ftext, "| [/temp](" .. base .. "/temp) |")
+  has(ftext, "| [/home](" .. base .. "/home) |")
+  has(ftext, "| [/gone](" .. base .. "/gone) |")
+  eq(
+    select(2, ftext:gsub("\n", "\n")),
+    select(2, fbefore:gsub("\n", "\n")),
+    "the same number of lines"
+  )
+  -- both flags: the answer and the new address in one write
+  H.write(fixdoc, fbefore)
+  run({ "check", "--sources", fixdoc, "--fix", "--write", "--timeout=1" })
+  ftext = H.read(fixdoc)
+  has(
+    ftext,
+    "| [/moved](" .. base .. "/ok) | Doku | x | frei | erreichbar (umgeleitet) 2026-11-22 |"
+  )
+  -- the pieces: what may be written, and a fragment is kept
+  local ok_new, why = sources.safe_target("https://a.example/x/y", "http://a.example/x/y")
+  eq(ok_new, false)
+  has(why, "http")
+  eq(sources.safe_target("https://a.example/x/y", "https://b.example/z?q=1#s"), true)
+  eq(
+    sources.safe_target("https://a.example", "https://b.example/"),
+    true,
+    "a front page stays a front page"
+  )
+  eq(sources.safe_target("https://a.example/x", "https://b.example/"), false)
+  eq(sources.safe_target("https://a.example/x", "https://b.example/a b"), false)
+  eq(sources.safe_target("https://a.example/x", "https://b.example/a|b"), false)
+  eq(sources.safe_target("https://a.example/x", "https://b.example/a<b"), false)
+  eq(sources.safe_target("https://a.example/x", "javascript:alert(1)"), false)
+  H.write(fixdoc, fbefore)
+  local fixed_text = sources.apply(fbefore, {
+    {
+      row = sources.rows(fbefore)[1],
+      state = "redirected",
+      code = 200,
+      redirects = 1,
+      final = "",
+      fixed = base .. "/ok#frag",
+    },
+  }, { fix = true })
+  has(fixed_text, "| [/moved](" .. base .. "/ok#frag) | Doku | x | frei | ungeprüft |")
+
   -- usage
+  eq(run({ "check", "--fix" }).code, 2, "--fix belongs to --sources")
   eq(run({ "check", "--sources", "--timeout=0" }).code, 2)
   eq(run({ "check", "--write" }).code, 2, "--write belongs to --sources")
 

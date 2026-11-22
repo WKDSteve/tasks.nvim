@@ -43,6 +43,7 @@ the version is not tagged yet (the repository is not published).
 
 ### Added
 
+- `tasks check --sources --fix`: a link of the `## Quellen` table that moved for good (301 or 308, a chain to its end) is rewritten to its target (`fixed` lines); a temporary redirect, a front page, a step back to http and a target that would break a Markdown link stay (`kept` lines with the reason). Only the address changes in the row; with `--write` the same write fills `Geprüft`. Never without the flag.
 - `tasks path <id>` filters the text output by `NVIM_MACHINE_ROLE` when `--machine` is not given (`private` also shows `wsl` points); `--machine=all` shows every point, `--format=json` and `--schedule` stay whole, and an unknown role filters nothing and prints a `note` line. The `machine` line says `from NVIM_MACHINE_ROLE`.
 - `tasks paths --format=json`, the path entry of `tasks.paths` / `tasks.path` and the rows of a project say how many leaves are `{safety}` (`safety`) and how many are for each machine (`machines`, by the effective `{machine=…}`), only when there are some (capability `path_marks`); the TSV of `tasks paths` keeps its columns. Schema, types, golden and `docs/CONTRACT.md` follow.
 - `tasks.paths` with `levels: true` (capability `paths_levels`): every level of every path in one request, as `tasks.path` has them, plus the XP or percent missing to a level not reached and, from the series of the learning figures, the day each level was reached and each reward granted. For the badges, rewards and overview of the desktop app.
