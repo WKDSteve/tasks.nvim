@@ -4349,6 +4349,10 @@
           "type": "integer",
           "minimum": 0
         },
+        "ack": {
+          "const": true,
+          "description": "`node_set` that reopens a point closed under `{safety}`: the inverse closes it again and carries the ack (capability `path_marks`)."
+        },
         "xp_clear": {
           "description": "`node_set` that wrote XP on a point that had none: remove them again (capability `xp`).",
           "const": true
@@ -4800,7 +4804,8 @@
             "container": { "type": "string" },
             "key": { "type": "string" },
             "state": { "enum": ["open", "learned", "seen", "dropped", "blocked"] },
-            "changed": { "type": "boolean" }
+            "changed": { "type": "boolean" },
+            "held": { "const": true, "description": "The point was left as it was: it is on or under a `{safety}` mark and the finish carried no `ack`; the notes say so (capability `path_marks`)." }
           },
           "additionalProperties": false
         },

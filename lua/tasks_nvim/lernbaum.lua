@@ -357,6 +357,17 @@ function M.on_machine(node, machine)
   return machine == "private" and vim.tbl_contains(eff, "wsl")
 end
 
+---The refusal for closing a point under a `{safety}` mark without the reader's ack (`danger` is the node that
+---carries the mark).
+---@param danger Tasks.LernNode
+---@return string
+function M.safety_message(danger)
+  return ("the point is under a {safety} mark (line %d: %s): read it and close it with ack (--ack, ack: true)"):format(
+    danger.line,
+    danger.label
+  )
+end
+
 ---The role a machine name stands for: `workstation` and `wsl` as they are, an empty name or `default` the private
 ---machine; nil for any other value.
 ---@param role? string

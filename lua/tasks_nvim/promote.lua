@@ -533,8 +533,8 @@ end
 ---(`point:`) and the node's mark says something else. Never raises; a missing container or node is no error here
 ---(`check` names it).
 ---@param task { id: string, point?: string, status?: string, outcome?: string, outcome_reason?: string }
----@param opts? { root?: string, today?: string }
----@return { container: string, key: string, state: string, changed: boolean }|nil result
+---@param opts? { root?: string, today?: string, ack?: boolean }
+---@return { container: string, key: string, state: string, changed: boolean, held?: string }|nil result  # `held`: why the point was left (under `{safety}` without `opts.ack`)
 ---@return string|nil err
 function M.sync_point(task, opts)
   opts = opts or {}
@@ -574,6 +574,11 @@ function M.sync_point(task, opts)
     end
     out = { container = c.id, key = key, state = state, changed = false }
     if node.state == state and (not reason or node.reason) then
+      return true
+    end
+    -- a point on or under `{safety}` stays as it is until someone says they read the warning (`opts.ack`)
+    if node.safety_eff and (state == "learned" or state == "seen") and opts.ack ~= true then
+      out.state, out.held = node.state or "open", lernbaum.safety_message(node.safety_eff)
       return true
     end
     local set, serr = lernbaum.set_state(tree, node.index, state, reason)

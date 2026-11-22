@@ -242,6 +242,7 @@ local FIELDS = {
     outcome = "string",
     outcome_reason = "string",
     ci = "string",
+    ack = "boolean",
   },
   move_area = { id = "string", to_area = "string", if_match = "string" },
   tick_step = {
@@ -1596,6 +1597,7 @@ local function do_done(op, ctx)
     outcome = op.outcome,
     outcome_reason = op.outcome_reason,
     ci = op.ci,
+    ack = op.ack == true,
     pick_next = false,
   })
   if not flow then
@@ -1651,6 +1653,7 @@ local function do_done(op, ctx)
       key = flow.point.key,
       state = flow.point.state,
       changed = flow.point.changed,
+      held = flow.point.held or nil,
     } or nil,
     notes = notes,
     changed_ids = done.already and {} or changed,
@@ -2182,16 +2185,8 @@ local function do_node_set(op, ctx)
   if before and before.tree then
     local n = require("tasks_nvim.lernbaum").node(before.tree, ref)
     old = n and { state = n.state, reason = n.reason, note = n.note, xp = n.xp_own } or nil
-    -- a point under `{safety}` is closed only by someone who says they read the warning (`ack`)
-    local danger = n and n.safety_eff
-    if danger and (op.state == "learned" or op.state == "seen") and op.ack ~= true then
-      return refuse(
-        "invalid_argument",
-        ("the point is under a {safety} mark (line %d: %s): read it and send ack: true to close it"):format(
-          danger.line,
-          danger.label
-        )
-      )
+    if old then
+      old.safety = n.safety_eff ~= nil
     end
   end
   local xp
@@ -2208,6 +2203,7 @@ local function do_node_set(op, ctx)
     dry_run = ctx.dry,
     note = op.note,
     xp = xp,
+    ack = op.ack == true,
   })
   if not r then
     if info and (info.code == "invalid_argument" or info.code == "not_found") then
@@ -2243,6 +2239,9 @@ local function do_node_set(op, ctx)
       note = op.note ~= nil and (old.note or "") or nil,
       xp = touches_xp and old.xp or nil,
       xp_clear = (touches_xp and old.xp == nil) or nil,
+      -- the point was closed under `{safety}` before: giving that back was read once already
+      ack = (op.state ~= nil and old.safety and (old.state == "learned" or old.state == "seen"))
+        or nil,
       if_match = r.etag_after,
     })
   end

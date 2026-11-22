@@ -2662,6 +2662,10 @@ export interface ResultEntry {
     key: string;
     state: "open" | "learned" | "seen" | "dropped" | "blocked";
     changed: boolean;
+    /**
+     * The point was left as it was: it is on or under a `{safety}` mark and the finish carried no `ack`; the notes say so (capability `path_marks`).
+     */
+    held?: true;
   };
   notes?: string[];
   move?: MovePlan;
@@ -2716,6 +2720,10 @@ export interface Inverse {
    * `node_set` that wrote XP: the XP the point had (capability `xp`).
    */
   xp?: number;
+  /**
+   * `node_set` that reopens a point closed under `{safety}`: the inverse closes it again and carries the ack (capability `path_marks`).
+   */
+  ack?: true;
   /**
    * `node_set` that wrote XP on a point that had none: remove them again (capability `xp`).
    */

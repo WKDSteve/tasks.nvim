@@ -641,6 +641,10 @@ path without any). `without-xp` lines name the points that carry no XP. `--forma
 (`points`, `xp`, `optional`, `stages`, `levels` with `at { index, line, key, label, stage }`, `without_xp`). Optional
 points (`{optional}`) stand apart in a line `optional` and count in none of the other lines.
 
+`point <area>/<slug> <key|#n> --state=open|learned|seen|dropped|blocked [--reason=text] [--ack]` changes one learning point
+(the operation `node_set`; `seen` and `dropped` need a reason). Closing a point on or under `{safety}` needs `--ack`; `done
+<id> --ack` does the same for the point a promoted task came from.
+
 `path <area>/<slug> --machine=private|workstation|wsl|env` lists only what may be practised on that machine (`todo` lines, `hidden N` for the points of other machines; `env` reads `NVIM_MACHINE_ROLE`). `{safety}` points (`safety` lines) always come first. See [ENGINE.md](ENGINE.md#machine-and-safety-marks).
 
 `path <area>/<slug> --schedule` prints the table of `## Zeitplan` made from the tree, for a path with a fixed rhythm:

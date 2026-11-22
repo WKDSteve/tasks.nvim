@@ -865,6 +865,12 @@ function M.run(id, opts)
         )
       elseif res then
         flow.point = res
+        if res.held then
+          flow.notes[#flow.notes + 1] = ("the learning point %s stays open: %s"):format(
+            meta.point,
+            res.held
+          )
+        end
       end
     end
   end

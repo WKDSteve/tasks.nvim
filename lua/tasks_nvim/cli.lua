@@ -122,6 +122,10 @@ commands:
                                           {safety} points come first (`safety` lines); --machine lists only the open
                                           points that may be practised on that machine (`todo`) and says how many
                                           are hidden (`hidden`); `env` reads NVIM_MACHINE_ROLE (empty/default: private)
+  point <area>/<slug> <key|#n> --state=open|learned|seen|dropped|blocked [--reason=text] [--ack]
+                                          change one learning point of a path (the operation node_set); seen and
+                                          dropped need a reason; closing (learned, seen) a point on or under a
+                                          {safety} mark needs --ack: you read it
   path <area>/<slug> --schedule [--write]
                                           the table of ## Zeitplan made from the tree: each point with planned hours
                                           ({h=8} or {h=8-10}; {done_h=9} the hours it took), its result (the child
@@ -235,7 +239,7 @@ commands:
                                           of the path (or task) come along; --no-index leaves the index as it is
   unpromote <area>/<slug>#<key|n> [--dry-run]
                                           take it back while the task holds no work (open, no commits, no assets)
-  done <area>/<slug> [--commits=repo@sha,repo@sha] [--done-in=text] [--date=YYYY-MM-DD] [--remind=7d|YYYY-MM-DD]
+  done <area>/<slug> [--ack] [--commits=repo@sha,repo@sha] [--done-in=text] [--date=YYYY-MM-DD] [--remind=7d|YYYY-MM-DD]
                                           [--by=<name>] [--force --note=<why>]  (a claimed task: see claim)
                                           [--no-next] [--unblock] [--last]  (--commits adds to the task's own `commits`)
                                           [--outcome=learned|seen|not-applicable] [--reason=text]  how it ended:
@@ -621,9 +625,10 @@ local SPECS = {
   ["migrate-actor"] = { value = {}, flag = { "write", "no-index" } },
   done = {
     value = { "done-in", "commits", "ci", "date", "remind", "by", "note", "outcome", "reason" },
-    flag = { "no-index", "no-next", "unblock", "last", "force" },
+    flag = { "no-index", "no-next", "unblock", "last", "force", "ack" },
   },
   reopen = { value = { "status" }, flag = {} },
+  point = { value = { "state", "reason" }, flag = { "ack" } },
   -- `latest` is both: `--latest` (the configured screenshot folders) and `--latest=<folder>`.
   attach = {
     value = { "name", "kind", "latest", "by", "note" },
@@ -1547,6 +1552,52 @@ commands["path-new"] = function(ctx)
     return path_from_draft(ctx)
   end
   return new_file_command(ctx, "path")
+end
+
+---`point <area>/<slug> <key|#n> --state=s [--reason=text] [--ack]`: change one learning point through the operation
+---`node_set`; closing a point under `{safety}` needs `--ack`.
+---@param ctx Tasks.CliCtx
+---@return integer code
+commands.point = function(ctx)
+  local args = ctx.args
+  local id, ref = args.pos[1], args.pos[2]
+  local state = args.opt.state
+  if not id or not ref or #args.pos > 2 or type(state) ~= "string" then
+    ctx.warn(
+      "error: usage: point <area>/<slug> <key|#n> --state=open|learned|seen|dropped|blocked [--reason=text] [--ack]"
+    )
+    return 2
+  end
+  local doc, err = require("tasks_nvim.ops").run({
+    ops = {
+      {
+        op = "node_set",
+        id = id,
+        point = ref,
+        state = state,
+        reason = args.opt.reason,
+        ack = args.opt.ack == true or nil,
+      },
+    },
+  }, { root = ctx.eo.root, today = ctx.eo.today })
+  if not doc then
+    ctx.warn("error: " .. tostring(type(err) == "table" and err.message or err))
+    return 1
+  end
+  local entry = doc.results[1]
+  if not entry.ok then
+    ctx.warn(("error: %s (%s)"):format(tostring(entry.error.message), tostring(entry.error.code)))
+    return entry.error.code == "invalid_argument" and 2 or 1
+  end
+  ctx.say(
+    ("%s\t%s\t%s\t%s"):format(
+      entry.outcome,
+      entry.id,
+      entry.node.key and ("#" .. entry.node.key) or ("line " .. entry.node.line),
+      entry.node.state
+    )
+  )
+  return 0
 end
 
 ---`path <area>/<slug> [--machine=m] [--format=text|json]`: the XP overview of an open learning path (`path_stats`).
@@ -3131,6 +3182,7 @@ function commands.done(ctx)
     outcome = args.opt.outcome --[[@as string|nil]],
     outcome_reason = args.opt.reason --[[@as string|nil]],
     ci = args.opt.ci --[[@as string|nil]],
+    ack = args.opt.ack == true,
     remind = args.opt.remind
         and (args.opt.remind:match("^%d+[dw]$") and "+" .. args.opt.remind or args.opt.remind)
       or nil,

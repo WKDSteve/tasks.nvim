@@ -351,7 +351,7 @@ end
 ---@param ref string|integer
 ---@param state? string
 ---@param reason? string
----@param opts? { root?: string, today?: string, if_match?: string, dry_run?: boolean, note?: string, xp?: integer|string }
+---@param opts? { root?: string, today?: string, if_match?: string, dry_run?: boolean, note?: string, xp?: integer|string, ack?: boolean }
 ---A changed state starts the routines that waited for a point of the path (`routines_started`, `notes`).
 ---@return { id: string, path: string, etag_before: string, etag_after: string, changed: boolean, node: { line: integer, key?: string, state: string, xp?: integer }, progress: Tasks.LernProgress, routines_started?: table[], notes?: string[] }|nil result
 ---@return string|nil err
@@ -362,6 +362,12 @@ function M.point(id, ref, state, reason, opts)
     local tree = lernbaum.parse(body)
     if state == nil and opts.note == nil and opts.xp == nil then
       return nil, "nothing to change: give a state, a note or xp", { code = "invalid_argument" }
+    end
+    -- a point on or under `{safety}` is closed only by someone who says they read the warning
+    local danger = (state == "learned" or state == "seen") and lernbaum.node(tree, ref)
+    danger = danger and danger.safety_eff
+    if danger and opts.ack ~= true then
+      return nil, lernbaum.safety_message(danger), { code = "invalid_argument" }
     end
     local node, serr
     if state ~= nil then

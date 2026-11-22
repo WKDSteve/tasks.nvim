@@ -349,13 +349,17 @@ end
 ---@param row integer
 ---@param state string
 ---@param reason? string
+---@param ack? boolean  # The reader said they read the `{safety}` mark the point is under.
 ---@return Tasks.LernNode|nil node   # The point as it is now.
 ---@return string|nil err
-function M.set_point(buf, row, state, reason)
+function M.set_point(buf, row, state, reason, ack)
   local snap = M.snapshot(buf)
   local node = M.node_at(snap, row)
   if not node then
     return nil, "no learning point on this line"
+  end
+  if node.safety_eff and (state == "learned" or state == "seen") and ack ~= true then
+    return nil, lernbaum.safety_message(node.safety_eff)
   end
   if node.promoted then
     return nil,
@@ -378,6 +382,7 @@ function M.set_point(buf, row, state, reason)
     local res, err = require("tasks_nvim.paths").point(loc.id, node.index, state, reason, {
       root = loc.root,
       if_match = fsio.etag(disk),
+      ack = ack == true,
     })
     if not res then
       return nil, err
@@ -414,8 +419,39 @@ function M.set_point_asking(buf, row, state, reason, done)
       notify.error(err)
     end
   end
+  local node = M.node_at(M.snapshot(buf), row)
+  if not node then
+    return done(nil, "no learning point on this line")
+  end
+  -- closing a point under `{safety}`: show the text and ask whether it was read, before any reason is asked
+  if node.safety_eff and (state == "learned" or state == "seen") then
+    local danger = node.safety_eff
+    vim.ui.select({ "Gelesen", "Abbrechen" }, {
+      prompt = ("Sicherheit (Zeile %d): %s"):format(danger.line, danger.label),
+    }, function(choice)
+      if choice ~= "Gelesen" then
+        return done(nil, nil)
+      end
+      if not vim.api.nvim_buf_is_valid(buf) then
+        return done(nil, "the buffer is gone")
+      end
+      M.set_point_reasoned(buf, row, state, reason, true, done)
+    end)
+    return
+  end
+  M.set_point_reasoned(buf, row, state, reason, false, done)
+end
+
+---The second half of `set_point_asking`: ask for the reason when the state needs one, then set the state.
+---@param buf integer
+---@param row integer
+---@param state string
+---@param reason? string
+---@param ack boolean
+---@param done fun(node: Tasks.LernNode|nil, err: string|nil)
+function M.set_point_reasoned(buf, row, state, reason, ack, done)
   if not lernbaum.NEEDS_REASON[state] or (reason and reason ~= "") then
-    return done(M.set_point(buf, row, state, reason))
+    return done(M.set_point(buf, row, state, reason, ack))
   end
   local node = M.node_at(M.snapshot(buf), row)
   if not node then
@@ -434,7 +470,7 @@ function M.set_point_asking(buf, row, state, reason, done)
     if answer:match("^%s*$") then
       return done(nil, state .. " needs a reason")
     end
-    done(M.set_point(buf, row, state, answer))
+    done(M.set_point(buf, row, state, answer, ack))
   end)
 end
 

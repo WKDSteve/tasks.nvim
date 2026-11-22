@@ -647,9 +647,13 @@ the word elsewhere in a text (IT security) is left alone.
 (`env` reads `NVIM_MACHINE_ROLE`: empty or `default` is `private`) adds a line `machine <role> hidden N open here M`
 and one `todo` line per open point that may be practised there (a point under `{safety}` carries `safety` and the text
 of the parent, `under: ...`); points of other machines leave the `without-xp` lines. Progress, levels and `Pfad
-fertig` stay as they are: a point that does not go here is closed with `[~]` and its reason (`LP-04`). The operation
-`node_set` refuses to close (`learned`, `seen`) a point under `{safety}` unless the request carries `ack: true`
-("read").
+fertig` stay as they are: a point that does not go here is closed with `[~]` and its reason (`LP-04`).
+
+Closing (`learned`, `seen`) a point on or under `{safety}` needs the reader's ack on every way that writes it: the
+operation `node_set` (`ack: true`; its inverse carries it), the command `tasks point <id> <key> --state=… --ack`, the
+editor (`:Tasks learn` shows the text of the mark and asks "Gelesen" or "Abbrechen"), and `done` of a task promoted
+from such a point (`--ack` / `ack: true`; without it the task is finished, the point stays as it was and the notes
+say so). One check sits in `paths.point`, so no door skips it.
 
 #### Promoting a learning point (`tasks_nvim.promote`)
 
