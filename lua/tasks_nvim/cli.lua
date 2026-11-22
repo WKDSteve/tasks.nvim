@@ -114,14 +114,14 @@ commands:
                                           marks, XP, arrows, links, levels, images), written only when nothing is
                                           wrong; every finding names the draft's line and its code (exit 1, nothing
                                           written); --dry-run says what would be made and writes nothing
-  path <area>/<slug> [--machine=private|workstation|wsl|env] [--format=text|json]  the XP overview of a learning path: points (all, open, without XP), XP in
+  path <area>/<slug> [--machine=private|workstation|wsl|env|all] [--format=text|json]  the XP overview of a learning path: points (all, open, without XP), XP in
                                           all and per stage (a root of ## Lernpunkte), and for each level the point
                                           at which it is reached when the points are learned in their order; the
                                           optional points ({optional} on a node) apart: they count for no level in
                                           percent and not for the path being done, their XP once earned do
                                           {safety} points come first (`safety` lines); --machine lists only the open
                                           points that may be practised on that machine (`todo`) and says how many
-                                          are hidden (`hidden`); `env` reads NVIM_MACHINE_ROLE (empty/default: private)
+                                          are hidden (`hidden`); `env` reads NVIM_MACHINE_ROLE (empty/default: private); without --machine the text output filters by that role (--machine=all shows every point; JSON stays whole)
   point <area>/<slug> <key|#n> --state=open|learned|seen|dropped|blocked [--reason=text] [--ack]
                                           change one learning point of a path (the operation node_set); seen and
                                           dropped need a reason; closing (learned, seen) a point on or under a
@@ -1643,18 +1643,34 @@ commands.path = function(ctx)
     or (schedule and (args.opt.format ~= nil or args.opt.machine ~= nil))
   then
     ctx.warn(
-      "error: usage: path <area>/<slug> [--machine=private|workstation|wsl|env] [--format=text|json]  |  path <area>/<slug> --schedule [--write]"
+      "error: usage: path <area>/<slug> [--machine=private|workstation|wsl|env|all] [--format=text|json]  |  path <area>/<slug> --schedule [--write]"
     )
     return 2
   end
   local lern = require("tasks_nvim.lernbaum")
-  local machine
+  local machine, machine_note
   if args.opt.machine ~= nil then
     local m = tostring(args.opt.machine)
-    machine = lern.machine_of_role(m == "env" and (os.getenv("NVIM_MACHINE_ROLE") or "") or m)
-    if not machine then
-      ctx.warn("error: --machine takes private, workstation, wsl or env, not '" .. m .. "'")
-      return 2
+    if m ~= "all" then
+      machine = lern.machine_of_role(m == "env" and (os.getenv("NVIM_MACHINE_ROLE") or "") or m)
+      if not machine then
+        ctx.warn("error: --machine takes private, workstation, wsl, env or all, not '" .. m .. "'")
+        return 2
+      end
+    end
+  elseif format == "text" and not schedule then
+    -- without --machine the text shows what goes on this machine (`NVIM_MACHINE_ROLE`); JSON stays whole, a script
+    -- reads the marks itself. An unknown role filters nothing and says so.
+    local role = os.getenv("NVIM_MACHINE_ROLE") or ""
+    machine = lern.machine_of_role(role)
+    if machine then
+      machine_note = "from NVIM_MACHINE_ROLE; --machine=all shows every point"
+    else
+      ctx.say(
+        ("note\tNVIM_MACHINE_ROLE '%s' is no machine (private, workstation, wsl): nothing is filtered"):format(
+          clean(role)
+        )
+      )
     end
   end
   if schedule then
@@ -1805,7 +1821,14 @@ commands.path = function(ctx)
     )
   end
   if machine then
-    ctx.say(("machine\t%s\thidden %d\topen here %d"):format(machine, marks.hidden, #marks.todo))
+    ctx.say(
+      ("machine\t%s\thidden %d\topen here %d%s"):format(
+        machine,
+        marks.hidden,
+        #marks.todo,
+        machine_note and ("\t" .. machine_note) or ""
+      )
+    )
     for _, t in ipairs(marks.todo) do
       ctx.say(
         ("todo\t%s\t%s\t(line %d)%s%s"):format(

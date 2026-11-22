@@ -152,6 +152,12 @@ return function(H)
     })
     return code, table.concat(out, "\n"), table.concat(err, "\n")
   end
+  local old_role = os.getenv("NVIM_MACHINE_ROLE")
+  local function role(v)
+    vim.uv.os_setenv("NVIM_MACHINE_ROLE", v or "")
+  end
+  -- the default of the text output is the role of this machine
+  role("workstation")
   local code, out, err = run({ "path", ID })
   eq(code, 0, err)
   has(out, "safety\t#strom\tStrom\t(line 7)")
@@ -159,7 +165,41 @@ return function(H)
     out:find("safety\t", 1, true) < out:find("points\t", 1, true),
     "safety comes before the counts"
   )
-  ok(not out:find("todo\t", 1, true), "no filter without --machine")
+  has(
+    out,
+    "machine\tworkstation\thidden 3\topen here 4\tfrom NVIM_MACHINE_ROLE",
+    "the default filter"
+  )
+  ok(not out:find("#dienste", 1, true), "a wsl-only point is hidden on the workstation")
+  has(out, "points\t7\topen 7", "progress counts every point, shown or not")
+  local function go(argv)
+    local c, o, e = run(argv)
+    eq(c, 0, e)
+    return o
+  end
+  role("")
+  has(
+    go({ "path", ID }),
+    "machine\tprivate\thidden 1\topen here 6\tfrom NVIM_MACHINE_ROLE",
+    "empty: private"
+  )
+  role("Default")
+  has(go({ "path", ID }), "machine\tprivate\thidden 1", "default: private")
+  out = go({ "path", ID, "--machine=all" })
+  ok(not out:find("machine\t", 1, true) and not out:find("todo\t", 1, true), "all: no filter")
+  role("workstation")
+  eq(vim.json.decode(go({ "path", ID, "--format=json" })).machine, nil, "json stays whole")
+  role("laptop")
+  out = go({ "path", ID })
+  has(out, "note\tNVIM_MACHINE_ROLE 'laptop' is no machine", "an unknown role: a note, no filter")
+  ok(not out:find("todo\t", 1, true), "an unknown role filters nothing")
+  role("workstation")
+  out = go({ "path", ID, "--machine=private" })
+  has(out, "machine\tprivate\thidden 1\topen here 6", "the option wins over the role")
+  ok(not out:find("from NVIM_MACHINE_ROLE", 1, true))
+  role("wsl")
+  has(go({ "path", ID, "--machine=env" }), "machine\twsl\t", "env reads the role")
+  role(old_role)
   code, out, err = run({ "path", ID, "--machine=workstation" })
   eq(code, 0, err)
   has(out, "machine\tworkstation\thidden 3\topen here 4")

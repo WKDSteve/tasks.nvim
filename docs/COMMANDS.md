@@ -645,7 +645,7 @@ points (`{optional}`) stand apart in a line `optional` and count in none of the 
 (the operation `node_set`; `seen` and `dropped` need a reason). Closing a point on or under `{safety}` needs `--ack`; `done
 <id> --ack` does the same for the point a promoted task came from.
 
-`path <area>/<slug> --machine=private|workstation|wsl|env` lists only what may be practised on that machine (`todo` lines, `hidden N` for the points of other machines; `env` reads `NVIM_MACHINE_ROLE`). `{safety}` points (`safety` lines) always come first. See [ENGINE.md](ENGINE.md#machine-and-safety-marks).
+`path <area>/<slug> --machine=private|workstation|wsl|env` lists only what may be practised on that machine (`todo` lines, `hidden N` for the points of other machines; `env` reads `NVIM_MACHINE_ROLE`; `all` shows every point). Without `--machine` the text output filters by the role in `NVIM_MACHINE_ROLE` (empty/`default`: `private`, which has `wsl` too; an unknown value filters nothing and prints a `note` line); `--format=json` and `--schedule` stay whole. `{safety}` points (`safety` lines) always come first. See [ENGINE.md](ENGINE.md#machine-and-safety-marks).
 
 `path <area>/<slug> --schedule` prints the table of `## Zeitplan` made from the tree, for a path with a fixed rhythm:
 each point (one level below a stage, or a stage itself) with planned hours `{h=8}` or `{h=8-10}` is a row, with the

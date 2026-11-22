@@ -651,6 +651,8 @@ and one `todo` line per open point that may be practised there (a point under `{
 of the parent, `under: ...`); points of other machines leave the `without-xp` lines. Progress, levels and `Pfad
 fertig` stay as they are: a point that does not go here is closed with `[~]` and its reason (`LP-04`).
 
+Without `--machine` the **text** output filters by the role in `NVIM_MACHINE_ROLE` as well (the `machine` line then ends with `from NVIM_MACHINE_ROLE; --machine=all shows every point`), so a reader never sees a point that does not go on this machine; `--machine=all` shows everything. A role that is no machine word filters nothing and says so in a `note` line. `--format=json` and `--schedule` stay whole unless `--machine` is given.
+
 Closing (`learned`, `seen`) a point on or under `{safety}` needs the reader's ack on every way that writes it: the
 operation `node_set` (`ack: true`; its inverse carries it), the command `tasks point <id> <key> --state=… --ack`, the
 editor (`:Tasks learn` shows the text of the mark and asks "Gelesen" or "Abbrechen"), and `done` of a task promoted
