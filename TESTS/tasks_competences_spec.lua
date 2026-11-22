@@ -137,6 +137,16 @@ return function(H)
   eq(refused({ competence_target = { x = 1 } }), "invalid_argument")
   eq(refused({ competence_target = "viel" }), "invalid_argument")
 
+  -- a line the frontmatter writer refuses (a map of another key) is refused without the path of this machine
+  local odd = root .. "/lib.nvim/ROADMAP/paths/odd-map.md"
+  H.write(odd, "---\ntitle: Odd\nstatus: doing\ntags: {a: 1}\n---\n\nText.\n")
+  local od = ops({ { op = "path_set", id = "lib.nvim/odd-map", patch = { tags = { "x" } } } })
+  eq(od.results[1].ok, false, vim.inspect(od))
+  local msg = od.results[1].error.message
+  ok(not msg:find(root, 1, true), "no path of this machine: " .. msg)
+  ok(not msg:find(root:gsub("/", "\\"), 1, true), "nor in backslashes: " .. msg)
+  os.remove(odd)
+
   -- check: the broken competence file, a path naming an unknown one, a malformed field of a path
   local file = root .. "/lib.nvim/ROADMAP/paths/signale.md"
   H.write(

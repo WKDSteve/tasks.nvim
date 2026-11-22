@@ -1905,15 +1905,16 @@ local function set_file(op, ctx, kind)
     link_resolver = link_resolver(ctx),
   })
   if not r then
+    -- a message of `plans.set` may name the file by its path on this machine (`cannot change <path>: ...`)
     if info and info.code == "invalid_argument" then
       return refuse(
         "invalid_argument",
-        tostring(err),
+        contract.redact(ctx.root, tostring(err)),
         info.problems and { problems = info.problems } or info.details
       )
     end
     if info and info.code == "not_found" then
-      return refuse("not_found", tostring(err))
+      return refuse("not_found", contract.redact(ctx.root, tostring(err)))
     end
     return mutate_failure(ctx, err, info)
   end
