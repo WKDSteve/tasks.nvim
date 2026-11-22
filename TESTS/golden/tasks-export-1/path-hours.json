@@ -1,0 +1,453 @@
+{
+  "body": "\n## Lernpunkte\n\n- [ ] Stufe 1 · Grundlagen {#s1}\n  - [x] Was ist ein Prozess {xp=10}\n  - [!] Scheduler {#sched}\n  - [ ] Woche 1: fork und exec {h=4-6} {done_h=2} {xp=20} {#w1}\n    - [ ] [man fork](https://man7.org/linux/man-pages/man2/fork.2.html) {xp=5}\n      > Notiz: Rückgabewert prüfen.\n    - [ ] Nachweis: eine Shell in C {for=p3} {#shell}\n  - [ ] Treiber laden {machine=private} {safety} {#drv}\n- [ ] Stufe 2 · Speicher {#s2}\n  - [ ] Seitentabellen {h=2} {#pt}\n  - [ ] Extras {optional}\n    - [ ] Huge Pages\n",
+  "body_truncated": false,
+  "digest": "sha256:3ea595fff8807733",
+  "engine": {
+    "git": "0000000",
+    "nvim": "0.0.0",
+    "version": "0.1.0-test"
+  },
+  "generated_at": "2026-01-01T00:00:00Z",
+  "kind": "tasks.path",
+  "nodes": [
+    {
+      "children": 4,
+      "closed": false,
+      "depth": 0,
+      "derived": "partial",
+      "index": 1,
+      "key": "s1",
+      "label": "Stufe 1 · Grundlagen",
+      "line": 4,
+      "mark": " ",
+      "progress": {
+        "blocked": 1,
+        "dropped": 0,
+        "learned": 1,
+        "open": 4,
+        "seen": 0,
+        "total": 5
+      },
+      "state": "open",
+      "xp_progress": {
+        "earned": 10,
+        "missing": 3,
+        "open": 5,
+        "points": 2,
+        "possible": 15
+      }
+    },
+    {
+      "children": 0,
+      "closed": true,
+      "depth": 1,
+      "derived": "learned",
+      "index": 2,
+      "label": "Was ist ein Prozess",
+      "line": 5,
+      "mark": "x",
+      "parent": 1,
+      "progress": {
+        "blocked": 0,
+        "dropped": 0,
+        "learned": 1,
+        "open": 0,
+        "seen": 0,
+        "total": 1
+      },
+      "state": "learned",
+      "xp": 10,
+      "xp_from": "point",
+      "xp_progress": {
+        "earned": 10,
+        "missing": 0,
+        "open": 0,
+        "points": 1,
+        "possible": 10
+      }
+    },
+    {
+      "children": 0,
+      "closed": false,
+      "depth": 1,
+      "derived": "blocked",
+      "index": 3,
+      "key": "sched",
+      "label": "Scheduler",
+      "line": 6,
+      "mark": "!",
+      "parent": 1,
+      "progress": {
+        "blocked": 1,
+        "dropped": 0,
+        "learned": 0,
+        "open": 1,
+        "seen": 0,
+        "total": 1
+      },
+      "state": "blocked",
+      "xp_progress": {
+        "earned": 0,
+        "missing": 1,
+        "open": 0,
+        "points": 0,
+        "possible": 0
+      },
+      "xp_suggest": 15
+    },
+    {
+      "children": 2,
+      "closed": false,
+      "depth": 1,
+      "derived": "open",
+      "index": 4,
+      "key": "w1",
+      "label": "Woche 1: fork und exec",
+      "line": 7,
+      "mark": " ",
+      "parent": 1,
+      "progress": {
+        "blocked": 0,
+        "dropped": 0,
+        "learned": 0,
+        "open": 2,
+        "seen": 0,
+        "total": 2
+      },
+      "state": "open",
+      "xp_progress": {
+        "earned": 0,
+        "missing": 1,
+        "open": 5,
+        "points": 1,
+        "possible": 5
+      }
+    },
+    {
+      "children": 0,
+      "closed": false,
+      "depth": 2,
+      "derived": "open",
+      "index": 5,
+      "label": "[man fork](https://man7.org/linux/man-pages/man2/fork.2.html)",
+      "line": 8,
+      "link": "https://man7.org/linux/man-pages/man2/fork.2.html",
+      "mark": " ",
+      "note": "Notiz: Rückgabewert prüfen.",
+      "parent": 4,
+      "progress": {
+        "blocked": 0,
+        "dropped": 0,
+        "learned": 0,
+        "open": 1,
+        "seen": 0,
+        "total": 1
+      },
+      "state": "open",
+      "xp": 5,
+      "xp_from": "point",
+      "xp_progress": {
+        "earned": 0,
+        "missing": 0,
+        "open": 5,
+        "points": 1,
+        "possible": 5
+      }
+    },
+    {
+      "children": 0,
+      "closed": false,
+      "depth": 2,
+      "derived": "open",
+      "index": 6,
+      "key": "shell",
+      "label": "Nachweis: eine Shell in C {for=p3}",
+      "line": 10,
+      "mark": " ",
+      "parent": 4,
+      "progress": {
+        "blocked": 0,
+        "dropped": 0,
+        "learned": 0,
+        "open": 1,
+        "seen": 0,
+        "total": 1
+      },
+      "state": "open",
+      "xp_progress": {
+        "earned": 0,
+        "missing": 1,
+        "open": 0,
+        "points": 0,
+        "possible": 0
+      },
+      "xp_suggest": 10
+    },
+    {
+      "children": 0,
+      "closed": false,
+      "depth": 1,
+      "derived": "open",
+      "index": 7,
+      "key": "drv",
+      "label": "Treiber laden",
+      "line": 11,
+      "machine": [
+        "private"
+      ],
+      "mark": " ",
+      "parent": 1,
+      "progress": {
+        "blocked": 0,
+        "dropped": 0,
+        "learned": 0,
+        "open": 1,
+        "seen": 0,
+        "total": 1
+      },
+      "safety": true,
+      "state": "open",
+      "xp_progress": {
+        "earned": 0,
+        "missing": 1,
+        "open": 0,
+        "points": 0,
+        "possible": 0
+      },
+      "xp_suggest": 15
+    },
+    {
+      "children": 2,
+      "closed": false,
+      "depth": 0,
+      "derived": "open",
+      "index": 8,
+      "key": "s2",
+      "label": "Stufe 2 · Speicher",
+      "line": 12,
+      "mark": " ",
+      "progress": {
+        "blocked": 0,
+        "dropped": 0,
+        "learned": 0,
+        "open": 2,
+        "seen": 0,
+        "total": 2
+      },
+      "state": "open",
+      "xp_progress": {
+        "earned": 0,
+        "missing": 2,
+        "open": 0,
+        "points": 0,
+        "possible": 0
+      }
+    },
+    {
+      "children": 0,
+      "closed": false,
+      "depth": 1,
+      "derived": "open",
+      "index": 9,
+      "key": "pt",
+      "label": "Seitentabellen",
+      "line": 13,
+      "mark": " ",
+      "parent": 8,
+      "progress": {
+        "blocked": 0,
+        "dropped": 0,
+        "learned": 0,
+        "open": 1,
+        "seen": 0,
+        "total": 1
+      },
+      "state": "open",
+      "xp_progress": {
+        "earned": 0,
+        "missing": 1,
+        "open": 0,
+        "points": 0,
+        "possible": 0
+      },
+      "xp_suggest": 15
+    },
+    {
+      "children": 1,
+      "closed": false,
+      "depth": 1,
+      "derived": "open",
+      "index": 10,
+      "label": "Extras",
+      "line": 14,
+      "mark": " ",
+      "optional": true,
+      "parent": 8,
+      "progress": {
+        "blocked": 0,
+        "dropped": 0,
+        "learned": 0,
+        "open": 1,
+        "seen": 0,
+        "total": 1
+      },
+      "state": "open",
+      "xp_progress": {
+        "earned": 0,
+        "missing": 1,
+        "open": 0,
+        "points": 0,
+        "possible": 0
+      }
+    },
+    {
+      "children": 0,
+      "closed": false,
+      "depth": 2,
+      "derived": "open",
+      "index": 11,
+      "label": "Huge Pages",
+      "line": 15,
+      "mark": " ",
+      "optional": true,
+      "parent": 10,
+      "progress": {
+        "blocked": 0,
+        "dropped": 0,
+        "learned": 0,
+        "open": 1,
+        "seen": 0,
+        "total": 1
+      },
+      "state": "open",
+      "xp_progress": {
+        "earned": 0,
+        "missing": 1,
+        "open": 0,
+        "points": 0,
+        "possible": 0
+      },
+      "xp_suggest": 10
+    }
+  ],
+  "path": {
+    "area": "lib.nvim",
+    "areas": [],
+    "created": "2026-01-01",
+    "etag": "sha256:3efb1d6e986ddee9",
+    "file": "lib.nvim/ROADMAP/paths/prozesse.md",
+    "has_tree": true,
+    "hours": {
+      "done": 2,
+      "open_max": 6,
+      "open_min": 4,
+      "planned_max": 8,
+      "planned_min": 6
+    },
+    "icon": {
+      "kind": "emoji",
+      "value": "🧠"
+    },
+    "id": "lib.nvim/prozesse",
+    "optional": {
+      "progress": {
+        "blocked": 0,
+        "dropped": 0,
+        "learned": 0,
+        "open": 1,
+        "seen": 0,
+        "total": 1
+      },
+      "xp": {
+        "earned": 0,
+        "missing": 1,
+        "open": 0,
+        "points": 0,
+        "possible": 0
+      }
+    },
+    "points": 11,
+    "problems": [],
+    "progress": {
+      "blocked": 1,
+      "dropped": 0,
+      "learned": 1,
+      "open": 5,
+      "seen": 0,
+      "total": 6
+    },
+    "project": "lib.nvim/os",
+    "slug": "prozesse",
+    "stage": "doing",
+    "status": "doing",
+    "summary": "",
+    "title": "Prozesse",
+    "updated": "2026-01-03",
+    "valid": true,
+    "xp": {
+      "earned": 10,
+      "missing": 4,
+      "open": 5,
+      "points": 2,
+      "possible": 15
+    }
+  },
+  "plugin": "tasks.nvim",
+  "progress": {
+    "blocked": 1,
+    "dropped": 0,
+    "learned": 1,
+    "open": 5,
+    "seen": 0,
+    "total": 6
+  },
+  "rev": "rev:ca4948",
+  "schedule": [
+    {
+      "closed": 0,
+      "done": 2,
+      "index": 4,
+      "key": "w1",
+      "label": "Woche 1: fork und exec",
+      "open_max": 4,
+      "open_min": 2,
+      "planned_max": 6,
+      "planned_min": 4,
+      "result": "eine Shell in C {for=p3}",
+      "state": "open",
+      "total": 2
+    },
+    {
+      "closed": 0,
+      "done": 0,
+      "index": 9,
+      "key": "pt",
+      "label": "Seitentabellen",
+      "open_max": 2,
+      "open_min": 2,
+      "planned_max": 2,
+      "planned_min": 2,
+      "state": "open",
+      "total": 1
+    }
+  ],
+  "schema": 1,
+  "tree_problems": [
+    {
+      "code": "path-bad-xp",
+      "key": "w1",
+      "line": 7,
+      "message": "a learning point with children sums the XP of its children: put {xp=…} on them"
+    }
+  ],
+  "vault": {
+    "id": "vault"
+  },
+  "xp": {
+    "earned": 10,
+    "missing": 4,
+    "open": 5,
+    "points": 2,
+    "possible": 15
+  }
+}

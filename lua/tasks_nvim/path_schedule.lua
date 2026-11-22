@@ -32,6 +32,8 @@ local RESULT_WORDS = { "Nachweis", "Aufgabe", "Ergebnis", "Result" }
 local EN_DASH = "\226\128\147"
 
 ---@class Tasks.ScheduleRow
+---@field index integer   # The point's `index` in the tree.
+---@field node Tasks.LernNode
 ---@field line integer
 ---@field key? string
 ---@field label string
@@ -82,6 +84,8 @@ function M.rows(tree)
         state = "partial"
       end
       out[#out + 1] = {
+        index = node.index,
+        node = node,
         line = node.line,
         key = node.key,
         label = node.label,

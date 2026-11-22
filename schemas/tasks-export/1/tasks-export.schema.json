@@ -462,6 +462,18 @@
       },
       "unevaluatedProperties": false
     },
+    "PathHours": {
+      "description": "Hours of a path or a session: planned (`{h=N}`, `{h=N-M}` on the outermost point that carries it: an inner one is part of it), done (`{done_h=N}`, the outermost too) and open (the planned hours of the points not closed, less what was done on each, never below 0). A point whose leaves are all dropped plans nothing; optional points count for nothing. Two decimal places at most.",
+      "type": "object",
+      "required": ["planned_min", "planned_max", "done", "open_min", "open_max"],
+      "properties": {
+        "planned_min": { "type": "number", "minimum": 0 },
+        "planned_max": { "type": "number", "minimum": 0 },
+        "done": { "type": "number", "minimum": 0 },
+        "open_min": { "type": "number", "minimum": 0 },
+        "open_max": { "type": "number", "minimum": 0 }
+      }
+    },
     "LearnPoint": {
       "description": "A learning point as the learning views over all paths carry it: where it stands, its stage (the root it stands below) and what its marks say.",
       "type": "object",
@@ -664,6 +676,25 @@
           "type": "array",
           "items": { "$ref": "#/$defs/PathLevel" }
         },
+        "schedule": {
+          "description": "The sessions of `## Zeitplan`: the points with planned hours that are a root or one level below, in file order, each with its hours, its result (the text after `Nachweis:`, `Aufgabe:` or `Ergebnis:` of its first such child) and its state (`partial`: some of its leaves closed). Only when the path has `hours`. Capability `path_hours`.",
+          "type": "array",
+          "items": {
+            "allOf": [{ "$ref": "#/$defs/PathHours" }],
+            "type": "object",
+            "required": ["index", "label", "state", "closed", "total"],
+            "properties": {
+              "index": { "type": "integer", "minimum": 1 },
+              "key": { "type": "string" },
+              "label": { "type": "string", "description": "As written (untrusted)." },
+              "result": { "type": "string" },
+              "state": { "enum": ["open", "partial", "done"] },
+              "closed": { "type": "integer", "minimum": 0, "description": "Its leaves closed (learned, seen, dropped)." },
+              "total": { "type": "integer", "minimum": 0 }
+            },
+            "unevaluatedProperties": false
+          }
+        },
         "level_problems": {
           "description": "The problems of `## Level` (`level-...` codes); with `levels`. Capability `xp`.",
           "type": "array",
@@ -721,6 +752,7 @@
         "requires_gate": { "$ref": "#/$defs/RequiresGate" },
         "waiting_on": { "$ref": "#/$defs/WaitingOn" },
         "stage": { "$ref": "#/$defs/PathStage" },
+        "hours": { "type": "object", "allOf": [{ "$ref": "#/$defs/PathHours" }], "unevaluatedProperties": false, "description": "The hours of the path; only when a point carries `{h=…}` or `{done_h=…}`. Capability `path_hours`." },
         "links": { "type": "array", "items": { "type": "string", "pattern": "^[Hh][Tt][Tt][Pp][Ss]?://" } },
         "icon": { "$ref": "#/$defs/Icon" },
         "cover": { "$ref": "#/$defs/Cover" },

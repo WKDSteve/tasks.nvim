@@ -107,6 +107,7 @@ M.CAPABILITIES = {
   "outcome",
   "path",
   "path_close",
+  "path_hours",
   "path_levels",
   "path_marks",
   "path_new",
@@ -3452,6 +3453,22 @@ local function level_state_entry(st)
   })
 end
 
+---Hours as the documents carry them (`learn.hours`, `learn.point_hours`); nil stays nil.
+---@param h? table
+---@return table|nil
+local function json_hours(h)
+  if not h then
+    return nil
+  end
+  return json.object({
+    planned_min = h.planned_min,
+    planned_max = h.planned_max,
+    done = h.done,
+    open_min = h.open_min,
+    open_max = h.open_max,
+  })
+end
+
 ---The lines a path's `rev` takes from outside its file: the XP of the tasks its promoted points name (they count in the
 ---document), so that a task's `xp:` changed gives a new `rev`.
 ---@param f Tasks.PlanFile
@@ -3490,6 +3507,8 @@ local function path_entry(root, f, text, idx, finished)
     -- capability `xp`: only when there is something to say, so a path without XP and levels reads as before
     xp = tree.has_xp and xp_entry(tree.xp) or nil,
     level = level_state_entry(req.hold_levels(f.level_state, rst)),
+    -- capability `path_hours`: the planned, done and open hours, only when a point carries some
+    hours = json_hours(require("tasks_nvim.learn").hours(tree)),
     -- capability `optional_points`: the points of `{optional}` subtrees, apart from `progress` and `xp` (which leave
     -- them out); only when the tree has any
     optional = tree.optional and tree.optional.progress.total > 0 and json.object({
@@ -3729,6 +3748,22 @@ function M.path(id, opts)
       return json.object({ code = p.code, line = p.line, key = p.key, message = p.message })
     end, tree.problems)
     doc.xp = tree.has_xp and xp_entry(tree.xp) or nil
+    -- capability `path_hours`: the sessions of `## Zeitplan` (the points with planned hours, `path_schedule.rows`),
+    -- each with its hours, so a page can open a path's sessions; only when the path has hours
+    if doc.path.hours then
+      local learn = require("tasks_nvim.learn")
+      doc.schedule = json.array(vim.tbl_map(function(r)
+        local entry = json_hours(learn.point_hours(r.node))
+        entry.index = r.index
+        entry.key = r.key
+        entry.label = r.label
+        entry.result = r.result
+        entry.state = r.state
+        entry.closed = r.closed
+        entry.total = r.total
+        return entry
+      end, require("tasks_nvim.path_schedule").rows(tree)))
+    end
     -- the lines of `## Level` (capability `xp`), only when the file has the section
     local lv = f.levels
     if lv and lv.has_section then

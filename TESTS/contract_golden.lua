@@ -278,7 +278,7 @@ function G.write_learn_paths(root)
       "- [ ] Stufe 1 \194\183 Grundlagen {#s1}",
       "  - [x] Was ist ein Prozess {xp=10}",
       "  - [!] Scheduler {#sched}",
-      "  - [ ] Woche 1: fork und exec {h=4-6} {xp=20} {#w1}",
+      "  - [ ] Woche 1: fork und exec {h=4-6} {done_h=2} {xp=20} {#w1}",
       "    - [ ] [man fork](https://man7.org/linux/man-pages/man2/fork.2.html) {xp=5}",
       "      > Notiz: Rückgabewert prüfen.",
       "    - [ ] Nachweis: eine Shell in C {for=p3} {#shell}",
@@ -696,6 +696,17 @@ G.cases = {
     request = function(root)
       G.write_learn_paths(root)
       return '{"params":{"machine":"workstation","n":2}}'
+    end,
+  },
+  {
+    -- the hours of a path (capability `path_hours`): planned as a span, done, open; the sessions of `## Zeitplan`
+    -- with their hours, their result and their state; a leaf with hours below a session counts in the session only
+    name = "path-hours",
+    method = "path",
+    fresh = true,
+    request = function(root)
+      G.write_learn_paths(root)
+      return '{"params":{"id":"lib.nvim/prozesse"}}'
     end,
   },
   {

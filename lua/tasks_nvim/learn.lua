@@ -20,6 +20,94 @@ M.MAX_NEXT = 20
 ---The number of points per path when the caller names none.
 M.DEFAULT_NEXT = 3
 
+---A sum of hours, kept to two places (`0.1 + 0.2` is `0.3`).
+---@param n number
+---@return number
+local function hours2(n)
+  local r = math.floor(n * 100 + 0.5) / 100
+  return r == math.floor(r) and math.floor(r) or r
+end
+
+---Whether a node above `node` carries the field (`h_min`, `done_h`): then the outer one counts, never both.
+---@param node Tasks.LernNode
+---@param field string
+---@return boolean
+local function above_has(node, field)
+  local up = node.parent
+  while up do
+    if up[field] ~= nil then
+      return true
+    end
+    up = up.parent
+  end
+  return false
+end
+
+---Whether every leaf below a node (the node itself for a leaf) is dropped: its hours are no plan any more.
+---@param node Tasks.LernNode
+---@return boolean
+local function all_dropped(node)
+  local p = node.progress
+  return p ~= nil and p.total > 0 and p.dropped == p.total
+end
+
+---The hours of one point: planned (`{h=N}`, `{h=N-M}`), done (`{done_h=N}`) and open (the planned ones of a point not
+---closed, less what was done on it, never below 0).
+---@param node Tasks.LernNode
+---@return { planned_min: number, planned_max: number, done: number, open_min: number, open_max: number }
+function M.point_hours(node)
+  local pmin, pmax = node.h_min or 0, node.h_max or node.h_min or 0
+  if all_dropped(node) then
+    pmin, pmax = 0, 0
+  end
+  local done = node.done_h or 0
+  local omin, omax = 0, 0
+  if not node.closed then
+    omin, omax = math.max(0, pmin - done), math.max(0, pmax - done)
+  end
+  return {
+    planned_min = hours2(pmin),
+    planned_max = hours2(pmax),
+    done = hours2(done),
+    open_min = hours2(omin),
+    open_max = hours2(omax),
+  }
+end
+
+---The hours of a tree: the sum over the outermost points that carry `{h=…}` (planned and open) and the outermost that
+---carry `{done_h=…}` (done), optional points left out as everywhere a path says how far it is; nil when no point
+---(optional or not) carries hours.
+---@param tree Tasks.LernTree
+---@return { planned_min: number, planned_max: number, done: number, open_min: number, open_max: number }|nil
+function M.hours(tree)
+  local any = false
+  local sum = { planned_min = 0, planned_max = 0, done = 0, open_min = 0, open_max = 0 }
+  for _, node in ipairs(tree and tree.nodes or {}) do
+    local planned = node.h_min ~= nil and not above_has(node, "h_min")
+    local done = node.done_h ~= nil and not above_has(node, "done_h")
+    any = any or node.h_min ~= nil or node.done_h ~= nil
+    if not node.in_optional and (planned or done) then
+      local h = M.point_hours(node)
+      if planned then
+        sum.planned_min = sum.planned_min + h.planned_min
+        sum.planned_max = sum.planned_max + h.planned_max
+        sum.open_min = sum.open_min + h.open_min
+        sum.open_max = sum.open_max + h.open_max
+      end
+      if done then
+        sum.done = sum.done + h.done
+      end
+    end
+  end
+  if not any then
+    return nil
+  end
+  for k, v in pairs(sum) do
+    sum[k] = hours2(v)
+  end
+  return sum
+end
+
 ---The root a node stands below (the node itself when it is a root).
 ---@param node Tasks.LernNode
 ---@return Tasks.LernNode

@@ -109,6 +109,7 @@ return function(H)
     "optional_points",
     "outcome",
     "path_close",
+    "path_hours",
     "path_levels",
     "path_marks",
     "path_new",

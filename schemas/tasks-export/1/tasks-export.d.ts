@@ -1118,6 +1118,24 @@ export type PathDocument = Head & {
    */
   levels?: PathLevel[];
   /**
+   * The sessions of `## Zeitplan`: the points with planned hours that are a root or one level below, in file order, each with its hours, its result (the text after `Nachweis:`, `Aufgabe:` or `Ergebnis:` of its first such child) and its state (`partial`: some of its leaves closed). Only when the path has `hours`. Capability `path_hours`.
+   */
+  schedule?: (PathHours & {
+    index: number;
+    key?: string;
+    /**
+     * As written (untrusted).
+     */
+    label: string;
+    result?: string;
+    state: "open" | "partial" | "done";
+    /**
+     * Its leaves closed (learned, seen, dropped).
+     */
+    closed: number;
+    total: number;
+  })[];
+  /**
    * The problems of `## Level` (`level-...` codes); with `levels`. Capability `xp`.
    */
   level_problems?: {
@@ -2179,6 +2197,10 @@ export interface PathEntry {
   requires_gate?: RequiresGate;
   waiting_on?: WaitingOn;
   stage?: PathStage;
+  /**
+   * The hours of the path; only when a point carries `{h=…}` or `{done_h=…}`. Capability `path_hours`.
+   */
+  hours?: PathHours;
   links?: string[];
   icon?: Icon;
   cover?: Cover;
@@ -2280,6 +2302,16 @@ export interface PathXp1 {
    * Leaves (not dropped) without XP.
    */
   missing: number;
+}
+/**
+ * Hours of a path or a session: planned (`{h=N}`, `{h=N-M}` on the outermost point that carries it: an inner one is part of it), done (`{done_h=N}`, the outermost too) and open (the planned hours of the points not closed, less what was done on each, never below 0). A point whose leaves are all dropped plans nothing; optional points count for nothing. Two decimal places at most.
+ */
+export interface PathHours {
+  planned_min: number;
+  planned_max: number;
+  done: number;
+  open_min: number;
+  open_max: number;
 }
 /**
  * One learning point of a tree. A parent has no mark of its own: its `derived` state comes from its leaves (learned, partial, open); `closed` when every leaf is (a parent with points that are not optional: every one of those).
