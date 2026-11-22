@@ -231,7 +231,7 @@ local methods = {
     end,
   },
   paths = {
-    params = { area = "string", include_done = "boolean" },
+    params = { area = "string", include_done = "boolean", levels = "boolean" },
     required = {},
     run = function(params, opts)
       return contract.paths(params, opts)

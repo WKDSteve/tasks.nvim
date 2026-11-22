@@ -118,6 +118,7 @@ M.CAPABILITIES = {
   "path_reward",
   "path_set",
   "paths",
+  "paths_levels",
   "plan_assets",
   "plan_close",
   "plan_compare",
@@ -3488,6 +3489,61 @@ local function task_xp_lines(f)
   return out
 end
 
+---Every line of `## Level` of a path as `tasks.paths` carries it with `levels: true` (capability `paths_levels`): as
+---`tasks.path` has them (`ref`, `number`, `kind`, `threshold`, `name`, `badge`, `reward`, `given`, `reached`, in file
+---order, the line of the whole path last), plus for a level not reached what is missing (`missing_xp`, or
+---`missing_percent` for a tree without XP and for the line of the whole path), and from the series of the learning
+---figures the day it was reached (`reached_on`) and its reward granted (`given_on`). nil for a path without the
+---section.
+---@param f Tasks.PlanFile
+---@param st? Tasks.LevelState  # As held by what the path waits for (`requires.hold_levels`).
+---@param dates? { reached_on: table<string, string>, given_on: table<string, string> }
+---@return table|nil
+local function level_entries(f, st, dates)
+  local lv = f.levels
+  if not (lv and lv.has_section) then
+    return nil
+  end
+  st = st or {}
+  local tree = f.tree or require("tasks_nvim.lernbaum").parse("")
+  local x = tree.xp
+  local percent = require("tasks_nvim.lernlevel").percent(tree)
+  local earned = x.earned + (tree.optional and tree.optional.xp.earned or 0)
+  local all = vim.list_slice(lv.levels, 1)
+  all[#all + 1] = lv.final
+  return json.array(vim.tbl_map(function(l)
+    local reached = (st.reached or {})[l.ref] == true
+    local entry = {
+      ref = l.ref,
+      number = l.number,
+      line = l.line,
+      kind = l.kind,
+      threshold = l.threshold,
+      name = l.name,
+      badge = l.badge,
+      reward = l.reward,
+      given = l.given,
+      reached = reached,
+    }
+    if not reached then
+      if l.kind == "xp" then
+        entry.missing_xp = math.max(0, l.threshold - earned)
+      elseif l.kind == "percent" and x.points > 0 then
+        entry.missing_xp = math.max(0, math.ceil(l.threshold * x.possible / 100) - x.earned)
+      elseif l.kind == "percent" then
+        entry.missing_percent = math.max(0, l.threshold - percent)
+      else
+        entry.missing_percent = math.max(0, 100 - percent)
+      end
+    end
+    if dates then
+      entry.reached_on = reached and dates.reached_on[l.ref] or nil
+      entry.given_on = l.given and dates.given_on[l.ref] or nil
+    end
+    return json.object(entry)
+  end, all))
+end
+
 ---A learning path as the documents carry it (`tasks.paths` items, `tasks.path`): the head of its file, its progress and
 ---its version, its XP (when the tree has any) and its level state (when it has levels); no tree (that is `tasks.path`).
 ---With `idx` (`requires.index`) the entry says what the path builds on (capability `requires`), and a held path keeps
@@ -3497,8 +3553,9 @@ end
 ---@param text? string  # The file as read (its `etag`).
 ---@param idx? Tasks.RequiresIndex
 ---@param finished? boolean  # A finished path, read from its Backlog (`include_done`).
+---@param levels? { dates?: { reached_on: table<string, string>, given_on: table<string, string> } }  # `levels: true`
 ---@return table
-local function path_entry(root, f, text, idx, finished)
+local function path_entry(root, f, text, idx, finished, levels)
   local tree = f.tree or require("tasks_nvim.lernbaum").parse("")
   local req = require("tasks_nvim.requires")
   local rst = (idx and not finished) and req.state(f, idx) or nil
@@ -3512,6 +3569,8 @@ local function path_entry(root, f, text, idx, finished)
     -- capability `xp`: only when there is something to say, so a path without XP and levels reads as before
     xp = tree.has_xp and xp_entry(tree.xp) or nil,
     level = level_state_entry(req.hold_levels(f.level_state, rst)),
+    -- capability `paths_levels` (`levels: true`): every level of `## Level`, what is missing, and when
+    levels = levels and level_entries(f, req.hold_levels(f.level_state, rst), levels.dates) or nil,
     -- capability `competences`: the fields of knowledge it serves and the stages it aims at
     competence = f.competence and vim.list_slice(f.competence, 1) or nil,
     competence_target = f.competence_target
@@ -3555,7 +3614,8 @@ end
 
 ---`tasks.paths`: the open learning paths of the vault or of one area (an area group stands for its members), each with
 ---its progress. The `rev` is that of the path files.
----@param params? { area?: string }
+---With `levels: true` (capability `paths_levels`) every entry of a path with `## Level` carries `levels` (`level_entries`).
+---@param params? { area?: string, include_done?: boolean, levels?: boolean }
 ---@param opts? { root?: string }
 ---@return table|nil doc
 ---@return Tasks.ContractError|string|nil err
@@ -3628,16 +3688,34 @@ function M.paths(params, opts)
           finished = finished_items,
         })
       or nil
+    -- `levels: true` (capability `paths_levels`): the day of each level and reward from the series of the learning
+    -- figures, read once
+    local lists
+    local function levels_of(f)
+      if params.levels ~= true then
+        return nil
+      end
+      if not lists then
+        local lh = require("tasks_nvim.learn_history")
+        local series = lh.read(root)
+        lists = lh.by_path(series.rows)
+        for _, rel in ipairs(series.files) do
+          lines[#lines + 1] = rel .. "\t" .. fsio.etag(series.texts[rel])
+        end
+      end
+      local reached_on, given_on = require("tasks_nvim.learn_history").dates(lists[f.id])
+      return { dates = { reached_on = reached_on, given_on = given_on } }
+    end
     for _, f in ipairs(files) do
       local text = fsio.read(f.path)
-      local entry = path_entry(root, f, text, idx)
+      local entry = path_entry(root, f, text, idx, nil, levels_of(f))
       items[#items + 1] = json.object(entry)
       lines[#lines + 1] = f.id .. "\t" .. (entry.etag or "")
       vim.list_extend(lines, task_xp_lines(f))
     end
     for _, f in ipairs(finished_files) do
       local text = fsio.read(f.path)
-      local entry = path_entry(root, f, text, idx, true)
+      local entry = path_entry(root, f, text, idx, true, levels_of(f))
       items[#items + 1] = json.object(entry)
       lines[#lines + 1] = "done:" .. f.id .. "\t" .. (entry.etag or "")
     end

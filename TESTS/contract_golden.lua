@@ -850,6 +850,38 @@ G.cases = {
     end,
   },
   {
+    -- every level of every path in one request (capability `paths_levels`): reached ones with the day the series
+    -- saw them reached and their reward granted, open ones with the XP or the percent missing
+    name = "paths-levels",
+    method = "paths",
+    fresh = true,
+    request = function(root)
+      write_xp_path(root)
+      G.write_learn_paths(root)
+      local dir = root .. "/_Telemetry/history"
+      vim.fn.mkdir(dir, "p")
+      local fh = assert(io.open(dir .. "/learn-2026-01.jsonl", "wb"))
+      fh:write(require("tasks_nvim.learn_history").encode_row({
+        day = "2026-01-04",
+        path = "lib.nvim/rust-lernen",
+        area = "lib.nvim",
+        at = "2026-01-04T08:00:00Z",
+        learned = 1,
+        seen = 1,
+        dropped = 1,
+        open = 2,
+        total = 5,
+        xp = 50,
+        done_h = 0,
+        level = 1,
+        reached = { "1", "4" },
+        given = { "1" },
+      }) .. "\n")
+      fh:close()
+      return '{"params":{"levels":true,"area":"lib.nvim"}}'
+    end,
+  },
+  {
     -- the XP of a point and the reward of a level written (capabilities `xp`, `path_reward`), each with its inverse;
     -- a level without a reward and both xp and xp_clear refused; the levels written (`path_levels`) and a bad one refused
     name = "result-path-xp",

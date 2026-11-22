@@ -2447,6 +2447,10 @@ export interface PathEntry {
   waiting_on?: WaitingOn;
   stage?: PathStage;
   /**
+   * With `levels: true` of `tasks.paths`: every line of `## Level` in file order, the line of the whole path last; only when the file has the section. Capability `paths_levels`.
+   */
+  levels?: PathEntryLevel[];
+  /**
    * The competences the path serves (`competence:`, ids of `<area>/ROADMAP/competences/<slug>.md`); only when the file names some. Capability `competences`.
    *
    * @minItems 1
@@ -2558,6 +2562,31 @@ export interface PathXp1 {
    * Leaves (not dropped) without XP.
    */
   missing: number;
+}
+/**
+ * One line of `## Level` as `tasks.paths` carries it with `levels: true` (capability `paths_levels`): what `PathLevel` says, plus for a level not reached what is missing (`missing_xp`: the XP of a level in XP, or of a level in percent when the tree has XP; `missing_percent`: of a level in percent without XP, and of the line of the whole path), and from the series of the learning figures (`tasks.learn_history`) the day it was first reached (`reached_on`, only while it is reached) and its reward first granted (`given_on`, only while it is granted); absent before the series knew it.
+ */
+export interface PathEntryLevel {
+  ref: string;
+  number?: number;
+  line: number;
+  kind: "xp" | "percent" | "done";
+  threshold?: number;
+  name?: string;
+  /**
+   * As written; a file below `assets/badges/` (a client draws it as an image only).
+   */
+  badge?: string;
+  /**
+   * What one grants oneself, untrusted text.
+   */
+  reward?: string;
+  given: boolean;
+  reached: boolean;
+  missing_xp?: number;
+  missing_percent?: number;
+  reached_on?: string;
+  given_on?: string;
 }
 /**
  * The stages the path aims at (`competence_target:`). Capability `competences`.

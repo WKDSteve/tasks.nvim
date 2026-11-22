@@ -1046,6 +1046,11 @@
         "requires_gate": { "$ref": "#/$defs/RequiresGate" },
         "waiting_on": { "$ref": "#/$defs/WaitingOn" },
         "stage": { "$ref": "#/$defs/PathStage" },
+        "levels": {
+          "description": "With `levels: true` of `tasks.paths`: every line of `## Level` in file order, the line of the whole path last; only when the file has the section. Capability `paths_levels`.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/PathEntryLevel" }
+        },
         "competence": {
           "description": "The competences the path serves (`competence:`, ids of `<area>/ROADMAP/competences/<slug>.md`); only when the file names some. Capability `competences`.",
           "type": "array",
@@ -1223,6 +1228,28 @@
         "reward": { "type": "string", "description": "What one grants oneself, untrusted text." },
         "given": { "type": "boolean", "description": "`[x]`: the reward was granted." },
         "reached": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "PathEntryLevel": {
+      "description": "One line of `## Level` as `tasks.paths` carries it with `levels: true` (capability `paths_levels`): what `PathLevel` says, plus for a level not reached what is missing (`missing_xp`: the XP of a level in XP, or of a level in percent when the tree has XP; `missing_percent`: of a level in percent without XP, and of the line of the whole path), and from the series of the learning figures (`tasks.learn_history`) the day it was first reached (`reached_on`, only while it is reached) and its reward first granted (`given_on`, only while it is granted); absent before the series knew it.",
+      "type": "object",
+      "required": ["ref", "line", "kind", "given", "reached"],
+      "properties": {
+        "ref": { "type": "string", "pattern": "^([1-9][0-9]*|done)$" },
+        "number": { "type": "integer", "minimum": 1 },
+        "line": { "type": "integer", "minimum": 1 },
+        "kind": { "enum": ["xp", "percent", "done"] },
+        "threshold": { "type": "integer", "minimum": 0 },
+        "name": { "type": "string" },
+        "badge": { "type": "string", "description": "As written; a file below `assets/badges/` (a client draws it as an image only)." },
+        "reward": { "type": "string", "description": "What one grants oneself, untrusted text." },
+        "given": { "type": "boolean" },
+        "reached": { "type": "boolean" },
+        "missing_xp": { "type": "integer", "minimum": 0 },
+        "missing_percent": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "reached_on": { "type": "string", "format": "date" },
+        "given_on": { "type": "string", "format": "date" }
       },
       "additionalProperties": false
     },

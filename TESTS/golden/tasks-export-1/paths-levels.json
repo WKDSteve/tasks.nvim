@@ -1,0 +1,287 @@
+{
+  "digest": "sha256:e7db330f61eed924",
+  "engine": {
+    "git": "0000000",
+    "nvim": "0.0.0",
+    "version": "0.1.0-test"
+  },
+  "generated_at": "2026-01-01T00:00:00Z",
+  "incomplete": [],
+  "items": [
+    {
+      "area": "lib.nvim",
+      "areas": [],
+      "created": "2026-01-01",
+      "etag": "sha256:1e0346a0db3ed524",
+      "file": "lib.nvim/ROADMAP/paths/pause.md",
+      "has_tree": true,
+      "id": "lib.nvim/pause",
+      "points": 1,
+      "problems": [],
+      "progress": {
+        "blocked": 0,
+        "dropped": 0,
+        "learned": 0,
+        "open": 1,
+        "seen": 0,
+        "total": 1
+      },
+      "slug": "pause",
+      "stage": "parked",
+      "status": "parked",
+      "summary": "",
+      "title": "Pause",
+      "updated": "2026-01-07",
+      "valid": true
+    },
+    {
+      "area": "lib.nvim",
+      "areas": [],
+      "competence": [
+        "lib.nvim/betriebssysteme"
+      ],
+      "competence_target": {
+        "p": 3.5,
+        "t": 4
+      },
+      "created": "2026-01-01",
+      "etag": "sha256:9ad69768e172ea11",
+      "file": "lib.nvim/ROADMAP/paths/prozesse.md",
+      "has_tree": true,
+      "hours": {
+        "done": 2,
+        "open_max": 6,
+        "open_min": 4,
+        "planned_max": 8,
+        "planned_min": 6
+      },
+      "icon": {
+        "kind": "emoji",
+        "value": "🧠"
+      },
+      "id": "lib.nvim/prozesse",
+      "optional": {
+        "progress": {
+          "blocked": 0,
+          "dropped": 0,
+          "learned": 0,
+          "open": 1,
+          "seen": 0,
+          "total": 1
+        },
+        "xp": {
+          "earned": 0,
+          "missing": 1,
+          "open": 0,
+          "points": 0,
+          "possible": 0
+        }
+      },
+      "points": 11,
+      "problems": [],
+      "progress": {
+        "blocked": 1,
+        "dropped": 0,
+        "learned": 1,
+        "open": 5,
+        "seen": 0,
+        "total": 6
+      },
+      "project": "lib.nvim/os",
+      "slug": "prozesse",
+      "stage": "doing",
+      "status": "doing",
+      "summary": "",
+      "title": "Prozesse",
+      "updated": "2026-01-03",
+      "valid": true,
+      "xp": {
+        "earned": 10,
+        "missing": 4,
+        "open": 5,
+        "points": 2,
+        "possible": 15
+      }
+    },
+    {
+      "area": "lib.nvim",
+      "areas": [],
+      "created": "2026-01-01",
+      "etag": "sha256:1f19cac4332d7165",
+      "file": "lib.nvim/ROADMAP/paths/rust-lernen.md",
+      "has_tree": true,
+      "id": "lib.nvim/rust-lernen",
+      "level": {
+        "badge": "assets/badges/stern.png",
+        "finished": false,
+        "level": 1,
+        "name": "Einsteiger",
+        "next": {
+          "missing_xp": 15,
+          "number": 2
+        },
+        "open_rewards": [],
+        "percent": 36
+      },
+      "levels": [
+        {
+          "badge": "assets/badges/stern.png",
+          "given": true,
+          "given_on": "2026-01-04",
+          "kind": "xp",
+          "line": 16,
+          "name": "Einsteiger",
+          "number": 1,
+          "reached": true,
+          "reached_on": "2026-01-04",
+          "ref": "1",
+          "reward": "großes Eis",
+          "threshold": 30
+        },
+        {
+          "badge": "assets/badges/mond.svg",
+          "given": false,
+          "kind": "percent",
+          "line": 17,
+          "missing_xp": 15,
+          "number": 2,
+          "reached": false,
+          "ref": "2",
+          "reward": "Kino",
+          "threshold": 50
+        },
+        {
+          "given": false,
+          "kind": "xp",
+          "line": 18,
+          "missing_xp": 50,
+          "number": 3,
+          "reached": false,
+          "ref": "3",
+          "reward": "ein Buch",
+          "threshold": 100
+        },
+        {
+          "given": false,
+          "kind": "xp",
+          "line": 19,
+          "number": 4,
+          "reached": true,
+          "reached_on": "2026-01-04",
+          "ref": "4",
+          "threshold": 20
+        },
+        {
+          "given": false,
+          "kind": "done",
+          "line": 20,
+          "missing_percent": 64,
+          "reached": false,
+          "ref": "done",
+          "reward": "Wochenende am See"
+        }
+      ],
+      "optional": {
+        "progress": {
+          "blocked": 0,
+          "dropped": 0,
+          "learned": 1,
+          "open": 1,
+          "seen": 0,
+          "total": 2
+        },
+        "xp": {
+          "earned": 10,
+          "missing": 0,
+          "open": 10,
+          "points": 2,
+          "possible": 20
+        }
+      },
+      "points": 9,
+      "problems": [],
+      "progress": {
+        "blocked": 0,
+        "dropped": 1,
+        "learned": 1,
+        "open": 2,
+        "seen": 1,
+        "total": 5
+      },
+      "slug": "rust-lernen",
+      "stage": "doing",
+      "status": "doing",
+      "summary": "",
+      "title": "Rust lernen",
+      "updated": "2026-01-05",
+      "valid": true,
+      "xp": {
+        "earned": 40,
+        "missing": 1,
+        "open": 60,
+        "points": 3,
+        "possible": 110
+      }
+    },
+    {
+      "area": "lib.nvim",
+      "areas": [],
+      "created": "2026-01-01",
+      "etag": "sha256:caf64b80e694007f",
+      "file": "lib.nvim/ROADMAP/paths/signale.md",
+      "has_tree": true,
+      "id": "lib.nvim/signale",
+      "points": 2,
+      "problems": [],
+      "progress": {
+        "blocked": 0,
+        "dropped": 0,
+        "learned": 0,
+        "open": 2,
+        "seen": 0,
+        "total": 2
+      },
+      "project": "lib.nvim/os",
+      "slug": "signale",
+      "stage": "idle",
+      "status": "planning",
+      "summary": "",
+      "title": "Signale",
+      "updated": "2026-01-05",
+      "valid": true
+    },
+    {
+      "area": "lib.nvim",
+      "areas": [],
+      "created": "2026-01-01",
+      "etag": "sha256:72733bf1777c660d",
+      "file": "lib.nvim/ROADMAP/paths/spaeter.md",
+      "has_tree": true,
+      "id": "lib.nvim/spaeter",
+      "points": 1,
+      "problems": [],
+      "progress": {
+        "blocked": 0,
+        "dropped": 0,
+        "learned": 0,
+        "open": 1,
+        "seen": 0,
+        "total": 1
+      },
+      "slug": "spaeter",
+      "stage": "idle",
+      "status": "planning",
+      "summary": "",
+      "title": "Später",
+      "updated": "2026-01-06",
+      "valid": true
+    }
+  ],
+  "kind": "tasks.paths",
+  "plugin": "tasks.nvim",
+  "rev": "rev:7eefd8",
+  "schema": 1,
+  "vault": {
+    "id": "vault"
+  }
+}

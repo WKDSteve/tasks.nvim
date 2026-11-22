@@ -60,6 +60,7 @@
     "path_reward",
     "path_set",
     "paths",
+    "paths_levels",
     "plan_assets",
     "plan_close",
     "plan_compare",

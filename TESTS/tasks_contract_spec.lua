@@ -110,6 +110,7 @@ return function(H)
     "outcome",
     "path_close",
     "path_hours",
+    "paths_levels",
     "path_levels",
     "path_marks",
     "path_new",
