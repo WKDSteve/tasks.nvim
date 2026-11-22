@@ -508,18 +508,25 @@ local function closed_text(block, closed, shared, root)
   return found
 end
 
+---The skip reason of a block `refresh_document` leaves for `defer_stale_refs`.
+M.DEFERRED_STALE_REFS = "it dates its refs with git (--stale=refs) and was left as it is: "
+  .. "`:Tasks plan ... --write` or `tasks done` on the command line renews it"
+
 ---Refresh every marker block of a document: only the blocks change, the rest of the file (and its line endings, line
 ---by line) stays. Nothing is written when nothing changed. The vault is read once for all the blocks, and the file is
 ---read again right before it is written: a change made while the blocks were being worked out is kept (the blocks
 ---are put into the NEW text), never overwritten.
 ---`closed` names plans finished a moment ago (plan id -> text): their block gets that text as its last state
 ---instead of being left showing tasks that are done.
+---`ropts.defer_stale_refs` (the editor) leaves a block whose marker records `--stale=refs` as it is, with a skip
+---reason: renewing it dates the refs with one `git log` per repo, which the editor does not wait for.
 ---@param path string
 ---@param root string
 ---@param closed? table<string, string>
+---@param ropts? { defer_stale_refs?: boolean }
 ---@return { changed: boolean, refreshed: string[], skipped: { scope: string, reason: string }[] }|nil result
 ---@return string|nil err
-function M.refresh_document(path, root, closed)
+function M.refresh_document(path, root, closed, ropts)
   local text, err = fsio.read(path)
   if not text then
     return nil, ("cannot read %s: %s"):format(path, tostring(err))
@@ -556,6 +563,9 @@ function M.refresh_document(path, root, closed)
     local filter, ferr = filter_of(block.attrs, root)
     if not filter then
       return { skip = "its recorded filter is invalid: " .. tostring(ferr) }
+    end
+    if filter.stale_refs and ropts and ropts.defer_stale_refs then
+      return { skip = M.DEFERRED_STALE_REFS }
     end
     if scope_opts.overview_id then
       local lang = require("tasks_nvim.projects").lang_for(text, root)

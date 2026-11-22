@@ -181,6 +181,59 @@ return function(H)
   eq(unrecordable.code, 2)
   has(unrecordable.err, "cannot be recorded")
 
+  -- ── a block recorded with --stale=refs: the editor leaves it (no git log), the CLI renews it ──
+  local staleness = require("tasks_nvim.staleness")
+  local real_compute, computes = staleness.compute, 0
+  staleness.compute = function(...)
+    computes = computes + 1
+    return real_compute(...)
+  end
+  local config = require("tasks_nvim.config")
+  local real_docs, real_notify = config.get().chain.marker_docs, vim.notify
+  local refs_doc = H.tmpdir() .. "/REFS.md"
+  H.write(refs_doc, "# R\n\n" .. plan_view.block_markers("lib.nvim") .. "\nSTALE\n" .. ef .. "\n")
+  local refs_ok, refs_err = pcall(function()
+    eq(run({ "plan", "lib.nvim", "--stale=refs", "--write=" .. refs_doc }).code, 0)
+    has(H.read(refs_doc), "stale=refs", "the marker records --stale=refs")
+    ok(computes > 0, "the CLI's write dates the refs")
+    local refs_written = H.read(refs_doc)
+    computes = 0
+    local deferred =
+      assert(plan_scope.refresh_document(refs_doc, root, nil, { defer_stale_refs = true }))
+    eq(computes, 0, "a deferring refresh asks no git")
+    eq(H.read(refs_doc), refs_written, "and leaves the block as it is")
+    eq(deferred.skipped[1] and deferred.skipped[1].reason, plan_scope.DEFERRED_STALE_REFS, "why")
+    assert(plan_scope.refresh_document(refs_doc, root))
+    ok(computes > 0, "a refresh without it (the CLI) dates the refs")
+
+    -- the finish chain refreshes the configured document: the CLI's `tasks done` dates the refs ...
+    config.merge({ chain = { marker_docs = { refs_doc } } })
+    F.task(H, root, "lib.nvim", "finish-on-cli", F.meta("Finish on the CLI", "open"))
+    computes = 0
+    eq(run({ "done", "lib.nvim/finish-on-cli" }).code, 0)
+    ok(computes > 0, "tasks done (CLI) still dates the refs of the block")
+
+    -- ... `:Tasks done` in the editor asks no git for it, and the user is told
+    F.task(H, root, "lib.nvim", "finish-in-editor", F.meta("Finish in editor", "open"))
+    require("tasks_nvim.vault").set_root(root)
+    local said = {}
+    vim.notify = function(msg)
+      said[#said + 1] = tostring(msg)
+    end
+    computes = 0
+    require("tasks_nvim.ui.cmd").finish("lib.nvim/finish-in-editor", {})
+    vim.notify = real_notify
+    has(table.concat(said, "\n"), "done lib.nvim/finish-in-editor", "the task was finished")
+    eq(computes, 0, ":Tasks done in the editor asks no git for the block")
+    has(table.concat(said, "\n"), "--stale=refs", "and says which block it left")
+  end)
+  staleness.compute, vim.notify = real_compute, real_notify
+  config.merge({ chain = { marker_docs = real_docs } })
+  require("tasks_nvim.vault").set_root(nil)
+  if not refs_ok then
+    error(refs_err, 0)
+  end
+
   -- ── the vault is read once for a document with many blocks ──
   local many = { "# Many" }
   for _ = 1, 5 do

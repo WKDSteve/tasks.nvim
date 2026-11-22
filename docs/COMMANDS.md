@@ -957,7 +957,9 @@ open; the ticks are written with the finished copy, so the rollback covers them)
 was is finished (moved to `Backlog/FEATURES/`, "Plan x is done: 12 tasks, estimate 9.5 d, finished in 14 days"), and
 the **generated blocks** of the documents named in `setup({ chain = { marker_docs = { ... } } })` are refreshed (only
 those files; the block of a finished plan becomes its closing line). The headless CLI has no `setup`: it reads the same
-list from `$TASKS_MARKER_DOCS` (comma separated). A plan counts as finished when no task with `plan: <id>` is left that
+list from `$TASKS_MARKER_DOCS` (comma separated). In the editor (`:Tasks done`, `:Tasks plan-close`, `:Tasks
+project-close`) a block written with `--stale=refs` is left as it is and the message says so: renewing it would date
+its refs with git while the editor waits; `:Tasks plan ... --write` or `tasks done` renews it. A plan counts as finished when no task with `plan: <id>` is left that
 is not `done` -- valid or not: a mistyped `status:` keeps the plan open; a scan that could not read every folder closes
 nothing and says so. One id namespace holds plans, tasks and Backlog files: a plan whose id an open task or a finished
 item already has is not finished (and `plan-new` / `new` skip such a slug).

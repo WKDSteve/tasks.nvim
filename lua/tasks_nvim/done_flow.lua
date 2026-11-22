@@ -47,6 +47,7 @@ local M = {}
 ---@field chain? boolean       # Run the follow-up steps (default true).
 ---@field pick_next? boolean   # Name the freed tasks and pick the next one (default true; a batch picks once at its end).
 ---@field refresh_docs? boolean  # Refresh the generated blocks of the configured documents (default true; a batch does it once).
+---@field defer_stale_refs? boolean  # The editor: blocks recorded with `--stale=refs` stay as they are (no `git log`).
 ---@field last? boolean        # Finish a routine (`repeat`) for good: no next round.
 ---@field defer_plan_close? boolean  # Leave step b to the caller (`close_plans`): a batch checks each plan once, not per task.
 ---@field defer_routines? boolean  # Leave the routines that wait for this (`repeat_after`) to the caller: `routine_refs` names what to settle; a batch scans once.
@@ -121,7 +122,7 @@ end
 ---`opts.closed` (plan id -> summary) names plans that were finished a moment ago: their block (the one that names the
 ---plan by `plan=<id>`, by id, or by a slug no open plan shares) is rewritten as the "plan is done" line, its last
 ---state.
----@param opts? { root?: string, closed?: table<string, table> }
+---@param opts? { root?: string, closed?: table<string, table>, defer_stale_refs?: boolean }
 ---@return string[] refreshed  # The documents that changed.
 ---@return string[] notes
 function M.refresh_marker_docs(opts)
@@ -142,7 +143,8 @@ function M.refresh_marker_docs(opts)
   end
   for _, doc in ipairs(docs) do
     local path = fsio.doc_path(doc)
-    local res, err = plan_scope.refresh_document(path, root, closed)
+    local res, err =
+      plan_scope.refresh_document(path, root, closed, { defer_stale_refs = opts.defer_stale_refs })
     if not res then
       notes[#notes + 1] = tostring(err)
     else
@@ -277,7 +279,7 @@ end
 ---when the plan was what held the project open. `opts.dry_run` writes nothing and says what would happen.
 ---@param kind "plan"|"project"
 ---@param id string
----@param opts? { root?: string, today?: string, dry_run?: boolean }
+---@param opts? { root?: string, today?: string, dry_run?: boolean, defer_stale_refs?: boolean }
 ---@return Tasks.CloseByHand
 function M.close_by_hand(kind, id, opts)
   opts = opts or {}
@@ -337,7 +339,15 @@ function M.close_by_hand(kind, id, opts)
     return out
   end
   out.projects = M.close_projects(project_ids, run)
-  M.refresh_marker_docs({ root = opts.root, closed = res.summaries })
+  local _, refresh_notes = M.refresh_marker_docs({
+    root = opts.root,
+    closed = res.summaries,
+    defer_stale_refs = opts.defer_stale_refs,
+  })
+  if opts.defer_stale_refs then
+    -- the editor says which block it left (the CLI's output of a close stays as it was)
+    vim.list_extend(out.notes, refresh_notes)
+  end
   M.settle_milestones(out, opts)
   return out
 end
@@ -970,8 +980,11 @@ function M.run(id, opts)
   -- c. the generated blocks of the documents the user named, and only those (a batch does this once at its end)
   if opts.refresh_docs ~= false then
     step("refreshing generated plan blocks", function()
-      local refreshed, notes =
-        M.refresh_marker_docs({ root = opts.root, closed = flow.plan_summaries })
+      local refreshed, notes = M.refresh_marker_docs({
+        root = opts.root,
+        closed = flow.plan_summaries,
+        defer_stale_refs = opts.defer_stale_refs,
+      })
       vim.list_extend(flow.docs_refreshed, refreshed)
       vim.list_extend(flow.notes, notes)
     end)

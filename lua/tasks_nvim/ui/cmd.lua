@@ -2528,6 +2528,8 @@ local function finish_task(id, opts)
     outcome = opts.outcome,
     outcome_reason = opts.outcome_reason,
     ci = opts.ci,
+    -- a marker block recorded with `--stale=refs` would date its refs with git: the editor leaves it and says so
+    defer_stale_refs = true,
   })
   if not flow then
     notify.error(tostring(err))
@@ -3000,7 +3002,7 @@ function M.close_by_hand(ctx, kind)
     return
   end
   local function run()
-    local res = done_flow.close_by_hand(kind, id, {})
+    local res = done_flow.close_by_hand(kind, id, { defer_stale_refs = true })
     for _, note in ipairs(res.notes) do
       notify.warn(note)
     end
