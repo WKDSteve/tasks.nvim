@@ -184,6 +184,8 @@ return function(H)
   res = ci.run({ root = root, strict = true, run_lint = runner(0) })
   eq(res.code, 0, "an absent neighbour repo is no warning: " .. table.concat(res.lines, "\n"))
   lacks(table.concat(res.lines, "\n"), "link-missing")
+  -- but the log shows it: the hint is an `info` line, named after the file that links there
+  has(table.concat(res.lines, "\n"), "lib.nvim/ROADMAP/tasks/alpha.md  info link-repo-absent")
   -- the same with the vault given relative to the working directory (`--vault=.`, as a user or a hook calls it)
   local cwd = vim.fn.getcwd()
   vim.fn.chdir(root)

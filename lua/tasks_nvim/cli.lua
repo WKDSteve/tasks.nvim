@@ -301,7 +301,8 @@ commands:
                                           ai-desktop:<job>); --repo adds how that repository is checked before
                                           commit and push (its .testing.lua, else its CLAUDE.md); no vault
   ci [--strict] [--no-lint] [--md-lint=<file>] [--trust-vault-lint]   CI gate: check + index --check + md_lint of the
-                                          generated indexes; exit 0/1 (--strict: warnings fail too).
+                                          generated indexes; exit 0/1 (--strict: warnings fail too; hints
+                                          are shown as info lines and never fail).
                                           md_lint is a script RUN from the vault (TOOLS/scripts/md_lint.lua): it runs only with
                                           --trust-vault-lint (or TASKS_TRUST_VAULT_LINT=1); else --md-lint=<own copy> or --no-lint
   areas [--format=names|tsv|json]        list the vault's areas (tsv: with the open counts, then the area groups as

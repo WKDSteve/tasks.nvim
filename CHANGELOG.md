@@ -29,6 +29,7 @@ the version is not tagged yet (the repository is not published).
 
 ### Changed
 
+- `tasks ci` shows the hints of `check` (severity `info`, e.g. `link-repo-absent`) as `info` lines in its log; they never count, the exit code stays the same, `--strict` included.
 - `tasks index <area> --staged` checks out only the vault's top files and the area's `ROADMAP/` from the staging area instead of the whole vault (`checkout-index --all` of about 8000 files): about 1.5 s instead of 15 s in the real vault. The rows name blockers by id, so no other area is read.
 - `tasks set <id> key=value` takes the id of an open learning path, plan or project as well (when no open task has it) and changes the frontmatter of that file, as `path_set` / `plan_set` / `project_set` do: `tasks set <path> project=<id> status=doing` no longer ends with "no such open task". `tasks-ops/1` (additive): `path_set` takes `tags` (a list; `on-workstation` / `not-on-workstation` go to the promoted tasks).
 - An arrow in the text of a learning point is text unless an id `<area>/<slug>` follows it and nothing but `{xp=…}`, `{#…}` or the reason after that: `Test rot → grün` or `Klick → Route → Engine` is no longer `path-bad-arrow`. A `→` before a word that has the form of an id but is none (`area/Slug`) stays text and is a hint of `check` (`path-bad-arrow`, severity `info`), never a warning; the tree carries such hints in `hints` (not in the contract's `tree_problems`).

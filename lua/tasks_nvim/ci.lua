@@ -4,7 +4,7 @@
 --- One command a pipeline can run (`tasks ci`, or `scripts/tasks-ci.lua`):
 ---
 ---  1. `check`: every rule finding of `tasks.check` (an `error` fails the run;
----     warnings only with `strict`)
+---     warnings only with `strict`; hints are printed as `info` lines and never fail)
 ---  2. `index --check`: no `ROADMAP/TASKS.md` is missing, outdated or an orphan
 ---     (`check` already reports it per area; this step is the explicit,
 ---     counted form, and it also fails on an index that cannot be rendered)
@@ -179,6 +179,11 @@ function M.run(opts, say)
       if f.code == "done-in-roadmap" and f.id then
         done_in_roadmap[#done_in_roadmap + 1] = fsio.clean(f.id)
       end
+    end
+    -- hints (`info`) are shown, never counted: a link into a repository that is not checked out
+    -- (`link-repo-absent`) is otherwise invisible in the log of the gate, `--strict` included
+    for _, h in ipairs(res.hints or {}) do
+      out(check.format(h, root))
     end
     local bad = res.errors + (strict and res.warnings or 0)
     local line = ("check: %d error(s), %d warning(s) in %d area(s), %d task file(s) read"):format(
