@@ -113,6 +113,99 @@ return function(H)
       "and nothing was attached"
     )
 
+    -- ── `:Tasks attach <id> from=clipboard` does not wait for the clipboard program ──
+    -- A stand-in for vim.system whose wait() throws: the program must be read through its exit callback.
+    local real_system = vim.system
+    local real_clip = require("lib.nvim.clipboard_image")
+    local spawned = {}
+    vim.system = function(argv, _, on_exit)
+      spawned[#spawned + 1] = { argv = argv, on_exit = on_exit }
+      return {
+        wait = function()
+          error("from=clipboard waited for the clipboard program", 0)
+        end,
+      }
+    end
+    local function shots_of(id)
+      local t = assert(scan.find(id, { root = root }))
+      return vim.fn.glob(vim.fs.dirname(t.path) .. "/assets/screenshots/*", false, true)
+    end
+    local sys_ok, sys_err = pcall(function()
+      local function from_clipboard(id)
+        cmd.task_attach({
+          rest = {},
+          args = { id = id },
+          kv = { from = "clipboard", name = "", dir = "", kind = "" },
+        })
+      end
+      local function attached_said(id)
+        vim.wait(1000, function()
+          return said():find("attached " .. id, 1, true) ~= nil
+        end, 5)
+        return said():find("attached " .. id, 1, true) ~= nil
+      end
+      cmd.attach_opts = {
+        root = root,
+        today = F.TODAY,
+        now = NOW,
+        clipboard = {
+          platform = "linux",
+          has = function(exe)
+            return exe == "wl-paste"
+          end,
+        },
+      }
+      local t5 = new_task("Clipboard later")
+      notes = {}
+      from_clipboard(t5.id)
+      eq(#spawned, 1, "the clipboard program was started")
+      eq(spawned[1].argv[1], "wl-paste", "the program of the platform")
+      ok(type(spawned[1].on_exit) == "function", "with an exit callback, not a wait")
+      lacks(said(), "attached", "nothing is attached before the program answers")
+      spawned[1].on_exit({ code = 0, stdout = PNG })
+      ok(attached_said(t5.id), "the image is attached once it is there: " .. said())
+      eq(#shots_of(t5.id), 1, "one screenshot in assets/screenshots/")
+
+      -- a newer call drops an older one still waiting: nothing of the older is written
+      local t6 = new_task("Clipboard twice")
+      notes = {}
+      from_clipboard(t6.id)
+      from_clipboard(t6.id)
+      eq(#spawned, 3, "both calls started the program")
+      spawned[2].on_exit({ code = 0, stdout = PNG })
+      spawned[3].on_exit({ code = 0, stdout = PNG })
+      ok(attached_said(t6.id), "the newer call attaches")
+      vim.wait(50, function()
+        return false
+      end)
+      eq(#shots_of(t6.id), 1, "the older call attached nothing")
+      eq(select(2, said():gsub("attached " .. t6.id:gsub("%p", "%%%0"), "")), 1, "said once")
+
+      -- an empty clipboard is said, later
+      notes = {}
+      from_clipboard(t6.id)
+      spawned[4].on_exit({ code = 1, stdout = "" })
+      vim.wait(1000, function()
+        return said():find("no image", 1, true) ~= nil
+      end, 5)
+      has(said(), "no image in the clipboard", "an empty clipboard says so")
+
+      -- an older lib.nvim without save_async: `save`, which waits (here for its replaced runner)
+      package.loaded["lib.nvim.clipboard_image"] = { save = real_clip.save }
+      cmd.attach_opts.clipboard.system = function()
+        return { code = 0, stdout = PNG }
+      end
+      local t7 = new_task("Clipboard old lib")
+      notes = {}
+      from_clipboard(t7.id)
+      package.loaded["lib.nvim.clipboard_image"] = real_clip
+      has(said(), "attached " .. t7.id, "an older lib.nvim still attaches (at once)")
+    end)
+    vim.system = real_system
+    package.loaded["lib.nvim.clipboard_image"] = real_clip
+    cmd.attach_opts = nil
+    ok(sys_ok, tostring(sys_err))
+
     -- ── no clipboard image: the newest screenshot ──
     local shots = H.tmpdir() .. "/shots"
     vim.fn.mkdir(shots, "p")

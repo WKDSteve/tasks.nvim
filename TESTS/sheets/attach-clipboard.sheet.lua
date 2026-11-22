@@ -1,7 +1,8 @@
 -- `:Tasks attach <id> from=clipboard` reads the image on the system clipboard through `lib.nvim.clipboard_image`: one
--- program of the platform (`powershell.exe -STA` on Windows, `pngpaste` on macOS, `wl-paste`/`xclip` on Linux), which
--- blocks the editor until it answers. The programs are recording stand-ins (`fakes`) that hand back no image, so the
--- sheet sees the case of an empty clipboard: the program was asked, the user is told, nothing is attached. The image
+-- program of the platform (`powershell.exe -STA` on Windows, `pngpaste` on macOS, `wl-paste`/`xclip` on Linux), started
+-- in the background (`clipboard_image.save_async`): the editor does not wait for it, the answer comes later. The
+-- programs are recording stand-ins (`fakes`) that hand back no image, so the sheet sees the case of an empty
+-- clipboard: the program was asked, the user is told, nothing is attached. The image
 -- itself (a PNG lands in assets/screenshots/ and the link at the cursor) is `manual`; the specs check it with a replaced
 -- runner (tasks_attach_source_spec).
 -- A fixture vault in a temp folder (never a real vault).
@@ -58,12 +59,18 @@ return {
       note = "the error message of an empty clipboard is expected",
     },
     {
-      expect = [[#_G.calls() == 1]],
-      note = "one clipboard program was asked, while the command ran",
+      wait = [[#_G.calls() == 1]],
+      timeout = 10000,
+      note = "one clipboard program was asked (in the background: the command returned before it answered)",
     },
     {
-      expect = [[_G.said("no image in the clipboard")]],
-      note = "the user is told the clipboard holds no image",
+      wait = [[_G.said("no image in the clipboard")]],
+      timeout = 10000,
+      note = "the user is told the clipboard holds no image, once the program answered",
+    },
+    {
+      expect = [[#_G.calls() == 1]],
+      note = "and it was asked once",
     },
     {
       expect = [[vim.fn.isdirectory(_G.root .. "/lib.nvim/ROADMAP/tasks/show-the-bug") == 0

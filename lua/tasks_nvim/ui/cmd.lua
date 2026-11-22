@@ -2640,6 +2640,9 @@ local function insert_at_cursor(path, text)
   return false
 end
 
+---The number of the newest `:Tasks attach <id> from=clipboard`: an older one whose image comes later is dropped.
+local clipboard_attach_seq = 0
+
 ---Say what an attach did, and put its link where it can be pasted: at the cursor of the task when it is open in a
 ---window, else into the `+` register.
 ---@param res table  # the result of `mutate.attach` / `attach_source.attach`
@@ -2673,6 +2676,10 @@ end
 ---copy the file (the clipboard image, the newest screenshot) into `assets/` (the folder of its kind below it:
 ---`assets/screenshots/` for the clipboard and the newest screenshot) and put the Markdown link at the
 ---cursor of the task when it is open in a window, else into the `+` register, and say so.
+---
+---`from=clipboard` does not wait for the clipboard program (on Windows a PowerShell start): the attach and its
+---report follow when the image is there. A newer `from=clipboard` drops an older one still waiting (nothing of it
+---is written), and the vault is the one of the call, also when it was switched meanwhile.
 ---@param ctx table
 function M.task_attach(ctx)
   if #ctx.rest > 0 then
@@ -2687,6 +2694,16 @@ function M.task_attach(ctx)
     notify.error("kind= takes video, image or screenshot, got " .. kind)
     return
   end
+  ---@param res table|nil
+  ---@param err string|nil
+  local function finish(res, err)
+    if not res then
+      -- The engine speaks CLI (`--name=`); here the same option is `name=<file name>`.
+      notify.error((tostring(err):gsub("pass %-%-name=", "pass name=<file name>")))
+      return
+    end
+    report_attach(res, before)
+  end
   local res, err, too_old
   if from then
     if ctx.args.file and ctx.args.file ~= "" then
@@ -2695,6 +2712,32 @@ function M.task_attach(ctx)
     end
     if from ~= "clipboard" and from ~= "latest" then
       notify.error("from= takes clipboard or latest, got " .. from)
+      return
+    end
+    if from == "clipboard" then
+      local source = require("tasks_nvim.attach_source")
+      clipboard_attach_seq = clipboard_attach_seq + 1
+      local seq = clipboard_attach_seq
+      -- `M.attach_opts`: the seam of the specs (a fake clipboard, the vault).
+      local base = M.attach_opts or {}
+      source.attach_async(
+        ctx.args.id,
+        "clipboard",
+        vim.tbl_extend("force", base, {
+          name = name,
+          kind = kind,
+          root = base.root or vault.root(),
+          cancelled = function()
+            return seq ~= clipboard_attach_seq
+          end,
+        }),
+        function(cres, cerr)
+          if cerr == source.CANCELLED then
+            return
+          end
+          finish(cres, cerr)
+        end
+      )
       return
     end
     res, err, too_old = require("tasks_nvim.attach_source").attach(ctx.args.id, from, {
@@ -2718,12 +2761,7 @@ function M.task_attach(ctx)
       { name = name, kind = kind }
     )
   end
-  if not res then
-    -- The engine speaks CLI (`--name=`); here the same option is `name=<file name>`.
-    notify.error((tostring(err):gsub("pass %-%-name=", "pass name=<file name>")))
-    return
-  end
-  report_attach(res, before)
+  finish(res, err)
 end
 
 ---Attach "a screenshot" to a task: the clipboard image, else the newest screenshot of the screenshot folders. The

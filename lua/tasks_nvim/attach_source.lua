@@ -34,6 +34,8 @@ local M = {}
 ---@field upload_dir? string                 # `upload`: the folder of the caller the file lies in.
 ---@field upload? string                     # `upload`: the plain name of the file in that folder.
 ---@field exact? boolean                     # `upload`: the asset is called `name` or nothing is attached (no counter).
+---@field kind? string                       # The asset kind (default: `screenshot` for clipboard and latest).
+---@field cancelled? fun(): boolean          # `attach_async`: asked before anything is written; true drops the call.
 
 ---The folders screenshots usually land in, per system.
 ---@param os_name? "windows"|"macos"|"linux"
@@ -106,7 +108,62 @@ local function with_counter(name, n)
   return ("%s-%d%s"):format(stem or name, n, ext or "")
 end
 
+---Copy `src` into the task under its name: the given one, or the default with a counter until one is free.
+---@param id string
+---@param mode Tasks.AttachMode
+---@param src string
+---@param ext string
+---@param opts Tasks.AttachSourceOpts
+---@return table|nil res
+---@return string|nil err
+local function place(id, mode, src, ext, opts)
+  local base = {
+    root = opts.root,
+    today = opts.today,
+    index = opts.index,
+    -- The image on the clipboard and the newest image of the screenshot folders are screenshots, wherever the call
+    -- comes from (the editor, the command line, a page); a file somebody sent has the kind its sender names, or none.
+    kind = opts.kind or (mode ~= "upload" and "screenshot" or nil),
+  }
+  local res, aerr
+  if opts.name and (mode ~= "upload" or opts.exact) then
+    res, aerr = mutate.attach(id, src, vim.tbl_extend("force", base, { name = opts.name }))
+  else
+    local name = opts.name or M.default_name(id, ext, opts.now)
+    for n = 1, 50 do
+      local try = n == 1 and name or with_counter(name, n)
+      res, aerr = mutate.attach(id, src, vim.tbl_extend("force", base, { name = try }))
+      if res or not tostring(aerr):find("^asset exists:") then
+        break
+      end
+    end
+  end
+  return res, aerr
+end
+
+---Attach the clipboard image that was saved to `tmp`; the temp file is removed either way.
+---@param id string
+---@param opts Tasks.AttachSourceOpts
+---@param saved boolean
+---@param err string|nil
+---@param tmp string
+---@return table|nil res
+---@return string|nil err
+local function attach_saved(id, opts, saved, err, tmp)
+  if not saved then
+    pcall(vim.uv.fs_unlink, tmp)
+    return nil, err
+  end
+  local res, aerr = place(id, "clipboard", tmp, "png", opts)
+  pcall(vim.uv.fs_unlink, tmp)
+  if res then
+    res.source = "clipboard"
+  end
+  return res, aerr
+end
+
 ---Attach the clipboard image or the newest screenshot to a task.
+---Waits for the clipboard program (on Windows a PowerShell start); the editor uses `attach_async`.
 ---@param id string                    # `<area>/<slug>`
 ---@param mode Tasks.AttachMode
 ---@param opts? Tasks.AttachSourceOpts
@@ -116,17 +173,11 @@ end
 function M.attach(id, mode, opts)
   opts = opts or {}
   local ext = "png"
-  local src, cleanup, source
+  local src, source
   if mode == "clipboard" then
     local tmp = vim.fn.tempname() .. ".png"
     local saved, err = require("lib.nvim.clipboard_image").save(tmp, opts.clipboard)
-    if not saved then
-      return nil, err
-    end
-    src, source = tmp, "clipboard"
-    cleanup = function()
-      pcall(vim.uv.fs_unlink, tmp)
-    end
+    return attach_saved(id, opts, saved, err, tmp)
   elseif mode == "latest" then
     local max_age = opts.max_age_s or require("tasks_nvim.config").get().attach.max_age_s
     local found, err, too_old = require("lib.nvim.fs.latest_file").find(
@@ -150,34 +201,45 @@ function M.attach(id, mode, opts)
     return nil, "attach source must be 'clipboard' or 'latest' or 'upload'"
   end
 
-  local base = {
-    root = opts.root,
-    today = opts.today,
-    index = opts.index,
-    -- The image on the clipboard and the newest image of the screenshot folders are screenshots, wherever the call
-    -- comes from (the editor, the command line, a page); a file somebody sent has the kind its sender names, or none.
-    kind = opts.kind or (mode ~= "upload" and "screenshot" or nil),
-  }
-  local res, aerr
-  if opts.name and (mode ~= "upload" or opts.exact) then
-    res, aerr = mutate.attach(id, src, vim.tbl_extend("force", base, { name = opts.name }))
-  else
-    local name = opts.name or M.default_name(id, ext, opts.now)
-    for n = 1, 50 do
-      local try = n == 1 and name or with_counter(name, n)
-      res, aerr = mutate.attach(id, src, vim.tbl_extend("force", base, { name = try }))
-      if res or not tostring(aerr):find("^asset exists:") then
-        break
-      end
-    end
-  end
-  if cleanup then
-    cleanup()
-  end
+  local res, aerr = place(id, mode, src, ext, opts)
   if res then
     res.source = source
   end
   return res, aerr
+end
+
+---The answer of `attach_async` when `opts.cancelled()` said the call is no longer wanted: nothing was attached.
+M.CANCELLED = "attach: cancelled"
+
+---`attach` without waiting for the clipboard program: `on_done(res, err, too_old)` gets what `attach` returns.
+---`clipboard` asks `lib.nvim.clipboard_image.save_async` (an older lib.nvim without it: `save`, which waits) and
+---answers on a later tick; `opts.cancelled()` is asked once the image is there, before anything is written -- true:
+---the temp file is removed and the answer is `nil, M.CANCELLED`. The other modes read only folders and answer at once.
+---@param id string
+---@param mode Tasks.AttachMode
+---@param opts? Tasks.AttachSourceOpts
+---@param on_done fun(res: table|nil, err: string|nil, too_old: table|nil)
+function M.attach_async(id, mode, opts, on_done)
+  opts = opts or {}
+  if mode ~= "clipboard" then
+    on_done(M.attach(id, mode, opts))
+    return
+  end
+  local clip = require("lib.nvim.clipboard_image")
+  local tmp = vim.fn.tempname() .. ".png"
+  local function saved(ok, err)
+    if opts.cancelled and opts.cancelled() then
+      pcall(vim.uv.fs_unlink, tmp)
+      on_done(nil, M.CANCELLED)
+      return
+    end
+    on_done(attach_saved(id, opts, ok, err, tmp))
+  end
+  if clip.save_async then
+    clip.save_async(tmp, opts.clipboard, saved)
+  else
+    saved(clip.save(tmp, opts.clipboard))
+  end
 end
 
 return M
