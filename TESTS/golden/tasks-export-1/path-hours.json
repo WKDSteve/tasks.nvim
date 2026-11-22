@@ -1,7 +1,7 @@
 {
   "body": "\n## Lernpunkte\n\n- [ ] Stufe 1 · Grundlagen {#s1}\n  - [x] Was ist ein Prozess {xp=10}\n  - [!] Scheduler {#sched}\n  - [ ] Woche 1: fork und exec {h=4-6} {done_h=2} {xp=20} {#w1}\n    - [ ] [man fork](https://man7.org/linux/man-pages/man2/fork.2.html) {xp=5}\n      > Notiz: Rückgabewert prüfen.\n    - [ ] Nachweis: eine Shell in C {for=p3} {#shell}\n  - [ ] Treiber laden {machine=private} {safety} {#drv}\n- [ ] Stufe 2 · Speicher {#s2}\n  - [ ] Seitentabellen {h=2} {#pt}\n  - [ ] Extras {optional}\n    - [ ] Huge Pages\n",
   "body_truncated": false,
-  "digest": "sha256:2011f378b92d7c6e",
+  "digest": "sha256:3a395ef3fb0ed657",
   "engine": {
     "git": "0000000",
     "nvim": "0.0.0",
@@ -161,7 +161,7 @@
       "derived": "open",
       "index": 6,
       "key": "shell",
-      "label": "Nachweis: eine Shell in C {for=p3}",
+      "label": "Nachweis: eine Shell in C",
       "line": 10,
       "mark": " ",
       "parent": 4,
@@ -420,7 +420,7 @@
       "open_min": 2,
       "planned_max": 6,
       "planned_min": 4,
-      "result": "eine Shell in C {for=p3}",
+      "result": "eine Shell in C",
       "state": "open",
       "total": 2
     },

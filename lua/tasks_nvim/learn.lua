@@ -7,6 +7,10 @@
 ---    open (an unknown mark reads as open, as in `lernbaum`), not blocked, not `{optional}` nor below an optional node,
 ---    and, with a machine, one it may be practised on (`lernbaum.on_machine`).
 ---  - `stage_of`: the stage of a node, the root it stands below (itself for a root).
+---  - `hours`: the planned, done and open hours of a tree.
+---  - `notes`: the points with a note, a link or an image, searched without case.
+---  - `evidence`: the points whose label starts with `Nachweis:`, `Aufgabe:` or `Ergebnis:` (`{for=t4}` names the
+---    stage they prove).
 ---
 --- Pure Lua, no I/O: `contract_learn` reads the paths.
 
@@ -164,6 +168,37 @@ function M.notes(tree, opts)
       has = hay:find(opts.query, 1, true) ~= nil
     end
     if has then
+      out[#out + 1] = node
+    end
+  end
+  return out
+end
+
+---The words a point's label starts with when it is evidence (`Nachweis: eine Shell in C`), as `path_schedule` finds
+---the result of a session.
+M.EVIDENCE_WORDS = { "Nachweis", "Aufgabe", "Ergebnis", "Evidence", "Result" }
+
+---Whether a point is evidence: its label starts with one of `EVIDENCE_WORDS` and a colon (any case).
+---@param node Tasks.LernNode
+---@return boolean
+function M.is_evidence(node)
+  local label = vim.trim(node.label or ""):lower()
+  for _, w in ipairs(M.EVIDENCE_WORDS) do
+    if label:match("^" .. w:lower() .. "%s*:") then
+      return true
+    end
+  end
+  return false
+end
+
+---The points of a tree that are evidence (`is_evidence`), in document order; an optional one too (it is evidence all
+---the same).
+---@param tree Tasks.LernTree
+---@return Tasks.LernNode[]
+function M.evidence(tree)
+  local out = {}
+  for _, node in ipairs(tree and tree.nodes or {}) do
+    if M.is_evidence(node) then
       out[#out + 1] = node
     end
   end

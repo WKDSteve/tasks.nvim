@@ -610,7 +610,9 @@ the XP (or percent) missing, `open_rewards` the rewards reached but not granted.
 A path with a fixed rhythm (weeks, sessions) keeps its sessions as points of the tree and its schedule made from them,
 not twice. `{h=N}` or `{h=N-M}` on a point (beside `{xp=…}`, any order; whole hours or one decimal, up to 1000) are
 the hours it is planned for, `{done_h=N}` the hours it took (`LP-10`); any node may carry them, nothing sums them up
-the tree, a value that is no such number is `path-bad-hours`. `tasks_nvim.path_schedule` makes the table of
+the tree, a value that is no such number is `path-bad-hours`. A point whose label starts with `Nachweis:`, `Aufgabe:` or `Ergebnis:` (`Evidence:`, `Result:`) is evidence
+(`tasks.learn_evidence`); `{for=t4}` or `{for=p3.5}` on it names the stage of the competence scale it proves (`t`
+theory, `p` practice, 0 to 8 in halves), anything else there is `path-bad-for`. `tasks_nvim.path_schedule` makes the table of
 `## Zeitplan` from the points with hours one level below a stage (or a stage itself): `Sitzung`, `Dauer` (planned,
 and taken), `Ergebnis` (the first child `Nachweis:`, `Aufgabe:` or `Ergebnis:`), `Stand` (`offen`, `teilweise n/m`,
 `erledigt`), and a row that sums the hours. `tasks path <id> --schedule --write` (`paths.write_schedule`) writes it

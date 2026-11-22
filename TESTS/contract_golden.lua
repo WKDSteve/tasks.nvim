@@ -765,6 +765,17 @@ G.cases = {
     end,
   },
   {
+    -- the evidence of all paths (capability `learn_evidence`): a `Nachweis:` and an `Ergebnis:` point with the stage
+    -- they prove, the competence of their path, and with `include_done` the evidence of a finished path, given
+    name = "learn-evidence",
+    method = "learn_evidence",
+    fresh = true,
+    request = function(root)
+      G.write_learn_paths(root)
+      return '{"params":{"include_done":true}}'
+    end,
+  },
+  {
     -- the hours of a path (capability `path_hours`): planned as a span, done, open; the sessions of `## Zeitplan`
     -- with their hours, their result and their state; a leaf with hours below a session counts in the session only
     name = "path-hours",

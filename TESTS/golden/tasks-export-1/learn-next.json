@@ -1,5 +1,5 @@
 {
-  "digest": "sha256:47777be029f25528",
+  "digest": "sha256:67b256c89fabd861",
   "engine": {
     "git": "0000000",
     "nvim": "0.0.0",
@@ -27,7 +27,7 @@
         {
           "index": 6,
           "key": "shell",
-          "label": "Nachweis: eine Shell in C {for=p3}",
+          "label": "Nachweis: eine Shell in C",
           "stage_index": 1,
           "stage_label": "Stufe 1 · Grundlagen"
         }
@@ -50,9 +50,9 @@
         {
           "index": 2,
           "key": "handler",
-          "label": "Ergebnis: ein Handler {for=t2}",
+          "label": "Ergebnis: ein Handler",
           "stage_index": 2,
-          "stage_label": "Ergebnis: ein Handler {for=t2}"
+          "stage_label": "Ergebnis: ein Handler"
         }
       ],
       "project": "lib.nvim/os",

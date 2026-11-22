@@ -99,7 +99,7 @@
 ---  - learning paths (`<area>/ROADMAP/paths/`, `tasks_nvim.paths`): a broken path file with the codes of a plan file
 ---    as `path-...` (and `path-no-stages`); `path-id-taken` (error); `path-reason-missing`, `path-duplicate-key`,
 ---    `path-bad-key`, `path-bad-mark`, `path-image-outside`, `path-arrow-dangling`, `path-image-missing`, `path-cycle`,
----    `path-bad-xp`, `path-bad-hours`, `path-stray-line` (warnings, the last also for a task's own tree): the tree of
+---    `path-bad-xp`, `path-bad-hours`, `path-bad-for`, `path-stray-line` (warnings, the last also for a task's own tree): the tree of
 ---    `## Lernpunkte` (`path-stray-line`: a line that is no point, no note and not empty); `path-bad-arrow` (a hint): an arrow before a word that
 ---    looks like an id but is none, read as text; `path-link-missing`
 ---    (warning): a relative link of the path that leads to no file (as `link-missing`; into a neighbour repo that

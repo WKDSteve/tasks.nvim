@@ -16,7 +16,7 @@
 --- none closed: open; else partial), and it is closed when every leaf is. Progress is always counted apart: learned,
 --- seen, dropped, open (blocked ones counted as open and once more as blocked).
 ---
---- A node line reads `<label>[ → <id>][ – Grund: <reason>][ {xp=N}][ {h=N}][ {done_h=N}][ {optional}][ {machine=a,b}][ {safety}][ {#key}]`;
+--- A node line reads `<label>[ → <id>][ – Grund: <reason>][ {xp=N}][ {h=N}][ {done_h=N}][ {for=t4}][ {optional}][ {machine=a,b}][ {safety}][ {#key}]`;
 --- the marks in braces come last (in any order), the reason after the label (also `Reason:`, and `—` or `-` as the
 --- dash), the arrow names the task the node was promoted to. An arrow is a reference only when an id `<area>/<slug>` follows it and nothing but the marks after
 --- that; any other arrow (`Test rot → grün`) is text of the label. A `> ` line indented
@@ -37,6 +37,9 @@
 --- point is planned for, `{done_h=N}` the hours it took (`LP-10`); whole numbers or one decimal (`1.5`), up to
 --- `MAX_HOURS`. Any node may carry them; nothing sums them up the tree. A value that is no such number is
 --- `path-bad-hours`.
+---
+--- Evidence (optional, `tasks_nvim.learn`): `{for=t4}` / `{for=p3.5}` says for which stage of the competence scale a
+--- point is evidence, `t` theory or `p` practice, a stage 0 to 8 in halves; anything else is `path-bad-for`.
 ---
 --- Optional (`{optional}` on a node, mostly a group such as the books of a path): the node and its subtree count for
 --- nothing that says how far the path is: `tree.progress` and `tree.xp` hold the other points only (progress, percent
@@ -111,6 +114,24 @@ function M.to_hours(v)
   end
   local n = tonumber(t)
   return (n and n <= M.MAX_HOURS) and n or nil
+end
+
+---The stage `{for=…}` names: the axis (`t` theory, `p` practice) and a stage 0 to 8 in halves (`t4`, `p3.5`,
+---`P 3,5`); nil for anything else.
+---@param v string
+---@return "t"|"p"|nil axis
+---@return number|nil level
+function M.to_for(v)
+  local axis, n = vim.trim(v or ""):lower():match("^([tp])%s*(%d[%.,]?%d?)$")
+  if not axis then
+    return nil
+  end
+  local level = tonumber((n:gsub(",", ".")))
+  if not level or level > 8 or (level * 2) ~= math.floor(level * 2) then
+    return nil
+  end
+  return axis, --[[@as "t"|"p"]]
+    level == math.floor(level) and math.floor(level) or level
 end
 
 ---The planned hours of `{h=…}`: `8` (8 to 8) or a span `8-10` (also with an en dash); nil when it is none.
@@ -210,6 +231,9 @@ end
 ---@field h_max? number
 ---@field done_h_raw? string     # The text of `{done_h=…}` as written.
 ---@field done_h? number         # The hours it took.
+---@field for_raw? string        # The text of `{for=…}` as written.
+---@field for_axis? "t"|"p"      # The axis `{for=…}` names (theory, practice); nil without or when it is none.
+---@field for_level? number      # The stage it names, 0..8 in halves.
 ---@field optional? boolean      # `{optional}` on its own line.
 ---@field safety? boolean        # `{safety}`: a danger the reader must have read; holds for the subtree.
 ---@field machine_raw? string    # The text of `{machine=…}` as written.
@@ -396,13 +420,14 @@ end
 
 ---Split the text after the mark into label, arrow, reason and key.
 ---@param text string
----@return { label: string, safety?: boolean, machine_raw?: string, key?: string, xp?: integer, xp_raw?: string, h_raw?: string, done_h_raw?: string, optional?: boolean, reason?: string, promoted?: string, arrow_bad?: string }
+---@return { label: string, safety?: boolean, machine_raw?: string, key?: string, xp?: integer, xp_raw?: string, h_raw?: string, done_h_raw?: string, for_raw?: string, optional?: boolean, reason?: string, promoted?: string, arrow_bad?: string }
 function M.split(text)
   local rest = text:gsub("%s+$", "")
   local out = {}
   -- the key, the XP, the hours and the optional mark at the end, in any order, each once
-  for _ = 1, 7 do
+  for _ = 1, 8 do
     local before, key = rest:match("^(.-)%s*{#([^{}%s]+)}$")
+    local b8, fr = rest:match("^(.-)%s*{for=([^{}]*)}$")
     local b6, mach = rest:match("^(.-)%s*{machine=([^{}]*)}$")
     local b7 = rest:match("^(.-)%s*{safety}$")
     local b3 = rest:match("^(.-)%s*{optional}$")
@@ -420,6 +445,8 @@ function M.split(text)
       rest, out.h_raw = b4, h
     elseif b5 and not out.done_h_raw then
       rest, out.done_h_raw = b5, dh
+    elseif b8 and not out.for_raw then
+      rest, out.for_raw = b8, fr
     else
       local b2, raw = rest:match("^(.-)%s*{xp=([^{}]*)}$")
       if b2 and out.xp == nil and out.xp_raw == nil then
@@ -696,6 +723,7 @@ function M.parse(body)
             machine = parts.machine_raw and M.to_machines(parts.machine_raw) or nil,
             h_raw = parts.h_raw,
             done_h_raw = parts.done_h_raw,
+            for_raw = parts.for_raw,
             in_optional = false,
             opt_progress = zero(),
             opt_xp = zero_xp(),
@@ -767,6 +795,19 @@ function M.parse(body)
                 ("{done_h=%s} is no hours (8 or 1.5, up to %d)"):format(
                   parts.done_h_raw,
                   M.MAX_HOURS
+                ),
+                parts.key
+              )
+            end
+          end
+          if parts.for_raw then
+            node.for_axis, node.for_level = M.to_for(parts.for_raw)
+            if not node.for_axis then
+              problem(
+                "path-bad-for",
+                i,
+                ("{for=%s} names no stage (t or p and a stage 0 to 8 in halves: t4, p3.5)"):format(
+                  parts.for_raw
                 ),
                 parts.key
               )
@@ -890,6 +931,9 @@ local function line_of(node)
   end
   if node.done_h_raw then
     parts[#parts + 1] = " {done_h=" .. node.done_h_raw .. "}"
+  end
+  if node.for_raw then
+    parts[#parts + 1] = " {for=" .. node.for_raw .. "}"
   end
   if node.optional then
     parts[#parts + 1] = " {optional}"

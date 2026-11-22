@@ -1,0 +1,68 @@
+{
+  "digest": "sha256:da9d3237cccf7f49",
+  "engine": {
+    "git": "0000000",
+    "nvim": "0.0.0",
+    "version": "0.1.0-test"
+  },
+  "generated_at": "2026-01-01T00:00:00Z",
+  "incomplete": [],
+  "items": [
+    {
+      "area": "lib.nvim",
+      "competence": [
+        "lib.nvim/betriebssysteme"
+      ],
+      "for": {
+        "axis": "p",
+        "level": 3
+      },
+      "index": 6,
+      "key": "shell",
+      "label": "Nachweis: eine Shell in C",
+      "path": "lib.nvim/prozesse",
+      "stage_index": 1,
+      "stage_label": "Stufe 1 · Grundlagen",
+      "state": "open",
+      "title": "Prozesse"
+    },
+    {
+      "area": "lib.nvim",
+      "for": {
+        "axis": "t",
+        "level": 2
+      },
+      "index": 2,
+      "key": "handler",
+      "label": "Ergebnis: ein Handler",
+      "path": "lib.nvim/signale",
+      "stage_index": 2,
+      "stage_label": "Ergebnis: ein Handler",
+      "state": "open",
+      "title": "Signale"
+    },
+    {
+      "area": "lib.nvim",
+      "for": {
+        "axis": "p",
+        "level": 2
+      },
+      "index": 2,
+      "key": "skript",
+      "label": "Nachweis: ein Skript mit Tests",
+      "path": "lib.nvim/shell",
+      "path_done": true,
+      "stage_index": 2,
+      "stage_label": "Nachweis: ein Skript mit Tests",
+      "state": "learned",
+      "title": "Shell"
+    }
+  ],
+  "kind": "tasks.learn_evidence",
+  "plugin": "tasks.nvim",
+  "rev": "rev:cb8268",
+  "schema": 1,
+  "vault": {
+    "id": "vault"
+  }
+}

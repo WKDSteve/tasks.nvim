@@ -8,6 +8,8 @@
 ---  - `learn notes [<text>] [--kind=note|link|image] [--area=a,b] [--paths=id,id] [--done] [--limit=N]
 ---    [--format=tsv|json]`: the notes, links and images of the points of all paths (`tasks.learn_notes`), `--done`
 ---    with the finished paths
+---  - `learn evidence [<area>] [--competence=<id>] [--paths=id,id] [--done] [--format=tsv|json]`: the evidence of all
+---    paths (`tasks.learn_evidence`), `--done` with the finished paths (the portfolio)
 ---
 --- Read only. `cli.lua` registers it (`register`).
 
@@ -15,6 +17,9 @@ local contract = require("tasks_nvim.contract")
 local fsio = require("tasks_nvim.fsio")
 
 local M = {}
+
+M.USAGE_EVIDENCE =
+  "learn evidence [<area>] [--competence=<id>] [--paths=id,id] [--done] [--format=tsv|json]"
 
 M.USAGE_NOTES =
   "learn notes [<text>] [--kind=note|link|image] [--area=a,b] [--paths=id,id] [--done] [--limit=N] [--format=tsv|json]"
@@ -232,15 +237,53 @@ local function competences(ctx)
   return 0
 end
 
+---@param ctx Tasks.CliCtx
+---@return integer
+local function learn_evidence(ctx)
+  local args, opt = ctx.args, ctx.args.opt
+  local format = opt.format or "tsv"
+  if (format ~= "tsv" and format ~= "json") or #args.pos > 2 then
+    ctx.warn("error: usage: " .. M.USAGE_EVIDENCE)
+    return 2
+  end
+  local doc, err = require("tasks_nvim.contract_learn").evidence({
+    competence = opt.competence ~= nil and tostring(opt.competence) or nil,
+    area = args.pos[2],
+    paths = list_opt(opt.paths),
+    include_done = opt.done == true or nil,
+  }, { root = ctx.eo.root, today = ctx.eo.today })
+  if format == "json" then
+    return emit_json(ctx, doc, err)
+  end
+  if not doc then
+    return fail(ctx, err)
+  end
+  for _, it in ipairs(doc.items) do
+    local f = it["for"]
+    ctx.say(table.concat({
+      fsio.clean(it.path),
+      it.key and ("#" .. fsio.clean(it.key)) or ("#" .. it.index),
+      it.state,
+      f and (f.axis:upper() .. ("%g"):format(f.level)) or "-",
+      fsio.clean(it.label),
+      fsio.clean(it.link or ""),
+    }, "\t"))
+  end
+  for _, e in ipairs(doc.incomplete) do
+    ctx.warn("warn: skipped " .. fsio.clean(e))
+  end
+  return 0
+end
+
 ---The subcommands of `learn`.
-local SUBS = { next = learn_next, notes = learn_notes }
+local SUBS = { next = learn_next, notes = learn_notes, evidence = learn_evidence }
 
 ---@param ctx Tasks.CliCtx
 ---@return integer
 local function run(ctx)
   local sub = SUBS[ctx.args.pos[1] or ""]
   if not sub then
-    ctx.warn("error: usage: " .. M.USAGE .. "  |  " .. M.USAGE_NOTES)
+    ctx.warn("error: usage: " .. M.USAGE .. "  |  " .. M.USAGE_NOTES .. "  |  " .. M.USAGE_EVIDENCE)
     return 2
   end
   return sub(ctx)
@@ -249,8 +292,10 @@ end
 ---@param commands table<string, fun(ctx: Tasks.CliCtx): integer>
 ---@param specs table<string, Tasks.CliSpec>
 function M.register(commands, specs)
-  specs.learn =
-    { value = { "machine", "n", "paths", "format", "kind", "area", "limit" }, flag = { "done" } }
+  specs.learn = {
+    value = { "machine", "n", "paths", "format", "kind", "area", "limit", "competence" },
+    flag = { "done" },
+  }
   commands.learn = run
   specs.competences = { value = { "format" }, flag = {} }
   commands.competences = competences

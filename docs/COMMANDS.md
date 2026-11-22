@@ -1108,6 +1108,10 @@ contract: `tasks.learn_next`, `tasks.learn_notes`, `tasks.competences`, [CONTRAC
 - `tasks learn notes [<text>] [--kind=note|link|image] [--area=a,b] [--paths=id,id] [--done] [--limit=N]`: the
   notes, links and images of the points of all paths; `<text>` searches label, note and link without case, `--done`
   adds the finished paths.
+- `tasks learn evidence [<area>] [--competence=<id>] [--paths=id,id] [--done]`: the evidence of the paths, the points
+  whose label starts with `Nachweis:`, `Aufgabe:` or `Ergebnis:`; `{for=t4}` (or `{for=p3.5}`) on such a point names
+  the stage of the competence scale it proves. `--competence` keeps the paths that serve it, `--done` adds the
+  finished paths.
 - `tasks competences [<area>]`: the competences of the vault, one file per field of knowledge in
   `<area>/ROADMAP/competences/<slug>.md`:
 

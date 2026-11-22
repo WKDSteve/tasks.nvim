@@ -415,4 +415,68 @@ function M.competences(params, opts)
   end)
 end
 
+---`tasks.learn_evidence`: the evidence of all learning paths (`learn.evidence`: points whose label starts with
+---`Nachweis:`, `Aufgabe:` or `Ergebnis:`), each with its path, the competences the path serves, its stage, state, link
+---and the stage it proves (`{for=t4}`); narrowed to the paths that serve a `competence`, to areas and paths, with
+---`include_done` the finished paths too (their evidence is the portfolio). Open paths by id, then the finished ones.
+---@param params? { competence?: string, area?: string, areas?: string[], paths?: string[], include_done?: boolean }
+---@param opts? { root?: string }
+---@return table|nil doc
+---@return Tasks.ContractError|string|nil err
+function M.evidence(params, opts)
+  params = params or {}
+  if params.competence ~= nil then
+    local a, s, e = vault.parse_id(params.competence)
+    if not a or not s or e then
+      return nil, bad_argument("competence: expected <area>/<slug>")
+    end
+  end
+  return fsio.read_scope(function()
+    local root, rerr = vault.root(opts)
+    if not root then
+      return nil, rerr
+    end
+    local files, incomplete = M.scope(root, params)
+    if not files then
+      return nil, incomplete
+    end
+    local items, lines = {}, {}
+    for _, f in ipairs(files) do
+      if params.competence == nil or vim.tbl_contains(f.competence or {}, params.competence) then
+        local text = fsio.read(f.path)
+        local done = f.location == "backlog"
+        vim.list_extend(lines, M.rev_lines(f, text))
+        if done then
+          lines[#lines + 1] = "done:" .. f.id
+        end
+        for _, node in ipairs(learn.evidence(f.tree)) do
+          local stage = learn.stage_of(node)
+          items[#items + 1] = json.object({
+            path = f.id,
+            area = f.area,
+            title = f.title,
+            path_done = done or nil,
+            competence = f.competence and vim.list_slice(f.competence, 1) or nil,
+            index = node.index,
+            key = node.key,
+            label = node.label,
+            stage_index = stage.index,
+            stage_label = stage.label,
+            state = node.derived,
+            link = node.link,
+            ["for"] = node.for_axis
+                and json.object({ axis = node.for_axis, level = node.for_level })
+              or nil,
+          })
+        end
+      end
+    end
+    local doc = contract.head("tasks.learn_evidence", root)
+    doc.competence = params.competence
+    doc.items = json.array(items)
+    doc.incomplete = incomplete
+    return contract.seal(doc, contract.doc.rev_of(lines)), nil
+  end)
+end
+
 return M

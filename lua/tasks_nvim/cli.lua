@@ -141,6 +141,11 @@ commands:
                                           the notes, links and images of the learning points of all paths, those
                                           whose label, note or link contain <text> (any case); --done adds the
                                           finished paths; a line per point (path, #key, state, label, note or link)
+  learn evidence [<area>] [--competence=<id>] [--paths=id,id] [--done] [--format=tsv|json]
+                                          the evidence of the learning paths: points whose label starts with
+                                          Nachweis:, Aufgabe: or Ergebnis: ({for=t4}: the stage it proves); --done
+                                          adds the finished paths; a line per point (path, #key, state, stage, label,
+                                          link)
   competences [<area>] [--format=tsv|json]
                                           the competences (<area>/ROADMAP/competences/<slug>.md): id, stage in
                                           theory (T) and practice (P), targets in 12 and 24 months, the learning

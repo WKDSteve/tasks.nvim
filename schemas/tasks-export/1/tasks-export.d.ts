@@ -33,6 +33,7 @@ export type TasksExport =
   | PathDocument
   | LearnNext
   | LearnNotes
+  | LearnEvidence
   | Competences
   | Milestones
   | MilestoneDocument
@@ -1220,6 +1221,57 @@ export type LearnNotes = Head & {
   }[];
   total: number;
   truncated: boolean;
+  incomplete: string[];
+};
+/**
+ * tasks.learn_evidence: the evidence of all learning paths: the points whose label starts with `Nachweis:`, `Aufgabe:` or `Ergebnis:` (`Evidence:`, `Result:`), each with its path, the competences the path serves, its stage, state, link and the stage of the competence scale it proves (`{for=t4}`). Narrowed to the paths that serve `competence`, to areas and paths; with `include_done` the finished paths too. Open paths by id, then the finished ones, each in document order. Capability `learn_evidence`.
+ */
+export type LearnEvidence = Head & {
+  kind: "tasks.learn_evidence";
+  rev: Rev;
+  digest: Digest;
+  /**
+   * The competence asked for.
+   */
+  competence?: string;
+  items: {
+    path: string;
+    area: string;
+    title: string;
+    /**
+     * The path is finished (from a Backlog, `include_done`).
+     */
+    path_done?: true;
+    /**
+     * The competences the path serves (`competence:`).
+     *
+     * @minItems 1
+     */
+    competence?: [string, ...string[]];
+    index: number;
+    key?: string;
+    /**
+     * As written (Markdown, untrusted), the word `Nachweis:` and the like included.
+     */
+    label: string;
+    stage_index: number;
+    stage_label: string;
+    /**
+     * The state shown (`PathNode.derived`): `learned` is evidence given.
+     */
+    state: "open" | "learned" | "seen" | "dropped" | "blocked" | "partial";
+    /**
+     * The first link of the label: where the evidence lies.
+     */
+    link?: string;
+    /**
+     * The stage it proves (`{for=t4}`): `t` theory or `p` practice.
+     */
+    for?: {
+      axis: "t" | "p";
+      level: CompetenceLevel;
+    };
+  }[];
   incomplete: string[];
 };
 /**
