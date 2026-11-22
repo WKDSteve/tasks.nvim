@@ -1,5 +1,5 @@
 {
-  "digest": "sha256:f65de3d93fac58a8",
+  "digest": "sha256:d1607547a3b144af",
   "engine": {
     "git": "0000000",
     "nvim": "0.0.0",
@@ -43,9 +43,9 @@
         {
           "index": 1,
           "key": "term",
-          "label": "SIGTERM und SIGKILL",
+          "label": "SIGTERM und SIGKILL ![Ablauf](assets/signale.svg)",
           "stage_index": 1,
-          "stage_label": "SIGTERM und SIGKILL"
+          "stage_label": "SIGTERM und SIGKILL ![Ablauf](assets/signale.svg)"
         },
         {
           "index": 2,
@@ -63,7 +63,7 @@
   "kind": "tasks.learn_next",
   "machine": "workstation",
   "plugin": "tasks.nvim",
-  "rev": "rev:d40900",
+  "rev": "rev:a9f35a",
   "schema": 1,
   "vault": {
     "id": "vault"

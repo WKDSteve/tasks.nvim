@@ -32,6 +32,7 @@ export type TasksExport =
   | Paths
   | PathDocument
   | LearnNext
+  | LearnNotes
   | Milestones
   | MilestoneDocument
   | DonePreview
@@ -1173,6 +1174,47 @@ export type LearnNext = Head & {
      */
     points: [LearnPoint, ...LearnPoint[]];
   }[];
+  incomplete: string[];
+};
+/**
+ * tasks.learn_notes: the points of all learning paths that carry a note (`> ` lines), a link or an image, narrowed to a `kind` and a search text (`query`: a part of the label, the note or the link, without case), each with its path, stage and state; open paths by id, then with `include_done` the finished ones, each in document order. At most `limit` (default 200); `total` counts every hit. Capability `learn_notes`.
+ */
+export type LearnNotes = Head & {
+  kind: "tasks.learn_notes";
+  rev: Rev;
+  digest: Digest;
+  items: {
+    path: string;
+    area: string;
+    title: string;
+    /**
+     * The path is finished (from a Backlog, `include_done`).
+     */
+    path_done?: true;
+    index: number;
+    key?: string;
+    /**
+     * As written (Markdown, untrusted).
+     */
+    label: string;
+    stage_index: number;
+    stage_label: string;
+    /**
+     * The state shown (`PathNode.derived`).
+     */
+    state: "open" | "learned" | "seen" | "dropped" | "blocked" | "partial";
+    /**
+     * The `> ` lines below the point, joined by newlines (Markdown, untrusted).
+     */
+    note?: string;
+    link?: string;
+    /**
+     * A file below `assets/` of the path; a client draws it as an image only.
+     */
+    image?: string;
+  }[];
+  total: number;
+  truncated: boolean;
   incomplete: string[];
 };
 /**

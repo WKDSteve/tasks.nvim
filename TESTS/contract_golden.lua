@@ -303,7 +303,8 @@ function G.write_learn_paths(root)
       "",
       "## Lernpunkte",
       "",
-      "- [ ] SIGTERM und SIGKILL {#term}",
+      "- [ ] SIGTERM und SIGKILL ![Ablauf](assets/signale.svg) {#term}",
+      "  > Quelle: APUE, Kapitel 10.",
       "- [ ] Ergebnis: ein Handler {for=t2} {#handler}",
       "",
     }, "\n")
@@ -311,6 +312,25 @@ function G.write_learn_paths(root)
   put(
     dir .. "/spaeter.md",
     "---\ntitle: Später\nstatus: planning\ncreated: 2026-01-01\nupdated: 2026-01-06\n---\n\n## Lernpunkte\n\n- [ ] Irgendwann\n"
+  )
+  put(
+    root .. "/lib.nvim/Backlog/FEATURES/2026-01-02_shell.md",
+    table.concat({
+      "---",
+      "title: Shell",
+      "status: done",
+      "closed_kind: path",
+      "created: 2026-01-01",
+      "updated: 2026-01-02",
+      "---",
+      "",
+      "## Lernpunkte",
+      "",
+      "- [x] [Bash-Handbuch](https://www.gnu.org/software/bash/manual/) {#bash}",
+      "  > Notiz: `set -euo pipefail` am Anfang.",
+      "- [x] Nachweis: ein Skript mit Tests {for=p2} {#skript}",
+      "",
+    }, "\n")
   )
   put(
     dir .. "/pause.md",
@@ -696,6 +716,17 @@ G.cases = {
     request = function(root)
       G.write_learn_paths(root)
       return '{"params":{"machine":"workstation","n":2}}'
+    end,
+  },
+  {
+    -- the notes, links and images of the points of all paths (capability `learn_notes`): a point with a link and a
+    -- note, one with an image and a note, and with `include_done` those of a finished path
+    name = "learn-notes",
+    method = "learn_notes",
+    fresh = true,
+    request = function(root)
+      G.write_learn_paths(root)
+      return '{"params":{"include_done":true}}'
     end,
   },
   {

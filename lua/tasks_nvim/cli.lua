@@ -137,6 +137,10 @@ commands:
                                           path the first N (3) open points in their order that are not blocked, not
                                           optional and, with --machine, may be practised there; a line per point
                                           (path, #key, stage, label, safety)
+  learn notes [<text>] [--kind=note|link|image] [--area=a,b] [--paths=id,id] [--done] [--limit=N] [--format=tsv|json]
+                                          the notes, links and images of the learning points of all paths, those
+                                          whose label, note or link contain <text> (any case); --done adds the
+                                          finished paths; a line per point (path, #key, state, label, note or link)
   paths [<area>] [--project=<id>] [--format=tsv|json]
                                           the learning paths: id, status, points, open points, progress in percent
                                           (of the XP, else of the points), title; --project: the paths of a project,

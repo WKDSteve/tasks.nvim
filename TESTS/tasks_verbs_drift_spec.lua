@@ -69,7 +69,10 @@ return function(H)
   local OPTIONS = {
     -- `:Tasks learn` changes the mark of the point under the cursor; `tasks learn next` asks what to learn next over
     -- all paths (`tasks.learn_next`), a query for a shell or a script, not a change in a buffer
-    ["learn"] = { composer = {}, cli = { "format", "machine", "n", "paths" } },
+    ["learn"] = {
+      composer = {},
+      cli = { "area", "done", "format", "kind", "limit", "machine", "n", "paths" },
+    },
     ["answer"] = { composer = {}, cli = { "no-index" } },
     ["attach"] = {
       composer = {},

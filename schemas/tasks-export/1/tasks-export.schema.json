@@ -89,6 +89,9 @@
       "$ref": "#/$defs/LearnNext"
     },
     {
+      "$ref": "#/$defs/LearnNotes"
+    },
+    {
       "$ref": "#/$defs/Milestones"
     },
     {
@@ -521,6 +524,44 @@
             "additionalProperties": false
           }
         },
+        "incomplete": { "type": "array", "items": { "type": "string" } }
+      },
+      "unevaluatedProperties": false
+    },
+    "LearnNotes": {
+      "description": "tasks.learn_notes: the points of all learning paths that carry a note (`> ` lines), a link or an image, narrowed to a `kind` and a search text (`query`: a part of the label, the note or the link, without case), each with its path, stage and state; open paths by id, then with `include_done` the finished ones, each in document order. At most `limit` (default 200); `total` counts every hit. Capability `learn_notes`.",
+      "allOf": [{ "$ref": "#/$defs/Head" }],
+      "type": "object",
+      "required": ["kind", "rev", "digest", "items", "total", "truncated", "incomplete"],
+      "properties": {
+        "kind": { "const": "tasks.learn_notes" },
+        "rev": { "$ref": "#/$defs/Rev" },
+        "digest": { "$ref": "#/$defs/Digest" },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["path", "area", "title", "index", "label", "stage_index", "stage_label", "state"],
+            "properties": {
+              "path": { "type": "string", "pattern": "^[^/]+/[^/]+$" },
+              "area": { "type": "string" },
+              "title": { "type": "string" },
+              "path_done": { "const": true, "description": "The path is finished (from a Backlog, `include_done`)." },
+              "index": { "type": "integer", "minimum": 1 },
+              "key": { "type": "string" },
+              "label": { "type": "string", "description": "As written (Markdown, untrusted)." },
+              "stage_index": { "type": "integer", "minimum": 1 },
+              "stage_label": { "type": "string" },
+              "state": { "enum": ["open", "learned", "seen", "dropped", "blocked", "partial"], "description": "The state shown (`PathNode.derived`)." },
+              "note": { "type": "string", "description": "The `> ` lines below the point, joined by newlines (Markdown, untrusted)." },
+              "link": { "type": "string" },
+              "image": { "type": "string", "description": "A file below `assets/` of the path; a client draws it as an image only." }
+            },
+            "additionalProperties": false
+          }
+        },
+        "total": { "type": "integer", "minimum": 0 },
+        "truncated": { "type": "boolean" },
         "incomplete": { "type": "array", "items": { "type": "string" } }
       },
       "unevaluatedProperties": false

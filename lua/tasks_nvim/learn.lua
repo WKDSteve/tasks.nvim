@@ -133,6 +133,43 @@ function M.learnable(node, machine)
   return machine == nil or lernbaum.on_machine(node, machine)
 end
 
+---The kinds of `notes`: a point with a note (`> ` lines), with a link, with an image.
+M.NOTE_KINDS = { "note", "link", "image" }
+
+---Text folded for a search without case (more than ASCII: `Über` finds `über`), as the other searches of the engine.
+---@param s string
+---@return string
+function M.fold(s)
+  return vim.fn.tolower(s)
+end
+
+---The points of a tree that carry a note, a link or an image (of `kind` only, when given) and, with a `query`
+---(already folded, `fold`), whose label, note or link contain it, in document order. Every point counts, a stage
+---and an optional one too.
+---@param tree Tasks.LernTree
+---@param opts? { kind?: "note"|"link"|"image", query?: string }
+---@return Tasks.LernNode[]
+function M.notes(tree, opts)
+  opts = opts or {}
+  local out = {}
+  for _, node in ipairs(tree and tree.nodes or {}) do
+    local has
+    if opts.kind then
+      has = node[opts.kind] ~= nil
+    else
+      has = node.note ~= nil or node.link ~= nil or node.image ~= nil
+    end
+    if has and opts.query and opts.query ~= "" then
+      local hay = M.fold(table.concat({ node.label or "", node.note or "", node.link or "" }, "\n"))
+      has = hay:find(opts.query, 1, true) ~= nil
+    end
+    if has then
+      out[#out + 1] = node
+    end
+  end
+  return out
+end
+
 ---The first `n` points of a tree that may be learned now, in document order.
 ---@param tree Tasks.LernTree
 ---@param opts? { machine?: string, n?: integer }

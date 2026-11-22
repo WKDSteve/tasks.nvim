@@ -1,0 +1,60 @@
+{
+  "digest": "sha256:183c486dcdef0f52",
+  "engine": {
+    "git": "0000000",
+    "nvim": "0.0.0",
+    "version": "0.1.0-test"
+  },
+  "generated_at": "2026-01-01T00:00:00Z",
+  "incomplete": [],
+  "items": [
+    {
+      "area": "lib.nvim",
+      "index": 5,
+      "label": "[man fork](https://man7.org/linux/man-pages/man2/fork.2.html)",
+      "link": "https://man7.org/linux/man-pages/man2/fork.2.html",
+      "note": "Notiz: Rückgabewert prüfen.",
+      "path": "lib.nvim/prozesse",
+      "stage_index": 1,
+      "stage_label": "Stufe 1 · Grundlagen",
+      "state": "open",
+      "title": "Prozesse"
+    },
+    {
+      "area": "lib.nvim",
+      "image": "assets/signale.svg",
+      "index": 1,
+      "key": "term",
+      "label": "SIGTERM und SIGKILL ![Ablauf](assets/signale.svg)",
+      "note": "Quelle: APUE, Kapitel 10.",
+      "path": "lib.nvim/signale",
+      "stage_index": 1,
+      "stage_label": "SIGTERM und SIGKILL ![Ablauf](assets/signale.svg)",
+      "state": "open",
+      "title": "Signale"
+    },
+    {
+      "area": "lib.nvim",
+      "index": 1,
+      "key": "bash",
+      "label": "[Bash-Handbuch](https://www.gnu.org/software/bash/manual/)",
+      "link": "https://www.gnu.org/software/bash/manual/",
+      "note": "Notiz: `set -euo pipefail` am Anfang.",
+      "path": "lib.nvim/shell",
+      "path_done": true,
+      "stage_index": 1,
+      "stage_label": "[Bash-Handbuch](https://www.gnu.org/software/bash/manual/)",
+      "state": "learned",
+      "title": "Shell"
+    }
+  ],
+  "kind": "tasks.learn_notes",
+  "plugin": "tasks.nvim",
+  "rev": "rev:e57f6e",
+  "schema": 1,
+  "total": 3,
+  "truncated": false,
+  "vault": {
+    "id": "vault"
+  }
+}

@@ -5,6 +5,9 @@
 ---  - `learn next [<area>] [--machine=private|workstation|wsl|env] [--n=N] [--paths=id,id] [--format=tsv|json]`:
 ---    the next points of the running paths (`tasks.learn_next`); `env` reads `NVIM_MACHINE_ROLE`, no `--machine`
 ---    means every machine
+---  - `learn notes [<text>] [--kind=note|link|image] [--area=a,b] [--paths=id,id] [--done] [--limit=N]
+---    [--format=tsv|json]`: the notes, links and images of the points of all paths (`tasks.learn_notes`), `--done`
+---    with the finished paths
 ---
 --- Read only. `cli.lua` registers it (`register`).
 
@@ -12,6 +15,9 @@ local contract = require("tasks_nvim.contract")
 local fsio = require("tasks_nvim.fsio")
 
 local M = {}
+
+M.USAGE_NOTES =
+  "learn notes [<text>] [--kind=note|link|image] [--area=a,b] [--paths=id,id] [--done] [--limit=N] [--format=tsv|json]"
 
 M.USAGE =
   "learn next [<area>] [--machine=private|workstation|wsl|env] [--n=N] [--paths=id,id] [--format=tsv|json]"
@@ -124,15 +130,64 @@ local function learn_next(ctx)
   return 0
 end
 
+---@param ctx Tasks.CliCtx
+---@return integer
+local function learn_notes(ctx)
+  local args, opt = ctx.args, ctx.args.opt
+  local format = opt.format or "tsv"
+  if (format ~= "tsv" and format ~= "json") or #args.pos > 2 then
+    ctx.warn("error: usage: " .. M.USAGE_NOTES)
+    return 2
+  end
+  local limit
+  if opt.limit ~= nil then
+    limit = tonumber(opt.limit)
+    if not limit then
+      ctx.warn("error: --limit takes a number")
+      return 2
+    end
+  end
+  local doc, err = require("tasks_nvim.contract_learn").notes({
+    query = args.pos[2],
+    kind = opt.kind ~= nil and tostring(opt.kind) or nil,
+    areas = list_opt(opt.area),
+    paths = list_opt(opt.paths),
+    include_done = opt.done == true or nil,
+    limit = limit,
+  }, { root = ctx.eo.root, today = ctx.eo.today })
+  if format == "json" then
+    return emit_json(ctx, doc, err)
+  end
+  if not doc then
+    return fail(ctx, err)
+  end
+  for _, it in ipairs(doc.items) do
+    ctx.say(table.concat({
+      fsio.clean(it.path),
+      it.key and ("#" .. fsio.clean(it.key)) or ("#" .. it.index),
+      it.state,
+      fsio.clean(it.label),
+      fsio.clean(it.note or it.link or it.image or ""),
+    }, "	"))
+  end
+  if doc.truncated then
+    ctx.warn(("warn: %d of %d hits shown (--limit)"):format(#doc.items, doc.total))
+  end
+  for _, e in ipairs(doc.incomplete) do
+    ctx.warn("warn: skipped " .. fsio.clean(e))
+  end
+  return 0
+end
+
 ---The subcommands of `learn`.
-local SUBS = { next = learn_next }
+local SUBS = { next = learn_next, notes = learn_notes }
 
 ---@param ctx Tasks.CliCtx
 ---@return integer
 local function run(ctx)
   local sub = SUBS[ctx.args.pos[1] or ""]
   if not sub then
-    ctx.warn("error: usage: " .. M.USAGE)
+    ctx.warn("error: usage: " .. M.USAGE .. "  |  " .. M.USAGE_NOTES)
     return 2
   end
   return sub(ctx)
@@ -141,7 +196,8 @@ end
 ---@param commands table<string, fun(ctx: Tasks.CliCtx): integer>
 ---@param specs table<string, Tasks.CliSpec>
 function M.register(commands, specs)
-  specs.learn = { value = { "machine", "n", "paths", "format" }, flag = {} }
+  specs.learn =
+    { value = { "machine", "n", "paths", "format", "kind", "area", "limit" }, flag = { "done" } }
   commands.learn = run
 end
 
