@@ -48,3 +48,4 @@ bash scripts/contract.sh              # schema, goldens, typen (Schritt `contrac
   Commits einer anderen Sitzung. Vor dem Push `git log origin/main..HEAD` ansehen und
   nicht blind `git push` ausführen.
 - Keine Pull Requests, keine Co-Autorenschaft von Claude.
+- Git: In einer Cloud-Sitzung (`CLAUDE_CODE_REMOTE` gesetzt) nie auf `main` pushen, nur auf den eigenen Branch `claude/…`; gelandet wird lokal per Rebase, der Geräteschlüssel signiert dabei (`GIT-09`). Das „auf main pushen“ (`GIT-01`) gilt nur lokal.
