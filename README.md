@@ -53,7 +53,9 @@ sessions that run without an editor. Nothing is stored anywhere but in the files
   git, `tasks hook install` adds a pre-commit hook that refuses a commit whose staged `TASKS.md` does not match its
   staged tasks (`tasks index --staged --check`), and `tasks commit <path>... --message=<text>` commits only your
   own paths with the generated files that go with them, whatever else is staged in a checkout shared by several
-  sessions.
+  sessions. `tasks push` sends them to `origin/main` from a throwaway worktree (retrying when the remote moves,
+  solving conflicts in generated files, never `--no-verify`), and `tasks merge-driver install` makes a conflict in a
+  generated `TASKS.md` no conflict at all.
 - **Plan and next**: stages, what is ready, which decision unlocks most, the critical path (`:Tasks plan`); the best
   next task with the reason and an honest empty answer (`:Tasks next`, and a dialog after `done`); sums that say what
   is missing (`:Tasks estimate`)

@@ -223,6 +223,19 @@ commands:
                                           they touch, generated from that commit, from a staging area of its own:
                                           another session's staged files stay staged and out; signed when
                                           commit.gpgsign is set; runs no hooks; does not push
+  push [<sha>...] [--attempts=n] [--dry-run] [--no-sync]
+                                          push your own commits (the given ones, else every local commit not on
+                                          origin/main) from a throwaway worktree on origin/main, so the pre-push hook
+                                          sees only what goes out; a conflict in a generated file (TASKS.md,
+                                          Backlog/README.md, history jsonl) is solved by rendering/union, any other
+                                          conflict names the file; a rejected push starts again (default 5 times);
+                                          then the shared checkout is rebased onto origin/main (--no-sync leaves it);
+                                          never --no-verify. Prints `pushed <sha>`, `synced` and notes
+  merge-driver install|status             git's merge driver for the generated TASKS.md (merge.tasks-index.driver, plus
+                                          the lines in the vault's .gitattributes): a conflict in it is none; the
+                                          next index render makes it right. `install` writes the git config of this
+                                          repository (per machine) and the missing .gitattributes lines (uncommitted)
+  merge-driver %O %A %B %P                what git runs: three-way merge by lines, ours kept when that conflicts
   hook install|status                     the vault's pre-commit hook (<git-common-dir>/hooks/pre-commit): refuses a
                                           commit whose staged TASKS.md is stale (index --staged --check); never
                                           overwrites another pre-commit hook
@@ -601,6 +614,8 @@ local SPECS = {
   meetings = { value = { "since", "until", "task", "format" }, flag = {} },
   index = { value = {}, flag = { "check", "all", "staged", "no-history" } },
   hook = { value = {}, flag = {} },
+  push = { value = { "attempts" }, flag = { "dry-run", "no-sync" } },
+  ["merge-driver"] = { value = {}, flag = {} },
   commit = { value = { "message" }, flag = { "dry-run" } },
   new = {
     value = {
@@ -1938,6 +1953,98 @@ commands.commit = function(ctx)
     )
   end
   return 0
+end
+
+---`push [<sha>...]`: `tasks_nvim.vault_push`. Exit 1 when nothing could be pushed (the reason on stderr), 0 otherwise
+---(also when there was nothing to push).
+---@param ctx Tasks.CliCtx
+---@return integer code
+commands.push = function(ctx)
+  local args = ctx.args
+  local attempts = args.opt.attempts and tonumber(args.opt.attempts) or nil
+  if args.opt.attempts and (not attempts or attempts < 1 or attempts % 1 ~= 0) then
+    ctx.warn("error: --attempts takes a whole number >= 1")
+    return 2
+  end
+  local res, err = require("tasks_nvim.vault_push").push({
+    root = ctx.eo.root,
+    shas = args.pos,
+    attempts = attempts,
+    dry_run = args.opt["dry-run"] == true,
+    sync = args.opt["no-sync"] ~= true,
+  })
+  if not res then
+    ctx.warn("error: " .. tostring(err))
+    return 1
+  end
+  if #res.picked == 0 then
+    ctx.say("nothing to push")
+    return 0
+  end
+  if args.opt["dry-run"] == true then
+    for _, s in ipairs(res.picked) do
+      ctx.say("would-push	" .. s:sub(1, 9))
+    end
+    return 0
+  end
+  for _, s in ipairs(res.pushed) do
+    ctx.say(("pushed	%s	try %d"):format(s:sub(1, 9), res.attempt))
+  end
+  ctx.say(res.sync == "synced" and "synced" or ("sync	" .. res.sync))
+  for _, n in ipairs(res.notes) do
+    ctx.warn("note: " .. n)
+  end
+  if res.leftover then
+    ctx.warn("warn: the worktree could not be removed (remove it by hand): " .. res.leftover)
+  end
+  return res.sync:sub(1, 6) == "failed" and 1 or 0
+end
+
+---`merge-driver install|status`, or what git runs (`%O %A %B %P`).
+---@param ctx Tasks.CliCtx
+---@return integer code
+commands["merge-driver"] = function(ctx)
+  local pos = ctx.args.pos
+  local vm = require("tasks_nvim.vault_merge")
+  if #pos == 4 then
+    local result, err = vm.driver(pos[1], pos[2], pos[3])
+    if not result then
+      ctx.warn("error: " .. tostring(err))
+      return 1
+    end
+    return 0
+  end
+  local sub = pos[1]
+  if (sub ~= "install" and sub ~= "status") or #pos > 1 then
+    ctx.warn("error: merge-driver takes install or status")
+    return 2
+  end
+  local res, err
+  if sub == "install" then
+    res, err = vm.install({ root = ctx.eo.root })
+    if res then
+      ctx.say(("%s	%s"):format(res.driver, vm.NAME))
+      for _, l in ipairs(res.added) do
+        ctx.say(("attribute	%s	%s"):format(res.file, l))
+      end
+      if #res.added > 0 then
+        ctx.warn(
+          "note: .gitattributes is changed in the working tree; commit it (`tasks commit .gitattributes`)"
+        )
+      end
+      return 0
+    end
+  else
+    res, err = vm.status({ root = ctx.eo.root })
+    if res then
+      ctx.say(
+        ("%s	%s	attributes %s"):format(res.state, vm.NAME, res.attributes and "ok" or "missing")
+      )
+      return (res.state == "installed" and res.attributes) and 0 or 1
+    end
+  end
+  ctx.warn("error: " .. tostring(err))
+  return 1
 end
 
 ---`hook install|status`: the vault's pre-commit hook (`tasks_nvim.vault_hook`). `status` prints the state

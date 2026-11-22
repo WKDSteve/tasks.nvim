@@ -5,6 +5,11 @@ the version is not tagged yet (the repository is not published).
 
 ## [Unreleased]
 
+### Added
+
+- `tasks push [<sha>...] [--attempts=n] [--dry-run] [--no-sync]` pushes your own commits of a shared vault from a throwaway worktree on `origin/main` (new module `tasks_nvim.vault_push`): conflicts in generated files are solved by rendering the index (`TASKS.md`) or keeping both sides' lines (`Backlog/README.md`, `_Telemetry/history/*.jsonl`), any other conflict names the file, a rejected push starts again (5 attempts), the pre-push hook sees only the worktree, the shared checkout is rebased afterwards with the files of other sessions kept (an autostash that conflicts in a generated file is rendered anew and dropped), and the worktree is removed with `git worktree remove`. Replaces the script `TOOLS/scripts/push-vault.sh` of the tasks-vault.
+- `tasks merge-driver install|status` sets up git's merge driver `tasks-index` for the generated `ROADMAP/TASKS.md` (new module `tasks_nvim.vault_merge`; the lines for `.gitattributes` also give `Backlog/README.md` and the history series the built-in `union`). A rebase, cherry-pick, `pull --rebase --autostash` or `stash apply` no longer ends in a conflict in a generated index; the next render makes the file right, the pre-push gate (`index-stale`) stays the control.
+
 ### Fixed
 
 - `plan_set`, `project_set` and `path_set` no longer name the file by its path on this machine when the frontmatter cannot be written (`cannot change C:/…/x.md: …`, e.g. a line holding a map the writer does not rewrite): the message is redacted like every other one of the contract.

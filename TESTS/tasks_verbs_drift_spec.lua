@@ -37,6 +37,8 @@ return function(H)
     "intent",
     -- `meetings` lists a window of meetings for a script or a hub; the editor picks one with `:Tasks meeting list`
     "meetings",
+    -- `merge-driver` is what git runs (and its one-time setup) in a shell; no editor action
+    "merge-driver",
     "migrate-actor",
     -- `milestone-new` makes a milestone file from a shell; the editor shows them with `:Tasks milestones`
     "milestone-new",
@@ -50,6 +52,8 @@ return function(H)
     -- `project-new` makes a project file like `plan-new`; the editor makes neither
     "project-new",
     "projects",
+    -- `push` sends the own commits of a shared vault from a shell (agents, scripts)
+    "push",
     -- `relink` mends the links of a vault once from a shell; done, reopen, move and folderize keep them by themselves
     "relink",
     "show",
