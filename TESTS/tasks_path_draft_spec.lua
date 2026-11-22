@@ -206,6 +206,58 @@ return function(H)
   -- the draft's line 8, though status, created and updated were added above the body
   has(err, "hint\txp-missing\tline 8:")
 
+  -- ── the old note: a pipe in code splits a table row (hint `table-ragged`, the row's line, never a refusal) ──
+  local note_lines = {
+    "---",
+    "title: Notiz mit Tabelle",
+    "---",
+    "",
+    "## Lernpunkte",
+    "",
+    "- [ ] Lesen {xp=10} {#lesen}",
+    "",
+    "## Notiz im Detail",
+    "",
+    "| Befehl | Zweck |",
+    "| --- | --- |",
+    "| `ls` | zeigt |",
+    "| `ls -l | less` | zeigt seitenweise |",
+    "| `ls -l \\| less` | escaped |",
+    "| `a | b | c` | drei Pipes |",
+    "",
+    "| Name | Wert |",
+    "|------|------|",
+    "| x | y |",
+    "",
+    "```",
+    "| a | b |",
+    "|---|---|",
+    "| 1 | 2 | 3 |",
+    "```",
+    "",
+    "## Notizen",
+    "",
+    "| A | B |",
+    "| --- | --- |",
+    "| 1 | 2 | 3 |",
+  }
+  local note = draft("note.md", note_lines)
+  code, _, err = run({ "path-new", A, "--from=" .. note, "--dry-run" })
+  eq(code, 0, err)
+  has(err, "hint\ttable-ragged\tline 14: table row has 3 cells, its header 2")
+  has(err, "hint\ttable-ragged\tline 16: table row has 4 cells, its header 2")
+  lacks(err, "table-ragged\tline 13", "a row of the right width")
+  lacks(err, "table-ragged\tline 15", "an escaped pipe splits nothing")
+  lacks(err, "table-ragged\tline 20", "the second table is sound")
+  lacks(err, "table-ragged\tline 25", "inside a code fence")
+  lacks(err, "table-ragged\tline 32", "only the section of the old note is read")
+  local ragged = require("tasks_nvim.path_draft").ragged_rows(table.concat(note_lines, "\n"))
+  eq(#ragged, 2)
+  eq(ragged[1].severity, "info", "a hint, not a finding")
+  code, _, err = run({ "path-new", A, "--from=" .. note })
+  eq(code, 0, "a hint does not refuse the draft: " .. err)
+  ok(H.read(path_file("notiz-mit-tabelle")) ~= nil, "written as it is")
+
   -- ── --dry-run without --from writes nothing either ──
   code, out, err = run({ "path-new", A, "Nur ein Probelauf", "--dry-run" })
   eq(code, 0, err)

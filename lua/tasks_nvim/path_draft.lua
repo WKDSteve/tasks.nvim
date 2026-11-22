@@ -8,6 +8,8 @@
 --- the findings of `check.path_file_findings` as if the file were already in place: keys, marks, XP, arrows,
 --- relative links, levels, images. Any error or warning refuses the draft before anything is written; a hint
 --- (`xp-missing`) does not. Every finding names the line of the draft and its code.
+--- The hint `table-ragged` is the draft's own: a row of a table in `## Notiz im Detail` (the old wording of a note) with
+--- more cells than its header, usually a pipe in code that Markdown split (`ls -l | less`).
 ---
 --- Not its job (yet): promoting points of the draft to tasks, the operation of `tasks-ops/1`.
 
@@ -92,6 +94,76 @@ local function draft_finding(f, draft, fm_end, shift)
     line = line or key_line(draft, f.message),
     message = message,
   }
+end
+
+---The number of cells of a table row: the pipes that are no escaped `\|`, without the outer ones.
+---@param line string
+---@return integer
+local function cell_count(line)
+  local body = vim.trim(line):gsub("^|", "")
+  local n, i, bs = 1, 1, string.char(92)
+  if body:sub(-1) == "|" and body:sub(-2, -2) ~= bs then
+    body = body:sub(1, -2)
+  end
+  while i <= #body do
+    local c = body:sub(i, i)
+    if c == bs then
+      i = i + 2
+    else
+      if c == "|" then
+        n = n + 1
+      end
+      i = i + 1
+    end
+  end
+  return n
+end
+
+---The rows of the tables of the section `## Notiz im Detail` (the old wording of a note) that have more cells than
+---their header: a pipe in code (`ls -l | less`) splits a cell in Markdown unless it is written `\|`, so the row would
+---land in the path as rubbish. A table is a row followed by a delimiter row (`| --- | --- |`); code fences are skipped.
+---@param text string
+---@return Tasks.PathDraftFinding[]
+function M.ragged_rows(text)
+  local out = {}
+  local lines = vim.split((text:gsub("\r\n", "\n")), "\n", { plain = true })
+  -- `pending`: a table row that may be a header (the delimiter row has to follow); `width`: the cells of the header of
+  -- the table the lines are in (nil outside a table)
+  local in_section, fence, pending, width = false, false, nil, nil
+  for lnum, line in ipairs(lines) do
+    if line:match("^%s*```") or line:match("^%s*~~~") then
+      fence = not fence
+    elseif not fence then
+      local heading = line:match("^##%s+(.-)%s*$")
+      if heading then
+        in_section = heading:lower():find("^notiz im detail") ~= nil
+        pending, width = nil, nil
+      elseif in_section then
+        if not line:match("^%s*|") then
+          pending, width = nil, nil
+        elseif line:match("^%s*|[%s:|-]+$") then
+          width = pending and cell_count(pending) or width
+          pending = nil
+        elseif width then
+          local n = cell_count(line)
+          if n > width then
+            out[#out + 1] = {
+              code = "table-ragged",
+              severity = "info",
+              line = lnum,
+              message = ("table row has %d cells, its header %d (a pipe inside code splits a cell: write it \\|)"):format(
+                n,
+                width
+              ),
+            }
+          end
+        else
+          pending = line
+        end
+      end
+    end
+  end
+  return out
 end
 
 ---@param code string
@@ -199,6 +271,8 @@ function M.run(area, draft, opts)
   for _, f in ipairs(raw_hints) do
     result.hints[#result.hints + 1] = draft_finding(f, draft, fm_end, shift)
   end
+  -- the hints of the draft itself, not of `check` (lines are those of the draft)
+  vim.list_extend(result.hints, M.ragged_rows(draft))
   table.sort(result.findings, function(a, b)
     if a.line ~= b.line then
       return a.line < b.line

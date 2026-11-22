@@ -618,7 +618,7 @@ sections, the tree, `## Level`): the slug as `path-new` gives the draft's `title
 `updated` added when the draft leaves them out, then the checks of `check` for a path (keys, marks, XP, arrows, relative
 links, levels, images) as if the file were in place. Any error or warning refuses the draft and nothing is written; each
 finding is a line `<severity>\t<code>\tline N: <message>` on stderr with the draft's line, then `refused\t<n> finding(s)`
-(exit 1). A hint (`xp-missing`) does not refuse it. `--dry-run` prints `would-create\t<id>\t<path>` and writes
+(exit 1). A hint (`xp-missing`; `table-ragged`: a row of a table in `## Notiz im Detail` with more cells than its header, usually a pipe in code that Markdown split, write it `\|`) does not refuse it. `--dry-run` prints `would-create\t<id>\t<path>` and writes
 nothing; the frontmatter options (`--areas`, `--tags`, …) are refused beside `--from` (exit 2).
 
 Headless `path <area>/<slug> [--format=text|json]` is the XP overview of a path while it is planned (`path_stats`):
