@@ -546,7 +546,7 @@ end
 
 ---Finish tasks (rule R6) one after the other, the index regenerated once per area at the end.
 ---@param ids string[]
----@param opts { root: string, today?: string, date?: string, pick_next?: boolean }
+---@param opts { root: string, today?: string, date?: string, pick_next?: boolean, defer_stale_refs?: boolean }
 ---@return Tasks.BatchDoneResult
 function M.done_many(ids, opts)
   ---@type Tasks.BatchDoneResult
@@ -661,8 +661,12 @@ function M.done_many(ids, opts)
   res.index_errors = reindex(res.areas, opts.root)
   if #res.done > 0 then
     -- The generated blocks of the configured documents: once for the whole stack, after everything is finished.
-    local refreshed, notes =
-      done_flow.refresh_marker_docs({ root = opts.root, closed = res.plan_summaries })
+    -- `defer_stale_refs` (the dashboard): a block recorded with `--stale=refs` is left, no git log
+    local refreshed, notes = done_flow.refresh_marker_docs({
+      root = opts.root,
+      closed = res.plan_summaries,
+      defer_stale_refs = opts.defer_stale_refs,
+    })
     res.docs_refreshed = refreshed
     vim.list_extend(res.notes, notes)
   end

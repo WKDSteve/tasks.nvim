@@ -1187,7 +1187,11 @@ end
 ---@param opts { root: string, today?: string, date?: string }
 ---@return Tasks.DashDoneResult
 function M.apply_done(ids, opts)
-  return require("tasks_nvim.batch").done_many(ids, opts)
+  -- the editor does not wait for git: a generated block recorded with `--stale=refs` is left and named in the notes
+  return require("tasks_nvim.batch").done_many(
+    ids,
+    vim.tbl_extend("force", opts, { defer_stale_refs = true })
+  )
 end
 
 ---@param res Tasks.DashDoneResult

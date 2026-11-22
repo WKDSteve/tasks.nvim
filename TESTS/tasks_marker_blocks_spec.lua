@@ -226,6 +226,17 @@ return function(H)
     has(table.concat(said, "\n"), "done lib.nvim/finish-in-editor", "the task was finished")
     eq(computes, 0, ":Tasks done in the editor asks no git for the block")
     has(table.concat(said, "\n"), "--stale=refs", "and says which block it left")
+
+    -- ... nor does a stack finished from the dashboard
+    F.task(H, root, "lib.nvim", "finish-in-dash", F.meta("Finish in the dashboard", "open"))
+    computes = 0
+    local stack = require("tasks_nvim.ui.dash_core").apply_done(
+      { "lib.nvim/finish-in-dash" },
+      { root = root, today = F.TODAY, pick_next = false }
+    )
+    eq(#stack.done, 1, "the dashboard finished the task")
+    eq(computes, 0, "the dashboard's finish asks no git for the block")
+    has(table.concat(stack.notes, "\n"), "--stale=refs", "and its notes name the block it left")
   end)
   staleness.compute, vim.notify = real_compute, real_notify
   config.merge({ chain = { marker_docs = real_docs } })
