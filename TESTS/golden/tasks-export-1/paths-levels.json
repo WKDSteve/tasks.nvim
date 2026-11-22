@@ -1,5 +1,5 @@
 {
-  "digest": "sha256:e7db330f61eed924",
+  "digest": "sha256:49115e2d6ff01840",
   "engine": {
     "git": "0000000",
     "nvim": "0.0.0",
@@ -60,6 +60,9 @@
         "value": "🧠"
       },
       "id": "lib.nvim/prozesse",
+      "machines": {
+        "private": 1
+      },
       "optional": {
         "progress": {
           "blocked": 0,
@@ -88,6 +91,7 @@
         "total": 6
       },
       "project": "lib.nvim/os",
+      "safety": 1,
       "slug": "prozesse",
       "stage": "doing",
       "status": "doing",
@@ -181,6 +185,9 @@
           "reward": "Wochenende am See"
         }
       ],
+      "machines": {
+        "wsl": 1
+      },
       "optional": {
         "progress": {
           "blocked": 0,
@@ -208,6 +215,7 @@
         "seen": 1,
         "total": 5
       },
+      "safety": 1,
       "slug": "rust-lernen",
       "stage": "doing",
       "status": "doing",

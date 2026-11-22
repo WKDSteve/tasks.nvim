@@ -1,7 +1,7 @@
 {
   "body": "\n## Lernpunkte\n\n- [ ] Rust lernen {#rust}\n  - [x] Das Buch {xp=30} {#book}\n  - [~] Rustlings – Grund: nur die Hälfte {xp=20}\n  - [ ] C-Compiler → lib.nvim/c-compiler {xp=40} {#cc}\n  - [-] Embedded – Grund: nicht nötig {xp=50}\n  - [ ] Ohne XP {machine=wsl} {#plain}\n- [ ] Literatur {optional} {#lit}\n  - [x] Ein Buch {xp=10} {#lit-a}\n  - [ ] Noch ein Buch {xp=10} {safety}\n\n## Level\n\n- [x] 30 XP · Einsteiger · Badge assets/badges/stern.png · Belohnung: großes Eis\n- [ ] 50 % · Badge assets/badges/mond.svg · Belohnung: Kino\n- [ ] 100 XP · Belohnung: ein Buch\n- [ ] 20 XP\n- [ ] Pfad fertig · Belohnung: Wochenende am See\n",
   "body_truncated": false,
-  "digest": "sha256:9cfcb9c65c3cf864",
+  "digest": "sha256:9b409b4b754929af",
   "engine": {
     "git": "0000000",
     "nvim": "0.0.0",
@@ -360,6 +360,9 @@
       "open_rewards": [],
       "percent": 36
     },
+    "machines": {
+      "wsl": 1
+    },
     "optional": {
       "progress": {
         "blocked": 0,
@@ -387,6 +390,7 @@
       "seen": 1,
       "total": 5
     },
+    "safety": 1,
     "slug": "rust-lernen",
     "stage": "doing",
     "status": "doing",

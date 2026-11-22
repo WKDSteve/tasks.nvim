@@ -3564,6 +3564,9 @@ local function path_entry(root, f, text, idx, finished, levels)
     rst =
       req.state(vim.tbl_extend("force", {}, f, { requires_gate = "soft", project = false }), idx)
   end
+  local marks_safety, marks_machines = require("tasks_nvim.path_stats").counts(tree)
+  marks_safety = marks_safety > 0 and marks_safety or nil
+  marks_machines = next(marks_machines) and json.object(marks_machines) or nil
   local entry = {
     stage = req.stage(f, rst, finished),
     -- capability `xp`: only when there is something to say, so a path without XP and levels reads as before
@@ -3598,6 +3601,9 @@ local function path_entry(root, f, text, idx, finished, levels)
     has_tree = tree.has_section,
     points = #tree.nodes,
     progress = progress_entry(tree.progress),
+    -- capability `path_marks`: the leaves under `{safety}` and the leaves per machine, only when there are some
+    safety = marks_safety,
+    machines = marks_machines,
     file = relative(root, f.path) or vim.fs.basename(f.path),
     etag = text and fsio.etag(text) or nil,
     valid = f.valid ~= false and #(f.errors or {}) == 0,

@@ -228,4 +228,40 @@ return function(H)
   eq(nodes.strom.safety, true)
   eq(nodes.lesen.machine, nil)
   eq(nodes.lesen.safety, nil)
+
+  -- ── the counts of `tasks paths` and the path entry (leaves only, by the effective machine) ──
+  eq(pd.path.safety, 2, "netzteil and messen are under {safety}")
+  eq(pd.path.machines, { private = 2, workstation = 2, wsl = 2 })
+  local entry
+  for _, e in ipairs(call("paths").items) do
+    if e.id == ID then
+      entry = e
+    end
+  end
+  eq(entry.safety, 2)
+  eq(entry.machines.wsl, 2)
+  code, out = run({ "paths", "--format=json" })
+  eq(code, 0)
+  local row
+  for _, prow in ipairs(vim.json.decode(out).paths) do
+    if prow.id == ID then
+      row = prow
+    end
+  end
+  eq(row.safety, 2)
+  eq(row.machines, { private = 2, workstation = 2, wsl = 2 })
+  code, out = run({ "paths" })
+  eq(code, 0)
+  ok(
+    out:match("lib.nvim/maschinen\tdoing\tpoints 7\topen %d+\t%d+ %%\tMaschinen") ~= nil,
+    "the tsv keeps its columns: " .. out
+  )
+  -- a path without marks has neither field
+  H.write(
+    root .. "/" .. A .. "/ROADMAP/paths/plain.md",
+    "---\ntitle: Plain\nstatus: doing\n---\n\n## Lernpunkte\n\n- [ ] Eins {#eins}\n"
+  )
+  entry = call("path", { id = A .. "/plain" }).path
+  eq(entry.safety, nil)
+  eq(entry.machines, nil)
 end

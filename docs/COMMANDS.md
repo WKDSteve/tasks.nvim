@@ -667,7 +667,7 @@ Headless `paths [<area>] [--project=<id>] [--format=tsv|json]` lists the open le
 status, `points <n>` (leaves of `## Lernpunkte`), `open <n>` and the progress in percent (of the XP when the path has
 any, else of its points: learned one, seen one half, dropped out; the same figure the levels read). `--project=<id>`
 lists the paths of one project and adds its finished ones (`done`, 100 %). An area group stands for its member areas.
-`--format=json` gives `{ paths: [ { id, title, status, points, open, percent, done } ] }`.
+`--format=json` gives `{ paths: [ { id, title, status, points, open, percent, done } ] }`, and per path `safety` (the leaves on or under a `{safety}` mark) and `machines` (the leaves per machine: `{ private: 2, wsl: 1 }`, by the effective `{machine=…}`, a leaf for two machines counts for both), each only when there are some; the TSV keeps its columns.
 
 ```
 tasks-desktop/rust-stack-a-rust-kern  doing     points 48  open 30  37 %  A · Rust-Kern

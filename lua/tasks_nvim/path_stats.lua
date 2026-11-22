@@ -269,4 +269,25 @@ function M.marks(tree, machine)
   return out
 end
 
+---The leaves of a tree that carry a mark: how many are `{safety}` (their own mark or a parent's) and, per machine, how
+---many are for it (their effective `{machine=…}`, a leaf for two machines counts for both). Leaves only, dropped ones
+---too, as the points of `tasks paths`; a leaf without a machine mark counts for no machine.
+---@param tree Tasks.LernTree
+---@return integer safety
+---@return table<string, integer> machines  # Empty when no leaf names a machine.
+function M.counts(tree)
+  local safety, machines = 0, {}
+  for _, n in ipairs(tree.nodes) do
+    if #n.children == 0 then
+      if n.safety_eff then
+        safety = safety + 1
+      end
+      for _, m in ipairs(n.machine_eff or {}) do
+        machines[m] = (machines[m] or 0) + 1
+      end
+    end
+  end
+  return safety, machines
+end
+
 return M

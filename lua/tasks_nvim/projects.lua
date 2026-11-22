@@ -147,6 +147,8 @@ end
 ---@field open integer       # Open (and blocked) leaves.
 ---@field percent integer    # The progress (`lernlevel.percent`); 100 for a finished path.
 ---@field done boolean       # Finished (closed into the Backlog).
+---@field safety? integer     # Leaves under a `{safety}` mark (only when there are some).
+---@field machines? table<string, integer>  # Leaves per `{machine=…}` (effective, only when a leaf names one).
 ---@field waiting_on? string[]  # The open hard requirements, its own and its project's (`requires`; only with an index).
 ---@field wait? string          # `requires.waiting_text`: what it waits for, or builds on and is not finished.
 ---@field requires_gate? "soft"|"hard"  # Its gate, when it has `requires` (only with an index).
@@ -164,6 +166,10 @@ function M.path_row(f, idx)
     percent = require("tasks_nvim.lernlevel").percent(tree)
   end
   local st = idx and require("tasks_nvim.requires").state(f, idx) or nil
+  local safety, machines
+  if tree then
+    safety, machines = require("tasks_nvim.path_stats").counts(tree)
+  end
   return {
     id = f.id,
     title = f.title,
@@ -172,6 +178,8 @@ function M.path_row(f, idx)
     open = open,
     percent = percent,
     done = false,
+    safety = (safety or 0) > 0 and safety or nil,
+    machines = machines and next(machines) and machines or nil,
     waiting_on = st and st.waiting_on or nil,
     wait = st and require("tasks_nvim.requires").waiting_text(st) or nil,
     requires_gate = st and st.gate or nil,

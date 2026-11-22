@@ -1042,6 +1042,14 @@
         "xp": { "$ref": "#/$defs/PathXp", "description": "The XP of the tree; only when a point carries XP. Capability `xp`." },
         "level": { "$ref": "#/$defs/PathLevelState", "description": "The level reached and what comes next; only when the file has levels. Capability `xp`." },
         "optional": { "$ref": "#/$defs/PathOptional" },
+        "safety": { "type": "integer", "minimum": 1, "description": "How many leaves are `{safety}` or below one; only when there are some. Capability `path_marks`." },
+        "machines": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": { "enum": ["private", "workstation", "wsl"] },
+          "additionalProperties": { "type": "integer", "minimum": 1 },
+          "description": "How many leaves are for each machine (`{machine=…}` on the leaf or the nearest parent; a leaf for two machines counts for both); only when a leaf names one. Capability `path_marks`."
+        },
         "requires": { "$ref": "#/$defs/Requires" },
         "requires_gate": { "$ref": "#/$defs/RequiresGate" },
         "waiting_on": { "$ref": "#/$defs/WaitingOn" },

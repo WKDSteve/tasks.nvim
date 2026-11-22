@@ -2442,6 +2442,16 @@ export interface PathEntry {
   xp?: PathXp;
   level?: PathLevelState;
   optional?: PathOptional;
+  /**
+   * How many leaves are `{safety}` or below one; only when there are some. Capability `path_marks`.
+   */
+  safety?: number;
+  /**
+   * How many leaves are for each machine (`{machine=…}` on the leaf or the nearest parent; a leaf for two machines counts for both); only when a leaf names one. Capability `path_marks`.
+   */
+  machines?: {
+    [k: string]: number;
+  };
   requires?: Requires;
   requires_gate?: RequiresGate;
   waiting_on?: WaitingOn;
