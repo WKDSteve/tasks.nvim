@@ -282,6 +282,7 @@ export type Snapshot = Head & {
     requires?: Requires;
     requires_gate?: RequiresGate;
     waiting_on?: WaitingOn;
+    stage?: PathStage;
     valid: boolean;
     links?: PlanLinks;
     icon?: Icon;
@@ -371,6 +372,10 @@ export type WaitingOn = {
   id: string;
   via?: string;
 }[];
+/**
+ * The stage of a path or project for a map of them: `done` (finished), `parked`, `waiting` (`waiting_on` not empty), `doing` (`status: doing`; a path: a point learned or seen; a project: a plan or task of it finished), else `idle`. An open soft requirement never makes it wait. Capability `requires`.
+ */
+export type PathStage = "done" | "parked" | "waiting" | "doing" | "idle";
 /**
  * The CI state of a task's commits beside `commits` (capability `ci`): pending (pushed, no verdict yet), green (the CI passed on every system) or red (it failed). Absent: not known.
  */
@@ -1097,10 +1102,6 @@ export type Paths = Head & {
     title: string;
   }[];
 };
-/**
- * The stage of a path for a map of them: `done` (finished), `parked`, `waiting` (`waiting_on` not empty), `doing` (`status: doing`, or a point learned or seen), else `idle`. An open soft requirement never makes it wait. Capability `requires`.
- */
-export type PathStage = "done" | "parked" | "waiting" | "doing" | "idle";
 /**
  * A stage of the scale of the competences, 0 (unknown) to 8 (mastermind), in halves (3.5: the evidence for 4 begun).
  */

@@ -1113,7 +1113,7 @@
       }
     },
     "PathStage": {
-      "description": "The stage of a path for a map of them: `done` (finished), `parked`, `waiting` (`waiting_on` not empty), `doing` (`status: doing`, or a point learned or seen), else `idle`. An open soft requirement never makes it wait. Capability `requires`.",
+      "description": "The stage of a path or project for a map of them: `done` (finished), `parked`, `waiting` (`waiting_on` not empty), `doing` (`status: doing`; a path: a point learned or seen; a project: a plan or task of it finished), else `idle`. An open soft requirement never makes it wait. Capability `requires`.",
       "enum": ["done", "parked", "waiting", "doing", "idle"]
     },
     "PathOptional": {
@@ -2613,6 +2613,7 @@
               "requires": { "$ref": "#/$defs/Requires" },
               "requires_gate": { "$ref": "#/$defs/RequiresGate" },
               "waiting_on": { "$ref": "#/$defs/WaitingOn" },
+              "stage": { "$ref": "#/$defs/PathStage" },
               "valid": { "type": "boolean" },
               "links": { "$ref": "#/$defs/PlanLinks" },
               "icon": { "$ref": "#/$defs/Icon" },

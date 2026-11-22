@@ -845,10 +845,13 @@ local function project_entries(view)
         days_open = r.days_open,
       }),
     }
-    -- capability `requires`: what the project builds on
-    for k, v in pairs(requires_fields(idx and require("tasks_nvim.requires").state(f, idx))) do
+    -- capability `requires`: what the project builds on, and its stage for a map of paths and projects
+    local req = require("tasks_nvim.requires")
+    local rst = idx and req.state(f, idx) or nil
+    for k, v in pairs(requires_fields(rst)) do
       entry[k] = v
     end
+    entry.stage = req.project_stage(f, rst, r)
     out[#out + 1] = with_links_and_assets(entry, f)
   end
   return out

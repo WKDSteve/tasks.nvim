@@ -330,6 +330,29 @@ function M.stage(f, st, finished)
   return "idle"
 end
 
+---The stage of a project for a map of paths and projects, the words of `stage`: `done` (`status: done`), `parked`,
+---`waiting` (an open hard requirement, `state.held`), `doing` (`status: doing`, or a plan or task of it finished),
+---else `idle`. The soft gate never makes it wait.
+---@param f Tasks.PlanFile
+---@param st? Tasks.RequiresState
+---@param rollup? { plans_done?: integer, tasks_done?: integer }  # `projects.rollup`.
+---@return "done"|"parked"|"waiting"|"doing"|"idle"
+function M.project_stage(f, st, rollup)
+  if f.status == "done" then
+    return "done"
+  elseif f.status == "parked" then
+    return "parked"
+  elseif st and st.held then
+    return "waiting"
+  elseif
+    f.status == "doing"
+    or (rollup and ((rollup.plans_done or 0) + (rollup.tasks_done or 0)) > 0)
+  then
+    return "doing"
+  end
+  return "idle"
+end
+
 ---What an open file waits on as edges of the graph: its own requirements, and for a path of a project the hard
 ---requirements of that project (inherited, `state`), never the path itself.
 ---@param idx Tasks.RequiresIndex

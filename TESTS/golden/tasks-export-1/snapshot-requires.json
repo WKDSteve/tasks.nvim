@@ -46,7 +46,7 @@
     "listed": 14,
     "unlisted": 2
   },
-  "digest": "sha256:d9f78131c12c2cc4",
+  "digest": "sha256:7e3d972893caaa27",
   "engine": {
     "git": "0000000",
     "nvim": "0.0.0",
@@ -181,6 +181,7 @@
         "tasks_done": 0,
         "tasks_open": 0
       },
+      "stage": "waiting",
       "status": "planning",
       "title": "Digital-Projekt",
       "valid": true,
@@ -205,6 +206,7 @@
         "tasks_done": 0,
         "tasks_open": 0
       },
+      "stage": "doing",
       "status": "doing",
       "title": "Hobby-Niveau",
       "valid": true
@@ -244,6 +246,7 @@
         "tasks_done": 1,
         "tasks_open": 2
       },
+      "stage": "doing",
       "status": "doing",
       "title": "The project",
       "valid": true

@@ -317,6 +317,24 @@ return function(H)
   end
   eq(entry.waiting_on, { { id = pa.id } })
   eq(entry.requires, { { id = pa.id, gate = "hard", kind = "project", met = false } })
+  -- the stage of a project for the map: waiting (hard), idle, doing, parked
+  local stage_of = function()
+    local stages = {}
+    for _, p in ipairs(call("snapshot").projects) do
+      stages[p.id] = p.stage
+    end
+    return stages
+  end
+  eq(stage_of()[pb.id], "waiting")
+  eq(stage_of()[pa.id], "idle", "nothing of it finished, not doing")
+  assert(plans.set(pa.id, { status = "doing" }, { root = root, kind = "project" }))
+  eq(stage_of()[pa.id], "doing")
+  assert(plans.set(pa.id, { status = "parked" }, { root = root, kind = "project" }))
+  eq(stage_of()[pa.id], "parked")
+  eq(stage_of()[pb.id], "waiting", "a parked requirement is still open")
+  assert(plans.set(pa.id, { status = "planning" }, { root = root, kind = "project" }))
+  eq(req.project_stage({ status = "planning" }, nil, { plans_done = 0, tasks_done = 1 }), "doing")
+  eq(req.project_stage({ status = "done" }, { held = true }), "done")
   local res = done_flow.close_projects({ pb.id }, o)
   eq(res.closed, {})
   eq(res.waiting[pb.id], { pa.id })
