@@ -313,14 +313,16 @@ commands:
                                           the sheet (testing sheets accept: only when it loads) or the bug task of
                                           the AI's answer; shown only, written with --yes
   check [<area>]                          rule check; exit 1 on any error
-  check --sources [<file|dir>] [--write] [--fix] [--timeout=<s>]
+  check --sources [<file|dir>] [--write] [--fix] [--allow-host-change] [--timeout=<s>]
                                           ask the web links of the `## Quellen` table of a learning path (all open
                                           paths without an argument) with HEAD (GET as fallback): dead (404),
                                           blocked (401/403/429), moved; exit 1 on a dead link. Needs the network, so
                                           only on this flag, never in the hook. --write puts date and answer into
                                           the column Geprüft; --fix writes the target of a PERMANENT redirect
                                           (301, 308) into the link (`fixed` lines; a temporary one, a front page,
-                                          or a step back to http stays: `kept`)
+                                          a step back to http or ANOTHER HOST stays: `kept`; the host is compared
+                                          without www., port and case; --allow-host-change takes a new host too,
+                                          look at the `fixed old -> new` lines first)
   relink [<area>] [--dry-run]             mend the dead relative links to .md files below ROADMAP/, Backlog/ and
                                           MEETINGS/: a link whose slug names one file (a task finished into the
                                           Backlog, a folder task, another area) is rewritten to it; ambiguous and
@@ -665,7 +667,10 @@ local SPECS = {
   folderize = { value = { "by", "note" }, flag = { "no-index", "force" } },
   ["sheet-run"] = { value = { "testing-cli" }, flag = { "dry-run" } },
   ["sheet-ai"] = { value = { "testing-cli", "from" }, flag = { "yes" } },
-  check = { value = { "timeout" }, flag = { "all", "fix", "sources", "write" } },
+  check = {
+    value = { "timeout" },
+    flag = { "all", "allow-host-change", "fix", "sources", "write" },
+  },
   relink = { value = {}, flag = { "dry-run" } },
   ci = { value = { "md-lint" }, flag = { "strict", "no-lint", "trust-vault-lint" } },
   template = {
@@ -3770,6 +3775,7 @@ local function check_sources(ctx)
       timeout = timeout,
       write = args.opt.write == true,
       fix = args.opt.fix == true,
+      allow_host_change = args.opt["allow-host-change"] == true,
       today = today,
     })
     if not results then
@@ -3822,8 +3828,8 @@ function commands.check(ctx)
   local args, eo = ctx.args, ctx.eo
   if args.opt.sources then
     return check_sources(ctx)
-  elseif args.opt.write or args.opt.timeout or args.opt.fix then
-    ctx.warn("error: --write, --fix and --timeout belong to --sources")
+  elseif args.opt.write or args.opt.timeout or args.opt.fix or args.opt["allow-host-change"] then
+    ctx.warn("error: --write, --fix, --allow-host-change and --timeout belong to --sources")
     return 2
   end
   if #args.pos > 1 then

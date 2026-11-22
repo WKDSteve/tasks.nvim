@@ -241,18 +241,32 @@ local function hop(url, timeout, done)
   end
 end
 
+---The host of an `http(s)` address for comparing: lower case, no user info, no port, no leading `www.`.
+---@param url string
+---@return string
+local function host_of(url)
+  local auth = (url:match("^https?://([^/?#]*)") or ""):gsub("^.*@", ""):gsub(":%d*$", "")
+  return (auth:lower():gsub("^www%.", ""))
+end
+
 ---Whether the address a redirect leads to may be written into the table in place of the old one: a plain `http(s)`
 ---address without anything that would break a Markdown link or a table cell, no step back from `https` to `http`, and
----not the front page of a site the old link went deeper into (that is usually a page that is gone).
+---not the front page of a site the old link went deeper into (that is usually a page that is gone). A target on
+---ANOTHER HOST (compared without user info, port, a leading `www.` and case) is only taken with `allow_host_change`:
+---a domain that changed hands may redirect anywhere, so a person looks at it first.
 ---@param old string
 ---@param new string
+---@param allow_host_change? boolean
 ---@return boolean ok
 ---@return string? reason
-function M.safe_target(old, new)
+function M.safe_target(old, new, allow_host_change)
   if not new:match("^https?://[%w%-._~:/?#%[%]@!$&*+,;=%%]+$") then
     return false, "the target is not a plain address"
   elseif old:match("^https://") and new:match("^http://") then
     return false, "the target is http, the link is https"
+  end
+  if not allow_host_change and host_of(old) ~= host_of(new) then
+    return false, "other host, check by hand (--allow-host-change)"
   end
   local old_path = (old:match("^https?://[^/?#]*(.*)$") or ""):gsub("[#?].*$", "")
   local new_path = (new:match("^https?://[^/?#]*(.*)$") or ""):gsub("[#?].*$", "")
@@ -287,7 +301,8 @@ end
 ---@param results Tasks.SourceResult[]
 ---@param timeout integer
 ---@param resolve? fun(url: string, timeout: integer, done: fun(target: string|nil))
-local function resolve_moved(results, timeout, resolve)
+---@param allow_host_change? boolean
+local function resolve_moved(results, timeout, resolve, allow_host_change)
   resolve = resolve or M.permanent_target
   for _, r in ipairs(results) do
     if r.state == "redirected" then
@@ -305,7 +320,7 @@ local function resolve_moved(results, timeout, resolve)
         if frag and not target:find("#", 1, true) then
           target = target .. frag
         end
-        local ok, why = M.safe_target(r.row.url, target)
+        local ok, why = M.safe_target(r.row.url, target, allow_host_change)
         if not ok then
           r.kept = why
         elseif target == r.row.url then
@@ -320,7 +335,7 @@ end
 
 ---Ask about the web links of a path file's Quellen table (at most `M.CONCURRENCY` at a time). Blocks until all answered.
 ---@param text string
----@param opts? { timeout?: integer, fix?: boolean, resolve?: function, probe?: fun(url: string, timeout: integer, done: fun(p: Tasks.SourceProbe)) }
+---@param opts? { timeout?: integer, fix?: boolean, allow_host_change?: boolean, resolve?: function, probe?: fun(url: string, timeout: integer, done: fun(p: Tasks.SourceProbe)) }
 ---@return Tasks.SourceResult[]
 function M.check_text(text, opts)
   opts = opts or {}
@@ -363,7 +378,7 @@ function M.check_text(text, opts)
       }
   end
   if opts.fix then
-    resolve_moved(results, timeout, opts.resolve)
+    resolve_moved(results, timeout, opts.resolve, opts.allow_host_change)
   end
   return results
 end
@@ -445,7 +460,7 @@ end
 
 ---Ask about the links of one file and, with `write`, put the answers into it.
 ---@param path string
----@param opts? { timeout?: integer, write?: boolean, fix?: boolean, today?: string, probe?: function, resolve?: function }
+---@param opts? { timeout?: integer, write?: boolean, fix?: boolean, allow_host_change?: boolean, today?: string, probe?: function, resolve?: function }
 ---@return Tasks.SourceResult[]|nil results
 ---@return string|nil err
 function M.check_file(path, opts)

@@ -38,6 +38,10 @@ return function(H)
         status, extra = "308 Permanent Redirect", "Location: /moved\r\n"
       elseif path == "/home" then
         status, extra = "301 Moved Permanently", "Location: /\r\n"
+      elseif path == "/otherhost" then
+        -- the same server under another name: a different host as far as the table is concerned
+        status = "301 Moved Permanently"
+        extra = "Location: http://localhost:" .. server:getsockname().port .. "/ok\r\n"
       elseif path == "/bad" then
         status, extra = "301 Moved Permanently", "Location: /ok)x\r\n"
       elseif path == "/forbidden" then
@@ -198,6 +202,55 @@ return function(H)
     select(2, fbefore:gsub("\n", "\n")),
     "the same number of lines"
   )
+  -- another HOST is never taken by --fix alone (a domain that changed hands may send anywhere): `kept`, old -> new
+  -- named; the same host with another path (/moved -> /ok above) is taken
+  local hostdoc = root .. "/host.md"
+  H.write(hostdoc, table_doc({ "/otherhost", "/moved" }))
+  local hbefore = H.read(hostdoc)
+  res = run({ "check", "--sources", hostdoc, "--fix", "--timeout=1" })
+  has(
+    res.out,
+    "kept\t"
+      .. hostdoc
+      .. ":7\t"
+      .. base
+      .. "/otherhost\tother host, check by hand (--allow-host-change)"
+  )
+  has(res.out, "fixed\t" .. hostdoc .. ":8\t" .. base .. "/moved -> " .. base .. "/ok")
+  has(res.out, "; 1 link(s) rewritten")
+  local htext = H.read(hostdoc)
+  has(htext, "| [/otherhost](" .. base .. "/otherhost) |", "the link of another host stays")
+  has(htext, "| [/moved](" .. base .. "/ok) |")
+  -- with the switch it is taken, and the line says what changed
+  H.write(hostdoc, hbefore)
+  res = run({ "check", "--sources", hostdoc, "--fix", "--allow-host-change", "--timeout=1" })
+  has(
+    res.out,
+    "fixed\t"
+      .. hostdoc
+      .. ":7\t"
+      .. base
+      .. "/otherhost -> http://localhost:"
+      .. base:match(":(%d+)$")
+      .. "/ok"
+  )
+  has(H.read(hostdoc), "| [/otherhost](http://localhost:" .. base:match(":(%d+)$") .. "/ok) |")
+  eq(run({ "check", "--allow-host-change" }).code, 2, "--allow-host-change belongs to --sources")
+  -- the comparison alone: www., case and port do not make another host; another host does, also behind user info
+  eq(sources.safe_target("https://a.example/x", "https://www.a.example/y"), true)
+  eq(sources.safe_target("https://www.A.example/x", "https://a.EXAMPLE:443/y"), true)
+  eq(sources.safe_target("http://a.example/x", "https://a.example/x"), true, "http to https")
+  local host_ok, host_why = sources.safe_target("https://a.example/x", "https://b.example/x")
+  eq(host_ok, false)
+  has(host_why, "other host")
+  eq(
+    sources.safe_target("https://a.example/x", "https://a.example@b.example/x"),
+    false,
+    "user info"
+  )
+  eq(sources.safe_target("https://a.example/x", "https://a.example.evil.example/x"), false)
+  eq(sources.safe_target("https://a.example/x", "https://b.example/x", true), true, "allowed")
+
   -- both flags: the answer and the new address in one write
   H.write(fixdoc, fbefore)
   run({ "check", "--sources", fixdoc, "--fix", "--write", "--timeout=1" })
@@ -210,17 +263,17 @@ return function(H)
   local ok_new, why = sources.safe_target("https://a.example/x/y", "http://a.example/x/y")
   eq(ok_new, false)
   has(why, "http")
-  eq(sources.safe_target("https://a.example/x/y", "https://b.example/z?q=1#s"), true)
+  eq(sources.safe_target("https://a.example/x/y", "https://b.example/z?q=1#s", true), true)
   eq(
-    sources.safe_target("https://a.example", "https://b.example/"),
+    sources.safe_target("https://a.example", "https://b.example/", true),
     true,
     "a front page stays a front page"
   )
-  eq(sources.safe_target("https://a.example/x", "https://b.example/"), false)
-  eq(sources.safe_target("https://a.example/x", "https://b.example/a b"), false)
-  eq(sources.safe_target("https://a.example/x", "https://b.example/a|b"), false)
-  eq(sources.safe_target("https://a.example/x", "https://b.example/a<b"), false)
-  eq(sources.safe_target("https://a.example/x", "javascript:alert(1)"), false)
+  eq(sources.safe_target("https://a.example/x", "https://b.example/", true), false)
+  eq(sources.safe_target("https://a.example/x", "https://b.example/a b", true), false)
+  eq(sources.safe_target("https://a.example/x", "https://b.example/a|b", true), false)
+  eq(sources.safe_target("https://a.example/x", "https://b.example/a<b", true), false)
+  eq(sources.safe_target("https://a.example/x", "javascript:alert(1)", true), false)
   H.write(fixdoc, fbefore)
   local fixed_text = sources.apply(fbefore, {
     {
