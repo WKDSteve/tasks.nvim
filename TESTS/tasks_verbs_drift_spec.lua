@@ -112,6 +112,9 @@ return function(H)
         "by",
         -- `ci=` is a key=value word of `:Tasks done`, as `commits=` and `remind=` are
         "ci",
+        -- the CLI commits what the finish wrote in the vault (`tasks commit`); the editor has no shared checkout to guard
+        "commit",
+        "commit-message",
         "commits",
         "date",
         "done-in",
