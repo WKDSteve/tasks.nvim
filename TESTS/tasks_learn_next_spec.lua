@@ -157,6 +157,39 @@ return function(H)
   eq(c, 0)
   eq(vim.json.decode(out).kind, "tasks.learn_next")
   eq((run({ "learn", "next", "--machine=laptop" })), 2)
+
+  -- without --machine the text filters by NVIM_MACHINE_ROLE, JSON stays whole, `all` switches it off
+  local old_role = os.getenv("NVIM_MACHINE_ROLE")
+  local function role(v)
+    vim.uv.os_setenv("NVIM_MACHINE_ROLE", v or "")
+  end
+  local function go(argv)
+    local c0, o, e = run(argv)
+    eq(c0, 0, e)
+    return o
+  end
+  local whole = go({ "learn", "next", "--n=20", "--machine=all" })
+  ok(not whole:find("machine\t", 1, true), "all: no filter and no note")
+  role("workstation")
+  local ws = go({ "learn", "next", "--n=20" })
+  has(ws, "machine\tworkstation\tfrom NVIM_MACHINE_ROLE", "the default filter is named")
+  ok(whole:find("#drv", 1, true), "all: the private-only point is there")
+  ok(not ws:find("#drv", 1, true), "the workstation does not get the private-only point")
+  local js = vim.json.decode(go({ "learn", "next", "--n=20", "--format=json" }))
+  eq(#js.items[1].points, 4, "json stays whole without --machine")
+  role("")
+  has(
+    go({ "learn", "next", "--n=20" }),
+    "machine\tprivate\tfrom NVIM_MACHINE_ROLE",
+    "empty: private"
+  )
+  role("laptop")
+  has(
+    go({ "learn", "next", "--n=20" }),
+    "note\tNVIM_MACHINE_ROLE 'laptop' is no machine",
+    "unknown role: a note"
+  )
+  role(old_role)
   eq((run({ "learn", "next", "--format=xml" })), 2)
   eq((run({ "learn", "nope" })), 2)
   local c2, _, err2 = run({ "learn" })

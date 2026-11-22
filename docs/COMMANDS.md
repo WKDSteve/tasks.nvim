@@ -947,6 +947,8 @@ routine for good: no next round (or take `repeat` away with `set <id> repeat=` f
 ends by itself after its last round (`routine-ended`), and a finish that a routine waited for (`repeat_after`) starts
 it (`routine-started <id> <due> after <ref>`); see [ENGINE.md](ENGINE.md#routines-repeat).
 
+Headless, `tasks done <id>` prints one line `commit-paths<TAB>p1 p2 ...` with the files the finish wrote in the vault (the backlog file, the removed source, closed plans, ...; not the generated `TASKS.md`, `Backlog/README.md` and history series), to hand to `tasks commit`. `tasks done <id> --commit [--commit-message=<text>]` commits exactly those files at once, as `tasks commit` does (staging area of its own, so another session's staged or changed files stay out; default message `done: <id>`); the line is then not printed. Push stays `tasks push`. A failed commit leaves the finish standing, prints the line and exits 1.
+
 Rule R6, after a confirmation (`--yes` skips it): `status: done`, `done_in`, `commits`; the file moves
 to `Backlog/FEATURES/` (`feature`, `idea`, `research`) or `Backlog/TASKS/` (`task`, `bug`, no
 kind) as `YYYY-MM-DD_<slug>.md`; its row goes on top of that section of `Backlog/README.md`;
@@ -1100,10 +1102,10 @@ No key is bound unless `keys.learning` names one ([BINDINGS.md](BINDINGS.md)).
 Questions over every learning path at once, for a shell or a script (the desktop app asks the same through the
 contract: `tasks.learn_next`, `tasks.learn_notes`, `tasks.competences`, [CONTRACT.md](CONTRACT.md)).
 
-- `tasks learn next [<area>] [--machine=private|workstation|wsl|env] [--n=N] [--paths=id,id] [--format=tsv|json]`:
+- `tasks learn next [<area>] [--machine=private|workstation|wsl|env|all] [--n=N] [--paths=id,id] [--format=tsv|json]`:
   what to learn next. For each running path (`status: doing` or a point learned or seen; an idle path of a project
   with `status: doing` too) the first N (3) open points in their order that are not blocked, not `{optional}` and,
-  with `--machine`, may be practised there (`env` reads `NVIM_MACHINE_ROLE`). A line per point: path, `#key`, stage,
+  with `--machine`, may be practised there (`env` reads `NVIM_MACHINE_ROLE`). Without `--machine` the text output filters by the role in `NVIM_MACHINE_ROLE` (empty or `default`: `private`, which takes `{machine=wsl}` points too) and says so in a first line `machine<TAB><role><TAB>from NVIM_MACHINE_ROLE`; `--machine=all` shows every point, an unknown role filters nothing and says so in a `note` line, `--format=json` stays whole. A line per point: path, `#key`, stage,
   label, `safety` when the point needs the ack to be closed.
 - `tasks learn notes [<text>] [--kind=note|link|image] [--area=a,b] [--paths=id,id] [--done] [--limit=N]`: the
   notes, links and images of the points of all paths; `<text>` searches label, note and link without case, `--done`

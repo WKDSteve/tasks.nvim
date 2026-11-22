@@ -417,4 +417,64 @@ function M.commit(paths, opts)
   return nil, ("HEAD kept moving: gave up after %d attempts"):format(M.ATTEMPTS)
 end
 
+---The changed files of the vault as they are now: path (relative to the vault) -> a hash of the file, `-` for a
+---deleted one. Taken before and after a command, the difference is what that command wrote, whatever other sessions
+---left in the tree (`changed_since`).
+---@param opts? { root?: string }
+---@return table<string, string>|nil snapshot
+---@return string|nil err
+function M.snapshot(opts)
+  local root, rerr = vault.root(opts or {})
+  if not root then
+    return nil, rerr
+  end
+  local out, err =
+    git(root, { "status", "--porcelain=v1", "-z", "-uall", "--no-renames", "--", "." })
+  if not out then
+    return nil, err
+  end
+  local top = git(root, { "rev-parse", "--show-prefix" })
+  local prefix = vim.trim(top or "")
+  local snap = {}
+  for _, entry in ipairs(nul_list(out)) do
+    local path = entry:sub(4)
+    if path:sub(1, #prefix) == prefix then
+      path = path:sub(#prefix + 1)
+    end
+    local f = io.open(root .. "/" .. path, "rb")
+    if f then
+      snap[path] = vim.fn.sha256(f:read("*a") or "")
+      f:close()
+    else
+      snap[path] = "-"
+    end
+  end
+  return snap
+end
+
+---The generated files `commit` renders itself; a tree's copy of them counts every session's work.
+---@param path string
+---@return boolean
+local function generated(path)
+  return path:match("/ROADMAP/TASKS%.md$") ~= nil
+    or path:match("/Backlog/README%.md$") ~= nil
+    or path:match("^_Telemetry/history/") ~= nil
+end
+
+---The paths that differ between two snapshots (new, changed or deleted in between), sorted, without the generated
+---files `commit` renders itself.
+---@param before table<string, string>
+---@param after table<string, string>
+---@return string[]
+function M.changed_since(before, after)
+  local list = {}
+  for path, hash in pairs(after) do
+    if before[path] ~= hash and not generated(path) then
+      list[#list + 1] = path
+    end
+  end
+  table.sort(list)
+  return list
+end
+
 return M

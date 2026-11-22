@@ -131,7 +131,7 @@ commands:
                                           ({h=8} or {h=8-10}; {done_h=9} the hours it took), its result (the child
                                           Nachweis:/Aufgabe:/Ergebnis:) and its state; --write puts it into the file
                                           between <!-- GENERATED:schedule start/end --> (a hand-kept table gives way)
-  learn next [<area>] [--machine=private|workstation|wsl|env] [--n=N] [--paths=id,id] [--format=tsv|json]
+  learn next [<area>] [--machine=private|workstation|wsl|env|all] [--n=N] [--paths=id,id] [--format=tsv|json]
                                           the next points of the running learning paths (status doing or a point
                                           learned or seen; an idle one of a project with status doing too): per
                                           path the first N (3) open points in their order that are not blocked, not
@@ -285,6 +285,9 @@ commands:
                                           seen and not-applicable need a reason (or the task's own outcome_reason)
                                           [--ci=pending|green|red]  the CI state of the commits (later:
                                           set <id> ci=green, on the finished task too)
+                                          [--commit] [--commit-message=text]  commit what the finish wrote in the vault
+                                          (as `tasks commit`, own staging area); without it a line `commit-paths`
+                                          lists the paths for `tasks commit`
                                           finish: move to Backlog/; prints the tasks it freed and what to start
                                           next; --unblock sets the freed tasks that still say blocked to open;
                                           a routine (`repeat: 8w`) starts its next round (--last: it ends for good)
@@ -669,8 +672,19 @@ local SPECS = {
   unpromote = { value = {}, flag = { "dry-run", "no-index" } },
   ["migrate-actor"] = { value = {}, flag = { "write", "no-index" } },
   done = {
-    value = { "done-in", "commits", "ci", "date", "remind", "by", "note", "outcome", "reason" },
-    flag = { "no-index", "no-next", "unblock", "last", "force", "ack" },
+    value = {
+      "done-in",
+      "commits",
+      "ci",
+      "date",
+      "remind",
+      "by",
+      "note",
+      "outcome",
+      "reason",
+      "commit-message",
+    },
+    flag = { "no-index", "no-next", "unblock", "last", "force", "ack", "commit" },
   },
   reopen = { value = { "status" }, flag = {} },
   point = { value = { "state", "reason" }, flag = { "ack" } },
@@ -3328,15 +3342,67 @@ function commands.migrate_actor(ctx)
 end
 commands["migrate-actor"] = commands.migrate_actor
 
+---After a `done`: the paths it wrote in the vault, as one line `commit-paths` to hand to `tasks commit` (TASKS-08), or
+---with `--commit` committed at once from a staging area of their own (other sessions' files stay out). The generated
+---index files are not in the list: `commit` renders them.
+---@param ctx Tasks.CliCtx
+---@param vcommit table  `tasks_nvim.vault_commit`
+---@param before table<string, string>|nil  `snapshot` taken before the finish
+---@return integer code
+local function done_commit(ctx, vcommit, before)
+  local args = ctx.args
+  if not before then
+    if args.opt.commit == true then
+      ctx.warn("error: --commit: the vault is no git repository, nothing was committed")
+      return 1
+    end
+    return 0
+  end
+  local after = vcommit.snapshot({ root = ctx.eo.root })
+  local paths = after and vcommit.changed_since(before, after) or {}
+  if #paths == 0 then
+    return 0
+  end
+  if args.opt.commit ~= true then
+    ctx.say("commit-paths	" .. table.concat(paths, " "))
+    return 0
+  end
+  local id = args.pos[1]
+  local res, err = vcommit.commit(paths, {
+    root = ctx.eo.root,
+    message = args.opt["commit-message"] or ("done: " .. id),
+  })
+  if not res then
+    ctx.warn("error: done stands, but the commit failed: " .. tostring(err))
+    ctx.say("commit-paths	" .. table.concat(paths, " "))
+    return 1
+  end
+  ctx.say(("committed	%s	%d path(s)"):format(res.commit:sub(1, 9), #res.paths))
+  if res.settle_error then
+    ctx.warn(
+      "warn: the shared staging area still holds the old version of the committed paths: "
+        .. res.settle_error
+    )
+  end
+  return 0
+end
+
 function commands.done(ctx)
   local args, eo = ctx.args, ctx.eo
   local id = args.pos[1]
   if not id or #args.pos > 1 then
     ctx.warn(
-      "error: usage: done <area>/<slug> [--commits=repo@sha,...] [--done-in=text] [--date=YYYY-MM-DD] [--remind=7d|YYYY-MM-DD] [--outcome=learned|seen|not-applicable] [--reason=text] [--ci=pending|green|red]"
+      "error: usage: done <area>/<slug> [--commits=repo@sha,...] [--done-in=text] [--date=YYYY-MM-DD] [--remind=7d|YYYY-MM-DD] [--outcome=learned|seen|not-applicable] [--reason=text] [--ci=pending|green|red] [--commit [--commit-message=text]]"
     )
     return 2
   end
+  if args.opt["commit-message"] ~= nil and args.opt.commit ~= true then
+    ctx.warn("error: --commit-message needs --commit")
+    return 2
+  end
+  -- What `done` wrote in the vault is what differs afterwards from what was there before.
+  local vcommit = require("tasks_nvim.vault_commit")
+  local before = vcommit.snapshot({ root = eo.root })
   local flow, err = done_flow.run(id, {
     root = eo.root,
     today = eo.today,
@@ -3440,7 +3506,7 @@ function commands.done(ctx)
     end
   end
   report_index(ctx, res)
-  return 0
+  return done_commit(ctx, vcommit, before)
 end
 
 ---The id `reopen` is given, as an id: `<area>/<slug>`, also the name of the finished file (`<area>/2026-11-18_<slug>`,

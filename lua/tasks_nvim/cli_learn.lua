@@ -2,9 +2,9 @@
 ---@brief The command line of the learning views over all paths: `learn next` (and its siblings), each a document of
 ---`tasks_nvim.contract_learn` as lines or as JSON.
 ---@description
----  - `learn next [<area>] [--machine=private|workstation|wsl|env] [--n=N] [--paths=id,id] [--format=tsv|json]`:
+---  - `learn next [<area>] [--machine=private|workstation|wsl|env|all] [--n=N] [--paths=id,id] [--format=tsv|json]`:
 ---    the next points of the running paths (`tasks.learn_next`); `env` reads `NVIM_MACHINE_ROLE`, no `--machine`
----    means every machine
+---    means the role of NVIM_MACHINE_ROLE in the text (all in JSON), `all` every machine
 ---  - `learn notes [<text>] [--kind=note|link|image] [--area=a,b] [--paths=id,id] [--done] [--limit=N]
 ---    [--format=tsv|json]`: the notes, links and images of the points of all paths (`tasks.learn_notes`), `--done`
 ---    with the finished paths
@@ -30,7 +30,7 @@ M.USAGE_NOTES =
   "learn notes [<text>] [--kind=note|link|image] [--area=a,b] [--paths=id,id] [--done] [--limit=N] [--format=tsv|json]"
 
 M.USAGE =
-  "learn next [<area>] [--machine=private|workstation|wsl|env] [--n=N] [--paths=id,id] [--format=tsv|json]"
+  "learn next [<area>] [--machine=private|workstation|wsl|env|all] [--n=N] [--paths=id,id] [--format=tsv|json]"
 
 ---@param code string|nil
 ---@return integer
@@ -92,15 +92,30 @@ local function learn_next(ctx)
     ctx.warn("error: usage: " .. M.USAGE)
     return 2
   end
-  local machine
+  local lern = require("tasks_nvim.lernbaum")
+  local machine, machine_note
   if opt.machine ~= nil then
     local m = tostring(opt.machine)
-    machine = require("tasks_nvim.lernbaum").machine_of_role(
-      m == "env" and (os.getenv("NVIM_MACHINE_ROLE") or "") or m
-    )
-    if not machine then
-      ctx.warn("error: --machine takes private, workstation, wsl or env, not '" .. m .. "'")
-      return 2
+    if m ~= "all" then
+      machine = lern.machine_of_role(m == "env" and (os.getenv("NVIM_MACHINE_ROLE") or "") or m)
+      if not machine then
+        ctx.warn("error: --machine takes private, workstation, wsl, env or all, not '" .. m .. "'")
+        return 2
+      end
+    end
+  elseif format == "tsv" then
+    -- without --machine the text shows what goes on this machine (`NVIM_MACHINE_ROLE`); JSON stays whole, a script
+    -- reads the marks itself. An unknown role filters nothing and says so.
+    local role = os.getenv("NVIM_MACHINE_ROLE") or ""
+    machine = lern.machine_of_role(role)
+    if machine then
+      machine_note = ("machine	%s	from NVIM_MACHINE_ROLE; --machine=all shows every point"):format(
+        machine
+      )
+    else
+      machine_note = ("note	NVIM_MACHINE_ROLE '%s' is no machine (private, workstation, wsl): nothing is filtered"):format(
+        fsio.clean(role)
+      )
     end
   end
   local n
@@ -122,6 +137,9 @@ local function learn_next(ctx)
   end
   if not doc then
     return fail(ctx, err)
+  end
+  if machine_note then
+    ctx.say(machine_note)
   end
   for _, item in ipairs(doc.items) do
     for _, p in ipairs(item.points) do
