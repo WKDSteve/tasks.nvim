@@ -37,11 +37,16 @@ return function(H)
     eq(res.attempt, 2, "the second attempt got through")
     -- the gate runs in a folder next to the repository (a trusted root), never in the temp folder
     local ran_in = vim.trim(H.read(where))
+    -- (compare the last two path parts: the shell may print `/c/...` where Lua has `C:/...`)
+    local function tail2(p)
+      return vim.fs.basename(vim.fs.dirname(p)) .. "/" .. vim.fs.basename(p)
+    end
     eq(
-      vim.fs.dirname(ran_in),
-      vim.fs.dirname(root),
-      "the hook ran next to the repository: " .. ran_in
+      vim.fs.basename(vim.fs.dirname(ran_in)),
+      vim.fs.basename(vim.fs.dirname(root)),
+      "the hook ran next to the repository: " .. tail2(ran_in)
     )
+    ok(vim.fs.basename(ran_in):find(".tasks-push-", 1, true), "in the throwaway folder: " .. ran_in)
     local check = remote_indexes_fresh(bare, "two")
     ok(H.read(check .. "/cascade.nvim/ROADMAP/tasks/mine-two.md"), "own task on the remote")
     ok(H.read(check .. "/lib.nvim/ROADMAP/tasks/raced.md"), "the raced task is still there")
