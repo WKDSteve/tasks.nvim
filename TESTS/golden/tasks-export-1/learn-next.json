@@ -1,5 +1,5 @@
 {
-  "digest": "sha256:67b256c89fabd861",
+  "digest": "sha256:c3587b7acf26e6f2",
   "engine": {
     "git": "0000000",
     "nvim": "0.0.0",
@@ -10,6 +10,7 @@
   "items": [
     {
       "area": "lib.nvim",
+      "etag": "sha256:9ad69768e172ea11",
       "icon": {
         "kind": "emoji",
         "value": "🧠"
@@ -38,6 +39,7 @@
     },
     {
       "area": "lib.nvim",
+      "etag": "sha256:caf64b80e694007f",
       "path": "lib.nvim/signale",
       "points": [
         {

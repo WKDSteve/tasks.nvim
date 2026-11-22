@@ -1178,6 +1178,10 @@ export type LearnNext = Head & {
     project?: string;
     stage: "doing" | "idle";
     /**
+     * The version of a file: `sha256:` and 16 hex digits of the hash of its bytes.
+     */
+    etag?: string;
+    /**
      * @minItems 1
      */
     points: [LearnPoint, ...LearnPoint[]];
@@ -1199,6 +1203,10 @@ export type LearnNotes = Head & {
      * The path is finished (from a Backlog, `include_done`).
      */
     path_done?: true;
+    /**
+     * The version of a file: `sha256:` and 16 hex digits of the hash of its bytes.
+     */
+    etag?: string;
     index: number;
     key?: string;
     /**

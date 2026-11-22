@@ -125,6 +125,48 @@ return function(H)
   eq(#free.items, 1, "the requirement is finished: it runs")
   ok(free.rev ~= waiting.rev, "a requirement finished elsewhere gives a new rev")
 
+  -- the version of the path file: a point is written on the version that was read, a change between is a conflict
+  local function path_etag(id)
+    local pdoc = vim.json.decode((api.call("path", { params = { id = id } }, { root = root })))
+    return pdoc.path.etag
+  end
+  local read_etag = free.items[1].etag
+  ok(type(read_etag) == "string" and read_etag:find("^sha256:"), vim.inspect(free.items[1]))
+  eq(read_etag, path_etag("lib.nvim/warte"), "the same form as PathEntry.etag")
+  local ops_mod = require("tasks_nvim.ops")
+  local function node_set(etag)
+    local res = assert(ops_mod.run({
+      ops = {
+        {
+          op = "node_set",
+          id = "lib.nvim/warte",
+          point = "danach",
+          state = "learned",
+          if_match = etag,
+        },
+      },
+    }, { root = root, today = F.TODAY }))
+    return res.results[1]
+  end
+  eq(node_set(read_etag).outcome, "changed", "written on the version read")
+  local stale = node_set(read_etag)
+  eq(stale.ok, false)
+  eq(stale.error.code, "conflict", "the file changed since it was read")
+  -- learn_notes: each hit carries the version of its path file
+  local notes = vim.json.decode(
+    (
+      api.call(
+        "learn_notes",
+        { params = { paths = { "lib.nvim/prozesse" } } },
+        { root = root, today = F.TODAY }
+      )
+    )
+  )
+  ok(#notes.items > 0, vim.inspect(notes))
+  for _, item in ipairs(notes.items) do
+    eq(item.etag, path_etag("lib.nvim/prozesse"))
+  end
+
   -- the refusals
   eq(select(2, call({ n = 0 })), "invalid_argument")
   eq(select(2, call({ n = 21 })), "invalid_argument")

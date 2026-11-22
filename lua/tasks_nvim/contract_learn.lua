@@ -154,7 +154,8 @@ end
 ---`tasks.learn_next`: for every running learning path (stage `doing`, or `idle` with its project begun, i.e. the
 ---project's `status: doing`) the first `n` points that may be learned now (`learn.next_points`), on the machine when
 ---one is named. Paths with such a point only; `doing` before `idle`, then the most recently active first (the last day
----the series of the learning figures saw a change, else `updated`), then by id.
+---the series of the learning figures saw a change, else `updated`), then by id. Each item carries the `etag` of its
+---path file, so a client writes a point on the version it read (`node_set` `if_match`).
 ---@param params? { area?: string, paths?: string[], machine?: string, n?: integer }
 ---@param opts? { root?: string }
 ---@return table|nil doc
@@ -202,7 +203,8 @@ function M.next(params, opts)
       if stage == "doing" or (stage == "idle" and f.project and begun[f.project]) then
         local points = learn.next_points(f.tree, { machine = params.machine, n = params.n })
         if #points > 0 then
-          chosen[#chosen + 1] = { f = f, stage = stage, points = points }
+          chosen[#chosen + 1] =
+            { f = f, stage = stage, points = points, etag = text and fsio.etag(text) or nil }
         end
       end
     end
@@ -239,6 +241,8 @@ function M.next(params, opts)
         icon = contract.icon_entry(c.f.icon),
         project = c.f.project,
         stage = c.stage,
+        -- the version of the path file, for `if_match` of `node_set` (as `PathEntry.etag`)
+        etag = c.etag,
         points = json.array(vim.tbl_map(function(n)
           return json.object(point_entry(n))
         end, c.points)),
@@ -261,7 +265,7 @@ M.MAX_QUERY = 200
 ---`tasks.learn_notes`: the notes, links and images of the points of all paths (`learn.notes`), with the path, the
 ---stage and the state of each, narrowed to a `kind` and a search text (`query`, without case over label, note and
 ---link), in path order (open paths by id, then with `include_done` the finished ones) and document order; at most
----`limit`, `truncated` says there were more and `total` how many.
+---`limit`, `truncated` says there were more and `total` how many. Each item carries the `etag` of its path file.
 ---@param params? { query?: string, kind?: string, area?: string, areas?: string[], paths?: string[], include_done?: boolean, limit?: integer }
 ---@param opts? { root?: string }
 ---@return table|nil doc
@@ -291,6 +295,7 @@ function M.notes(params, opts)
     local items, lines, total = {}, {}, 0
     for _, f in ipairs(files) do
       local text = fsio.read(f.path)
+      local etag = text and fsio.etag(text) or nil
       local done = f.location == "backlog"
       vim.list_extend(lines, M.rev_lines(f, text))
       if done then
@@ -305,6 +310,8 @@ function M.notes(params, opts)
             area = f.area,
             title = f.title,
             path_done = done or nil,
+            -- the version of the path file, for `if_match` of a write to the point (as `PathEntry.etag`)
+            etag = etag,
             index = node.index,
             key = node.key,
             label = node.label,

@@ -7,6 +7,7 @@ the version is not tagged yet (the repository is not published).
 
 ### Added
 
+- The items of `tasks.learn_next` and `tasks.learn_notes` carry `etag`, the version of their path file (as `PathEntry.etag`), so a page writes a point with `node_set` on the version it read (`if_match`; a change in between is a `conflict`) instead of blindly.
 - `snapshot.projects[]` carry `stage` (capability `requires`), the words of a path's stage: `done`, `parked`, `waiting` (an open hard requirement), `doing` (`status: doing`, or a plan or task of it finished), else `idle` (`requires.project_stage`), so a map of paths and projects needs no rule of its own.
 - `requires` (capability `requires`): an id of another vault (`<vault>:<area>/<slug>`, `<vault>/<area>/<slug>`) and a broken entry stay in the list of the documents as `kind: "foreign"` and `kind: "bad"` (`id` as written, `met: false`, never in `waiting_on`, no gate held), so a map draws them as a box; they stay the file's fault `path-bad-requires` / `project-bad-requires` for `check`. `tasks path` prints them as `foreign` / `bad`.
 - `tasks done <id> --commit [--commit-message=<text>]` commits the files the finish wrote in the vault at once (`tasks_nvim.vault_commit.snapshot`/`changed_since`: what differs afterwards from before, without the generated index files), from the staging area of `tasks commit`, so other sessions' files stay out. Without `--commit`, `done` prints a line `commit-paths` for `tasks commit`.
