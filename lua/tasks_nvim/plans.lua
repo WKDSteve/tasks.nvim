@@ -62,6 +62,8 @@ M.STATUSES = { "planning", "doing", "parked", "done" }
 ---@field requires? string[]          # A path or project: the paths and projects it builds on (ids; `tasks_nvim.requires`).
 ---@field requires_raw? string[]      # `requires` as the file writes them (ids or wikilinks).
 ---@field requires_gate? "soft"|"hard"  # What an unmet requirement does (absent: `soft`).
+---@field competence? string[]       # A path: the competences it serves (`tasks_nvim.competences`).
+---@field competence_target? Tasks.CompetenceTarget  # A path: the stages it aims at.
 ---@field created? string
 ---@field updated? string
 ---@field summary string
@@ -293,6 +295,8 @@ function M.parse(text, ctx)
       end
     end
     if file_kind == "path" then
+      -- the field of knowledge it serves (`tasks_nvim.competences`)
+      require("tasks_nvim.competences").read_path(parsed, plan, bad)
       -- the problems of the tree are `check`'s findings, never a fault of the file (R3: nothing refuses a write)
       plan.tree = require("tasks_nvim.lernbaum").parse(parsed.body or "")
       plan.levels = require("tasks_nvim.lernlevel").parse(parsed.body or "")
@@ -1094,8 +1098,47 @@ M.SET_KEYS = {
     "tags",
     "requires",
     "requires_gate",
+    "competence",
+    "competence_target",
   },
 }
+
+---The competences a `path_set` names (`competence`): a list or a text (`a/b,c/d`, also in brackets), each the id of
+---a competence file of the vault (`tasks_nvim.competences`); nil and why for anything else.
+---@param value any
+---@param root string
+---@return string[]|nil ids
+---@return string|nil err
+local function competence_list(value, root)
+  local items = value
+  if type(value) == "string" then
+    items = vim.split((value:gsub("^%s*%[", ""):gsub("%]%s*$", "")), ",", { plain = true })
+  end
+  if type(items) ~= "table" then
+    return nil, "competence must be a list of ids"
+  end
+  local known = require("tasks_nvim.competences").ids(root)
+  local out = {}
+  for _, item in ipairs(items) do
+    local text = vim.trim(tostring(item))
+    if text ~= "" then
+      local a, sl, e = vault.parse_id(text)
+      if not a or not sl or e then
+        return nil, "competence: expected <area>/<slug>, got '" .. text .. "'"
+      end
+      if not known[text] then
+        return nil,
+          "competence "
+            .. text
+            .. ": no competence of that id (<area>/ROADMAP/competences/<slug>.md)"
+      end
+      if not vim.tbl_contains(out, text) then
+        out[#out + 1] = text
+      end
+    end
+  end
+  return out, nil
+end
 
 ---The finder of a kind of file: plans here, projects and paths in their own modules (required where used: they
 ---require this module).
@@ -1158,7 +1201,7 @@ function M.set(id, patch, opts)
     local remove = value == nil
       or value == vim.NIL
       or value == ""
-      or (type(value) == "table" and #value == 0)
+      or (type(value) == "table" and next(value) == nil)
     if remove then
       if key == "title" or key == "status" then
         return nil, key .. " cannot be removed", { code = "invalid_argument" }
@@ -1198,6 +1241,37 @@ function M.set(id, patch, opts)
         return nil, lerr, { code = "invalid_argument" }
       end
       pairs_[#pairs_ + 1] = { key, #list > 0 and list or mutate.REMOVE }
+    elseif key == "competence" then
+      local list, cerr = competence_list(value, root)
+      if not list then
+        return nil, cerr, { code = "invalid_argument" }
+      end
+      pairs_[#pairs_ + 1] = { key, #list > 0 and list or mutate.REMOVE }
+    elseif key == "competence_target" then
+      if value == vim.NIL or value == mutate.REMOVE then
+        pairs_[#pairs_ + 1] = { key, mutate.REMOVE }
+      else
+        local comp = require("tasks_nvim.competences")
+        local target, terr
+        if type(value) == "table" then
+          local t, p = value.t, value.p
+          for k in pairs(value) do
+            if k ~= "t" and k ~= "p" then
+              return nil, "competence_target takes t and p only", { code = "invalid_argument" }
+            end
+          end
+          target, terr = comp.target_of(comp.render_target({ t = t, p = p }))
+          if target and ((t ~= nil and target.t ~= t) or (p ~= nil and target.p ~= p)) then
+            target, terr = nil, "competence_target: a stage is 0..8 in halves"
+          end
+        else
+          target, terr = comp.target_of(value)
+        end
+        if not target then
+          return nil, "competence_target: " .. tostring(terr), { code = "invalid_argument" }
+        end
+        pairs_[#pairs_ + 1] = { key, comp.render_target(target) }
+      end
     elseif key == "requires_gate" then
       local gate, gerr = require("tasks_nvim.requires").gate_of(value)
       if not gate then
@@ -1331,10 +1405,22 @@ function M.set(id, patch, opts)
     local before = {}
     for _, kv in ipairs(pairs_) do
       local old = parsed and parsed.has_block and fm.get(parsed, kv[1]) or nil
+      if old == nil and kv[1] == "competence_target" and parsed and parsed.has_block then
+        -- a map the reader keeps as its line only (`{t: 4, p: 4}`)
+        old = require("tasks_nvim.competences").raw_value(parsed, kv[1])
+      end
       before[kv[1]] = old == nil and vim.NIL or old
     end
     result.before = before
-    local text, uerr = fm.update_text(cur, pairs_)
+    -- a key the reader keeps as its line only (a map, `competence_target: {t: 4, p: 4}`) is not rewritten by the
+    -- frontmatter writer: its line goes first, the new value is written as a key of its own
+    local base = cur
+    for _, kv in ipairs(pairs_) do
+      if kv[1] == "competence_target" and parsed and parsed.has_block then
+        base = require("tasks_nvim.competences").drop_opaque(base, parsed, kv[1])
+      end
+    end
+    local text, uerr = fm.update_text(base, pairs_)
     if not text then
       return nil,
         "cannot change " .. file.path .. ": " .. tostring(uerr),

@@ -268,6 +268,8 @@ function G.write_learn_paths(root)
       "title: Prozesse",
       "status: doing",
       "project: lib.nvim/os",
+      "competence: lib.nvim/betriebssysteme",
+      "competence_target: {t: 4, p: 3.5}",
       'icon: "\240\159\167\160"',
       "created: 2026-01-01",
       "updated: 2026-01-03",
@@ -289,6 +291,27 @@ function G.write_learn_paths(root)
       "    - [ ] Huge Pages",
       "",
     }, "\n")
+  )
+  local cdir = root .. "/lib.nvim/ROADMAP/competences"
+  put(
+    cdir .. "/betriebssysteme.md",
+    table.concat({
+      "---",
+      'title: "Betriebssysteme"',
+      'group: "Informatik-Kern"',
+      "t: 3",
+      "p: 1",
+      "target_12: 4",
+      "target_24: {t: 5, p: 4.5}",
+      "assessed: 2026-10-29",
+      "---",
+      "Stallings Kap. 1\226\128\1478 gelesen. Nachweis 4: eigene Shell in C.",
+      "",
+    }, "\n")
+  )
+  put(
+    cdir .. "/netze.md",
+    "---\ntitle: Netze\ngroup: Informatik-Kern\nt: ?\np: 9\nlevel: hoch\n---\n"
   )
   put(
     dir .. "/signale.md",
@@ -727,6 +750,18 @@ G.cases = {
     request = function(root)
       G.write_learn_paths(root)
       return '{"params":{"include_done":true}}'
+    end,
+  },
+  {
+    -- the competences of the vault (capability `competences`): stages, a target for both axes and one per axis, the
+    -- paths that name it, the scale in German; a broken file with a stage out of range and an unknown field, its
+    -- `?` read as not assessed
+    name = "competences",
+    method = "competences",
+    fresh = true,
+    request = function(root)
+      G.write_learn_paths(root)
+      return '{"params":{}}'
     end,
   },
   {

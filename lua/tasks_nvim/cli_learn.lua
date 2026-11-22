@@ -168,10 +168,63 @@ local function learn_notes(ctx)
       it.state,
       fsio.clean(it.label),
       fsio.clean(it.note or it.link or it.image or ""),
-    }, "	"))
+    }, "\t"))
   end
   if doc.truncated then
     ctx.warn(("warn: %d of %d hits shown (--limit)"):format(#doc.items, doc.total))
+  end
+  for _, e in ipairs(doc.incomplete) do
+    ctx.warn("warn: skipped " .. fsio.clean(e))
+  end
+  return 0
+end
+
+---`competences [<area>] [--format=tsv|json]`: the competences of the vault (`tasks.competences`), a line each: id,
+---T, P, target in 12 months, target in 24 months, paths, title (`-` for what is not there).
+---@param ctx Tasks.CliCtx
+---@return integer
+local function competences(ctx)
+  local args, opt = ctx.args, ctx.args.opt
+  local format = opt.format or "tsv"
+  if (format ~= "tsv" and format ~= "json") or #args.pos > 1 then
+    ctx.warn("error: usage: competences [<area>] [--format=tsv|json]")
+    return 2
+  end
+  local doc, err = require("tasks_nvim.contract_learn").competences(
+    { area = args.pos[1] },
+    { root = ctx.eo.root, today = ctx.eo.today }
+  )
+  if format == "json" then
+    return emit_json(ctx, doc, err)
+  end
+  if not doc then
+    return fail(ctx, err)
+  end
+  local function stage(v)
+    return v == nil and "-" or ("%g"):format(v)
+  end
+  local function target(t)
+    if not t then
+      return "-"
+    end
+    if t.t == t.p then
+      return stage(t.t)
+    end
+    return ("T%s/P%s"):format(stage(t.t), stage(t.p))
+  end
+  for _, c in ipairs(doc.items) do
+    ctx.say(table.concat({
+      fsio.clean(c.id),
+      "T " .. stage(c.t),
+      "P " .. stage(c.p),
+      "12: " .. target(c.target_12),
+      "24: " .. target(c.target_24),
+      #c.paths > 0 and table.concat(c.paths, ",") or "-",
+      fsio.clean(c.title),
+    }, "\t"))
+    for _, prob in ipairs(c.problems) do
+      ctx.warn("warn: " .. fsio.clean(c.id) .. ": " .. fsio.clean(prob))
+    end
   end
   for _, e in ipairs(doc.incomplete) do
     ctx.warn("warn: skipped " .. fsio.clean(e))
@@ -199,6 +252,8 @@ function M.register(commands, specs)
   specs.learn =
     { value = { "machine", "n", "paths", "format", "kind", "area", "limit" }, flag = { "done" } }
   commands.learn = run
+  specs.competences = { value = { "format" }, flag = {} }
+  commands.competences = competences
 end
 
 return M

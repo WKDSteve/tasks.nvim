@@ -141,6 +141,10 @@ commands:
                                           the notes, links and images of the learning points of all paths, those
                                           whose label, note or link contain <text> (any case); --done adds the
                                           finished paths; a line per point (path, #key, state, label, note or link)
+  competences [<area>] [--format=tsv|json]
+                                          the competences (<area>/ROADMAP/competences/<slug>.md): id, stage in
+                                          theory (T) and practice (P), targets in 12 and 24 months, the learning
+                                          paths that name it (competence: in the path), title; a broken file warns
   paths [<area>] [--project=<id>] [--format=tsv|json]
                                           the learning paths: id, status, points, open points, progress in percent
                                           (of the XP, else of the points), title; --project: the paths of a project,

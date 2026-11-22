@@ -23,6 +23,8 @@ return function(H)
     "ci",
     -- `commit` is for the shared vault in a shell (agents, scripts); the editor has git plugins of its own
     "commit",
+    -- `competences` lists the competence files for a shell or a script; the desktop app has the catalogue
+    "competences",
     "export",
     -- `history` reads and writes the series of the figures for a hub, a script or a chart of tasks-desktop; the
     -- editor has no view of it

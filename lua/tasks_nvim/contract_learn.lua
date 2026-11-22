@@ -312,4 +312,105 @@ function M.notes(params, opts)
   end)
 end
 
+---The longest body of a competence a document carries.
+M.MAX_COMPETENCE_BODY = 16384
+
+---`tasks.competences`: the competences of the vault (or of areas), each with its stages, targets, the date it was
+---assessed, its text (untrusted, cut at 16 KiB) and the open learning paths that name it, plus the scale (0..8 with
+---the names of the stages) in the language of the vault (`tasks-vault.json`, else German).
+---@param params? { area?: string, areas?: string[] }
+---@param opts? { root?: string }
+---@return table|nil doc
+---@return Tasks.ContractError|string|nil err
+function M.competences(params, opts)
+  params = params or {}
+  return fsio.read_scope(function()
+    local root, rerr = vault.root(opts)
+    if not root then
+      return nil, rerr
+    end
+    local comp = require("tasks_nvim.competences")
+    local in_scope
+    if params.area ~= nil or params.areas ~= nil then
+      in_scope = {}
+      local asked = params.areas and vim.list_slice(params.areas, 1) or {}
+      if params.area ~= nil then
+        table.insert(asked, 1, params.area)
+      end
+      for _, a in ipairs(asked) do
+        local scope = vault.area_scope(root, a)
+        if not scope then
+          return nil,
+            { code = "not_found", message = "unknown area: " .. tostring(a), retryable = false }
+        end
+        for _, n in ipairs(scope.areas) do
+          in_scope[n] = true
+        end
+      end
+    end
+    local lines, incomplete = {}, {}
+    -- the paths that name a competence: every open path of the vault (a path of another area may serve it)
+    local by_competence = {}
+    for _, f in ipairs(require("tasks_nvim.paths").all({ root = root }) or {}) do
+      for _, id in ipairs(f.competence or {}) do
+        by_competence[id] = by_competence[id] or {}
+        table.insert(by_competence[id], f.id)
+        lines[#lines + 1] = "path:" .. f.id .. "\t" .. id
+      end
+    end
+    local items = {}
+    for _, a in ipairs(vault.areas(root)) do
+      if not in_scope or in_scope[a.name] then
+        local list, errs = comp.area(a.name, { root = root })
+        for _, e in ipairs(type(errs) == "table" and errs or {}) do
+          incomplete[#incomplete + 1] = contract.redact(root, tostring(e))
+        end
+        for _, c in ipairs(list or {}) do
+          local text = fsio.read(c.path)
+          lines[#lines + 1] = c.id .. "\t" .. (text and fsio.etag(text) or "")
+          local body = vim.trim(c.body or "")
+          local truncated = #body > M.MAX_COMPETENCE_BODY
+          local function target(t)
+            return t and json.object({ t = t.t, p = t.p }) or nil
+          end
+          local paths = by_competence[c.id] or {}
+          table.sort(paths)
+          items[#items + 1] = json.object({
+            id = c.id,
+            area = c.area,
+            slug = c.slug,
+            title = c.title,
+            group = c.group,
+            t = c.t,
+            p = c.p,
+            target_12 = target(c.target_12),
+            target_24 = target(c.target_24),
+            assessed = c.assessed,
+            body = truncated and body:sub(1, M.MAX_COMPETENCE_BODY) or body,
+            body_truncated = truncated or nil,
+            paths = json.array(paths),
+            file = contract.relative(root, c.path) or vim.fs.basename(c.path),
+            etag = text and fsio.etag(text) or nil,
+            valid = c.valid,
+            problems = vim.tbl_map(function(e)
+              return contract.redact(root, tostring(e))
+            end, c.errors),
+          })
+        end
+      end
+    end
+    local marker = require("tasks_nvim.vault_marker").read(root)
+    local lang = (marker and marker.lang == "en") and "en" or "de"
+    lines[#lines + 1] = "lang:" .. lang
+    local doc = contract.head("tasks.competences", root)
+    doc.lang = lang
+    doc.scale = json.array(vim.tbl_map(function(s)
+      return json.object(s)
+    end, comp.scale(lang)))
+    doc.items = json.array(items)
+    doc.incomplete = incomplete
+    return contract.seal(doc, contract.doc.rev_of(lines)), nil
+  end)
+end
+
 return M

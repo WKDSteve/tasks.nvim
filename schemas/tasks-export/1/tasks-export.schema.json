@@ -92,6 +92,9 @@
       "$ref": "#/$defs/LearnNotes"
     },
     {
+      "$ref": "#/$defs/Competences"
+    },
+    {
       "$ref": "#/$defs/Milestones"
     },
     {
@@ -566,6 +569,78 @@
       },
       "unevaluatedProperties": false
     },
+    "CompetenceLevel": {
+      "description": "A stage of the scale of the competences, 0 (unknown) to 8 (mastermind), in halves (3.5: the evidence for 4 begun).",
+      "type": "number",
+      "minimum": 0,
+      "maximum": 8,
+      "multipleOf": 0.5
+    },
+    "CompetenceTarget": {
+      "description": "Stages aimed at, in theory (`t`) and practice (`p`); a target written as one stage holds for both.",
+      "type": "object",
+      "minProperties": 1,
+      "properties": {
+        "t": { "$ref": "#/$defs/CompetenceLevel" },
+        "p": { "$ref": "#/$defs/CompetenceLevel" }
+      },
+      "additionalProperties": false
+    },
+    "Competences": {
+      "description": "tasks.competences: the fields of knowledge of the vault (`<area>/ROADMAP/competences/<slug>.md`), each with its stage in theory (`t`) and practice (`p`; absent: not assessed, `?`), its targets in 12 and 24 months, the day it was assessed, its text (untrusted, cut at 16 KiB) and the open learning paths that name it (`competence:`), plus the scale (0..8 with the names of the stages) in the language of the vault. A broken file is still here (`valid: false`, `problems`). Capability `competences`.",
+      "allOf": [{ "$ref": "#/$defs/Head" }],
+      "type": "object",
+      "required": ["kind", "rev", "digest", "lang", "scale", "items", "incomplete"],
+      "properties": {
+        "kind": { "const": "tasks.competences" },
+        "rev": { "$ref": "#/$defs/Rev" },
+        "digest": { "$ref": "#/$defs/Digest" },
+        "lang": { "enum": ["de", "en"], "description": "The language of the names of the scale: the vault's (`tasks-vault.json`), else German." },
+        "scale": {
+          "type": "array",
+          "minItems": 9,
+          "maxItems": 9,
+          "items": {
+            "type": "object",
+            "required": ["level", "name"],
+            "properties": {
+              "level": { "type": "integer", "minimum": 0, "maximum": 8 },
+              "name": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "area", "slug", "title", "body", "paths", "file", "valid", "problems"],
+            "properties": {
+              "id": { "type": "string", "pattern": "^[^/]+/[^/]+$" },
+              "area": { "type": "string" },
+              "slug": { "type": "string" },
+              "title": { "type": "string" },
+              "group": { "type": "string" },
+              "t": { "$ref": "#/$defs/CompetenceLevel" },
+              "p": { "$ref": "#/$defs/CompetenceLevel" },
+              "target_12": { "$ref": "#/$defs/CompetenceTarget" },
+              "target_24": { "$ref": "#/$defs/CompetenceTarget" },
+              "assessed": { "type": "string", "format": "date" },
+              "body": { "type": "string", "description": "The text after the frontmatter, trimmed (Markdown, untrusted): why, and the next evidence." },
+              "body_truncated": { "const": true },
+              "paths": { "type": "array", "items": { "type": "string", "pattern": "^[^/]+/[^/]+$" }, "description": "The open learning paths that name it, by id." },
+              "file": { "type": "string" },
+              "etag": { "type": "string" },
+              "valid": { "type": "boolean" },
+              "problems": { "type": "array", "items": { "type": "string" } }
+            },
+            "additionalProperties": false
+          }
+        },
+        "incomplete": { "type": "array", "items": { "type": "string" } }
+      },
+      "unevaluatedProperties": false
+    },
     "Milestones": {
       "description": "tasks.milestones: the milestones of the vault or of an area (`<area>/ROADMAP/milestones/`), each with its progress over its members. Capability `milestones`.",
       "allOf": [{ "$ref": "#/$defs/Head" }],
@@ -793,6 +868,13 @@
         "requires_gate": { "$ref": "#/$defs/RequiresGate" },
         "waiting_on": { "$ref": "#/$defs/WaitingOn" },
         "stage": { "$ref": "#/$defs/PathStage" },
+        "competence": {
+          "description": "The competences the path serves (`competence:`, ids of `<area>/ROADMAP/competences/<slug>.md`); only when the file names some. Capability `competences`.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "pattern": "^[^/]+/[^/]+$" }
+        },
+        "competence_target": { "$ref": "#/$defs/CompetenceTarget", "description": "The stages the path aims at (`competence_target:`). Capability `competences`." },
         "hours": { "type": "object", "allOf": [{ "$ref": "#/$defs/PathHours" }], "unevaluatedProperties": false, "description": "The hours of the path; only when a point carries `{h=…}` or `{done_h=…}`. Capability `path_hours`." },
         "links": { "type": "array", "items": { "type": "string", "pattern": "^[Hh][Tt][Tt][Pp][Ss]?://" } },
         "icon": { "$ref": "#/$defs/Icon" },

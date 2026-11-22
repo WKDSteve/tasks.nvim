@@ -68,6 +68,7 @@ M.CAPABILITIES = {
   "check",
   "ci",
   "claims",
+  "competences",
   "done_preview",
   "eff_prio",
   "estimate",
@@ -3508,6 +3509,10 @@ local function path_entry(root, f, text, idx, finished)
     -- capability `xp`: only when there is something to say, so a path without XP and levels reads as before
     xp = tree.has_xp and xp_entry(tree.xp) or nil,
     level = level_state_entry(req.hold_levels(f.level_state, rst)),
+    -- capability `competences`: the fields of knowledge it serves and the stages it aims at
+    competence = f.competence and vim.list_slice(f.competence, 1) or nil,
+    competence_target = f.competence_target
+      and json.object({ t = f.competence_target.t, p = f.competence_target.p }),
     -- capability `path_hours`: the planned, done and open hours, only when a point carries some
     hours = json_hours(require("tasks_nvim.learn").hours(tree)),
     -- capability `optional_points`: the points of `{optional}` subtrees, apart from `progress` and `xp` (which leave

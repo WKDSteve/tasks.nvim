@@ -33,6 +33,7 @@ export type TasksExport =
   | PathDocument
   | LearnNext
   | LearnNotes
+  | Competences
   | Milestones
   | MilestoneDocument
   | DonePreview
@@ -1099,6 +1100,10 @@ export type Paths = Head & {
  */
 export type PathStage = "done" | "parked" | "waiting" | "doing" | "idle";
 /**
+ * A stage of the scale of the competences, 0 (unknown) to 8 (mastermind), in halves (3.5: the evidence for 4 begun).
+ */
+export type CompetenceLevel = number;
+/**
  * tasks.path: one learning path with its body and its tree as a flat list in document order. Capability `path`.
  */
 export type PathDocument = Head & {
@@ -1215,6 +1220,86 @@ export type LearnNotes = Head & {
   }[];
   total: number;
   truncated: boolean;
+  incomplete: string[];
+};
+/**
+ * tasks.competences: the fields of knowledge of the vault (`<area>/ROADMAP/competences/<slug>.md`), each with its stage in theory (`t`) and practice (`p`; absent: not assessed, `?`), its targets in 12 and 24 months, the day it was assessed, its text (untrusted, cut at 16 KiB) and the open learning paths that name it (`competence:`), plus the scale (0..8 with the names of the stages) in the language of the vault. A broken file is still here (`valid: false`, `problems`). Capability `competences`.
+ */
+export type Competences = Head & {
+  kind: "tasks.competences";
+  rev: Rev;
+  digest: Digest;
+  /**
+   * The language of the names of the scale: the vault's (`tasks-vault.json`), else German.
+   */
+  lang: "de" | "en";
+  /**
+   * @minItems 9
+   * @maxItems 9
+   */
+  scale: [
+    {
+      level: number;
+      name: string;
+    },
+    {
+      level: number;
+      name: string;
+    },
+    {
+      level: number;
+      name: string;
+    },
+    {
+      level: number;
+      name: string;
+    },
+    {
+      level: number;
+      name: string;
+    },
+    {
+      level: number;
+      name: string;
+    },
+    {
+      level: number;
+      name: string;
+    },
+    {
+      level: number;
+      name: string;
+    },
+    {
+      level: number;
+      name: string;
+    }
+  ];
+  items: {
+    id: string;
+    area: string;
+    slug: string;
+    title: string;
+    group?: string;
+    t?: CompetenceLevel;
+    p?: CompetenceLevel;
+    target_12?: CompetenceTarget1;
+    target_24?: CompetenceTarget1;
+    assessed?: string;
+    /**
+     * The text after the frontmatter, trimmed (Markdown, untrusted): why, and the next evidence.
+     */
+    body: string;
+    body_truncated?: true;
+    /**
+     * The open learning paths that name it, by id.
+     */
+    paths: string[];
+    file: string;
+    etag?: string;
+    valid: boolean;
+    problems: string[];
+  }[];
   incomplete: string[];
 };
 /**
@@ -2240,6 +2325,13 @@ export interface PathEntry {
   waiting_on?: WaitingOn;
   stage?: PathStage;
   /**
+   * The competences the path serves (`competence:`, ids of `<area>/ROADMAP/competences/<slug>.md`); only when the file names some. Capability `competences`.
+   *
+   * @minItems 1
+   */
+  competence?: [string, ...string[]];
+  competence_target?: CompetenceTarget;
+  /**
    * The hours of the path; only when a point carries `{h=…}` or `{done_h=…}`. Capability `path_hours`.
    */
   hours?: PathHours;
@@ -2344,6 +2436,13 @@ export interface PathXp1 {
    * Leaves (not dropped) without XP.
    */
   missing: number;
+}
+/**
+ * The stages the path aims at (`competence_target:`). Capability `competences`.
+ */
+export interface CompetenceTarget {
+  t?: CompetenceLevel;
+  p?: CompetenceLevel;
 }
 /**
  * Hours of a path or a session: planned (`{h=N}`, `{h=N-M}` on the outermost point that carries it: an inner one is part of it), done (`{done_h=N}`, the outermost too) and open (the planned hours of the points not closed, less what was done on each, never below 0). A point whose leaves are all dropped plans nothing; optional points count for nothing. Two decimal places at most.
@@ -2555,6 +2654,13 @@ export interface LearnPoint {
    * @minItems 1
    */
   machine?: ["private" | "workstation" | "wsl", ...("private" | "workstation" | "wsl")[]];
+}
+/**
+ * Stages aimed at, in theory (`t`) and practice (`p`); a target written as one stage holds for both.
+ */
+export interface CompetenceTarget1 {
+  t?: CompetenceLevel;
+  p?: CompetenceLevel;
 }
 /**
  * A milestone (`<area>/ROADMAP/milestones/<slug>.md`): the head of its file, its progress, whether it is overdue, its version.

@@ -1095,6 +1095,39 @@ They work on a buffer that holds a learning path (`<area>/ROADMAP/paths/<slug>.m
 
 No key is bound unless `keys.learning` names one ([BINDINGS.md](BINDINGS.md)).
 
+### Over all learning paths (command line): `tasks learn next`, `tasks learn notes`, `tasks competences`
+
+Questions over every learning path at once, for a shell or a script (the desktop app asks the same through the
+contract: `tasks.learn_next`, `tasks.learn_notes`, `tasks.competences`, [CONTRACT.md](CONTRACT.md)).
+
+- `tasks learn next [<area>] [--machine=private|workstation|wsl|env] [--n=N] [--paths=id,id] [--format=tsv|json]`:
+  what to learn next. For each running path (`status: doing` or a point learned or seen; an idle path of a project
+  with `status: doing` too) the first N (3) open points in their order that are not blocked, not `{optional}` and,
+  with `--machine`, may be practised there (`env` reads `NVIM_MACHINE_ROLE`). A line per point: path, `#key`, stage,
+  label, `safety` when the point needs the ack to be closed.
+- `tasks learn notes [<text>] [--kind=note|link|image] [--area=a,b] [--paths=id,id] [--done] [--limit=N]`: the
+  notes, links and images of the points of all paths; `<text>` searches label, note and link without case, `--done`
+  adds the finished paths.
+- `tasks competences [<area>]`: the competences of the vault, one file per field of knowledge in
+  `<area>/ROADMAP/competences/<slug>.md`:
+
+  ```yaml
+  ---
+  title: "Betriebssysteme"
+  group: "Informatik-Kern"
+  t: 3            # stage in theory, 0..8, halves allowed (3.5); ? = not assessed yet
+  p: 1            # stage in practice
+  target_12: 4    # target in 12 months: one stage, or {t: 4, p: 4.5}
+  target_24: 4.5
+  assessed: 2026-10-29
+  ---
+  Why, and the next evidence.
+  ```
+
+  A learning path names its field with `competence: ALL/betriebssysteme` (or a list) and its aim with
+  `competence_target: {t: 4, p: 4}`; `tasks set <path> "competence=[ALL/betriebssysteme]"` writes it. `check` reports
+  a broken competence file and a path that names none (`competence-unknown`).
+
 ### `:Tasks folder <area> [folder] [--action=files|grep|smart] [--list] [--to=]`
 
 A picker over the files of **one folder of one area**. `folder` is `tasks`

@@ -109,6 +109,10 @@
 ---  - what learning paths and projects build on (`requires`, `tasks_nvim.requires`): `requires-unknown`,
 ---    `requires-cycle` (errors); a broken entry or gate is the file's `path-bad-requires`, `path-bad-requires-gate`
 ---    (`project-...`), a plan file with either field `plan-requires`
+---  - competences (`<area>/ROADMAP/competences/`, `tasks_nvim.competences`): a broken file
+---    (`competence-unknown-field`, `competence-bad-level`, `competence-bad-target`, `bad-date`, ...; errors);
+---    `competence-unknown` (error): a learning path's `competence` names no competence file; a malformed
+---    `competence` or `competence_target` is the path's `path-bad-competence`
 ---  - milestones (`<area>/ROADMAP/milestones/`, `tasks_nvim.milestones`): a broken file (`milestone-bad-status`,
 ---    `milestone-bad-close`, `milestone-too-many`, `bad-date`, ...); `milestone-include-unknown`,
 ---    `milestone-include-foreign`, `milestone-bad-include`, `milestone-nested`, `milestone-id-taken` (errors): a member
@@ -1381,6 +1385,47 @@ local function path_findings(findings, open_ids, names, scan_opts, is_finished, 
   end
 end
 
+---The competences of the checked areas (`<area>/ROADMAP/competences/`, `tasks_nvim.competences`): a broken file with
+---its own codes (`competence-unknown-field`, `competence-bad-level`, `competence-bad-target`, `bad-date`, ...), and a
+---learning path whose `competence` names no competence file of the vault (`competence-unknown`, error).
+---@param findings Tasks.Finding[]
+---@param names string[]
+---@param scan_opts table
+local function competence_findings(findings, names, scan_opts)
+  local comp = require("tasks_nvim.competences")
+  local root = scan_opts.root
+  for _, name in ipairs(names) do
+    local list, errs = comp.area(name, { root = root })
+    for _, e in ipairs(type(errs) == "table" and errs or {}) do
+      add(findings, "error", "unreadable", { area = name, path = comp.dir(root, name) }, e)
+    end
+    for _, c in ipairs(list or {}) do
+      for i, msg in ipairs(c.errors) do
+        add(findings, "error", c.error_codes[i] or "frontmatter-invalid", c, msg)
+      end
+    end
+  end
+  local known
+  for _, name in ipairs(names) do
+    for _, f in ipairs(require("tasks_nvim.paths").area(name, { root = root }) or {}) do
+      for _, id in ipairs(f.competence or {}) do
+        known = known or comp.ids(root)
+        if not known[id] then
+          add(
+            findings,
+            "error",
+            "competence-unknown",
+            f,
+            "competence "
+              .. id
+              .. ": no competence of that id (<area>/ROADMAP/competences/<slug>.md)"
+          )
+        end
+      end
+    end
+  end
+end
+
 ---What the learning paths and projects of the checked areas build on (`requires`, `tasks_nvim.requires`):
 ---`requires-unknown` (error) an id that is no learning path or project of the vault, open or finished, `requires-cycle`
 ---(error) a circle of requirements among open ones (named once, on its first member of a checked area), and for a path
@@ -2203,6 +2248,7 @@ function M.run(opts)
   meeting_findings(findings, hints, open_ids, names, scan_opts, is_finished, today, repos)
   path_findings(findings, open_ids, names, scan_opts, is_finished, hints, repos)
   requires_findings(findings, names, scan_opts)
+  competence_findings(findings, names, scan_opts)
   milestone_findings(findings, open_ids, names, scan_opts, is_finished, today)
   promote_findings(findings, open_ids, names, scan_opts, is_finished, finished_by_area)
   view_findings(findings, root, names)

@@ -250,6 +250,12 @@ local methods = {
       return require("tasks_nvim.contract_learn").next(params, opts)
     end,
   },
+  competences = {
+    params = { area = "string", areas = "string_list" },
+    run = function(params, opts)
+      return require("tasks_nvim.contract_learn").competences(params, opts)
+    end,
+  },
   learn_notes = {
     params = {
       query = "string",

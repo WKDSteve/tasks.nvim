@@ -1,5 +1,5 @@
 {
-  "digest": "sha256:183c486dcdef0f52",
+  "digest": "sha256:6dece4c31783de3f",
   "engine": {
     "git": "0000000",
     "nvim": "0.0.0",
@@ -50,7 +50,7 @@
   ],
   "kind": "tasks.learn_notes",
   "plugin": "tasks.nvim",
-  "rev": "rev:e57f6e",
+  "rev": "rev:cb8268",
   "schema": 1,
   "total": 3,
   "truncated": false,

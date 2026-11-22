@@ -1,0 +1,100 @@
+{
+  "digest": "sha256:53c1d844c0708eaa",
+  "engine": {
+    "git": "0000000",
+    "nvim": "0.0.0",
+    "version": "0.1.0-test"
+  },
+  "generated_at": "2026-01-01T00:00:00Z",
+  "incomplete": [],
+  "items": [
+    {
+      "area": "lib.nvim",
+      "assessed": "2026-10-29",
+      "body": "Stallings Kap. 1–8 gelesen. Nachweis 4: eigene Shell in C.",
+      "etag": "sha256:4826c282bb3d476f",
+      "file": "lib.nvim/ROADMAP/competences/betriebssysteme.md",
+      "group": "Informatik-Kern",
+      "id": "lib.nvim/betriebssysteme",
+      "p": 1,
+      "paths": [
+        "lib.nvim/prozesse"
+      ],
+      "problems": [],
+      "slug": "betriebssysteme",
+      "t": 3,
+      "target_12": {
+        "p": 4,
+        "t": 4
+      },
+      "target_24": {
+        "p": 4.5,
+        "t": 5
+      },
+      "title": "Betriebssysteme",
+      "valid": true
+    },
+    {
+      "area": "lib.nvim",
+      "body": "",
+      "etag": "sha256:e20996e6f9e947c0",
+      "file": "lib.nvim/ROADMAP/competences/netze.md",
+      "group": "Informatik-Kern",
+      "id": "lib.nvim/netze",
+      "paths": [],
+      "problems": [
+        "unknown field 'level' (known: title, group, t, p, target_12, target_24, assessed, created, updated)",
+        "p '9' is no stage 0..8 in halves (or ? for not assessed)"
+      ],
+      "slug": "netze",
+      "title": "Netze",
+      "valid": false
+    }
+  ],
+  "kind": "tasks.competences",
+  "lang": "de",
+  "plugin": "tasks.nvim",
+  "rev": "rev:54b5ea",
+  "scale": [
+    {
+      "level": 0,
+      "name": "Unbekannt"
+    },
+    {
+      "level": 1,
+      "name": "Newbie"
+    },
+    {
+      "level": 2,
+      "name": "Fortgeschritten"
+    },
+    {
+      "level": 3,
+      "name": "Profi"
+    },
+    {
+      "level": 4,
+      "name": "Bachelor"
+    },
+    {
+      "level": 5,
+      "name": "Master"
+    },
+    {
+      "level": 6,
+      "name": "Doctor"
+    },
+    {
+      "level": 7,
+      "name": "Professor"
+    },
+    {
+      "level": 8,
+      "name": "Mastermind"
+    }
+  ],
+  "schema": 1,
+  "vault": {
+    "id": "vault"
+  }
+}
