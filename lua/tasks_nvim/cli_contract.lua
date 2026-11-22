@@ -352,7 +352,7 @@ local function project_rows(ctx, set, plan_files)
           { plans = plan_files, open = open, finished = finished, paths = path_files }
         ),
       }
-      if f.requires and #f.requires > 0 then
+      if req.names(f) then
         req_index = req_index
           or req.index({
             root = ctx.eo.root,

@@ -59,9 +59,10 @@ function M.read(meta, plan, bad, resolver)
   local list = model.field_list(meta.requires, "requires", bad)
   plan.requires, plan.requires_raw, plan.requires_entries = {}, {}, {}
   local seen = {}
-  ---An entry no requirement can be made of, kept for the documents: once, as written (one line, clipped).
+  ---An entry no requirement can be made of, kept for the documents: once, as written (one line of valid UTF-8 without
+  ---control characters, at most `ENTRY_MAX` characters and an ellipsis: never cut inside a character).
   local function keep(odd, text)
-    text = vim.trim(fsio.clean(text)):sub(1, M.ENTRY_MAX)
+    text = require("lib.lua.strings.safe").clean(vim.trim(text), M.ENTRY_MAX)
     if text ~= "" and not seen[text] then
       seen[text] = true
       plan.requires_entries[#plan.requires_entries + 1] = { id = text, kind = odd }
@@ -543,13 +544,23 @@ function M.waiting_text(req)
   return nil
 end
 
+---Whether a path or project file names any entry in `requires`: an id of this vault, or one kept as `foreign` or
+---`bad` (an entry the documents list although it is no requirement).
+---@param f Tasks.PlanFile
+---@return boolean
+function M.names(f)
+  return (f.requires and #f.requires > 0)
+    or (f.requires_entries and #f.requires_entries > 0)
+    or false
+end
+
 ---Whether a list of path or project files names any requirement: only then is an index of the vault worth reading.
 ---@param ... Tasks.PlanFile[]
 ---@return boolean
 function M.any(...)
   for _, files in ipairs({ ... }) do
     for _, f in ipairs(files or {}) do
-      if (f.requires and #f.requires > 0) or (f.requires_entries and #f.requires_entries > 0) then
+      if M.names(f) then
         return true
       end
     end

@@ -3562,7 +3562,7 @@ local function path_entry(root, f, text, idx, finished, levels)
   local tree = f.tree or require("tasks_nvim.lernbaum").parse("")
   local req = require("tasks_nvim.requires")
   local rst = (idx and not finished) and req.state(f, idx) or nil
-  if finished and idx and f.requires and #f.requires > 0 then
+  if finished and idx and req.names(f) then
     -- a finished path still names what it built on (the arrows of a map), but waits for nothing
     rst =
       req.state(vim.tbl_extend("force", {}, f, { requires_gate = "soft", project = false }), idx)
@@ -3800,8 +3800,7 @@ function M.path(id, opts)
     local tree = f.tree or lernbaum.parse("")
     local doc = M.head("tasks.path", root)
     local req = require("tasks_nvim.requires")
-    local idx = ((f.requires and #f.requires > 0) or f.project) and req.index({ root = root })
-      or nil
+    local idx = (req.names(f) or f.project) and req.index({ root = root }) or nil
     doc.path = json.object(path_entry(root, f, text, idx))
     doc.body = body
     doc.body_truncated = truncated

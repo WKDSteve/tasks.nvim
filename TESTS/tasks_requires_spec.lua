@@ -450,6 +450,22 @@ return function(H)
   eq(code, 0)
   has(out, "requires\tkein id\tbad\thard")
   has(out, "requires\ttricentis-vault:Learning/sap\tforeign\thard")
+  -- a long broken entry is cut after whole characters, never inside one (the document stays valid UTF-8)
+  local long = new_path("Lang kaputt")
+  -- one ASCII byte first: the last byte a cut by bytes keeps is then the middle of a character
+  local umlauts = "x" .. string.rep("\195\164", req.ENTRY_MAX + 50)
+  H.write(
+    long.path,
+    (H.read(long.path):gsub("\ntitle:", "\nrequires: [" .. umlauts .. "]\ntitle:", 1))
+  )
+  local ldoc = call("path", { id = long.id })
+  eq(
+    ldoc.path.requires[1].id,
+    "x" .. string.rep("\195\164", req.ENTRY_MAX - 1) .. "\226\128\166",
+    "whole characters and an ellipsis"
+  )
+  eq(ldoc.path.requires[1].kind, "bad")
+  assert(paths.close(long.id, o))
   -- only entries that are no id: listed, nothing held, the stage as without them
   local only = new_path("Nur fremd")
   H.write(

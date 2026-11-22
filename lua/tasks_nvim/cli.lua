@@ -1750,8 +1750,7 @@ commands.path = function(ctx)
   local tree = file.tree or require("tasks_nvim.lernbaum").parse("")
   -- what the path builds on: a hard gate keeps the line of the whole path open while it waits
   local req = require("tasks_nvim.requires")
-  local rst = ((file.requires and #file.requires > 0) or file.project)
-      and req.state(file, req.index({ root = eo.root }))
+  local rst = (req.names(file) or file.project) and req.state(file, req.index({ root = eo.root }))
     or nil
   local st = require("tasks_nvim.path_stats").compute(
     tree,
