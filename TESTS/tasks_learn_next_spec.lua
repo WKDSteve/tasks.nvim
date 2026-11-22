@@ -102,6 +102,29 @@ return function(H)
   eq(#call({ paths = { "lib.nvim/prozesse" } }).items, 1)
   eq(#call({ area = "cascade.nvim" }).items, 0)
 
+  -- a path that waits for a hard requirement does not run; once the requirement is finished elsewhere (outside the
+  -- paths asked for) it runs, and the rev says so
+  local pdir = root .. "/lib.nvim/ROADMAP/paths"
+  H.write(
+    pdir .. "/warte.md",
+    "---\ntitle: Warte\nstatus: doing\nrequires: [lib.nvim/grund]\nrequires_gate: hard\n---\n\n"
+      .. "## Lernpunkte\n\n- [ ] Danach {#danach}\n"
+  )
+  H.write(
+    pdir .. "/grund.md",
+    "---\ntitle: Grund\nstatus: doing\n---\n\n## Lernpunkte\n\n- [ ] Zuerst\n"
+  )
+  local waiting = call({ paths = { "lib.nvim/warte" } })
+  eq(#waiting.items, 0, "a waiting path does not run")
+  os.remove(pdir .. "/grund.md")
+  H.write(
+    root .. "/lib.nvim/Backlog/FEATURES/2026-01-02_grund.md",
+    "---\ntitle: Grund\nstatus: done\nclosed_kind: path\n---\n\nFertig.\n"
+  )
+  local free = call({ paths = { "lib.nvim/warte" } })
+  eq(#free.items, 1, "the requirement is finished: it runs")
+  ok(free.rev ~= waiting.rev, "a requirement finished elsewhere gives a new rev")
+
   -- the refusals
   eq(select(2, call({ n = 0 })), "invalid_argument")
   eq(select(2, call({ n = 21 })), "invalid_argument")
@@ -123,7 +146,8 @@ return function(H)
     })
     return c, table.concat(out, "\n"), table.concat(err, "\n")
   end
-  local c, out, err = run({ "learn", "next", "--machine=workstation", "--n=1" })
+  local c, out, err =
+    run({ "learn", "next", "--machine=workstation", "--n=1", "--paths=lib.nvim/prozesse" })
   eq(c, 0, err)
   eq(
     vim.trim(out),

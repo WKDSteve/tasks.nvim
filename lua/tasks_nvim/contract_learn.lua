@@ -205,6 +205,8 @@ function M.next(params, opts)
         end
       end
     end
+    -- what the paths wait for: a requirement finished elsewhere changes whether a path runs
+    vim.list_extend(lines, contract.requires_rev_lines(files, idx))
     table.sort(chosen, function(a, b)
       if a.stage ~= b.stage then
         return a.stage == "doing"

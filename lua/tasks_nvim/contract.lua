@@ -901,6 +901,7 @@ local function views_rev(root)
 end
 
 M.redact = redact
+M.requires_rev_lines = requires_rev_lines
 M.seal = seal
 M.relative = relative
 
