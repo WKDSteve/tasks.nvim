@@ -4,6 +4,8 @@ How tasks.nvim is meant to be used, one scenario at a time. The reference docume
 does ([COMMANDS.md](COMMANDS.md), [ENGINE.md](ENGINE.md), [BINDINGS.md](BINDINGS.md)); this one says *when you
 reach for it* and what happens around it.
 
+Creating a learning path has its own step-by-step document with checklists: [LEARNING-PATH-WORKFLOW.md](LEARNING-PATH-WORKFLOW.md).
+
 Every scenario carries a tag:
 
 | Tag | Meaning |
