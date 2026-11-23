@@ -1024,6 +1024,23 @@ can ask the same question):
 
 `preview` and the other verbs still take a full id.
 
+### `:Tasks open [<id>] --desktop | --web`
+
+Shows one task alone in a page instead of opening its file (the page's `#task=<id>` window, the same page in both):
+
+- `--desktop`: `http://127.0.0.1:<port>/#task=<id>` in the system browser, the port read from the `hub.json` of a
+  running tasks-desktop (files only, the discovery of `appkit_core::family`). The address carries no token: the page
+  gets its own session from the hub, as ai-desktop's page does when tasks-desktop opens it. Nothing is started; a hub
+  that is not running is told, with `--web`.
+- `--web`: `tasks.html#task=<id>` of the tasks-web checkout `open = { web_dir = "<folder>" }` names (no search of the
+  disk).
+- Without an id: the task of the current buffer, else the one created last in this session.
+- On the Tricentis workstation (`NVIM_MACHINE_ROLE=workstation`) only `--web` works; the native app is not looked for.
+
+After `:'<,'>Tasks new <area> [title]` (a task made from a selection) `new = { open_after = "ask" | "always" | "never" }`
+decides whether the new task is shown there too: `ask` (default) asks "Open <id> in tasks-desktop?", `always` opens it,
+`never` does nothing. Nothing is asked when no tasks-desktop runs and no `web_dir` is set. The form of `:'<,'>Tasks new` (no area) asks after `<C-s>`, for the first task it made.
+
 ### `:Tasks preview <id>`
 
 The same file (an open task, else its finished copy) rendered in the browser by mdview.nvim:

@@ -1596,10 +1596,23 @@ local function nested_routes()
         {
           name = "id",
           type = "TASK_QUERY",
-          desc = "Task id, or a part of its name (`area/` narrows)",
+          optional = true,
+          desc = "Task id, or a part of its name (`area/` narrows); with --desktop or --web: the task of this buffer, else the one created last",
         },
       },
-      desc = "Open the file of a task (an open one, else its finished copy in Backlog/); a part of the name is enough when it points at one task, else the candidates are offered",
+      flags = {
+        {
+          name = "desktop",
+          bool = true,
+          desc = "Show the task in the running tasks-desktop (not on the workstation)",
+        },
+        {
+          name = "web",
+          bool = true,
+          desc = "Show the task in tasks-web (`open.web_dir` of setup)",
+        },
+      },
+      desc = "Open the file of a task (an open one, else its finished copy in Backlog/); a part of the name is enough when it points at one task, else the candidates are offered. --desktop / --web show the task alone in tasks-desktop (http://127.0.0.1:<port>/#task=<id>, port from its hub.json) or tasks-web (tasks.html#task=<id>) instead of opening the file",
       run = function(ctx)
         cmd().task_open(ctx)
       end,

@@ -80,7 +80,15 @@
 ---@field learning Tasks.LearningConfig
 ---@field gamification boolean  XP per learning point, the level reached and the open rewards in the learning tree view (`:Tasks learn`), and the one quiet line when a level is reached. `false` hides all of it; the tree and its progress stay. `:Tasks xp` and `:Tasks reward` still write when called.
 ---@field tree boolean|Tasks.Tree.Opts  The vault in a tree view that reads `lib.nvim.tree.registry` (the own tree of filetree.nvim): a count of open tasks on the area folders, a view `tasks`, and the actions "finish" and "claim" on a task. `true`: registered, the actions in the tree's menu; `{ keys = { done = "<key>", claim = "<key>" } }`: on those keys in the tree buffer as well; `false`: nothing is registered.
+---@field new Tasks.NewConfig
+---@field open Tasks.OpenConfig
 ---@field ai boolean|"auto"  The AI functions of the ai family (handing a task to an agent of ai-desktop or ai.nvim): `false` none at all (no command, no key, no menu entry), `true` always offered, `"auto"` only where ai.nvim or ai-desktop is found on this machine. AI does not push itself forward; `:checkhealth tasks_nvim` says what is found. See `tasks_nvim.ai`.
+
+---@class Tasks.NewConfig
+---@field open_after "ask"|"always"|"never"  After `:Tasks new` created a task (with a selection): show it in tasks-desktop (running) or tasks-web (set up): `ask` (default) asks "Open in tasks-desktop?", `always` opens it, `never` does nothing. Without a running tasks-desktop and without `open.web_dir` nothing is asked.
+
+---@class Tasks.OpenConfig
+---@field web_dir? string  A tasks-web checkout (the folder with `tasks.html`) for `:Tasks open --web`; no search of the disk. See `tasks_nvim.open_app`.
 
 ---@class Tasks.LearningConfig
 ---@field auto boolean  Attach the learning tree view (`:Tasks learn`) by itself to a learning path or a task with `## Lernpunkte` when it is shown (group `TasksLearnAuto`). Off by default.
@@ -114,6 +122,8 @@ return {
   gamification = true,
   tree = true,
   ai = "auto",
+  new = { open_after = "ask" },
+  open = {},
   keys = {
     dashboard = {
       status = "s",

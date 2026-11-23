@@ -1568,6 +1568,17 @@ function M.task_new_form(given)
           end
           notify.info(("created %s"):format(table.concat(ids, ", ")))
           open_file(res.path)
+          -- A task made from a selection (it carries the ref): show it in tasks-desktop or tasks-web as
+          -- `new.open_after` says.
+          if given.refs then
+            require("tasks_nvim.open_app").after_new(ids[1], function(msg, level)
+              if level == "warn" then
+                notify.warn(msg)
+              else
+                notify.info("opened " .. msg)
+              end
+            end)
+          end
           if with_screenshot then
             -- After the task is open: the link lands in it, at the cursor. A task without a screenshot stays
             -- (it is made, only the attachment failed, and `M.attach_screenshot` says so).
@@ -2017,6 +2028,16 @@ function M.task_new(ctx)
     end
     notify.info(("created %s"):format(res.id))
     open_file(res.path)
+    -- A task made from a selection: show it in tasks-desktop or tasks-web as `new.open_after` says.
+    if source then
+      require("tasks_nvim.open_app").after_new(res.id, function(msg, level)
+        if level == "warn" then
+          notify.warn(msg)
+        else
+          notify.info("opened " .. msg)
+        end
+      end)
+    end
   end
 
   if title ~= "" then
@@ -3197,7 +3218,15 @@ function M.task_open(ctx)
   if not no_stray_words(ctx) then
     return
   end
+  local flags = ctx.flags or {}
+  if flags.desktop or flags.web then
+    return M.task_open_app(ctx, flags.desktop and "desktop" or "web")
+  end
   local query = ctx.args.id
+  if query == nil or query == "" then
+    notify.error("open: give a task id (the id may be left out only with --desktop or --web)")
+    return
+  end
   local task, find_err = scan.find(query)
   task = task or scan.find_done(query)
   if task then
@@ -3262,6 +3291,39 @@ function M.task_open(ctx)
       open_id(choice.id)
     end
   end)
+end
+
+---`:Tasks open [<id>] --desktop | --web`: the task alone in tasks-desktop or tasks-web (`tasks_nvim.open_app`).
+---@param ctx table
+---@param which "desktop"|"web"
+function M.task_open_app(ctx, which)
+  local app = require("tasks_nvim.open_app")
+  if ctx.flags.desktop and ctx.flags.web then
+    notify.error("open: --desktop and --web exclude each other")
+    return
+  end
+  local id = ctx.args.id
+  if id == nil or id == "" then
+    id = app.default_id()
+    if not id then
+      notify.error("open: no id given, this buffer is no task and none was created in this session")
+      return
+    end
+  else
+    local task, find_err = scan.find(id)
+    task = task or scan.find_done(id)
+    if not task then
+      notify.error(find_err or ("no such task: " .. id))
+      return
+    end
+    id = task.id or id
+  end
+  local ok, msg = app.open(id, which)
+  if ok then
+    notify.info("opened " .. msg)
+  else
+    notify.error(msg)
+  end
 end
 
 ---`:Tasks preview <id>` -- the task file (an open one, else its finished

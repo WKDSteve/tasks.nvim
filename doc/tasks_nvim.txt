@@ -55,6 +55,8 @@ blockers, plan or estimate is valid and stays visible everywhere.
     lists = {},
     tree = true,                        -- true, false or { keys = { done =, claim = } }
     ai = "auto",                        -- false, true or "auto"
+    new = { open_after = "ask" },       -- after :'<,'>Tasks new: "ask", "always" or "never" show it in tasks-desktop
+    open = { web_dir = nil },           -- a tasks-web checkout (tasks.html) for :Tasks open --web
   })
 <
 
@@ -223,6 +225,9 @@ A wrong key or value is ignored with a message and listed in
   :Tasks template [--to=]                The task file template.
   :Tasks open {id|part}                  Open the task file; a part of the name is
                                          enough when it points at one task.
+  :Tasks open [{id}] --desktop|--web     Show the task alone in tasks-desktop (running;
+                                         port from its hub.json) or in tasks-web
+                                         (`open.web_dir`). No id: this buffer's task.
   :Tasks preview {id}                    Browser preview (mdview.nvim).
   :Tasks index [{area}] [--all] [--check]
                                          (Re)write the generated overviews;

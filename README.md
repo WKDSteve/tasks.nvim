@@ -170,6 +170,8 @@ require("tasks_nvim").setup({
   area_groups = {},                                                             -- area groups on top of <vault>/area-groups.json, see below
   quick_wins = { min_value = 4, max_effort = "S" },                              -- what counts as a quick win (both written on the task)
   tree = true,                                                                  -- the vault in a tree view: true, false or { keys = { done = "<key>", claim = "<key>" } }
+  new = { open_after = "ask" },                                                 -- after :'<,'>Tasks new: ask / always / never "open in tasks-desktop?"
+  open = { web_dir = nil },                                                     -- a tasks-web checkout (the folder with tasks.html) for :Tasks open --web
   ai = "auto",                                                                  -- AI functions: false (none), true, or "auto" (only where ai.nvim or ai-desktop is found)
   learning = { auto = false },                                                  -- the learning tree view (:Tasks learn) by itself on paths and learning tasks
   gamification = true,                                                          -- XP, level and rewards in the learning tree view; false hides them

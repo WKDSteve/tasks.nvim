@@ -18,7 +18,7 @@ local state = vim.deepcopy(DEFAULTS)
 ---@type table<string, boolean>
 local given = {}
 
----@alias Tasks.ConfigType "string"|"vaults"|"vault_rules"|"boolean"|"string_list"|"posint"|"keymap"|"backend"|"value"|"effort"|"lists"|"area_groups"|"finished_window"|"links"|"form_mode"|"tree"|"ai"
+---@alias Tasks.ConfigType "string"|"vaults"|"vault_rules"|"boolean"|"string_list"|"posint"|"keymap"|"backend"|"value"|"effort"|"lists"|"area_groups"|"finished_window"|"links"|"form_mode"|"tree"|"ai"|"open_after"
 
 ---@type table<string, Tasks.ConfigType|table<string, Tasks.ConfigType>>
 local SCHEMA = {
@@ -46,6 +46,8 @@ local SCHEMA = {
   gamification = "boolean",
   tree = "tree",
   ai = "ai",
+  new = { open_after = "open_after" },
+  open = { web_dir = "string" },
   keys = { dashboard = "keymap", dashboard_input = "keymap", form = "keymap", learning = "keymap" },
 }
 
@@ -162,6 +164,11 @@ local function check(kind, value)
       return true, value, nil
     end
     return false, nil, 'true, false or "auto"'
+  elseif kind == "open_after" then
+    if value == "ask" or value == "always" or value == "never" then
+      return true, value, nil
+    end
+    return false, nil, 'one of "ask", "always", "never"'
   elseif kind == "links" then
     if value == "plain" or value == "wikilink" then
       return true, value, nil

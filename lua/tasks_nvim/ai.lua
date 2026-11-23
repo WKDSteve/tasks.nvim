@@ -57,10 +57,12 @@ function M.family_dir()
   return base and vim.fs.joinpath(base, "appkit-family") or nil
 end
 
----The config folder of ai-desktop (which holds its `hub.json`), or nil when nothing names one.
+---The config folder of an app of the family (which holds its `hub.json`), or nil when nothing names one.
+---@param app string  e.g. "ai-desktop"
+---@param prefix string  its variable prefix, e.g. "AI_DESKTOP" (`<prefix>_CONFIG_DIR`)
 ---@return string|nil
-function M.config_dir()
-  local dir = env("AI_DESKTOP_CONFIG_DIR")
+function M.config_dir_of(app, prefix)
+  local dir = env(prefix .. "_CONFIG_DIR")
   if dir then
     return dir
   end
@@ -72,7 +74,13 @@ function M.config_dir()
   else
     base = env("XDG_CONFIG_HOME") or (home() and vim.fs.joinpath(home(), ".config"))
   end
-  return base and vim.fs.joinpath(base, APP) or nil
+  return base and vim.fs.joinpath(base, app) or nil
+end
+
+---The config folder of ai-desktop (which holds its `hub.json`), or nil when nothing names one.
+---@return string|nil
+function M.config_dir()
+  return M.config_dir_of(APP, "AI_DESKTOP")
 end
 
 ---A small JSON file as a table; nil when it is missing, too large or not a JSON object.
@@ -183,12 +191,14 @@ function M.ai_desktop()
   return found
 end
 
----The `hub.json` of a running ai-desktop: `app`, `port`, `pid`, `instance` (a string, possibly empty), or nil when there
----is none, it is not ai-desktop's, its numbers are not whole numbers in range or its process is not alive (or, on
----Windows, started after the file was written: another process with the id of an ended ai-desktop).
+---The `hub.json` of a running app of the family: `app`, `port`, `pid`, `instance` (a string, possibly empty), or nil
+---when there is none, it is not that app's, its numbers are not whole numbers in range or its process is not alive
+---(or, on Windows, started after the file was written: another process with the id of an ended one).
+---@param app string
+---@param prefix string
 ---@return { app: string, port: integer, pid: integer, instance: string }|nil
-function M.hub_record()
-  local config = M.config_dir()
+function M.hub_record_of(app, prefix)
+  local config = M.config_dir_of(app, prefix)
   if not config then
     return nil
   end
@@ -200,7 +210,7 @@ function M.hub_record()
   local port = record and record.port
   if
     record
-    and record.app == APP
+    and record.app == app
     and type(pid) == "number"
     and pid > 0
     and pid == math.floor(pid)
@@ -211,13 +221,19 @@ function M.hub_record()
     and alive(pid, written)
   then
     return {
-      app = APP,
+      app = app,
       port = port,
       pid = pid,
       instance = type(record.instance) == "string" and record.instance or "",
     }
   end
   return nil
+end
+
+---The `hub.json` of a running ai-desktop (see `hub_record_of`).
+---@return { app: string, port: integer, pid: integer, instance: string }|nil
+function M.hub_record()
+  return M.hub_record_of(APP, "AI_DESKTOP")
 end
 
 ---Whether ai.nvim is loaded or can be loaded (`require("ai")` with a `setup`).

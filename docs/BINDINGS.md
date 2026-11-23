@@ -16,7 +16,7 @@ keymaps and no autocommands at load time (the browser preview adds a short-lived
 | `attach` | `<id> <file> [name=]` | copy a file into the task's `assets/` |
 | `folderize` | `<id>` | turn a plain task into a folder task |
 | `template` | `[--to=]` | the task file template |
-| `open` | `<id>` | open the file of a task |
+| `open` | `[<id>] [--desktop\|--web]` | open the file of a task; `--desktop` / `--web` show the task alone in tasks-desktop or tasks-web (no id: the task of the buffer, else the one created last) |
 | `preview` | `<id>` | browser preview through mdview.nvim |
 | `folder` | `<area> [tasks\|roadmap\|backlog\|handover\|notes\|all] [--action=] [--list] [--to=]` | picker over an area folder |
 | `learn` | `[toggle\|on\|off\|image\|follow]` | the learning tree view in this buffer: progress, folds, image placeholders; the image or the promoted task of the point under the cursor |
