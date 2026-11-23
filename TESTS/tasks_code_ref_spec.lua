@@ -198,6 +198,7 @@ return function(H)
   run({ "git", "config", "user.email", "t@example.invalid" }, repo)
   run({ "git", "config", "commit.gpgsign", "false" }, repo)
   run({ "git", "config", "core.hooksPath", "no-hooks-here" }, repo)
+  run({ "git", "config", "core.autocrlf", "false" }, repo)
   local src = repo .. "/lua/a.lua"
   vim.fn.writefile({ "local M = {}", "function M.work(x)", "  return x", "end" }, src)
   run({ "git", "add", "." }, repo)
@@ -238,6 +239,9 @@ return function(H)
   eq(long.truncated, true)
   eq(long.lines, { 1, 100 }, "lines are the whole range")
   eq(code_ref.problems(vim.json.encode(long)), {}, "the cut document passes")
+  -- a carriage return at the end of a line is not part of the excerpt
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "a\r", "b\r" })
+  eq((code_ref.capture(buf, 1, 2)).excerpt, "a\nb", "no carriage returns in the excerpt")
   vim.bo[buf].modified = false
   vim.cmd("enew!")
 

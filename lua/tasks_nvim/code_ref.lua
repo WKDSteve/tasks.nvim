@@ -675,7 +675,12 @@ function M.capture(buf, first_line, last_line)
     doc.lang = ft
   end
   doc.symbol = M.symbol(buf, first_line)
-  local text = table.concat(vim.api.nvim_buf_get_lines(buf, first_line - 1, last_line, false), "\n")
+  -- a CRLF file read as one with unix endings leaves a carriage return at the end of every line: not part of the code
+  local lines = vim.api.nvim_buf_get_lines(buf, first_line - 1, last_line, false)
+  for i, line in ipairs(lines) do
+    lines[i] = line:gsub("\r$", "")
+  end
+  local text = table.concat(lines, "\n")
   if M.valid_utf8(text) then
     text = clean(text)
     local excerpt, truncated = M.cut(text, M.MAX_EXCERPT_BYTES)
