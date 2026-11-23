@@ -328,6 +328,72 @@ function M.parse_split(block)
   return { phases = phases, drafts = drafts }, nil
 end
 
+-- The most the summary of a hand-over weighs, in bytes (the limit of ai-desktop; checked again here: the text comes out
+-- of an agent's run).
+M.SUMMARY_MAX = 4096
+-- The headings of the summary of a hand-over, in the order ai-desktop checks them (`docs/JOBS.md` of ai-desktop).
+local SUMMARY_HEADINGS = { "## Getan", "## Commits", "## Prüfungen", "## Offen" }
+
+---Why a job's summary is none: its `summary_error` (cleaned of control characters, cut) or a plain sentence.
+---@param job table
+---@return string
+local function summary_why(job)
+  local err = job.summary_error
+  if type(err) == "string" then
+    err = err:gsub("[%z\1-\31\127]", ""):sub(1, 200)
+    if err ~= "" then
+      return err
+    end
+  end
+  return "the run left no summary"
+end
+
+---The summary of a finished hand-over (`summary` of `GET /jobs/<id>`, schema `handoff-summary/1`) as the section to add
+---to the task, or why there is none. The text is an agent's: schema, job, date, size, characters and the four headings
+---(each alone on its line, in order) are checked here before anything can be written (the same rules as the hub of
+---tasks-desktop). The engine takes no `## ` inside a section, so the four headings go one level down; the section's own
+---heading names the job and the date.
+---@param job table The job of ai-desktop, ended `done`.
+---@return string|nil block The section, first line its heading.
+---@return string|nil why
+function M.handoff_summary(job)
+  local summary = job.summary
+  if type(summary) ~= "table" then
+    return nil, summary_why(job)
+  end
+  if summary.schema ~= "handoff-summary/1" then
+    return nil, "the summary is not of the schema handoff-summary/1"
+  end
+  if type(job.id) ~= "string" or not job.id:match("^[%w_%-]+$") or summary.job_id ~= job.id then
+    return nil, "the summary belongs to another job"
+  end
+  local date = summary.date
+  if type(date) ~= "string" or not date:match("^%d%d%d%d%-%d%d%-%d%d$") then
+    return nil, "the date of the summary is not YYYY-MM-DD"
+  end
+  local markdown = summary.markdown
+  if type(markdown) ~= "string" then
+    return nil, "the summary has no text"
+  end
+  if #markdown > M.SUMMARY_MAX then
+    return nil, "the summary is longer than 4 KiB"
+  end
+  if markdown:find("[%z\1-\8\11-\31\127]") then
+    return nil, "the summary holds a control character"
+  end
+  local want = 1
+  for line in (markdown .. "\n"):gmatch("([^\n]*)\n") do
+    if SUMMARY_HEADINGS[want] and line:gsub("%s+$", "") == SUMMARY_HEADINGS[want] then
+      want = want + 1
+    end
+  end
+  if want <= #SUMMARY_HEADINGS then
+    return nil, "the summary lacks one of its four headings"
+  end
+  local text = vim.trim((("\n" .. markdown):gsub("\n## ", "\n### ")))
+  return ("## Agent-Verlauf (Job %s, %s)\n\n%s"):format(job.id, date, text), nil
+end
+
 ---The follow-up task the review proposes (`title`, `summary`), or nil when it proposes none.
 ---@param block string
 ---@return { title: string, summary: string|nil }|nil

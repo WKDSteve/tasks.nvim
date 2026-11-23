@@ -3713,6 +3713,57 @@ local function review_came_back(task, job, confirm_fn, create)
   )
 end
 
+---The hand-over ran to its end (`kind=handoff mode=run`): show its summary as text and, after a yes, add it to the task
+---as the section `## Agent-Verlauf (Job <id>, <date>)`. The summary is checked first (`review.handoff_summary`); a run
+---that failed or was cancelled has none and says only that. Nothing is written without the yes.
+---@param task table
+---@param job table The job of ai-desktop (`GET /jobs/<id>`).
+---@param confirm_fn fun(msg: string, label: string, cb: fun(yes: boolean))
+local function handoff_came_back(task, job, confirm_fn)
+  local review = require("tasks_nvim.review")
+  if job.status ~= "done" then
+    notify.error(
+      ("agent: the hand-over of %s ended %s%s; it left no summary"):format(
+        task.id,
+        tostring(job.status),
+        type(job.error) == "string" and (": " .. job.error) or ""
+      )
+    )
+    return
+  end
+  local block, why = review.handoff_summary(job)
+  if not block then
+    notify.warn(
+      ("agent: the hand-over of %s ended, but no summary is added: %s (job %s, see the dashboard of ai-desktop)"):format(
+        task.id,
+        tostring(why),
+        tostring(job.id)
+      )
+    )
+    return
+  end
+  agent_buffer(task.id, vim.split(block, "\n", { plain = true }), "summary")
+  local heading = block:match("^[^\n]*")
+  confirm_fn(
+    ("Add this summary to %s as its section %s?"):format(task.id, heading),
+    "add",
+    function(yes)
+      if not yes then
+        notify.info("agent: the summary was not added; it stays in this buffer")
+        return
+      end
+      write_door_prewarm()
+      local ok, err = review.write(task.id, { block })
+      if not ok then
+        notify.error("agent: " .. tostring(err))
+        return
+      end
+      refresh_task_buffers(task.id)
+      notify.info(("agent: the summary is in %s (%s)"):format(task.id, heading))
+    end
+  )
+end
+
 ---A prepared decision came back (`kind=prepare-decision`): show it, and after a yes write the proposal (and the open
 ---questions, when the task has none of its own) into the task through the engine (`mutate.edit_text`); the status
 ---stays `decision`, the person answers the questions (`:Tasks answer`).
@@ -4277,13 +4328,15 @@ function M.task_agent(ctx, deps)
           res.note and (" (" .. res.note .. ")") or ""
         )
       )
-      if not is_review and not is_decision and not is_split then
+      -- A hand-over is watched only when it runs (or waits for ai-desktop's own yes): a prefilled one runs nowhere.
+      local is_run = kind == "handoff" and mode == "run" and res.status ~= "prefilled"
+      if not is_review and not is_decision and not is_split and not is_run then
         return
       end
       -- The answer comes back to this editor (watched until the job ends).
       local record = res.peer or deps.record or ai.hub_record()
       if not record then
-        notify.warn("agent: ai-desktop is gone; the review's answer is in its dashboard")
+        notify.warn("agent: ai-desktop is gone; the answer is in its dashboard")
         return
       end
       local watch = deps.watch or agent.watch
@@ -4300,6 +4353,8 @@ function M.task_agent(ctx, deps)
           split_came_back(task, job, confirm_fn, deps)
         elseif is_decision then
           decision_came_back(task, job, confirm_fn)
+        elseif is_run then
+          handoff_came_back(task, job, confirm_fn)
         else
           review_came_back(task, job, confirm_fn, deps.create)
         end

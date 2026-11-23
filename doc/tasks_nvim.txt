@@ -205,6 +205,11 @@ A wrong key or value is ignored with a message and listed in
                                          `tasks://split/{plan}` to tick ([x]);
                                          `:w` creates the ticked ones after a
                                          yes (a new phase after its own yes).
+                                         `kind=handoff mode=run` watches the
+                                         job; its checked summary comes to
+                                         `tasks://summary/{id}` and goes into
+                                         the task as `## Agent-Verlauf (Job
+                                         {id}, {date})` only after a yes.
                                          Hidden while the option `ai` is off.
   :Tasks plan [{area}|all] [--for={id}|--plan={id}] [filters] [--ready] [--with-steps]
               [--format=] [--to=] [--write={file} [--scope=] [--check]]
