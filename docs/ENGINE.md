@@ -577,6 +577,27 @@ with the `{xp=…}` / `{#…}` on it: the tree skips it, so a point whose link l
 second half without it. Not stray: HTML comments, headings `###` and deeper, fenced code, and the paragraph
 `Fehlt im Bestand: …` (LP-11) up to its blank line.
 
+#### Exercise blocks
+
+A point that is an exercise (`Üben: …`, `Übung: …`, `Aufgabe: …`, `Mini-Projekt …`, `Projekt: …`) is a title; the task
+behind it is its note, four labelled parts of the `> ` lines (`tasks_nvim.exercise`; the format is
+`ALL/Lernpunkt-Aufgabenblock-Format-2026-11-23.md` of the tasks-vault):
+
+```markdown
+  - [ ] Üben: Verzeichnis anzeigen {xp=10} {#u1}
+    > **Aufgabe:** What exactly to do: place, commands, inputs.
+    > **Fertig, wenn:** How you can tell it worked.
+    > **Nachweis:** What to enter when ticking it off.
+    > **Ergebnis:** The learner's proof.
+```
+
+A part runs over several `> ` lines up to the next label. A point whose block names a `Nachweis` is learned only with
+a non-empty `Ergebnis` (`LP-04`): `lernbaum.set_state(…, "learned")` refuses it, `lernbaum.set_result` writes the line
+(the other parts stay byte for byte), and `paths.point(id, ref, "learned", nil, { result = "…" })` writes the result and
+ticks the point in one call. `seen`, `dropped`, `blocked` and a point without a block behave as before. `check` hints
+`path-exercise-vague` (one line per path) for exercise points without a task text; it is a hint because paths converted
+from old plans have hundreds.
+
 #### XP, levels and rewards (optional)
 
 A little play for a path, never a duty: a path without XP and without `## Level` works in full. A leaf carries XP as

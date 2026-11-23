@@ -133,6 +133,7 @@
 ---
 --- Not its job: fixing anything (`index.write_area` regenerates an index).
 
+local exercise = require("tasks_nvim.exercise")
 local fsio = require("tasks_nvim.fsio")
 
 ---Image extensions (as `mutate.attach` links them with `![]()`).
@@ -1263,6 +1264,31 @@ function M.path_file_findings(findings, hints, p, c)
         ),
       }
     end
+  end
+  -- an exercise point (`Üben: …`) with no task text is only a title: nothing to do, nothing to prove (a hint, since
+  -- paths converted from the old plans have many; one line per path, not one per point)
+  local vague = {}
+  for _, node in ipairs(tree.nodes) do
+    if
+      #node.children == 0
+      and node.state ~= "dropped"
+      and exercise.is_vague(node.label, node.note)
+    then
+      vague[#vague + 1] = tostring(node.line + off)
+    end
+  end
+  if #vague > 0 then
+    hints[#hints + 1] = {
+      code = "path-exercise-vague",
+      severity = "info",
+      area = p.area,
+      path = p.path,
+      id = p.id,
+      message = ("%d exercise point(s) without a task text (line %s): give each a note with **Aufgabe:**, **Fertig, wenn:** and **Nachweis:**"):format(
+        #vague,
+        table.concat(vague, ", ", 1, math.min(#vague, 8)) .. (#vague > 8 and ", …" or "")
+      ),
+    }
   end
   for _, node in ipairs(tree.nodes) do
     if node.promoted and not open_ids[node.promoted] and not is_finished(node.promoted) then

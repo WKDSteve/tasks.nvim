@@ -351,7 +351,8 @@ end
 ---@param ref string|integer
 ---@param state? string
 ---@param reason? string
----@param opts? { root?: string, today?: string, if_match?: string, dry_run?: boolean, note?: string, xp?: integer|string, ack?: boolean }
+---@param opts? { root?: string, today?: string, if_match?: string, dry_run?: boolean, note?: string, result?: string, xp?: integer|string, ack?: boolean }
+---`opts.result` writes the `**Ergebnis:**` of an exercise block before the state is set (`lernbaum.set_result`).
 ---A changed state starts the routines that waited for a point of the path (`routines_started`, `notes`).
 ---@return { id: string, path: string, etag_before: string, etag_after: string, changed: boolean, node: { line: integer, key?: string, state: string, xp?: integer }, progress: Tasks.LernProgress, routines_started?: table[], notes?: string[] }|nil result
 ---@return string|nil err
@@ -360,8 +361,10 @@ function M.point(id, ref, state, reason, opts)
   opts = opts or {}
   local res, err, info = edit_body(id, opts, function(body, result)
     local tree = lernbaum.parse(body)
-    if state == nil and opts.note == nil and opts.xp == nil then
-      return nil, "nothing to change: give a state, a note or xp", { code = "invalid_argument" }
+    if state == nil and opts.note == nil and opts.xp == nil and opts.result == nil then
+      return nil,
+        "nothing to change: give a state, a note, a result or xp",
+        { code = "invalid_argument" }
     end
     -- a point on or under `{safety}` is closed only by someone who says they read the warning
     local danger = (state == "learned" or state == "seen") and lernbaum.node(tree, ref)
@@ -370,6 +373,13 @@ function M.point(id, ref, state, reason, opts)
       return nil, lernbaum.safety_message(danger), { code = "invalid_argument" }
     end
     local node, serr
+    -- the result goes in first: one call may write it and tick the point off
+    if opts.result ~= nil then
+      node, serr = lernbaum.set_result(tree, ref, opts.result)
+      if not node then
+        return nil, serr, { code = "invalid_argument" }
+      end
+    end
     if state ~= nil then
       node, serr = lernbaum.set_state(tree, ref, state, reason)
       if not node then

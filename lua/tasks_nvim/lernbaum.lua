@@ -50,6 +50,8 @@
 --- Pure Lua, no I/O. Not its job: whether an arrow names a task that exists, cycles over files, images on disk
 --- (`check`); the path file itself (`tasks_nvim.paths`); levels and rewards (`tasks_nvim.lernlevel`).
 
+local exercise = require("tasks_nvim.exercise")
+
 local M = {}
 
 ---The headings of the section, German and English.
@@ -1057,6 +1059,10 @@ function M.set_state(tree, ref, state, reason)
   if M.NEEDS_REASON[state] and not (reason or node.reason) then
     return nil, state .. " needs a reason"
   end
+  -- an exercise with a `Nachweis` is learned with a result, not with a tick (`LP-04`)
+  if state == "learned" and exercise.needs_result(node.note) then
+    return nil, "learned needs a result: write the **Ergebnis:** line under the point (LP-04)"
+  end
   node.mark, node.state = M.MARK_OF[state], state
   if M.NEEDS_REASON[state] then
     node.reason = reason or node.reason
@@ -1066,6 +1072,25 @@ function M.set_state(tree, ref, state, reason)
   node.dirty = true
   derive_tree(tree)
   return node, nil
+end
+
+---Write the `Ergebnis` of an exercise point: the note keeps its other parts, the `**Ergebnis:**` line is set to `text`
+---(`tasks_nvim.exercise.with_result`). A point without an exercise block is refused.
+---@param tree Tasks.LernTree
+---@param ref string|integer
+---@param text string
+---@return Tasks.LernNode|nil node
+---@return string|nil err
+function M.set_result(tree, ref, text)
+  local node = M.node(tree, ref)
+  if not node then
+    return nil, "no such learning point: " .. tostring(ref)
+  end
+  local note, err = exercise.with_result(node.note or "", text)
+  if not note then
+    return nil, err
+  end
+  return M.set_note(tree, ref, note)
 end
 
 ---Write the note of a node: the `> ` lines below it (the blank lines between them included) give way to `text`, one
