@@ -111,9 +111,10 @@ Checklist for **every point**:
 
 Checklist for **every exercise or result point** (labels starting with "Üben", "Aufgabe", "Übung", "Ergebnis"):
 
-- [ ] The point is a **title; the task is written out** under it as a quote (`> **Aufgabe:** …`): steps, sample values, the expected result.
-- [ ] A **"Fertig, wenn"** line says how you can tell it is done (an artefact, a number, an output you can compare).
-- [ ] The proof is named (note, table, protocol, screenshot as an asset) because "done" means proof, not "read" (`LP-04`).
+- [ ] The point is a **title; the task is written out** under it as a quote block of four lines, the format decided on 2026-11-23
+  (`tasks-vault/ALL/Lernpunkt-Aufgabenblock-Format-2026-11-23.md`): `> **Aufgabe:**` (what exactly is done: place, commands, inputs),
+  `> **Erwartet:**` (how you can tell it worked), `> **Nachweis:**` (what to enter when ticking), `> **Ergebnis:**` (left empty, the learner fills it).
+- [ ] The proof is named (note, table, protocol, screenshot as an asset) because "done" means proof, not "read" (`LP-04`); `[x]` needs a non-empty Ergebnis.
 - [ ] If the text is longer than about 10 lines or needs its own sub-points: **promote** it (`promote <path>#<key>`), the task then holds the steps as checkboxes (`LP-05`).
 - [ ] Nothing in the point needs another AI prompt to become doable. A point like "Üben: `ls`, `ls -l`" without steps is a
   description, not a task; that mistake was found in 321 points of earlier paths (`tasks.nvim/uebungspunkte-mit-ausformulierter-aufgabe`).
