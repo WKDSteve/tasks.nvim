@@ -489,4 +489,51 @@ return function(H)
   found = codes_of(assert(check.run({ root = root, area = A })))
   eq(found["requires-unknown"], { x.id }, "no requires-unknown for them: their fault is the file's")
   ok(vim.tbl_contains(found["path-bad-requires"] or {}, odd.id), vim.inspect(found))
+
+  -- ── an id of an area only another configured vault has (`foreign`), a link that names no id (`unknown`) ──
+  local vault_mod = require("tasks_nvim.vault")
+  local other = F.vault(H)
+  vim.fn.mkdir(other .. "/Learning/ROADMAP/tasks", "p")
+  vault_mod.configure({ vaults = { main = root, other = other } })
+  local abroad = new_path("Anderer Vault")
+  H.write(
+    abroad.path,
+    (
+      H.read(abroad.path):gsub(
+        "\ntitle:",
+        '\nrequires: [Learning/sap, "[[gibt-es-nirgends]]", lib.nvim/verloren]\nrequires_gate: hard\ntitle:',
+        1
+      )
+    )
+  )
+  local ab = assert(paths.find(abroad.id, o))
+  eq(ab.requires, { "Learning/sap", "lib.nvim/verloren" }, "a well-formed id stays in the graph")
+  local adoc = call("path", { id = abroad.id })
+  eq(adoc.path.requires, {
+    { id = "Learning/sap", gate = "hard", kind = "foreign", met = false },
+    { id = "[[gibt-es-nirgends]]", gate = "hard", kind = "unknown", met = false },
+    { id = "lib.nvim/verloren", gate = "hard", kind = "unknown", met = false },
+  }, "the area of the other vault is foreign; the dangling link is a box as written")
+  eq(adoc.path.waiting_on, {}, "neither holds the gate")
+  found = codes_of(assert(check.run({ root = root, area = A })))
+  local unknown_ids = found["requires-unknown"] or {}
+  ok(
+    vim.tbl_contains(unknown_ids, abroad.id),
+    "the lost id of this vault is still requires-unknown"
+  )
+  local dangling = found["wikilink-dangling"] or {}
+  ok(
+    vim.tbl_contains(dangling, abroad.id),
+    "the dangling link stays a link problem: " .. vim.inspect(found)
+  )
+  -- without the other vault the area is no vault's: unknown as before
+  vault_mod.configure({ vaults = {} })
+  local plain = call("path", { id = abroad.id })
+  eq(((plain.path or {}).requires or {})[1], {
+    id = "Learning/sap",
+    gate = "hard",
+    kind = "unknown",
+    met = false,
+  }, vim.inspect(plain))
+  assert(paths.close(abroad.id, o))
 end

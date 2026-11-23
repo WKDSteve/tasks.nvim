@@ -316,20 +316,6 @@ function M.cache(root)
   }
 end
 
----Whether `area` is an area of another configured vault (`setup({ vaults })`) and none of this one.
----@param root string
----@param area string
----@return boolean
-local function area_of_other_vault(root, area)
-  for _, name in ipairs(vault.vault_names()) do
-    local other = vault.named_root(name)
-    if other and not fsio.same_path(other, root) and vault.has_area(other, area) then
-      return true
-    end
-  end
-  return false
-end
-
 ---What an id of `includes:` names: its kind, whether it is done, its title. An id written with a vault in front
 ---(`<vault>:<area>/<slug>`, `<vault>/<area>/<slug>`) or of an area that only another configured vault has is `foreign`;
 ---a malformed one `bad`; one that exists nowhere `unknown`.
@@ -351,7 +337,7 @@ function M.member(id, cache)
     if not area or not slug then
       out = { id = id, kind = "bad" }
     elseif not vault.has_area(root, area) then
-      out = { id = id, kind = area_of_other_vault(root, area) and "foreign" or "unknown" }
+      out = { id = id, kind = vault.area_of_other_vault(root, area) and "foreign" or "unknown" }
     else
       local task = require("tasks_nvim.scan").find(id, { root = root })
       if task then

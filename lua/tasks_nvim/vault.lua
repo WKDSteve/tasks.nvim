@@ -879,6 +879,24 @@ function M.has_area(root, area)
   return type(area) == "string" and is_area_dir(root, area) and M.dir_listed(root, area)
 end
 
+---Whether `area` is an area of another configured vault (`setup({ vaults })`) and none of the vault at `root`: an id
+---of that area names something of the other vault (a milestone's `includes`, a `requires`), not a lost one of this.
+---@param root string
+---@param area string
+---@return boolean
+function M.area_of_other_vault(root, area)
+  if M.has_area(root, area) then
+    return false
+  end
+  for _, name in ipairs(M.vault_names()) do
+    local other = M.named_root(name)
+    if other and not fsio.same_path(other, root) and M.has_area(other, area) then
+      return true
+    end
+  end
+  return false
+end
+
 ---The areas of `names` that come close to a name that is none: those that start with it first, then those that
 ---only contain it (any case), three at most. The name has to be the folder's (`hover.nvim`, not `hover`).
 ---@param area string

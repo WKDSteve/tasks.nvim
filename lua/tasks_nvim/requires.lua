@@ -37,8 +37,9 @@ end
 
 ---Read `requires` and `requires_gate` of a path or project file into `plan` (`requires`, `requires_raw`,
 ---`requires_entries`, `requires_gate`, `link_problems`). `requires_entries` is the list in the file's order with the
----entries no requirement can be made of kept as `{ id = <as written>, kind = "foreign"|"bad" }` (the documents show
----them; the file's fault stays `plan-bad-requires`); a resolved one is `{ id = <id> }`. A plan file must have neither (`plan-requires`). `bad` takes the codes with the
+---entries no requirement can be made of kept as `{ id = <as written>, kind = "foreign"|"bad"|"unknown" }` (the
+---documents show them; the file's fault stays `plan-bad-requires`, a `[[slug]]` that names no or several ids stays a
+---link problem and is `unknown`); a resolved one is `{ id = <id> }`. A plan file must have neither (`plan-requires`). `bad` takes the codes with the
 ---`plan-` prefix (`plans.parse` turns them into `path-...` / `project-...`).
 ---@param meta table
 ---@param plan Tasks.PlanFile
@@ -87,6 +88,8 @@ function M.read(meta, plan, bad, resolver)
           raw = raw,
           candidates = vim.list_slice(ids, 1),
         })
+        -- a box of the map all the same, as written; `check` says the link problem, never `requires-unknown`
+        keep("unknown", raw)
       end
     else
       local _, slug, err = vault.parse_id(value)
@@ -186,6 +189,7 @@ end
 
 ---@class Tasks.RequiresIndex
 ---@field items table<string, Tasks.RequiresItem>  # Every path and project of the vault, open and finished, by id.
+---@field root? string  # The vault's root: an id of an area only another configured vault has is `foreign`.
 
 ---Every learning path and project of the vault, open (their files) and finished (the Backlog items with
 ---`closed_kind: path|project`). `opts.paths`, `opts.projects`, `opts.finished` take lists read already.
@@ -209,7 +213,7 @@ function M.index(opts)
       items[f.id] = { id = f.id, kind = kind, title = f.title or f.id, done = false, file = f }
     end
   end
-  return { items = items }
+  return { items = items, root = (vault.root({ root = opts.root })) }
 end
 
 ---Add (or replace) an open file in an index: a file as a change would leave it, or one about to be made.
@@ -223,7 +227,16 @@ function M.with_file(idx, file)
   end
   items[file.id] =
     { id = file.id, kind = file.kind, title = file.title or file.id, done = false, file = file }
-  return { items = items }
+  return { items = items, root = idx.root }
+end
+
+---Whether an id that is no path or project of the vault names one of another configured vault: its area is only there.
+---@param idx Tasks.RequiresIndex
+---@param id string
+---@return boolean
+local function of_other_vault(idx, id)
+  local area = idx.root and vault.parse_id(id)
+  return area ~= nil and vault.area_of_other_vault(idx.root, area)
 end
 
 ---@class Tasks.RequiresState
@@ -276,8 +289,13 @@ function M.state(file, idx)
     local id = e.id
     local it = not e.kind and idx.items[id] or nil
     if e.kind then
-      -- an id of another vault or a broken entry: a box of the map, never a wait (the file's fault says the rest)
+      -- an id of another vault, a broken entry or a link that names no single id: a box of the map, never a wait (the
+      -- file's fault or its link problem says the rest)
       st.requirements[#st.requirements + 1] = { id = id, kind = e.kind, gate = gate, met = false }
+    elseif not it and id ~= file.id and of_other_vault(idx, id) then
+      -- an id of an area only another configured vault has: that vault's, as a milestone's `includes` reads it
+      st.requirements[#st.requirements + 1] =
+        { id = id, kind = "foreign", gate = gate, met = false }
     elseif not it or id == file.id then
       st.unknown[#st.unknown + 1] = id
       st.requirements[#st.requirements + 1] =
