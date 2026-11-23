@@ -122,10 +122,12 @@ commands:
                                           {safety} points come first (`safety` lines); --machine lists only the open
                                           points that may be practised on that machine (`todo`) and says how many
                                           are hidden (`hidden`); `env` reads NVIM_MACHINE_ROLE (empty/default: private); without --machine the text output filters by that role (--machine=all shows every point; JSON stays whole)
-  point <area>/<slug> <key|#n> --state=open|learned|seen|dropped|blocked [--reason=text] [--ack]
+  point <area>/<slug> <key|#n> [--state=open|learned|seen|dropped|blocked] [--result=text] [--reason=text] [--ack]
                                           change one learning point of a path (the operation node_set); seen and
                                           dropped need a reason; closing (learned, seen) a point on or under a
-                                          {safety} mark needs --ack: you read it
+                                          {safety} mark needs --ack: you read it; --result=<text> writes the
+                                          **Ergebnis:** line of the point's exercise block (an exercise with a
+                                          **Nachweis:** is learned only with it; both in one call)
   path <area>/<slug> --schedule [--write]
                                           the table of ## Zeitplan made from the tree: each point with planned hours
                                           ({h=8} or {h=8-10}; {done_h=9} the hours it took), its result (the child
@@ -687,7 +689,7 @@ local SPECS = {
     flag = { "no-index", "no-next", "unblock", "last", "force", "ack", "commit" },
   },
   reopen = { value = { "status" }, flag = {} },
-  point = { value = { "state", "reason" }, flag = { "ack" } },
+  point = { value = { "state", "reason", "result" }, flag = { "ack" } },
   -- `latest` is both: `--latest` (the configured screenshot folders) and `--latest=<folder>`.
   attach = {
     value = { "name", "kind", "latest", "by", "note" },
@@ -1616,17 +1618,25 @@ commands["path-new"] = function(ctx)
   return new_file_command(ctx, "path")
 end
 
----`point <area>/<slug> <key|#n> --state=s [--reason=text] [--ack]`: change one learning point through the operation
----`node_set`; closing a point under `{safety}` needs `--ack`.
+---`point <area>/<slug> <key|#n> [--state=s] [--result=text] [--reason=text] [--ack]`: change one learning point through
+---the operation `node_set`; `--result` writes the `Ergebnis` of its exercise block (with `--state=learned` in one call);
+---closing a point under `{safety}` needs `--ack`.
 ---@param ctx Tasks.CliCtx
 ---@return integer code
 commands.point = function(ctx)
   local args = ctx.args
   local id, ref = args.pos[1], args.pos[2]
-  local state = args.opt.state
-  if not id or not ref or #args.pos > 2 or type(state) ~= "string" then
+  local state, result = args.opt.state, args.opt.result
+  if
+    not id
+    or not ref
+    or #args.pos > 2
+    or (state ~= nil and type(state) ~= "string")
+    or (result ~= nil and type(result) ~= "string")
+    or (state == nil and result == nil)
+  then
     ctx.warn(
-      "error: usage: point <area>/<slug> <key|#n> --state=open|learned|seen|dropped|blocked [--reason=text] [--ack]"
+      "error: usage: point <area>/<slug> <key|#n> [--state=open|learned|seen|dropped|blocked] [--result=text] [--reason=text] [--ack]  (a state or a result)"
     )
     return 2
   end
@@ -1637,6 +1647,7 @@ commands.point = function(ctx)
         id = id,
         point = ref,
         state = state,
+        result = result,
         reason = args.opt.reason,
         ack = args.opt.ack == true or nil,
       },

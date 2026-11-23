@@ -105,6 +105,7 @@ return function(H)
     "move_area_preview",
     "next_not_category",
     "node_note",
+    "node_result",
     "node_set",
     "optional_points",
     "outcome",

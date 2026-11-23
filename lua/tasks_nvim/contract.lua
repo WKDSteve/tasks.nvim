@@ -104,6 +104,7 @@ M.CAPABILITIES = {
   "next",
   "next_not_category",
   "node_note",
+  "node_result",
   "node_set",
   "ops",
   "optional_points",

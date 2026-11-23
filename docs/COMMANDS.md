@@ -678,8 +678,9 @@ path without any). `without-xp` lines name the points that carry no XP. `--forma
 (`points`, `xp`, `optional`, `stages`, `levels` with `at { index, line, key, label, stage }`, `without_xp`). Optional
 points (`{optional}`) stand apart in a line `optional` and count in none of the other lines.
 
-`point <area>/<slug> <key|#n> --state=open|learned|seen|dropped|blocked [--reason=text] [--ack]` changes one learning point
-(the operation `node_set`; `seen` and `dropped` need a reason). Closing a point on or under `{safety}` needs `--ack`; `done
+`point <area>/<slug> <key|#n> [--state=open|learned|seen|dropped|blocked] [--result=text] [--reason=text] [--ack]` changes one learning point
+(the operation `node_set`; `seen` and `dropped` need a reason). `--result` writes the `**Ergebnis:**` line of the point's exercise block
+(`docs/ENGINE.md`, "Exercise blocks"); an exercise with a `**Nachweis:**` is learned only with a result, so `--state=learned --result="…"` does both in one call. Closing a point on or under `{safety}` needs `--ack`; `done
 <id> --ack` does the same for the point a promoted task came from.
 
 `path <area>/<slug> --machine=private|workstation|wsl|env` lists only what may be practised on that machine (`todo` lines, `hidden N` for the points of other machines; `env` reads `NVIM_MACHINE_ROLE`; `all` shows every point). Without `--machine` the text output filters by the role in `NVIM_MACHINE_ROLE` (empty/`default`: `private`, which has `wsl` too; an unknown value filters nothing and prints a `note` line); `--format=json` and `--schedule` stay whole. `{safety}` points (`safety` lines) always come first. See [ENGINE.md](ENGINE.md#machine-and-safety-marks).

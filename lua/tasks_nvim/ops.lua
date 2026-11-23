@@ -351,6 +351,7 @@ local FIELDS = {
     state = "string",
     reason = "string",
     note = "string",
+    result = "string",
     xp = "integer",
     xp_clear = "boolean",
     ack = "boolean",
@@ -2160,7 +2161,8 @@ local function point_ref(point)
 end
 
 ---Change one learning point of an open path: its state and reason, its XP (`xp`, or `xp_clear` to remove them) and/or
----its note (`paths.point`); the answer carries the progress after it and an `inverse` (what the op touched, as it was
+---its note or the `Ergebnis` of its exercise block (`result`, `paths.point`; the point must have an exercise block, and
+---`note` and `result` are not given together); the answer carries the progress after it and an `inverse` (what the op touched, as it was
 ---before; a note the point did not have is "", XP it did not have are `xp_clear`).
 ---@param op table
 ---@param ctx Tasks.OpsCtx
@@ -2168,8 +2170,18 @@ end
 local function do_node_set(op, ctx)
   local ref = point_ref(op.point)
   local touches_xp = op.xp ~= nil or op.xp_clear == true
-  if op.id == nil or ref == nil or (op.state == nil and op.note == nil and not touches_xp) then
-    return refuse("invalid_argument", "node_set needs id, point and a state, a note or xp")
+  if
+    op.id == nil
+    or ref == nil
+    or (op.state == nil and op.note == nil and op.result == nil and not touches_xp)
+  then
+    return refuse(
+      "invalid_argument",
+      "node_set needs id, point and a state, a note, a result or xp"
+    )
+  end
+  if op.note ~= nil and op.result ~= nil then
+    return refuse("invalid_argument", "node_set takes note or result, not both")
   end
   if op.xp ~= nil and op.xp_clear == true then
     return refuse("invalid_argument", "node_set takes xp or xp_clear, not both")
@@ -2179,6 +2191,9 @@ local function do_node_set(op, ctx)
   end
   if has_control(op.note) then
     return refuse("invalid_argument", "note contains a control character")
+  end
+  if has_control(op.result) then
+    return refuse("invalid_argument", "result contains a control character")
   end
   local paths = require("tasks_nvim.paths")
   local before = paths.find(op.id, { root = ctx.root })
@@ -2203,6 +2218,7 @@ local function do_node_set(op, ctx)
     if_match = op.if_match,
     dry_run = ctx.dry,
     note = op.note,
+    result = op.result,
     xp = xp,
     ack = op.ack == true,
   })
@@ -2237,7 +2253,8 @@ local function do_node_set(op, ctx)
       point = r.node.key or ("#" .. tostring(ref)),
       state = op.state ~= nil and old.state or nil,
       reason = op.state ~= nil and old.reason or nil,
-      note = op.note ~= nil and (old.note or "") or nil,
+      -- a result changes the note of the point: the inverse gives the note back as it was
+      note = (op.note ~= nil or op.result ~= nil) and (old.note or "") or nil,
       xp = touches_xp and old.xp or nil,
       xp_clear = (touches_xp and old.xp == nil) or nil,
       -- the point was closed under `{safety}` before: giving that back was read once already

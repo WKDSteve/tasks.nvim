@@ -4812,7 +4812,7 @@
           "type": "string"
         },
         "note": {
-          "description": "`node_set` that wrote a note: the note the point had, `\"\"` when it had none (capability `node_note`).",
+          "description": "`node_set` that wrote a note or a `result`: the note the point had, `\"\"` when it had none (capabilities `node_note`, `node_result`).",
           "type": "string"
         },
         "section": {

@@ -101,7 +101,7 @@ return function(H)
     -- the editor shows them in a float; `--format=json` is for a script
     ["milestones"] = { composer = {}, cli = { "format" } },
     -- the editor asks the reason and the ack; the command takes them as options
-    ["point"] = { composer = {}, cli = { "ack", "reason", "state" } },
+    ["point"] = { composer = {}, cli = { "ack", "reason", "result", "state" } },
     ["plan-close"] = { composer = { "yes" }, cli = {} },
     ["project-close"] = { composer = { "yes" }, cli = {} },
     ["done"] = {

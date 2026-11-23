@@ -3194,7 +3194,7 @@ export interface Inverse {
    */
   reason?: string;
   /**
-   * `node_set` that wrote a note: the note the point had, `""` when it had none (capability `node_note`).
+   * `node_set` that wrote a note or a `result`: the note the point had, `""` when it had none (capabilities `node_note`, `node_result`).
    */
   note?: string;
   /**
