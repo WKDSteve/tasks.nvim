@@ -1566,38 +1566,106 @@ function M.task_new_form(given)
               notify.warn(require("tasks_nvim.wikilinks").ambiguity_message(m.ambiguous))
             end
           end
-          notify.info(("created %s"):format(table.concat(ids, ", ")))
-          open_file(res.path)
-          -- A task made from a selection (it carries the ref): show it in tasks-desktop or tasks-web as
-          -- `new.open_after` says.
-          if given.refs then
-            require("tasks_nvim.open_app").after_new(ids[1], function(msg, level)
-              if level == "warn" then
-                notify.warn(msg)
-              else
-                notify.info("opened " .. msg)
-              end
-            end)
-          end
-          if with_screenshot then
-            -- After the task is open: the link lands in it, at the cursor. A task without a screenshot stays
-            -- (it is made, only the attachment failed, and `M.attach_screenshot` says so).
-            M.attach_screenshot(res.id)
-          elseif with_assets then
-            local assets = vim.fs.dirname(res.path) .. "/" .. mutate.ASSETS_DIR
-            local made, merr = fsio.mkdirp(assets)
-            if made then
-              open_explorer(assets)
-            else
-              notify.warn(
-                ("task created, but %s could not be created: %s"):format(assets, tostring(merr))
-              )
+          -- The block of the marked code first: the file is complete before it is opened or offered to an app. It
+          -- goes in only while the ref line of the form is as the selection made it (a person who cleared the ref
+          -- does not want the code of it either).
+          local items = {}
+          if given.code_ref and opts.refs == given.ref_list then
+            for i, m in ipairs(created) do
+              items[#items + 1] = { area = names[i], id = m.id, path = m.path }
             end
           end
+          M.write_code_refs(given.code_ref, items, function()
+            notify.info(("created %s"):format(table.concat(ids, ", ")))
+            open_file(res.path)
+            -- A task made from a selection (it carries the ref): show it in tasks-desktop or tasks-web as
+            -- `new.open_after` says.
+            if given.refs then
+              require("tasks_nvim.open_app").after_new(ids[1], function(msg, level)
+                if level == "warn" then
+                  notify.warn(msg)
+                else
+                  notify.info("opened " .. msg)
+                end
+              end)
+            end
+            if with_screenshot then
+              -- After the task is open: the link lands in it, at the cursor. A task without a screenshot stays
+              -- (it is made, only the attachment failed, and `M.attach_screenshot` says so).
+              M.attach_screenshot(res.id)
+            elseif with_assets then
+              local assets = vim.fs.dirname(res.path) .. "/" .. mutate.ASSETS_DIR
+              local made, merr = fsio.mkdirp(assets)
+              if made then
+                open_explorer(assets)
+              else
+                notify.warn(
+                  ("task created, but %s could not be created: %s"):format(assets, tostring(merr))
+                )
+              end
+            end
+          end)
         end
       )
     end,
   })
+end
+
+---Writes the `code-ref/1` block of a selection (`tasks_nvim.code_ref`) into the tasks just created, then `done()`:
+---the block stands in the file before the task is opened or offered to an app. In a private area (`new.private_areas`,
+---`new.private_vaults`) the excerpt goes in only after a yes; a no (or a dismissed dialog) writes the reference without
+---it. A block the check of the reader refuses is never written; the task stays, the reason is told.
+---@param doc table|nil  the document of `code_ref.capture`
+---@param items { area: string, id: string, path: string }[]
+---@param done fun()
+---@param deps? { confirm?: fun(msg: string, label: string, cb: fun(yes: boolean)) }
+function M.write_code_refs(doc, items, done, deps)
+  if not doc or #items == 0 then
+    done()
+    return
+  end
+  local code_ref = require("tasks_nvim.code_ref")
+  local root = vault.root()
+  local private = {}
+  local any_private = false
+  for i, item in ipairs(items) do
+    private[i] = code_ref.is_private(item.area, root)
+    any_private = any_private or private[i]
+  end
+  local function write(excerpt_ok)
+    local plain, perr = code_ref.render(code_ref.strip_excerpt(doc))
+    local full, ferr = code_ref.render(doc)
+    for i, item in ipairs(items) do
+      local block, err = plain, perr
+      if not private[i] or excerpt_ok then
+        block, err = full, ferr
+      end
+      if not block then
+        notify.warn(("no code-ref block in %s: %s"):format(item.id, table.concat(err or {}, "; ")))
+      else
+        local ok, ierr = code_ref.insert(item.path, block)
+        if not ok then
+          notify.warn(("no code-ref block in %s: %s"):format(item.id, tostring(ierr)))
+        end
+      end
+    end
+    done()
+  end
+  if any_private and doc.excerpt then
+    local ask = (deps and deps.confirm)
+      or function(msg, label, cb)
+        confirm.yesno(msg, label, cb)
+      end
+    ask(
+      "This area is private. Write the code excerpt (up to 4 KiB of the marked lines) into the task?\n\nNo writes the reference only: repository, commit, file and lines.",
+      "write the excerpt",
+      function(yes)
+        write(yes == true)
+      end
+    )
+    return
+  end
+  write(true)
 end
 
 ---The ref of a range in a file: the path relative to the git root of the file (so it holds whatever the working
@@ -1608,17 +1676,7 @@ end
 ---@param last_line integer
 ---@return string ref
 function M.range_ref(file, first_line, last_line)
-  local abs = fsio.norm(vim.fn.fnamemodify(file, ":p"))
-  local root = vim.fs.root(abs, ".git")
-  local where
-  if root then
-    root = fsio.norm(root):gsub("/+$", "")
-    -- Drive letters differ in case on Windows (`E:` and `e:`): compare without it.
-    if abs:sub(1, #root + 1):lower() == (root .. "/"):lower() then
-      where = abs:sub(#root + 2)
-    end
-  end
-  where = where or fsio.norm(vim.fn.fnamemodify(file, ":."))
+  local where = require("tasks_nvim.code_ref").relative(file)
   if last_line > first_line then
     return ("%s:%d-%d"):format(where, first_line, last_line)
   end
@@ -1630,7 +1688,7 @@ end
 ---see `range_ref`; a ref the staleness check understands), `text` the first non-blank line, squeezed and cut, for a title nobody typed.
 ---@param ctx table  composer context; `ctx.range = { range, line1, line2 }`
 ---@param buf? integer  default: the current buffer
----@return { ref?: string, text?: string }|nil source  # nil: no range given
+---@return { ref?: string, text?: string, code_ref?: table, code_ref_reason?: string }|nil source  # nil: no range given
 function M.range_source(ctx, buf)
   local r = ctx.range
   if not r or (r.range or 0) == 0 then
@@ -1648,6 +1706,9 @@ function M.range_source(ctx, buf)
   -- A real file only: `term://`, `tasks://` and the like name no path a ref could point at.
   if name ~= "" and not name:match("^%a[%w+.-]*://") and vim.bo[buf].buftype == "" then
     source.ref = M.range_ref(name, first_line, last_line)
+    -- the code-ref/1 block of the task (`tasks_nvim.code_ref`); the reason when there is none
+    source.code_ref, source.code_ref_reason =
+      require("tasks_nvim.code_ref").capture(buf, first_line, last_line)
   end
   for _, line in ipairs(vim.api.nvim_buf_get_lines(buf, first_line - 1, last_line, false)) do
     local squeezed = vim.trim((line:gsub("%s+", " ")))
@@ -1744,6 +1805,7 @@ function M.task_new_draft(ctx, deps)
     local given = draft.given(d)
     if source and source.ref then
       given.refs, given.ref_list = source.ref, { source.ref }
+      given.code_ref = source.code_ref
     end
     if #d.dropped > 0 then
       notify.info(
@@ -1937,6 +1999,10 @@ function M.task_new(ctx)
     if source then
       given.refs, given.title = source.ref, source.text
       given.ref_list = source.ref and { source.ref } or nil
+      given.code_ref = source.code_ref
+      if source.ref and not source.code_ref and source.code_ref_reason then
+        notify.info("no code-ref block: " .. source.code_ref_reason)
+      end
     end
     M.task_new_form(given)
     return
@@ -2026,18 +2092,26 @@ function M.task_new(ctx)
     if res.ambiguous then
       notify.warn(require("tasks_nvim.wikilinks").ambiguity_message(res.ambiguous))
     end
-    notify.info(("created %s"):format(res.id))
-    open_file(res.path)
-    -- A task made from a selection: show it in tasks-desktop or tasks-web as `new.open_after` says.
-    if source then
-      require("tasks_nvim.open_app").after_new(res.id, function(msg, level)
-        if level == "warn" then
-          notify.warn(msg)
-        else
-          notify.info("opened " .. msg)
-        end
-      end)
+    if source and source.ref and not source.code_ref and source.code_ref_reason then
+      notify.info("no code-ref block: " .. source.code_ref_reason)
     end
+    -- The code-ref block first (it asks in a private area), then the task is opened.
+    local items = source and source.code_ref and { { area = area, id = res.id, path = res.path } }
+      or {}
+    M.write_code_refs(source and source.code_ref, items, function()
+      notify.info(("created %s"):format(res.id))
+      open_file(res.path)
+      -- A task made from a selection: show it in tasks-desktop or tasks-web as `new.open_after` says.
+      if source then
+        require("tasks_nvim.open_app").after_new(res.id, function(msg, level)
+          if level == "warn" then
+            notify.warn(msg)
+          else
+            notify.info("opened " .. msg)
+          end
+        end)
+      end
+    end)
   end
 
   if title ~= "" then

@@ -86,6 +86,8 @@
 
 ---@class Tasks.NewConfig
 ---@field open_after "ask"|"always"|"never"  After `:Tasks new` created a task (with a selection): show it in tasks-desktop (running) or tasks-web (set up): `ask` (default) asks "Open in tasks-desktop?", `always` opens it, `never` does nothing. Without a running tasks-desktop and without `open.web_dir` nothing is asked.
+---@field private_areas string[]  Areas (names, as in `vault.areas`) whose tasks are private: `:'<,'>Tasks new` writes the code excerpt of its `code-ref` block there only after a yes. See `tasks_nvim.code_ref`.
+---@field private_vaults string[]  Names of vault folders all of whose areas are private (default `tricentis-vault`).
 
 ---@class Tasks.OpenConfig
 ---@field web_dir? string  A tasks-web checkout (the folder with `tasks.html`) for `:Tasks open --web`; no search of the disk. See `tasks_nvim.open_app`.
@@ -122,7 +124,7 @@ return {
   gamification = true,
   tree = true,
   ai = "auto",
-  new = { open_after = "ask" },
+  new = { open_after = "ask", private_areas = {}, private_vaults = { "tricentis-vault" } },
   open = {},
   keys = {
     dashboard = {

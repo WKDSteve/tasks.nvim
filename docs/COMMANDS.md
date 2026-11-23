@@ -317,6 +317,41 @@ opens with the same title and ref filled in.
 :'<,'>Tasks new lib.nvim                    " title = first selected line, refs = this file:line
 ```
 
+The task also gets a **`code-ref/1` block** (contract `appkit/schemas/code-ref/1`) under `## Kontext`, so DocMap,
+tasks-desktop and an agent read the code from the task file alone:
+
+````markdown
+```code-ref
+{
+  "schema": "code-ref/1",
+  "repo": "tasks.nvim",
+  "sha": "8aa627637680566b0022ee27b4d98d5f506c3f0b",
+  "dirty": false,
+  "file": "lua/tasks_nvim/ui/cmd.lua",
+  "lines": [1598, 1606],
+  "lang": "lua",
+  "symbol": "M.range_source",
+  "excerpt": "function M.range_source(ctx, buf) ...",
+  "truncated": false
+}
+```
+````
+
+- `repo` is the name of the repository (a worktree is named after its main checkout), `file` is relative to the git
+  root, never a path of this machine. `sha` is the HEAD; `dirty` is `true` when the buffer has unsaved changes or the
+  file differs from HEAD (the lines and the excerpt are then of the working tree). `lang` is the filetype, `symbol` the
+  function, method or class around the start of the range when a tree-sitter parser is there.
+- `excerpt` is the text of the buffer, at most 4096 UTF-8 bytes, cut on a whole character (`truncated: true`); `lines`
+  stays the whole marked range.
+- **Private areas**: in an area named in `new.private_areas`, or in any area of a vault whose folder is named in
+  `new.private_vaults` (default `tricentis-vault`), the excerpt is written only after a yes (`Write the code excerpt ...?`);
+  a no writes the reference without it.
+- The block is written before `new.open_after` asks, and the same for the form (no area) and `:'<,'>Tasks new <area>`.
+  It is checked with the Lua port of the reader's check (`tasks_nvim.code_ref.problems`, the goldens of appkit are in
+  `TESTS/golden/code-ref/`): a document the check refuses is never written, the task stays and the reason is told. No
+  block is made for a buffer without a file, a file outside a git repository or a form
+  whose ref line was cleared (also with `--draft`, the block comes with the form). The `refs:` entry is written as before.
+
 On the command line `tasks new <area> <title> --created=YYYY-MM-DD` puts a task on the record on an earlier day, never a later one (history written
 down later; `updated` stays today). A title that starts with `--` goes in as `--title=--diagnose ...` (or after a `--`
 that ends the options).

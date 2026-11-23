@@ -55,7 +55,11 @@ blockers, plan or estimate is valid and stays visible everywhere.
     lists = {},
     tree = true,                        -- true, false or { keys = { done =, claim = } }
     ai = "auto",                        -- false, true or "auto"
-    new = { open_after = "ask" },       -- after :'<,'>Tasks new: "ask", "always" or "never" show it in tasks-desktop
+    new = {                             -- after :'<,'>Tasks new: open_after "ask", "always" or "never" shows it in tasks-desktop;
+      open_after = "ask",               -- the task holds a code-ref/1 block (repo, sha, file, lines, excerpt); in a private
+      private_areas = {},               -- area (or a vault folder of private_vaults) the excerpt is written only after a yes
+      private_vaults = { "tricentis-vault" },
+    },
     open = { web_dir = nil },           -- a tasks-web checkout (tasks.html) for :Tasks open --web
   })
 <

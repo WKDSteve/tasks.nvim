@@ -46,7 +46,7 @@ local SCHEMA = {
   gamification = "boolean",
   tree = "tree",
   ai = "ai",
-  new = { open_after = "open_after" },
+  new = { open_after = "open_after", private_areas = "string_list", private_vaults = "string_list" },
   open = { web_dir = "string" },
   keys = { dashboard = "keymap", dashboard_input = "keymap", form = "keymap", learning = "keymap" },
 }
