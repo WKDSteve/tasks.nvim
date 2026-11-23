@@ -1597,7 +1597,7 @@ local function nested_routes()
           name = "id",
           type = "TASK_QUERY",
           optional = true,
-          desc = "Task id, or a part of its name (`area/` narrows); with --desktop or --web: the task of this buffer, else the one created last",
+          desc = "Task id or part of its name; with --desktop/--web optional (buffer task)",
         },
       },
       flags = {
