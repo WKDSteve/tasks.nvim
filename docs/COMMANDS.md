@@ -309,8 +309,8 @@ chain of `vim.ui.input` prompts. Fields already given as `key=value` are not ask
 contain `, [ ] " ' #` (they sit in an inline list).
 
 **With a range** (a visual selection, or `:5,10Tasks new <area>`) the task is *about those lines*: it gets a
-`refs:` entry for them (`lua/a.lua:5`: file relative to the working directory, first line -- the staleness check
-reads it) and, when you typed no title, the first non-blank selected line as the title. Without an area the form
+`refs:` entry for them (`lua/a.lua:5-12`: file relative to its git root, so it holds from any working directory, and
+the selected lines; a single line is `lua/a.lua:5` -- the staleness check reads both) and, when you typed no title, the first non-blank selected line as the title. Without an area the form
 opens with the same title and ref filled in.
 
 ```vim

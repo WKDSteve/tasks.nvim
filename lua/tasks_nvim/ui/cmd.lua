@@ -1589,9 +1589,34 @@ function M.task_new_form(given)
   })
 end
 
+---The ref of a range in a file: the path relative to the git root of the file (so it holds whatever the working
+---directory of the editor is; without a git root, relative to the working directory as before) and the lines
+---(`lua/a.lua:5`, `lua/a.lua:5-12`), the forms the staleness check understands.
+---@param file string  absolute or relative path of the file
+---@param first_line integer
+---@param last_line integer
+---@return string ref
+function M.range_ref(file, first_line, last_line)
+  local abs = fsio.norm(vim.fn.fnamemodify(file, ":p"))
+  local root = vim.fs.root(abs, ".git")
+  local where
+  if root then
+    root = fsio.norm(root):gsub("/+$", "")
+    -- Drive letters differ in case on Windows (`E:` and `e:`): compare without it.
+    if abs:sub(1, #root + 1):lower() == (root .. "/"):lower() then
+      where = abs:sub(#root + 2)
+    end
+  end
+  where = where or fsio.norm(vim.fn.fnamemodify(file, ":."))
+  if last_line > first_line then
+    return ("%s:%d-%d"):format(where, first_line, last_line)
+  end
+  return ("%s:%d"):format(where, first_line)
+end
+
 ---The code a range names: `:'<,'>Tasks new` (from a visual selection or any `:5,10Tasks new`) makes a task about
----those lines. `ref` is the buffer's file relative to the working directory plus the first line (`lua/a.lua:5`, a
----ref the staleness check understands), `text` the first non-blank line, squeezed and cut, for a title nobody typed.
+---those lines. `ref` is the buffer's file relative to its git root plus the lines (`lua/a.lua:5` or `lua/a.lua:5-12`,
+---see `range_ref`; a ref the staleness check understands), `text` the first non-blank line, squeezed and cut, for a title nobody typed.
 ---@param ctx table  composer context; `ctx.range = { range, line1, line2 }`
 ---@param buf? integer  default: the current buffer
 ---@return { ref?: string, text?: string }|nil source  # nil: no range given
@@ -1611,7 +1636,7 @@ function M.range_source(ctx, buf)
   local name = vim.api.nvim_buf_get_name(buf)
   -- A real file only: `term://`, `tasks://` and the like name no path a ref could point at.
   if name ~= "" and not name:match("^%a[%w+.-]*://") and vim.bo[buf].buftype == "" then
-    source.ref = ("%s:%d"):format(fsio.norm(vim.fn.fnamemodify(name, ":.")), first_line)
+    source.ref = M.range_ref(name, first_line, last_line)
   end
   for _, line in ipairs(vim.api.nvim_buf_get_lines(buf, first_line - 1, last_line, false)) do
     local squeezed = vim.trim((line:gsub("%s+", " ")))

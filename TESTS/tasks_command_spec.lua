@@ -168,7 +168,31 @@ return function(H)
   local code_buf = vim.api.nvim_get_current_buf()
   local src = assert(cmd.range_source({ range = { range = 2, line1 = 1, line2 = 3 } }, code_buf))
   eq(src.text, "local x = 1", "the first non-blank selected line, whitespace squeezed")
-  ok(src.ref and src.ref:find("a.lua:1$") ~= nil, "the ref is file:first-line")
+  ok(src.ref and src.ref:find("a.lua:1%-3$") ~= nil, "the ref is file:first-last for a range")
+  local one = assert(cmd.range_source({ range = { range = 1, line1 = 2, line2 = 2 } }, code_buf))
+  ok(one.ref and one.ref:find("a.lua:2$") ~= nil, "one line: file:line, no range")
+
+  -- The ref holds whatever the working directory of the editor is: it is relative to the git root of the file.
+  local repo_dir = H_.tmpdir() .. "/repo"
+  vim.fn.mkdir(repo_dir .. "/.git", "p")
+  vim.fn.mkdir(repo_dir .. "/sub", "p")
+  local repo_file = repo_dir .. "/sub/b.lua"
+  vim.fn.writefile({ "one", "two", "three" }, repo_file)
+  vim.cmd("edit " .. vim.fn.fnameescape(repo_file))
+  local elsewhere = H_.tmpdir() .. "/elsewhere"
+  vim.fn.mkdir(elsewhere, "p")
+  local old_cwd = vim.fn.getcwd()
+  vim.cmd("cd " .. vim.fn.fnameescape(elsewhere))
+  local rooted = assert(
+    cmd.range_source(
+      { range = { range = 2, line1 = 2, line2 = 3 } },
+      vim.api.nvim_get_current_buf()
+    )
+  )
+  vim.cmd("cd " .. vim.fn.fnameescape(old_cwd))
+  eq(rooted.ref, "sub/b.lua:2-3", "relative to the git root, not to the working directory")
+  vim.cmd("edit " .. vim.fn.fnameescape(code_file))
+  code_buf = vim.api.nvim_get_current_buf()
   vim.fn.writefile({ string.rep("w", 200) }, code_file)
   vim.cmd("edit!")
   local long = assert(cmd.range_source({ range = { range = 1, line1 = 1, line2 = 99 } }, code_buf))

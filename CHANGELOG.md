@@ -17,6 +17,7 @@ the version is not tagged yet (the repository is not published).
 
 ### Fixed
 
+- `:'<,'>Tasks new` writes the `refs:` entry of a selection relative to the git root of the file and with the whole range (`lua/a.lua:5-12`); it was relative to the working directory of the editor (a wrong path from any other folder) and named only the first line.
 - `tasks push` no longer reports `pushed` for a pick that could not be committed (signing, a hook, a lock): only a pick that leaves nothing staged is skipped, any other failure is an error with git's words; the pushed list is taken before the push, and a push counts only when the head is on the remote afterwards (`nothing new landed` as a note otherwise).
 
 - `plan_set`, `project_set` and `path_set` no longer name the file by its path on this machine when the frontmatter cannot be written (`cannot change C:/…/x.md: …`, e.g. a line holding a map the writer does not rewrite): the message is redacted like every other one of the contract.
