@@ -20,6 +20,12 @@ return {
     docs = "docs/COMMANDS.md",
   },
   {
+    id = "tasks.code-ref",
+    title = ":'<,'>Tasks new writes the code-ref/1 block of the marked code into the task; a private area asks before the excerpt",
+    surface = { "command:Tasks new range" },
+    docs = "docs/COMMANDS.md",
+  },
+  {
     id = "tasks.attach-clipboard",
     title = ":Tasks attach <id> from=clipboard saves the image on the system clipboard into the task's assets",
     surface = { "command:Tasks attach from=clipboard" },
