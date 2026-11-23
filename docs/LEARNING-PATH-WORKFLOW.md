@@ -99,7 +99,8 @@ Section titles stay German (the engine reads them); frontmatter keys and status 
 Tree syntax (`LP-02`): `- [ ] text {#key}`, children indented by two spaces; marks `[ ]` open, `[x]` learned, `[~]` seen (with
 reason), `[-]` not applicable (with reason), `[!]` blocked (with the key it waits for). Markers: `{xp=N}`, `{h=N}`,
 `{optional}`, `{machine=private|workstation|wsl}`, `{safety}`, `{for=t4}`. No `→` in a label (it means "promoted task").
-Keep every label on **one line**.
+Keep every label on **one line**. A marker on a parent point holds for its whole subtree (`LP-19`): put `{machine=private}` on the
+lab group, not on each exercise.
 
 Checklist for **every point**:
 
@@ -155,7 +156,7 @@ XP are never computed from a scheme; each point states its own (`LP-18`). A path
 
 ## 9. Traps seen so far
 
-- `path-new --from` refuses a draft with `Badge assets/badges/…` (`level-badge-missing`): create the path **without** the badge text, attach the files, then add the text (`tasks.nvim/path-new-from-badges-neben-dem-entwurf`).
+- `path-new --from` refuses a draft with `Badge assets/badges/…` (`level-badge-missing`): create the path **without** the badge text, attach the files, then add the text (`tasks.nvim/path-new-from-badges-neben-dem-entwurf`). The script `tasks-vault/TOOLS/scripts/learning-path/mkpath.py` does these steps in one call.
 - `attach` puts files in `assets/`, not `assets/badges/`: move them.
 - Folder form (after `attach`) breaks relative links by one level (`tasks.nvim/folderize-bricht-relative-links`): add one `../`.
 - `attach` on your own claimed task needs `--by=<name>`.
