@@ -1017,6 +1017,16 @@ export type MeetingDocument = Head & {
      * Ticked in `## Teilnehmer`.
      */
     present: boolean;
+    /**
+     * The id of the contact the participant is (capability `participant_contacts`): the name links to it (`[Rick](<area>/rick)`) or exactly one contact holds the address (case does not matter). Derived when the meeting is read, never written into a file. Absent: the line stays text.
+     */
+    contact?: string;
+    /**
+     * Several contacts hold the address and the name links to none of them: their ids, sorted. The participant is not resolved (`contact` is absent); nothing is guessed.
+     *
+     * @minItems 2
+     */
+    contact_candidates?: [string, string, ...string[]];
   }[];
   documents: {
     n: number;
@@ -1116,6 +1126,26 @@ export type ContactDocument = Head & {
    * The text of the notes section, trimmed; empty when there is none.
    */
   notes: string;
+  /**
+   * The meetings whose participant lines name this contact (capability `participant_contacts`), the latest first: derived when the contact is read, never written. A participant whose address several contacts hold is in no one's history.
+   */
+  history?: {
+    id: string;
+    title: string;
+    status?: "planned" | "done" | "cancelled";
+    date?: Date;
+    starts_at?: string;
+    /**
+     * The `n` of the participant line.
+     */
+    participant: number;
+    role?: string;
+    present: boolean;
+  }[];
+  /**
+   * More meetings than the list holds.
+   */
+  history_truncated?: true;
 };
 /**
  * tasks.paths: the open learning paths of the vault or of an area (with `include_done` the finished ones too, `stage: done`, after them), each with its progress; no tree (that is tasks.path). Capability `paths`.

@@ -142,6 +142,7 @@ return function(H)
     "view_delete",
     "view_save",
     "late_blockers",
+    "participant_contacts",
     "waits_for",
     "xp",
   }) do

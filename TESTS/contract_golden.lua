@@ -518,6 +518,43 @@ function G.write_contacts(root)
   write(dir .. "/bad-zone.md", "---\nname: Bad Zone\ntz: Vienna\n---\n\nWrong zone.\n")
 end
 
+---The contacts of `write_contacts` and two meetings whose participants resolve to them: by a name that links to the
+---contact, by the address, and a line no contact has (golden cases `meeting-participants`, `contact-history`).
+---@param root string
+function G.write_participants(root)
+  G.write_contacts(root)
+  local function write(path, text)
+    vim.fn.mkdir(vim.fs.dirname(path), "p")
+    local fh = assert(io.open(path, "wb"))
+    fh:write(text)
+    fh:close()
+  end
+  local dir = root .. "/lib.nvim/MEETINGS"
+  write(
+    dir .. "/standup.md",
+    table.concat({
+      "---",
+      'title: "Standup"',
+      "status: planned",
+      "date: 2026-01-13",
+      'time: "09:00"',
+      "---",
+      "",
+      "Daily.",
+      "",
+      "## Teilnehmer",
+      "- [x] [Rick](lib.nvim/rick-beispiel) (Lead)",
+      "- [ ] Anna <ANNA@example.org>",
+      "- [ ] Stranger <stranger@example.org>",
+      "",
+    }, "\n")
+  )
+  write(
+    dir .. "/retro.md",
+    "---\ntitle: Retro\nstatus: done\ndate: 2026-01-09\n---\n\nLooking back.\n\n## Teilnehmer\n- Rick <r.beispiel@example.org> (Gast)\n"
+  )
+end
+
 ---Write a weekly series with an excepted day, an end and one occurrence that has its file (moved by a day) into
 ---`root`: the golden cases `meetings-series`, `meeting-occurrence` and `result-meeting-series`.
 ---@param root string
@@ -1002,6 +1039,28 @@ G.cases = {
     fresh = true,
     request = function(root)
       G.write_contacts(root)
+      return '{"params":{"id":"lib.nvim/rick-beispiel"}}'
+    end,
+  },
+  {
+    -- the participants of a meeting resolved to contacts: by link, by address (case folded), none
+    -- (capability `participant_contacts`)
+    name = "meeting-participants",
+    method = "meeting",
+    fresh = true,
+    request = function(root)
+      G.write_participants(root)
+      return '{"params":{"id":"lib.nvim/standup"}}'
+    end,
+  },
+  {
+    -- the history of a contact: the meetings whose participants resolve to it, the latest first
+    -- (capability `participant_contacts`)
+    name = "contact-history",
+    method = "contact",
+    fresh = true,
+    request = function(root)
+      G.write_participants(root)
       return '{"params":{"id":"lib.nvim/rick-beispiel"}}'
     end,
   },

@@ -2494,7 +2494,10 @@ MEETING_SUBS.show = function(ctx, rest)
   ctx.say(("%s\t%s\t%s %s\t%s"):format(m.id, m.status, m.date or "", m.time or "", m.title))
   -- the lists are the document's; the entry has their counts
   for _, p in ipairs(doc.participants or {}) do
-    ctx.say(("participant\t%d\t%s\t%s"):format(p.n, p.present and "x" or " ", p.name))
+    ctx.say(
+      ("participant\t%d\t%s\t%s"):format(p.n, p.present and "x" or " ", p.name)
+        .. (p.contact and ("\t" .. p.contact) or "")
+    )
   end
   for _, f in ipairs(doc.followups or {}) do
     ctx.say(("followup\t%d\t%s\t%s\t%s"):format(f.n, f.ticked and "x" or " ", f.text, f.task or ""))
@@ -2654,6 +2657,9 @@ CONTACT_SUBS.show = function(ctx, rest)
   end
   for _, ph in ipairs(c.phones) do
     ctx.say("phone\t" .. ph)
+  end
+  for _, h in ipairs(doc.history or {}) do
+    ctx.say(("meeting\t%s\t%s\t%s"):format(h.id, h.date or "", h.title))
   end
   return 0
 end

@@ -1,0 +1,72 @@
+{
+  "body": "\nContact at the customer for the T2 cases.\n\n## Notizen\n\nPrefers mail over calls.\n",
+  "body_truncated": false,
+  "contact": {
+    "area": "lib.nvim",
+    "assets": [
+      "assets/card.png"
+    ],
+    "created": "2026-01-02",
+    "emails": [
+      "rick@example.org",
+      "r.beispiel@example.org"
+    ],
+    "etag": "sha256:e2075463480adb03",
+    "file": "lib.nvim/CONTACTS/rick-beispiel/rick-beispiel.md",
+    "folder": true,
+    "id": "lib.nvim/rick-beispiel",
+    "name": "Rick Beispiel",
+    "org": "Beispiel GmbH",
+    "phones": [
+      "+43 1 2345678"
+    ],
+    "problems": [],
+    "role": "Support, T2",
+    "slug": "rick-beispiel",
+    "summary": "Contact at the customer for the T2 cases.",
+    "tags": [
+      "t2",
+      "kunde"
+    ],
+    "tz": "Europe/Vienna",
+    "updated": "2026-01-09",
+    "valid": true
+  },
+  "digest": "sha256:26e0f7184f736e5b",
+  "engine": {
+    "git": "0000000",
+    "nvim": "0.0.0",
+    "version": "0.1.0-test"
+  },
+  "generated_at": "2026-01-01T00:00:00Z",
+  "history": [
+    {
+      "date": "2026-01-13",
+      "id": "lib.nvim/standup",
+      "participant": 1,
+      "present": true,
+      "role": "Lead",
+      "starts_at": "2026-01-13T09:00",
+      "status": "planned",
+      "title": "Standup"
+    },
+    {
+      "date": "2026-01-09",
+      "id": "lib.nvim/retro",
+      "participant": 1,
+      "present": false,
+      "role": "Gast",
+      "starts_at": "2026-01-09",
+      "status": "done",
+      "title": "Retro"
+    }
+  ],
+  "kind": "tasks.contact",
+  "notes": "Prefers mail over calls.",
+  "plugin": "tasks.nvim",
+  "rev": "rev:b929c2",
+  "schema": 1,
+  "vault": {
+    "id": "vault"
+  }
+}

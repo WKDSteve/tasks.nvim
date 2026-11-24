@@ -303,6 +303,7 @@ end
 ---@field name string
 ---@field email? string
 ---@field role? string
+---@field link? string  # The contact id the name links to (`[Rick](<area>/rick)`), as written; the contact may not exist.
 ---@field present boolean
 
 ---The participants: one line each, `Name <mail> (role)`; mail and role are optional. A checkbox ticked is present; a
@@ -317,6 +318,19 @@ local function participants_of(lines)
       text = bullet(line)
     end
     if text then
+      -- a name that is a link to a contact: `[Rick](<area>/rick)`; the text is the name, the target the contact id
+      local link
+      local label, target = text:match("%[([^%[%]]*)%]%(([^()%s]+)%)")
+      local link_area, link_slug
+      if label then
+        link_area, link_slug = vault.parse_id(target)
+      end
+      if link_area and link_slug then
+        link = target
+        text = text:gsub("%[[^%[%]]*%]%([^()%s]+%)", function()
+          return label
+        end, 1)
+      end
       local role = text:match("%(([^()]*)%)%s*$")
       if role then
         text = text:gsub("%s*%([^()]*%)%s*$", "")
@@ -331,6 +345,7 @@ local function participants_of(lines)
           n = #out + 1,
           name = name,
           email = model.is_email(email) and email or nil,
+          link = link,
           role = role and trim(role) ~= "" and trim(fsio.clean(role)) or nil,
           present = ticked == true,
         }

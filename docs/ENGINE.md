@@ -579,6 +579,20 @@ than 20 mails or numbers) and the codes every file has (`slug`, `frontmatter-mis
 values in the `inverse`), `contact_delete` (the inverse makes the file again from what it held; a contact folder that
 holds more than its file is not deleted). All three take the lock of the file and refuse a symbolic link.
 
+**Participants resolve to contacts** (capability `participant_contacts`; `contacts.index`, `contacts.resolve`,
+`contacts.history`). A participant line of a meeting stays text (`Name <mail> (role)`); when the meeting or the contact
+is read, the line is matched against the contacts, and nothing is written into any file. The name may link to the
+contact (`[Rick](<area>/rick) (Lead)`: the link text is the name, the target the contact id) and that wins as long as
+the contact exists; otherwise the mail address matches when exactly one contact holds it (case does not matter). An
+address that several contacts hold is **never guessed**: the participant stays unresolved, `contact_candidates` of the
+document names the contacts (sorted), and `check` says `meeting-participant-ambiguous` (hint); linking the name to one
+of them settles it. A link to a contact that does not exist resolves to nothing (and is a dead link for `check`:
+`meeting-link-missing`; a link to a contact that does exist is none). `tasks.meeting` carries `contact` and
+`contact_candidates` on its participants; `tasks.contact` carries `history`, the meetings whose participants resolve to
+the contact (the latest first, at most one list page, `history_truncated` beyond), each with the `participant` line it
+is, its `role` and `present`; the `rev` follows the history and the contacts that share an address. `tasks.contacts`
+(the list) carries no history, so listing stays one read of the contacts.
+
 ### Learning paths (`ROADMAP/paths/`)
 
 A learning path organises knowledge where a plan organises work: `<area>/ROADMAP/paths/<slug>.md` (the folder form

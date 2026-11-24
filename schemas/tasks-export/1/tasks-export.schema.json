@@ -1342,7 +1342,27 @@
         "contact": { "$ref": "#/$defs/ContactEntry" },
         "body": { "type": "string", "description": "The file after the frontmatter, untrusted text." },
         "body_truncated": { "type": "boolean" },
-        "notes": { "type": "string", "description": "The text of the notes section, trimmed; empty when there is none." }
+        "notes": { "type": "string", "description": "The text of the notes section, trimmed; empty when there is none." },
+        "history": {
+          "type": "array",
+          "description": "The meetings whose participant lines name this contact (capability `participant_contacts`), the latest first: derived when the contact is read, never written. A participant whose address several contacts hold is in no one's history.",
+          "items": {
+            "type": "object",
+            "required": ["id", "title", "participant", "present"],
+            "properties": {
+              "id": { "type": "string", "pattern": "^[^/]+/[^/]+$" },
+              "title": { "type": "string" },
+              "status": { "enum": ["planned", "done", "cancelled"] },
+              "date": { "$ref": "#/$defs/Date" },
+              "starts_at": { "type": "string" },
+              "participant": { "type": "integer", "minimum": 1, "description": "The `n` of the participant line." },
+              "role": { "type": "string" },
+              "present": { "type": "boolean" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "history_truncated": { "const": true, "description": "More meetings than the list holds." }
       },
       "unevaluatedProperties": false
     },
@@ -1458,6 +1478,17 @@
               "present": {
                 "type": "boolean",
                 "description": "Ticked in `## Teilnehmer`."
+              },
+              "contact": {
+                "type": "string",
+                "pattern": "^[^/]+/[^/]+$",
+                "description": "The id of the contact the participant is (capability `participant_contacts`): the name links to it (`[Rick](<area>/rick)`) or exactly one contact holds the address (case does not matter). Derived when the meeting is read, never written into a file. Absent: the line stays text."
+              },
+              "contact_candidates": {
+                "type": "array",
+                "minItems": 2,
+                "items": { "type": "string", "pattern": "^[^/]+/[^/]+$" },
+                "description": "Several contacts hold the address and the name links to none of them: their ids, sorted. The participant is not resolved (`contact` is absent); nothing is guessed."
               }
             },
             "additionalProperties": false

@@ -113,6 +113,7 @@ M.CAPABILITIES = {
   "optional_points",
   "order",
   "outcome",
+  "participant_contacts",
   "path",
   "path_close",
   "path_hours",
@@ -3336,13 +3337,17 @@ function M.meeting(id, opts)
     doc.agenda = vim.tbl_map(function(a)
       return json.object({ n = a.n, text = a.text, ticked = a.ticked })
     end, m.agenda)
+    local idx = contacts.index((contacts.all({ root = root })) or {})
     doc.participants = vim.tbl_map(function(p)
+      local contact, candidates = contacts.resolve(p, idx)
       return json.object({
         n = p.n,
         name = p.name,
         email = p.email,
         role = p.role,
         present = p.present,
+        contact = contact,
+        contact_candidates = candidates,
       })
     end, m.participants)
     doc.documents = vim.tbl_map(function(d)
@@ -3513,7 +3518,41 @@ function M.contact(id, opts)
     doc.body = body
     doc.body_truncated = truncated
     doc.notes = c.notes
-    return seal(doc, builder.rev_of({ c.id .. "\t" .. (c.etag or "") })), nil
+    -- the history is derived: the meetings whose participant lines name this contact, never written into a file
+    local all_contacts = contacts.all({ root = root })
+    local idx = contacts.index(all_contacts or {})
+    local all_meetings = meetings.all({ root = root })
+    local lines = { c.id .. "\t" .. (c.etag or "") }
+    -- another contact with the same address changes who the participants are
+    for _, e in ipairs(c.emails) do
+      for _, other in ipairs(idx.by_email[e:lower()] or {}) do
+        if other ~= c.id then
+          lines[#lines + 1] = other .. "\t" .. (idx.by_id[other].etag or "")
+        end
+      end
+    end
+    local verlauf, cut = {}, false
+    for _, h in ipairs(contacts.history(c.id, all_meetings or {}, idx)) do
+      if #verlauf >= M.LIMITS.list_items then
+        cut = true
+        break
+      end
+      local e = meeting_entry(root, h.meeting)
+      verlauf[#verlauf + 1] = json.object({
+        id = e.id,
+        title = e.title,
+        status = e.status,
+        date = e.date,
+        starts_at = e.starts_at,
+        participant = h.participant.n,
+        role = h.participant.role,
+        present = h.participant.present,
+      })
+      lines[#lines + 1] = h.meeting.id .. "\t" .. (h.meeting.etag or "") .. "\t" .. h.participant.n
+    end
+    doc.history = verlauf
+    doc.history_truncated = cut or nil
+    return seal(doc, builder.rev_of(lines)), nil
   end)
 end
 

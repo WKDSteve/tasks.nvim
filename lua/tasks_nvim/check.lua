@@ -95,7 +95,8 @@
 ---    `## Ergebnis` (allowed), two planned meetings of the area at the same time; a series (`repeat`):
 ---    `meeting-bad-repeat`, `meeting-bad-repeat-until`, `meeting-bad-except`, `meeting-bad-series` (errors),
 ---    `meeting-series-missing` (warning: `series:` names no series of the area), `meeting-series-off-day` (hint: the
----    day of an occurrence file is no day of its series any more)
+---    day of an occurrence file is no day of its series any more); `meeting-participant-ambiguous` (hint: the mail
+---    address of a participant is held by several contacts, so the name stays text until it links to one)
 ---  - contacts (`<area>/CONTACTS/`, `tasks_nvim.contacts`): a broken contact file is reported with its own codes
 ---    (`contact-name-missing`, `contact-bad-email`, `contact-bad-phone`, `contact-bad-tz`, `contact-too-many`);
 ---    `contact-id-taken` (error): a task (open or finished), plan, project, path or meeting of the area has the same
@@ -601,10 +602,11 @@ end
 ---@param item { area: string, path: string, id?: string, icon?: Tasks.Icon, cover?: string }
 ---@param code string
 ---@param repos? Tasks.AbsentRepos
-local function file_link_findings(findings, item, code, repos)
+---@param skip_targets? table<string, boolean>  # Targets that are no file (the contact a participant's name links to).
+local function file_link_findings(findings, item, code, repos, skip_targets)
   local icon = item.icon and item.icon.kind == "asset" and item.icon.value or nil
   link_findings(findings, item, code, function(l)
-    return l.target == item.cover or l.target == icon
+    return l.target == item.cover or l.target == icon or (skip_targets or {})[l.target] == true
   end, nil, repos)
 end
 
@@ -868,6 +870,8 @@ local function meeting_findings(
     hints[#hints + 1] =
       { code = code, severity = "info", area = m.area, path = m.path, id = m.id, message = message }
   end
+  ---@type Tasks.ContactIndex|nil
+  local contact_idx
   for _, name in ipairs(names) do
     local list, errs = meetings.area(name, scan_opts)
     for _, e in ipairs(type(errs) == "table" and errs or {}) do
@@ -884,6 +888,7 @@ local function meeting_findings(
     for _, m in ipairs(list or {}) do
       by_id[m.id] = m
     end
+    contact_idx = contact_idx or contacts.index((contacts.all(scan_opts)) or {})
     for _, m in ipairs(list or {}) do
       for i, msg in ipairs(m.errors) do
         add(findings, "error", m.error_codes[i] or "frontmatter-invalid", m, msg)
@@ -931,7 +936,26 @@ local function meeting_findings(
         end
       end
       picture_findings(findings, m, "meeting-")
-      file_link_findings(findings, m, "meeting-link-missing", repos)
+      -- a participant's name that links to a contact is a contact id, not a file; and an address several contacts hold
+      -- names no one (the participant stays text)
+      local contact_links = {}
+      for _, p in ipairs(m.participants) do
+        if p.link and contact_idx.by_id[p.link] then
+          contact_links[p.link] = true
+        end
+        local _, candidates = contacts.resolve(p, contact_idx)
+        if candidates then
+          hint(
+            "meeting-participant-ambiguous",
+            m,
+            ("participant %d: more than one contact has the address (%s); link the name to one"):format(
+              p.n,
+              table.concat(candidates, ", ")
+            )
+          )
+        end
+      end
+      file_link_findings(findings, m, "meeting-link-missing", repos, contact_links)
       if m.image_alias then
         hint(
           "meeting-image-alias",

@@ -1,0 +1,78 @@
+{
+  "agenda": [],
+  "body": "\nDaily.\n\n## Teilnehmer\n- [x] [Rick](lib.nvim/rick-beispiel) (Lead)\n- [ ] Anna \u003cANNA@example.org>\n- [ ] Stranger \u003cstranger@example.org>\n",
+  "body_truncated": false,
+  "digest": "sha256:40335cabff99ddcf",
+  "documents": [],
+  "engine": {
+    "git": "0000000",
+    "nvim": "0.0.0",
+    "version": "0.1.0-test"
+  },
+  "followups": [],
+  "generated_at": "2026-01-01T00:00:00Z",
+  "kind": "tasks.meeting",
+  "meeting": {
+    "agenda": {
+      "ticked": 0,
+      "total": 0
+    },
+    "all_day": false,
+    "area": "lib.nvim",
+    "date": "2026-01-13",
+    "ends_at": "2026-01-13T09:00",
+    "etag": "sha256:426e97f87a751740",
+    "file": "lib.nvim/MEETINGS/standup.md",
+    "followups": {
+      "ticked": 0,
+      "total": 0
+    },
+    "has_decisions": false,
+    "has_protocol": false,
+    "has_result": false,
+    "id": "lib.nvim/standup",
+    "notify": [],
+    "participants": {
+      "present": 1,
+      "total": 3
+    },
+    "problems": [],
+    "slug": "standup",
+    "starts_at": "2026-01-13T09:00",
+    "status": "planned",
+    "summary": "Daily.",
+    "tags": [],
+    "tasks": [],
+    "time": "09:00",
+    "title": "Standup",
+    "valid": true
+  },
+  "participants": [
+    {
+      "contact": "lib.nvim/rick-beispiel",
+      "n": 1,
+      "name": "Rick",
+      "present": true,
+      "role": "Lead"
+    },
+    {
+      "contact": "lib.nvim/anna-muster",
+      "email": "ANNA@example.org",
+      "n": 2,
+      "name": "Anna",
+      "present": false
+    },
+    {
+      "email": "stranger@example.org",
+      "n": 3,
+      "name": "Stranger",
+      "present": false
+    }
+  ],
+  "plugin": "tasks.nvim",
+  "rev": "rev:6b5389",
+  "schema": 1,
+  "vault": {
+    "id": "vault"
+  }
+}

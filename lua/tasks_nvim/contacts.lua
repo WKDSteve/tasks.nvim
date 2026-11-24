@@ -336,4 +336,77 @@ function M.find(id, opts)
   return M.from_file(path, { area = area, slug = slug, folder = folder == true }), nil
 end
 
+-- ── participants of meetings ────────────────────────────────────────────────
+
+---@class Tasks.ContactIndex
+---@field by_id table<string, Tasks.Contact>
+---@field by_email table<string, string[]>  # lower-case mail address -> the ids of the contacts that hold it, sorted
+
+---What resolves participants: the contacts by id and by mail address (case does not matter). A contact with a broken
+---file still counts: its other fields are read as far as they are valid.
+---@param list Tasks.Contact[]
+---@return Tasks.ContactIndex
+function M.index(list)
+  local idx = { by_id = {}, by_email = {} }
+  for _, c in ipairs(list) do
+    idx.by_id[c.id] = c
+    local seen = {}
+    for _, e in ipairs(c.emails) do
+      local key = e:lower()
+      if not seen[key] then
+        seen[key] = true
+        idx.by_email[key] = idx.by_email[key] or {}
+        table.insert(idx.by_email[key], c.id)
+      end
+    end
+  end
+  for _, ids in pairs(idx.by_email) do
+    table.sort(ids)
+  end
+  return idx
+end
+
+---The contact a participant is. A name that links to a contact that exists wins (`[Rick](<area>/rick)`); else the mail
+---address, when exactly one contact holds it. Two or more contacts with the same address are no answer: the participant
+---stays unresolved and `candidates` names them, nothing is guessed. A link to nothing falls back to the address.
+---@param p { email?: string, link?: string }
+---@param idx Tasks.ContactIndex
+---@return string|nil id
+---@return string[]|nil candidates  # Set when the address is held by several contacts.
+function M.resolve(p, idx)
+  if p.link and idx.by_id[p.link] then
+    return p.link, nil
+  end
+  local ids = p.email and idx.by_email[p.email:lower()]
+  if not ids then
+    return nil, nil
+  end
+  if #ids == 1 then
+    return ids[1], nil
+  end
+  return nil, vim.list_slice(ids, 1)
+end
+
+---The meetings a contact took part in, the latest first: each with the participant line that names the contact.
+---@param id string  # The contact id.
+---@param list Tasks.Meeting[]
+---@param idx Tasks.ContactIndex
+---@return { meeting: Tasks.Meeting, participant: Tasks.MeetingParticipant }[]
+function M.history(id, list, idx)
+  local sorted = vim.list_slice(list, 1)
+  table.sort(sorted, function(a, b)
+    return meetings.less(b, a)
+  end)
+  local out = {}
+  for _, m in ipairs(sorted) do
+    for _, p in ipairs(m.participants) do
+      if (M.resolve(p, idx)) == id then
+        out[#out + 1] = { meeting = m, participant = p }
+        break
+      end
+    end
+  end
+  return out
+end
+
 return M
