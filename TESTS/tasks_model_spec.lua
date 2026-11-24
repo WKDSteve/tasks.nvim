@@ -121,6 +121,18 @@ return function(H)
     "comment-only body"
   )
   eq(model.first_paragraph("a   b\n  c\n\nd"), "a b c", "whitespace collapsed")
+  -- an image line is no text (a pasted screenshot); an image inside a sentence is
+  eq(model.first_paragraph("![shot](./assets/a.png)\n"), "", "an image-only line is no summary")
+  eq(
+    model.first_paragraph("\n![a](./a.png) ![b](./b.png)\n\nReal text.\n"),
+    "Real text.",
+    "images are skipped, the next real line is the summary"
+  )
+  eq(
+    model.first_paragraph("See ![i](./a.png) here\n"),
+    "See ![i](./a.png) here",
+    "an image inside a sentence stays"
+  )
   -- the learning points and the levels are data, never the summary (a path that starts with its tree)
   eq(
     model.first_paragraph("## Lernpunkte\n\n- [ ] Root {#root}\n  - [x] First {xp=60} {#first}\n"),
@@ -225,6 +237,19 @@ return function(H)
     )
     eq(#t.errors, #t.error_codes, "one code per error")
     ok(t.slug and t.id, "an invalid task still has an id")
+  end
+
+  -- the paste of a screenshot over the opening `---` is named, not just "no frontmatter block"
+  for _, text in ipairs({
+    "-![x](./assets/s.png)--\ntitle: T\nstatus: open\n---\n\nbody\n",
+    "![x](./assets/s.png)\ntitle: T\nstatus: open\n---\n\nbody\n",
+  }) do
+    local pasted = parse(text)
+    ok(has_code(pasted, "frontmatter-missing"), "a pasted first line is frontmatter-missing")
+    ok(
+      table.concat(pasted.errors, "\n"):find("line 1 holds a pasted image link", 1, true),
+      "the message names line 1 and the image: " .. vim.inspect(pasted.errors)
+    )
   end
 
   local bad_prio = parse(F.text(F.meta("Title kept", "open", { { "prio", "9" } })))

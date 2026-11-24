@@ -20,6 +20,8 @@
 ---    `ux` (vault rule R19: the category is the one source for "touches the surface", a tag only says which part)
 ---  - `outcome-without-reason`, `outcome-on-open-task` (hints, severity `info`): an outcome `seen` / `not-applicable`
 ---    without `outcome_reason` (open or finished); an outcome on an open task (allowed: a note made in advance)
+---  - `summary-missing` (a hint, severity `info`): an open task whose summary is empty (no `summary:`, no line of real
+---    text in the body: an image line, a comment, a heading or a checklist is none), so its index cell stays empty
 ---  - `ui-word-without-ux` (a hint, `result.hints`, severity `info`): a word of `M.UI_WORDS` in the title of an open task
 ---    that has neither the category `ux` nor a UI tag. Never an error or a warning, not in the contract document;
 ---    `opts.ui_words = false` switches it off (`setup({ check = { ui_words_off = { "<vault name>" } } })`)
@@ -2316,6 +2318,18 @@ function M.run(opts)
   for _, name in ipairs(names) do
     for _, t in ipairs(by_area[name] and by_area[name].tasks or {}) do
       ui_findings(findings, hints, t, words)
+      -- an open task whose index cell would stay empty: nothing of real text in the file (a body that starts with a
+      -- pasted screenshot, or none at all)
+      if t.status ~= "done" and (t.summary or "") == "" then
+        hints[#hints + 1] = {
+          code = "summary-missing",
+          severity = "info",
+          area = t.area,
+          path = t.path,
+          id = t.id,
+          message = "no one-line summary: set `summary:` or start the body with a sentence (the index cell stays empty)",
+        }
+      end
       -- a blocker due after this task begins: a hint (the plan may still work out; capability `late_blockers`)
       for _, late in ipairs(require("tasks_nvim.late").blockers(t, open_ids)) do
         hints[#hints + 1] = {

@@ -105,11 +105,33 @@ local function truncate(s, max)
   return vim.fn.strcharpart(s, 0, max - 1) .. ELLIPSIS
 end
 
+---A summary is written beside its task file, but shown in `ROADMAP/TASKS.md`: a relative link or image in it
+---(`./assets/x.png` of a folder task) is rebased to the folder of the task as seen from the index
+---(`tasks/<slug>/assets/x.png`), or it points nowhere. URLs, `#anchors` and absolute paths stay as they are; a task
+---outside `ROADMAP/` is left alone.
+---@param text string
+---@param path string  # the task file
+---@return string
+local function rebase_links(text, path)
+  local dir = (path or ""):match("/ROADMAP/(.*)/[^/]*$")
+  if not dir or not text:find("](", 1, true) then
+    return text
+  end
+  return (
+    text:gsub("(%[[^%]]*%]%()([^)%s]+)(%))", function(open, target, close)
+      if target:match("^[%a][%w+.-]*:") or target:match("^[/#<]") then
+        return nil
+      end
+      return open .. dir .. "/" .. target:gsub("^%./", "") .. close
+    end)
+  )
+end
+
 ---@param task Tasks.Task
 ---@param max integer
 ---@return string
 local function summary_cell(task, max)
-  local text = truncate(task.summary, max)
+  local text = truncate(rebase_links(task.summary, task.path), max)
   if #task.blocked_by > 0 then
     local ids = {}
     for i, id in ipairs(task.blocked_by) do

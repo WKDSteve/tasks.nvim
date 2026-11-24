@@ -232,6 +232,50 @@ return function(H)
     remove(tasks .. "w-ux.md")
     reindex()
   end
+  -- a body that opens with a pasted screenshot has no summary: a hint, never a finding
+  do
+    F.task(
+      H,
+      root,
+      "lib.nvim",
+      "shot-first",
+      F.meta("T", "open"),
+      "\n![shot](./assets/screenshots/a.png)\n"
+    )
+    F.task(
+      H,
+      root,
+      "lib.nvim",
+      "shot-then-text",
+      F.meta("T", "open"),
+      "\n![shot](./assets/screenshots/a.png)\n\nA real sentence.\n"
+    )
+    F.task(
+      H,
+      root,
+      "lib.nvim",
+      "summary-set",
+      F.meta("T", "open", { { "summary", "One line." } }),
+      "\n![x](./a.png)\n"
+    )
+    reindex()
+    local res = run()
+    ok(
+      not vim.tbl_contains(codes(res), "summary-missing"),
+      "a missing summary is a hint, never a finding"
+    )
+    local got = {}
+    for _, h in ipairs(res.hints) do
+      if h.code == "summary-missing" then
+        got[#got + 1] = h.id
+      end
+    end
+    eq(got, { "lib.nvim/shot-first" }, "only the task without text gets the hint")
+    for _, slug in ipairs({ "shot-first", "shot-then-text", "summary-set" }) do
+      remove(tasks .. slug .. ".md")
+    end
+    reindex()
+  end
   expect("bad date", function()
     F.task(H, root, "lib.nvim", "bad-date", F.meta("T", "parked", { { "created", "2026-02-30" } }))
   end, { "bad-date" }, function()

@@ -982,6 +982,7 @@ file that is there (also not a refused one). Nobody else writes it: a person edi
 | `invalid-waits-for` (error) | `waits_for` is not one key: a lower-case word of a-z, 0-9 and `-`, at most 40 characters, not `none` |
 | `waits-for-without-parked` (warning) | `waits_for` on a task that is not `parked`: only a parked task waits (the engine drops the key when the status leaves `parked`; this is a file edited by hand) |
 | `unknown-outcome` (error) | `outcome` is none of `learned`, `seen`, `not-applicable` |
+| `summary-missing` (hint) | an open task whose summary stays empty: no `summary:` and no line of real text in the body (an image line, a comment, a heading or a checklist is none), so its index cell is an en dash. Hint like `ui-word-without-ux`: in `result.hints`, never a warning |
 | `outcome-without-reason`, `outcome-on-open-task` (hints) | an open or finished task with `outcome: seen` / `not-applicable` and no `outcome_reason`; an outcome on an open task (allowed: a note made in advance, `done` writes it for real). Hints like `ui-word-without-ux`: in `result.hints`, never a warning |
 | `slug` | filename is not a kebab-case ASCII slug, or the file lies in a subfolder of `tasks/` other than `<slug>/<slug>.md` |
 | `slug-conflict` | the same slug exists as a file and as a folder task |

@@ -1030,7 +1030,14 @@ function M.first_paragraph(body)
       if #para > 0 then
         break
       end
-    elseif t == "" or t:match("^#+%s") or t:match("^<!%-%-.*%-%->$") then
+    elseif
+      t == ""
+      or t:match("^#+%s")
+      or t:match("^<!%-%-.*%-%->$")
+      -- a line of nothing but images (a pasted screenshot) is no text: its link is relative to the task's folder and
+      -- would point nowhere from the index
+      or (t:match("^!%[") and ((t:gsub("!%[[^%]]*%]%b()", ""))):match("^%s*$"))
+    then
       in_box = false
       if #para > 0 then
         break
@@ -1422,6 +1429,12 @@ function M.parse_text(text, ctx)
   elseif not parsed.has_block then
     if parsed.unterminated then
       bad("frontmatter-missing", "frontmatter block is never closed (no closing ---)")
+    elseif (text:match("^[^\n]*") or ""):find("!%[[^%]]*%]%(") then
+      -- the paste of a screenshot replaced the opening `---` (it ran while the cursor stood in line 1)
+      bad(
+        "frontmatter-missing",
+        "line 1 holds a pasted image link instead of the opening ---: delete that link and put the --- line back"
+      )
     else
       bad("frontmatter-missing", "no frontmatter block")
     end
