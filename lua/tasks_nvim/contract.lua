@@ -70,6 +70,7 @@ M.CAPABILITIES = {
   "ci",
   "claims",
   "competences",
+  "contact",
   "contacts",
   "done_preview",
   "eff_prio",

@@ -25,6 +25,10 @@ return function(H)
     "commit",
     -- `competences` lists the competence files for a shell or a script; the desktop app has the catalogue
     "competences",
+    -- `contact` and `contacts` make, change, delete and list the contact files from a shell or a hub; the editor has no
+    -- view of them (the desktop app has the Office tab)
+    "contact",
+    "contacts",
     "export",
     -- `history` reads and writes the series of the figures for a hub, a script or a chart of tasks-desktop; the
     -- editor has no view of it
