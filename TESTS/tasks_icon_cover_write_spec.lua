@@ -235,7 +235,8 @@ return function(H)
       end
     end
     for _, f in ipairs(res.hints or {}) do
-      if f.id == id then
+      -- this spec is about the cover codes: the missing-summary hint of a task made without text is not its subject
+      if f.id == id and f.code ~= "summary-missing" then
         found[#found + 1] = f.code
       end
     end
