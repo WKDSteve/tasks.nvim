@@ -7,7 +7,7 @@
 --- the JSON Schemas in `schemas/tasks-export/1/`. The Markdown files stay the single source of truth.
 ---
 --- Documents (`kind`): `tasks.hello`, `tasks.snapshot`, `tasks.list`, `tasks.task`, `tasks.next`, `tasks.areas`, `tasks.finished`, `tasks.history`, `tasks.links`, `tasks.groupings`,
---- `tasks.views`, `tasks.waits`, `tasks.meetings`, `tasks.meeting`, `tasks.meetingparse`, `tasks.error`. Every one starts with the same head (`schema`, `plugin`, `kind`, `generated_at`, `vault.id`,
+--- `tasks.views`, `tasks.waits`, `tasks.meetings`, `tasks.meeting`, `tasks.meetingparse`, `tasks.contacts`, `tasks.contact`, `tasks.error`. Every one starts with the same head (`schema`, `plugin`, `kind`, `generated_at`, `vault.id`,
 --- `engine`); a document that comes from a scan also carries `rev` (what the vault looked like) and `digest` (the hash
 --- of the content: without `generated_at` and `engine`, so two runs on an unchanged vault have the same digest).
 ---
@@ -31,6 +31,7 @@ local fsio = require("tasks_nvim.fsio")
 local history = require("tasks_nvim.history")
 local json = require("lib.nvim.json.canonical")
 local links = require("tasks_nvim.links")
+local contacts = require("tasks_nvim.contacts")
 local meetings = require("tasks_nvim.meetings")
 local model = require("tasks_nvim.model")
 local next_pick = require("tasks_nvim.next_pick")
@@ -69,6 +70,7 @@ M.CAPABILITIES = {
   "ci",
   "claims",
   "competences",
+  "contacts",
   "done_preview",
   "eff_prio",
   "estimate",
@@ -3349,6 +3351,168 @@ function M.meeting(id, opts)
       return json.object({ n = f.n, text = f.text, ticked = f.ticked, task = f.task })
     end, m.followups)
     return seal(doc, builder.rev_of({ m.id .. "\t" .. (m.etag or "") })), nil
+  end)
+end
+
+-- ── contacts ─────────────────────────────────────────────────────────────────
+
+---A message of a contact document: a path of this machine out (`redact`), a mail address and a phone number out
+---(`contacts.scrub`): a contact is a third party, and a message is logged and sent on.
+---@param root string
+---@param msg string
+---@return string
+local function contact_message(root, msg)
+  return contacts.scrub(redact(root, msg))
+end
+
+---A contact as the documents carry it (`tasks.contacts` items, `tasks.contact`).
+---@param root string
+---@param c Tasks.Contact
+---@return table
+local function contact_entry(root, c)
+  local entry = {
+    id = c.id,
+    area = c.area,
+    slug = c.slug,
+    name = c.name,
+    org = c.org,
+    role = c.role,
+    emails = vim.list_slice(c.emails, 1),
+    phones = vim.list_slice(c.phones, 1),
+    tz = c.tz,
+    tags = vim.list_slice(c.tags, 1),
+    summary = clip(c.summary or "", M.LIMITS.summary),
+    created = c.created,
+    updated = c.updated,
+    file = relative(root, c.path) or vim.fs.basename(c.path),
+    etag = c.etag,
+    valid = c.valid,
+    problems = {},
+  }
+  for i, msg in ipairs(c.errors) do
+    entry.problems[#entry.problems + 1] =
+      { code = c.error_codes[i] or "invalid", msg = contact_message(root, msg) }
+  end
+  if c.folder then
+    entry.folder = true
+    local assets, truncated = require("tasks_nvim.plans").assets(c, M.LIMITS.list_items)
+    entry.assets = assets
+    entry.assets_truncated = truncated or nil
+  end
+  return entry
+end
+
+---`tasks.contacts`: the contacts of the vault by name, one page. `area` (an area or a group), `tag` and `org` (the
+---organisation, case does not matter) narrow it. The revision is over the contacts listed. Capability `contacts`.
+---@param params? table
+---@param opts? { root?: string }
+---@return table|nil doc
+---@return Tasks.ContractError|string|nil err
+function M.contacts(params, opts)
+  params = params or {}
+  local limit = params.limit or M.LIMITS.list_items
+  local offset = params.offset or 0
+  if
+    type(limit) ~= "number"
+    or limit < 1
+    or limit > M.LIMITS.list_items
+    or limit ~= math.floor(limit)
+  then
+    return nil, bad_argument(("limit must be 1..%d"):format(M.LIMITS.list_items))
+  end
+  if type(offset) ~= "number" or offset < 0 or offset ~= math.floor(offset) then
+    return nil, bad_argument("offset must be a whole number of 0 or more")
+  end
+  return fsio.read_scope(function()
+    local root, rerr = vault.root(opts)
+    if not root then
+      return nil, rerr
+    end
+    local area_set
+    if params.area ~= nil then
+      local scope = vault.area_scope(root, params.area)
+      if not scope then
+        return nil,
+          {
+            code = "not_found",
+            message = "unknown area: " .. tostring(params.area),
+            retryable = false,
+          }
+      end
+      area_set = scope.set
+    end
+    local org = type(params.org) == "string" and params.org:lower() or nil
+    local all, errors = contacts.all({ root = root })
+    local matching = {}
+    for _, c in ipairs(all or {}) do
+      if
+        (area_set == nil or area_set[c.area])
+        and (params.tag == nil or vim.tbl_contains(c.tags, params.tag))
+        and (org == nil or (c.org or ""):lower() == org)
+      then
+        matching[#matching + 1] = c
+      end
+    end
+    table.sort(matching, function(a, b)
+      local an, bn = a.name:lower(), b.name:lower()
+      if an ~= bn then
+        return an < bn
+      end
+      return a.id < b.id
+    end)
+    local doc = M.head("tasks.contacts", root)
+    doc.area, doc.tag, doc.org = params.area, params.tag, params.org
+    doc.total = #matching
+    doc.offset = offset
+    doc.limit = limit
+    local items, lines = {}, {}
+    for i = offset + 1, math.min(#matching, offset + limit) do
+      local c = matching[i]
+      items[#items + 1] = contact_entry(root, c)
+      lines[#lines + 1] = c.id .. "\t" .. (c.etag or "")
+    end
+    doc.items = items
+    if offset + limit < #matching then
+      doc.next_offset = offset + limit
+    end
+    doc.incomplete = vim.tbl_map(function(e)
+      return contact_message(root, tostring(e))
+    end, type(errors) == "table" and errors or {})
+    return seal(doc, builder.rev_of(lines)), nil
+  end)
+end
+
+---`tasks.contact`: one contact with its text (cut at `body_bytes`) and its notes. Capability `contacts`.
+---@param id string
+---@param opts? { root?: string }
+---@return table|nil doc
+---@return Tasks.ContractError|string|nil err
+function M.contact(id, opts)
+  local area, slug, perr = vault.parse_id(tostring(id))
+  if not area or not slug then
+    return nil, bad_argument(perr or "expected <area>/<slug>")
+  end
+  return fsio.read_scope(function()
+    local root, rerr = vault.root(opts)
+    if not root then
+      return nil, rerr
+    end
+    local c, err = contacts.find(id, { root = root })
+    if not c then
+      return nil,
+        { code = "not_found", message = contact_message(root, tostring(err)), retryable = false }
+    end
+    local body = c.body or ""
+    local truncated = #body > M.LIMITS.body_bytes
+    if truncated then
+      body = body:sub(1, M.LIMITS.body_bytes)
+    end
+    local doc = M.head("tasks.contact", root)
+    doc.contact = contact_entry(root, c)
+    doc.body = body
+    doc.body_truncated = truncated
+    doc.notes = c.notes
+    return seal(doc, builder.rev_of({ c.id .. "\t" .. (c.etag or "") })), nil
   end)
 end
 

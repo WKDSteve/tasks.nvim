@@ -29,6 +29,8 @@ export type TasksExport =
   | Meetings
   | MeetingDocument
   | MeetingParse
+  | Contacts
+  | ContactDocument
   | Paths
   | PathDocument
   | LearnNext
@@ -1079,6 +1081,41 @@ export type MeetingParse = Head & {
   all_day: boolean;
   assumed: "date"[];
   problems: string[];
+};
+/**
+ * tasks.contacts: the contacts of the vault (or of an area, a tag, an organisation), by name, one page. Capability `contacts`.
+ */
+export type Contacts = Head & {
+  kind: "tasks.contacts";
+  rev: Rev;
+  digest: Digest;
+  area?: string;
+  tag?: string;
+  org?: string;
+  total: number;
+  offset: number;
+  limit: number;
+  next_offset?: number;
+  items: ContactEntry[];
+  incomplete: string[];
+};
+/**
+ * tasks.contact: one contact with its text and its notes (`## Notizen` / `## Notes`). Capability `contacts`.
+ */
+export type ContactDocument = Head & {
+  kind: "tasks.contact";
+  rev: Rev;
+  digest: Digest;
+  contact: ContactEntry;
+  /**
+   * The file after the frontmatter, untrusted text.
+   */
+  body: string;
+  body_truncated: boolean;
+  /**
+   * The text of the notes section, trimmed; empty when there is none.
+   */
+  notes: string;
 };
 /**
  * tasks.paths: the open learning paths of the vault or of an area (with `include_done` the finished ones too, `stage: done`, after them), each with its progress; no tree (that is tasks.path). Capability `paths`.
@@ -2425,6 +2462,37 @@ export interface MeetingEntry {
   problems: Problem[];
 }
 /**
+ * One contact (`<area>/CONTACTS/<slug>.md`, capability `contacts`): a person, not a task. A broken contact is still here (`valid: false`, `problems`); a problem never names a mail address or a phone number. The addresses and numbers of `emails` and `phones` are the data of a third party: a reader that logs or sends them on is answerable for them.
+ */
+export interface ContactEntry {
+  id: string;
+  area: string;
+  slug: string;
+  name: string;
+  org?: string;
+  role?: string;
+  emails: string[];
+  phones: string[];
+  /**
+   * An IANA time zone (only its form is checked).
+   */
+  tz?: string;
+  tags: string[];
+  /**
+   * The first paragraph of the text.
+   */
+  summary: string;
+  created?: Date;
+  updated?: Date;
+  folder?: true;
+  assets?: PlanAssets;
+  assets_truncated?: PlanAssetsTruncated;
+  file: string;
+  etag?: Etag;
+  valid: boolean;
+  problems: Problem[];
+}
+/**
  * A learning path (`<area>/ROADMAP/paths/<slug>.md`): the head of its file, its progress over the leaves of its tree (optional ones apart, `optional`), its version.
  */
 export interface PathEntry {
@@ -2933,7 +3001,10 @@ export interface ResultEntry {
     | "path_reward"
     | "path_levels"
     | "milestone_new"
-    | "milestone_set";
+    | "milestone_set"
+    | "contact_new"
+    | "contact_set"
+    | "contact_delete";
   id?: string;
   /**
    * `meeting_close`: the meeting has no `## Ergebnis` afterwards (allowed: a hint for the front end).
@@ -3155,7 +3226,10 @@ export interface Inverse {
     | "unpromote"
     | "path_reward"
     | "path_levels"
-    | "milestone_set";
+    | "milestone_set"
+    | "contact_new"
+    | "contact_set"
+    | "contact_delete";
   /**
    * `node_set` that wrote XP: the XP the point had (capability `xp`).
    */
@@ -3251,6 +3325,10 @@ export interface Inverse {
    */
   view?: {};
   patch?: {};
+  /**
+   * `contact_new` as the inverse of `contact_delete`: the frontmatter fields the contact had.
+   */
+  fields?: {};
   after?: string;
   before?: string;
   if_match?: Etag;

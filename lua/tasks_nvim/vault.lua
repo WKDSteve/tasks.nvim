@@ -658,8 +658,43 @@ function M.has_plan_or_project(root, area, slug)
     end
   end
   local dir = M.meetings_dir(root, area)
-  return fsio.is_file(dir .. "/" .. slug .. ".md")
+  if
+    fsio.is_file(dir .. "/" .. slug .. ".md")
     or fsio.is_file(dir .. "/" .. slug .. "/" .. slug .. ".md")
+  then
+    return true
+  end
+  return M.resolve_contact(root, area, slug) ~= nil
+end
+
+---`<area>/CONTACTS`: the contact files of the area (optional), one file per person (`tasks_nvim.contacts`). A contact
+---lives wherever its area is: the vault does not ask whether the vault may hold personal data (decision D3).
+---@param root string
+---@param area string
+---@return string
+function M.contacts_dir(root, area)
+  return root .. "/" .. area .. "/CONTACTS"
+end
+
+---Find a contact file on disk, whichever form it has: `CONTACTS/<slug>.md`, or `CONTACTS/<slug>/<slug>.md` once
+---something was attached to it.
+---@param root string
+---@param area string
+---@param slug string
+---@return string|nil path
+---@return boolean|string folder  # true for the folder form, false for a plain file; the error when there is none
+function M.resolve_contact(root, area, slug)
+  local dir = M.contacts_dir(root, area)
+  local file, folder = dir .. "/" .. slug .. ".md", dir .. "/" .. slug .. "/" .. slug .. ".md"
+  local has_file, has_folder = fsio.is_file(file), fsio.is_file(folder)
+  if has_file and has_folder then
+    return nil, ("contact exists as file and as folder: %s/%s"):format(area, slug)
+  elseif has_file then
+    return file, false
+  elseif has_folder then
+    return folder, true
+  end
+  return nil, ("no such contact: %s/%s"):format(area, slug)
 end
 
 ---The plan or project files of one `ROADMAP/plans` (or `projects`) folder: `<slug>.md` and `<slug>/<slug>.md`.

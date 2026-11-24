@@ -185,6 +185,15 @@ mutate("a participant without a name", "meeting", (d) => delete d.participants[0
 mutate("a follow-up task that is no id", "meeting", (d) => (d.followups[0].task = "gamma"));
 mutate("an occurrence that says it is not virtual", "meetings-series", (d) => (d.items[0].virtual = false));
 mutate("an occurrence on no day", "meeting-occurrence", (d) => (d.meeting.occurrence = "Monday"));
+mutate("a contact with an unknown field", "contacts", (d) => (d.items[0].surprise = 1));
+mutate("a contact without a name", "contacts", (d) => delete d.items[0].name);
+mutate("a contact whose mails are one text", "contacts", (d) => (d.items[0].emails = "a@example.org"));
+mutate("a contact whose id is no id", "contacts", (d) => (d.items[0].id = "anna"));
+mutate("a contact problem without a code", "contacts", (d) => delete d.items[1].problems[0].code);
+mutate("a contacts page without a total", "contacts", (d) => delete d.total);
+mutate("a contact document without its notes", "contact", (d) => delete d.notes);
+mutate("a contact document that cuts nothing out", "contact", (d) => delete d.body_truncated);
+mutate("an inverse of a contact that is no operation", "result-contacts", (d) => (d.results[0].inverse.op = "contact_rename"));
 mutate("a series that is no id", "meeting-occurrence", (d) => (d.meeting.series = "one-on-one"));
 mutate("a repeat as a word, not normalised", "meeting-occurrence", (d) => (d.meeting.repeat = "weekly"));
 mutate("an except that is no list of days", "meeting-occurrence", (d) => (d.meeting.except = ["soon"]));

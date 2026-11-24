@@ -476,6 +476,48 @@ function G.write_meetings(root)
   write(dir .. "/someday.md", "---\ntitle: Someday\nstatus: planned\n---\n\nNo date yet.\n")
 end
 
+---Write the contacts of the golden cases `contacts` and `contact` into `root`: one with every field and a folder, one
+---plain, one with a zone that is none (still listed, with its problem).
+---@param root string
+function G.write_contacts(root)
+  local function write(path, text)
+    vim.fn.mkdir(vim.fs.dirname(path), "p")
+    local fh = assert(io.open(path, "wb"))
+    fh:write(text)
+    fh:close()
+  end
+  local dir = root .. "/lib.nvim/CONTACTS"
+  write(
+    dir .. "/rick-beispiel/rick-beispiel.md",
+    table.concat({
+      "---",
+      'name: "Rick Beispiel"',
+      'org: "Beispiel GmbH"',
+      'role: "Support, T2"',
+      "emails: [rick@example.org, r.beispiel@example.org]",
+      'phones: ["+43 1 2345678"]',
+      "tz: Europe/Vienna",
+      "tags: [t2, kunde]",
+      "created: 2026-01-02",
+      "updated: 2026-01-09",
+      "---",
+      "",
+      "Contact at the customer for the T2 cases.",
+      "",
+      "## Notizen",
+      "",
+      "Prefers mail over calls.",
+      "",
+    }, "\n")
+  )
+  write(dir .. "/rick-beispiel/assets/card.png", "png")
+  write(
+    dir .. "/anna-muster.md",
+    "---\nname: Anna Muster\norg: Muster AG\nemails: [anna@example.org]\ntags: [kunde]\n---\n\nSales.\n"
+  )
+  write(dir .. "/bad-zone.md", "---\nname: Bad Zone\ntz: Vienna\n---\n\nWrong zone.\n")
+end
+
 ---Write a weekly series with an excepted day, an end and one occurrence that has its file (moved by a day) into
 ---`root`: the golden cases `meetings-series`, `meeting-occurrence` and `result-meeting-series`.
 ---@param root string
@@ -943,6 +985,27 @@ G.cases = {
     request = '{"params":{"text":"Workshop 9:30 90m @Raum_3.14"}}',
   },
   {
+    -- the contacts of the vault by name (capability `contacts`): one with every field and a folder, one plain, one
+    -- broken (still listed with its problem, which names no value)
+    name = "contacts",
+    method = "contacts",
+    fresh = true,
+    request = function(root)
+      G.write_contacts(root)
+      return '{"params":{"area":"lib.nvim"}}'
+    end,
+  },
+  {
+    -- one contact with its text and its notes (capability `contacts`)
+    name = "contact",
+    method = "contact",
+    fresh = true,
+    request = function(root)
+      G.write_contacts(root)
+      return '{"params":{"id":"lib.nvim/rick-beispiel"}}'
+    end,
+  },
+  {
     -- one meeting with its body and the sections the engine reads (capability `meeting`)
     name = "meeting",
     method = "meeting",
@@ -1297,6 +1360,44 @@ G.cases = {
           { op = "meeting_attend", id = id, n = 1 },
           { op = "meeting_followups", id = id },
           { op = "meeting_close", id = id, result = "Vereinbart." },
+        },
+      })
+    end,
+  },
+  {
+    -- contacts for real: made (the inverse deletes), changed (the inverse puts back), deleted (the inverse makes it
+    -- again), a mail address that is none refused without naming it, a stale version a conflict
+    name = "result-contacts",
+    method = "ops",
+    fresh = true,
+    request = function()
+      return encode({
+        client_op_id = "golden-contacts",
+        ops = {
+          {
+            op = "contact_new",
+            area = "lib.nvim",
+            name = "Anna Muster",
+            fields = { org = "Muster AG", emails = { "anna@example.org" }, tags = { "kunde" } },
+          },
+          {
+            op = "contact_set",
+            id = "lib.nvim/anna-muster",
+            patch = { role = "Sales", phones = { "+43 1 2345678" } },
+          },
+          {
+            op = "contact_new",
+            area = "lib.nvim",
+            name = "Zed",
+            fields = { emails = { "zed@@" } },
+          },
+          {
+            op = "contact_set",
+            id = "lib.nvim/anna-muster",
+            patch = { role = "Boss" },
+            if_match = "sha256:0000000000000000",
+          },
+          { op = "contact_delete", id = "lib.nvim/anna-muster" },
         },
       })
     end,

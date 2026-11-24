@@ -1226,6 +1226,15 @@ title), makes the meeting through the write door and opens it at its agenda. `cl
 [--result=]` marks it done (at any time; the message says when it has no result). The headless
 twins: `tasks meeting new|set|close|followups|attend|show|parse` and `tasks meetings`.
 
+### Headless: `contact` and `contacts`
+
+The contacts of the vault (`<area>/CONTACTS/`, [Contacts](ENGINE.md#contacts-contacts)): `tasks contact new <area>
+"<name>" [--org=] [--role=] [--emails=a@x,b@y] [--phones=] [--tz=] [--tags=] [--slug=] [--dry-run]` makes one,
+`tasks contact set <id> --<field>=<value>` changes a field (an empty value removes it), `tasks contact delete <id>
+[--dry-run]` deletes the file, `tasks contact show <id> [--format=json]` shows it (`tasks.contact`) and `tasks contacts
+[<area>] [--tag=] [--org=] [--format=tsv|json]` lists them by name (`tasks.contacts`). The write commands go through the
+write door (`contact_new`, `contact_set`, `contact_delete`); an error names the field, never a mail address or a number.
+
 ### Headless: `import --from-rules` and `bootstrap` (rules.nvim)
 
 A run of [rules.nvim](https://github.com/WKDSteve/rules.nvim) written as a work list (`rules-work-list/1`, see

@@ -111,6 +111,10 @@ function M.preview(id, to_area, opts)
   if vault.resolve_meeting(root, to_area, task.slug) then
     conflict("slug-taken", ("%s is a meeting already"):format(new_id))
   end
+  -- a contact keeps its place (nothing names a task from it): only its id is in the way
+  if vault.resolve_contact(root, to_area, task.slug) then
+    conflict("slug-taken", ("%s is a contact already"):format(new_id))
+  end
 
   -- who names the old id
   local all, scan_errors

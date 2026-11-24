@@ -188,6 +188,9 @@ M.OPS = {
   "path_levels",
   "milestone_new",
   "milestone_set",
+  "contact_new",
+  "contact_set",
+  "contact_delete",
 }
 
 ---The operations after which the milestones are brought in line (`milestones.settle`); `done` does it in its flow.
@@ -370,6 +373,17 @@ local FIELDS = {
     slug = "string",
   },
   milestone_set = { id = "string", patch = "object", if_match = "string" },
+  contact_new = {
+    id = "string",
+    area = "string",
+    name = "string",
+    fields = "object",
+    body = "string",
+    slug = "string",
+    lang = "string",
+  },
+  contact_set = { id = "string", patch = "object", if_match = "string" },
+  contact_delete = { id = "string", if_match = "string" },
   promote = {
     container = "string",
     point = "string",
@@ -3360,10 +3374,207 @@ local function settle_after(name, entry, ctx)
   return entry
 end
 
+-- ── contacts ─────────────────────────────────────────────────────────────────
+
+---The answer of a contact operation that failed. A contact holds personal data of third parties: the message is
+---scrubbed of mail addresses and phone numbers whatever its source (`contacts.scrub`), also in a conflict.
+---@param ctx Tasks.OpsCtx
+---@param err any
+---@param info table|nil
+---@return table
+local function contact_failure(ctx, err, info)
+  local contacts = require("tasks_nvim.contacts")
+  local message = contacts.scrub(contract.redact(ctx.root, tostring(err)))
+  if info and info.code == "conflict" then
+    return refuse("conflict", message, { actual = info.actual, expected = info.expected })
+  end
+  if info and info.code then
+    return refuse(info.code, message, info.details)
+  end
+  return refuse("io", message)
+end
+
+---The entry of a contact edit: changed or not, the versions.
+---@param ctx Tasks.OpsCtx
+---@param r Tasks.ContactEdit
+---@return table
+local function contact_entry(ctx, r)
+  return {
+    ok = true,
+    id = r.id,
+    outcome = r.changed and (ctx.dry and "would_change" or "changed") or "unchanged",
+    file = rel(ctx, r.path),
+    etag_before = r.etag_before,
+    etag_after = (not ctx.dry) and r.etag_after or nil,
+    changed_ids = (r.changed and not ctx.dry) and { r.id } or {},
+  }
+end
+
+---`contact_new` { area | id, name, fields?, body?, slug?, lang? }: make a contact file (`contact_write.new`); a dry run
+---names the id it would get. The inverse is `contact_delete` on the version just written.
+---@param op table
+---@param ctx Tasks.OpsCtx
+---@return table entry
+local function do_contact_new(op, ctx)
+  -- `id` is `area` and `slug` in one word (the inverse of `contact_delete` names the contact it makes again by it)
+  local area, slug = op.area, op.slug
+  if op.id ~= nil then
+    local id_area, id_slug = vault.parse_id(tostring(op.id))
+    if not id_area or not id_slug then
+      return refuse("invalid_argument", "id: expected <area>/<slug>")
+    end
+    if (area ~= nil and area ~= id_area) or (slug ~= nil and slug ~= id_slug) then
+      return refuse(
+        "invalid_argument",
+        "contact_new: id names another area or slug than area and slug"
+      )
+    end
+    area, slug = id_area, id_slug
+  end
+  if area == nil or op.name == nil then
+    return refuse("invalid_argument", "contact_new needs area (or id) and name")
+  end
+  if
+    any_control(op.fields)
+    or has_control(op.name)
+    or has_control(slug)
+    or has_control(area)
+    or has_control(op.body)
+  then
+    return refuse("invalid_argument", "the contact contains a control character")
+  end
+  if op.body and too_long(op.body, M.MAX_BODY) then
+    return refuse("payload_too_large", ("body is longer than %d characters"):format(M.MAX_BODY))
+  end
+  local over = over_limit("title", op.name)
+  for key, value in pairs(op.fields or {}) do
+    over = over or over_limit(key, value)
+  end
+  if over then
+    return refuse("payload_too_large", "a field is too long")
+  end
+  if op.lang ~= nil and op.lang ~= "de" and op.lang ~= "en" then
+    return refuse("invalid_argument", "lang must be de or en")
+  end
+  local r, err, info = require("tasks_nvim.contact_write").new(area, {
+    root = ctx.root,
+    today = ctx.today,
+    name = op.name,
+    fields = op.fields,
+    body = op.body,
+    slug = slug,
+    lang = op.lang,
+    dry_run = ctx.dry,
+  })
+  if not r then
+    return contact_failure(ctx, err, info)
+  end
+  local etag = (not ctx.dry) and etag_of_file(r.path) or nil
+  local entry = {
+    ok = true,
+    id = r.id,
+    outcome = ctx.dry and "would_create" or "created",
+    file = rel(ctx, r.path),
+    slug = r.slug,
+    renamed = r.renamed,
+    etag_after = etag,
+    changed_ids = ctx.dry and {} or { r.id },
+  }
+  if etag then
+    entry.inverse = json.object({ op = "contact_delete", id = r.id, if_match = etag })
+  end
+  return entry
+end
+
+---`contact_set` { id, patch, if_match? }: change the frontmatter of a contact; the answer has an `inverse`.
+---@param op table
+---@param ctx Tasks.OpsCtx
+---@return table entry
+local function do_contact_set(op, ctx)
+  if op.id == nil or op.patch == nil then
+    return refuse("invalid_argument", "contact_set needs id and patch")
+  end
+  if any_control(op.patch) then
+    return refuse("invalid_argument", "the patch contains a control character")
+  end
+  for key, value in pairs(op.patch) do
+    if over_limit(key, value) then
+      return refuse("payload_too_large", "a field is too long")
+    end
+  end
+  local r, err, info = require("tasks_nvim.contact_write").set(op.id, op.patch, {
+    root = ctx.root,
+    today = ctx.today,
+    if_match = op.if_match,
+    dry_run = ctx.dry,
+  })
+  if not r then
+    return contact_failure(ctx, err, info)
+  end
+  local entry = contact_entry(ctx, r)
+  if r.changed and not ctx.dry then
+    entry.inverse = json.object({
+      op = "contact_set",
+      id = r.id,
+      patch = json.object(r.before),
+      if_match = r.etag_after,
+    })
+  end
+  return entry
+end
+
+---`contact_delete` { id, if_match? }: delete a contact file. The inverse makes it again (`contact_new` with its slug,
+---fields and text).
+---@param op table
+---@param ctx Tasks.OpsCtx
+---@return table entry
+local function do_contact_delete(op, ctx)
+  if op.id == nil then
+    return refuse("invalid_argument", "contact_delete needs id")
+  end
+  local r, err, info = require("tasks_nvim.contact_write").delete(op.id, {
+    root = ctx.root,
+    if_match = op.if_match,
+    dry_run = ctx.dry,
+  })
+  if not r then
+    return contact_failure(ctx, err, info)
+  end
+  local entry = {
+    ok = true,
+    id = r.id,
+    outcome = ctx.dry and "would_delete" or "deleted",
+    file = rel(ctx, r.path),
+    etag_before = r.etag_before,
+    changed_ids = ctx.dry and {} or { r.id },
+  }
+  if not ctx.dry then
+    local c = r.contact
+    local fields = {}
+    for _, key in ipairs(require("tasks_nvim.contacts").KEYS) do
+      local value = c[key]
+      if key ~= "name" and value ~= nil and not (type(value) == "table" and #value == 0) then
+        fields[key] = value
+      end
+    end
+    entry.inverse = json.object({
+      op = "contact_new",
+      id = r.id,
+      name = c.name,
+      fields = json.object(fields),
+      body = vim.trim(c.body),
+    })
+  end
+  return entry
+end
+
 ---@type table<string, fun(op: table, ctx: Tasks.OpsCtx): table>
 local HANDLERS = {
   milestone_new = do_milestone_new,
   milestone_set = do_milestone_set,
+  contact_new = do_contact_new,
+  contact_set = do_contact_set,
+  contact_delete = do_contact_delete,
   meeting_new = do_meeting_new,
   meeting_set = do_meeting_set,
   meeting_close = do_meeting_close,

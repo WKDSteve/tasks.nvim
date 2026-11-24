@@ -179,6 +179,14 @@ commands:
   meeting parse "<line>"                  what the quick capture reads from a line (JSON; nothing written)
   meetings [area] [--since=] [--until=] [--task=<id>] [--format=json]
                                           the meetings of a window (default: 30 days back, 90 ahead)
+  contact new <area> <name> [--org=] [--role=] [--emails=a@x,b@y] [--phones=+43...] [--tz=Europe/Vienna]
+              [--tags=] [--slug=] [--dry-run]
+                                          make <area>/CONTACTS/<slug>.md (slug: the name)
+  contact set <id> --<field>=<value>      change a field (an empty value removes it): name, org, role, emails, phones, tz, tags
+  contact delete <id> [--dry-run]         delete the contact file (the answer carries the way back)
+  contact show <id> [--format=json]       the contact with its text and notes (tasks.contact)
+  contacts [area] [--tag=] [--org=] [--format=json]
+                                          the contacts by name (tasks.contacts); no message names a mail or a number
   plan-close <area>/<slug>                finish a plan by hand (refused while a member task is open); the project it
                                           belongs to is finished after it when nothing else holds it open
   project-close <area>/<slug>             finish a project by hand (refused while an own task, or an open plan or
@@ -617,6 +625,11 @@ local SPECS = {
     flag = { "dry-run", "absent" },
   },
   meetings = { value = { "since", "until", "task", "format" }, flag = {} },
+  contact = {
+    value = { "name", "org", "role", "emails", "phones", "tz", "tags", "slug", "lang", "format" },
+    flag = { "dry-run" },
+  },
+  contacts = { value = { "tag", "org", "format" }, flag = {} },
   index = { value = {}, flag = { "check", "all", "staged", "no-history" } },
   hook = { value = {}, flag = {} },
   push = { value = { "attempts" }, flag = { "dry-run", "no-sync" } },
@@ -2535,6 +2548,148 @@ commands.meetings = function(ctx)
   end
   for _, m in ipairs(doc.items or {}) do
     ctx.say(("%s\t%s\t%s\t%s"):format(m.id, m.starts_at or m.date or "", m.status, m.title))
+  end
+  return 0
+end
+
+-- ── contacts ─────────────────────────────────────────────────────────────────
+
+---The options of `contact new` and `contact set` that are fields of the contact.
+local CONTACT_FIELD_OPTS = { "name", "org", "role", "emails", "phones", "tz", "tags" }
+
+---The fields the options name (`--emails=a,b` a list; `--x=` an empty value, which `set` reads as "remove").
+---@param opt table<string, any>
+---@return table<string, any>
+local function contact_fields(opt)
+  local out = {}
+  for _, key in ipairs(CONTACT_FIELD_OPTS) do
+    local value = opt[key]
+    if type(value) == "string" then
+      if key == "emails" or key == "phones" or key == "tags" then
+        local list = {}
+        for item in value:gmatch("[^,]+") do
+          list[#list + 1] = vim.trim(item)
+        end
+        out[key] = list
+      else
+        out[key] = value
+      end
+    end
+  end
+  return out
+end
+
+---@type table<string, fun(ctx: Tasks.CliCtx, rest: string[]): integer>
+local CONTACT_SUBS = {}
+
+CONTACT_SUBS.new = function(ctx, rest)
+  local opt = ctx.args.opt
+  local area, name = rest[1], rest[2] or opt.name
+  if not area or not name then
+    ctx.warn(
+      'error: usage: contact new <area> "<name>" [--org=] [--emails=a@x,b@y] [--phones=] [--tz=]'
+    )
+    return 2
+  end
+  local fields = contact_fields(opt)
+  fields.name = nil
+  local code = meeting_op(ctx, {
+    op = "contact_new",
+    area = area,
+    name = name,
+    fields = fields,
+    slug = opt.slug,
+    lang = opt.lang,
+  }, opt["dry-run"] == true)
+  return code
+end
+
+CONTACT_SUBS.set = function(ctx, rest)
+  local id = rest[1]
+  local patch = contact_fields(ctx.args.opt)
+  if not id or next(patch) == nil then
+    ctx.warn(
+      "error: usage: contact set <area>/<slug> --<field>=<value> (an empty value removes the field)"
+    )
+    return 2
+  end
+  for key, value in pairs(patch) do
+    if value == "" then
+      patch[key] = vim.NIL
+    end
+  end
+  return (
+    meeting_op(ctx, { op = "contact_set", id = id, patch = patch }, ctx.args.opt["dry-run"] == true)
+  )
+end
+
+CONTACT_SUBS.delete = function(ctx, rest)
+  local id = rest[1]
+  if not id then
+    ctx.warn("error: usage: contact delete <area>/<slug> [--dry-run]")
+    return 2
+  end
+  return (meeting_op(ctx, { op = "contact_delete", id = id }, ctx.args.opt["dry-run"] == true))
+end
+
+CONTACT_SUBS.show = function(ctx, rest)
+  local id = rest[1]
+  if not id then
+    ctx.warn("error: usage: contact show <area>/<slug> [--format=json]")
+    return 2
+  end
+  local doc, err = contract.contact(id, { root = ctx.eo.root })
+  if not doc then
+    ctx.warn("error: " .. tostring(type(err) == "table" and err.message or err))
+    return 1
+  end
+  if ctx.args.opt.format == "json" then
+    ctx.out(vim.json.encode(doc) .. "\n")
+    return 0
+  end
+  local c = doc.contact
+  ctx.say(("%s\t%s\t%s"):format(c.id, c.name, c.org or ""))
+  for _, e in ipairs(c.emails) do
+    ctx.say("email\t" .. e)
+  end
+  for _, ph in ipairs(c.phones) do
+    ctx.say("phone\t" .. ph)
+  end
+  return 0
+end
+
+---`tasks contact <new|set|delete|show> ...`
+---@param ctx Tasks.CliCtx
+---@return integer code
+commands.contact = function(ctx)
+  local sub = ctx.args.pos[1]
+  local run = sub and CONTACT_SUBS[sub]
+  if not run then
+    ctx.warn("error: usage: contact <new|set|delete|show> ...")
+    return 2
+  end
+  return run(ctx, vim.list_slice(ctx.args.pos, 2))
+end
+
+---`tasks contacts [area] [--tag= --org=] [--format=tsv|json]`: the contacts by name (`tasks.contacts`).
+---@param ctx Tasks.CliCtx
+---@return integer code
+commands.contacts = function(ctx)
+  local opt = ctx.args.opt
+  local doc, err = contract.contacts(
+    { area = ctx.args.pos[1], tag = opt.tag, org = opt.org },
+    { root = ctx.eo.root }
+  )
+  if not doc then
+    ctx.warn("error: " .. tostring(type(err) == "table" and err.message or err))
+    return type(err) == "table" and err.code == "invalid_argument" and 2 or 1
+  end
+  if opt.format == "json" then
+    ctx.out(vim.json.encode(doc) .. "\n")
+    return 0
+  end
+  for _, c in ipairs(doc.items or {}) do
+    ctx.say(("%s\t%s\t%s"):format(c.id, c.name, c.org or ""))
   end
   return 0
 end

@@ -1,0 +1,120 @@
+{
+  "client_op_id": "golden-contacts",
+  "digest": "sha256:4500ae4d69c73d49",
+  "dry_run": false,
+  "engine": {
+    "git": "0000000",
+    "nvim": "0.0.0",
+    "version": "0.1.0-test"
+  },
+  "generated_at": "2026-01-01T00:00:00Z",
+  "kind": "tasks.result",
+  "ok": false,
+  "plugin": "tasks.nvim",
+  "results": [
+    {
+      "changed_ids": [
+        "lib.nvim/anna-muster"
+      ],
+      "etag_after": "sha256:8d55d9cf4716faac",
+      "file": "lib.nvim/CONTACTS/anna-muster.md",
+      "id": "lib.nvim/anna-muster",
+      "inverse": {
+        "id": "lib.nvim/anna-muster",
+        "if_match": "sha256:8d55d9cf4716faac",
+        "op": "contact_delete"
+      },
+      "n": 1,
+      "ok": true,
+      "op": "contact_new",
+      "outcome": "created",
+      "renamed": false,
+      "slug": "anna-muster"
+    },
+    {
+      "changed_ids": [
+        "lib.nvim/anna-muster"
+      ],
+      "etag_after": "sha256:424595c375eae125",
+      "etag_before": "sha256:8d55d9cf4716faac",
+      "file": "lib.nvim/CONTACTS/anna-muster.md",
+      "id": "lib.nvim/anna-muster",
+      "inverse": {
+        "id": "lib.nvim/anna-muster",
+        "if_match": "sha256:424595c375eae125",
+        "op": "contact_set",
+        "patch": {
+          "phones": null,
+          "role": null
+        }
+      },
+      "n": 2,
+      "ok": true,
+      "op": "contact_set",
+      "outcome": "changed"
+    },
+    {
+      "changed_ids": [],
+      "error": {
+        "code": "invalid_argument",
+        "message": "emails[1] is no mail address",
+        "retryable": false
+      },
+      "n": 3,
+      "ok": false,
+      "op": "contact_new",
+      "outcome": "failed"
+    },
+    {
+      "changed_ids": [],
+      "error": {
+        "code": "conflict",
+        "details": {
+          "actual": "sha256:424595c375eae125",
+          "expected": "sha256:0000000000000000"
+        },
+        "message": "lib.nvim/anna-muster is not the version the change was made on (it is sha256:424595c375eae125, the change was made on sha256:0000000000000000)",
+        "retryable": false
+      },
+      "n": 4,
+      "ok": false,
+      "op": "contact_set",
+      "outcome": "failed"
+    },
+    {
+      "changed_ids": [
+        "lib.nvim/anna-muster"
+      ],
+      "etag_before": "sha256:424595c375eae125",
+      "file": "lib.nvim/CONTACTS/anna-muster.md",
+      "id": "lib.nvim/anna-muster",
+      "inverse": {
+        "body": "## Notizen",
+        "fields": {
+          "emails": [
+            "anna@example.org"
+          ],
+          "org": "Muster AG",
+          "phones": [
+            "+43 1 2345678"
+          ],
+          "role": "Sales",
+          "tags": [
+            "kunde"
+          ]
+        },
+        "id": "lib.nvim/anna-muster",
+        "name": "Anna Muster",
+        "op": "contact_new"
+      },
+      "n": 5,
+      "ok": true,
+      "op": "contact_delete",
+      "outcome": "deleted"
+    }
+  ],
+  "schema": 1,
+  "vault": {
+    "id": "vault"
+  }
+}

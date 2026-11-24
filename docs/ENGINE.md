@@ -72,6 +72,7 @@ TESTS/              specs (run with scripts/test.sh, i.e. testing.nvim)
 | `tasks_nvim.moves` | Moving a task to another area, stage 1: `preview(id, to_area, { root })` answers whether the move could be made (the area exists, the slug is free there among open tasks, finished tasks and plans: otherwise `conflicts` with `slug-taken`) and what would dangle (`references`: the `blocked_by`, `after` and `refs` of other tasks, the `target` of a plan file, a configured document that names the id), with notes such as a plan that does not list the new area. Nothing is written; rewriting the references with a rollback is stage 2, until then the move itself is refused. | `preview` |
 | `tasks_nvim.steps` | The optional `## Plan` section of a task (`- [ ] 1. step -- Acceptance 1`): `parse` reads progress ("2/4") and the step texts, `tick_all` ticks the open steps byte-exactly (line endings kept; a step marked `(dropped)` / `(entfaellt)` is struck from the count and never ticked; code fences and other sections are not the plan), `uncovered_acceptance` names acceptance points no step refers to (a hint in `check`, never an error). A task without the section is complete: nothing is said about it. | `parse`, `tick_all`, `uncovered_acceptance`, `template_section` |
 | `tasks_nvim.plans` | Plan files, `<area>/ROADMAP/plans/<slug>.md` (or the folder form `<slug>/<slug>.md`, whose other files are assets: `assets` lists them): frontmatter `title`, `status` (planning / doing / parked / done), `areas`, `target`, `phase_order`, `gate` (`hard`), `links` (http/https), dates; no task list. `parse` / `from_file` always return a plan (a broken one carries errors), `area` / `all` / `find` read them, `members` picks the tasks that name one, `new` creates one (never overwrites), `close` finishes one like a task (moved to `Backlog/FEATURES/`, a README row, snapshot and rollback), `summary` says what a finished plan amounted to. | `parse`, `area`, `all`, `find`, `members`, `new`, `close`, `summary` |
+| `tasks_nvim.contacts` / `tasks_nvim.contact_write` | Contact files, `<area>/CONTACTS/<slug>.md` (or the folder form `<slug>/<slug>.md`), see [Contacts](#contacts-contacts): `parse` (`name`, `org`, `role`, `emails`, `phones`, `tz`, `tags`, the text and the notes section), `area`/`all`/`find`, `is_email`, `is_phone`, `scrub` (takes a mail address and a phone number out of a text); `contact_write.new`/`set`/`delete` under the lock of the file, on the version the caller read |
 | `tasks_nvim.meetings` | Meeting files, `<area>/MEETINGS/<slug>.md` (or the folder form `<slug>/<slug>.md`), see [Meetings](#meetings-meetings): a meeting is no task and names its tasks (`tasks:`); `by_task` derives the meetings of a task. `parse` / `from_file` always return a meeting (a broken one carries errors; a parse cache by mtime and size), `area` / `all` / `find` read them, `online_service` tells the service of an address, `parse_duration`, `parse_notify`, `is_tz` read the fields; a series (`repeat`) is computed into its occurrences (`occurrence_days`, `expand`), `find_any` also reads an occurrence without a file. | `parse`, `from_file`, `area`, `all`, `find`, `find_any`, `by_task`, `less`, `online_service`, `occurrence_days`, `occurrence`, `expand` |
 | `tasks_nvim.meeting_write` | Writing meetings under the file lock, on the version read: `new`, `set`, `close`, `capture` (one line of the minutes), `attend`, `followups` (tasks of the follow-ups), `board_save` (a whiteboard, replaced only on the version read); `renames_for_move` and `tick_done` for `move_area` and `done`; pure body helpers (`capture_body`, `attend_body`, `tick_item`, `add_items`, `append_to_section`, `set_section`). | `new`, `set`, `close`, `capture`, `attend`, `followups`, `board_save`, `edit` |
 | `tasks_nvim.meeting_quick` | The quick capture of a meeting: one line (day, time, duration, all-day, address, `@place`, `#task`, `!notify`, the rest the title) read into a proposal of the fields of `meeting_new`, with what it assumed and the words it could not read. Pure. | `parse` |
@@ -533,6 +534,50 @@ occurrences without a file. `check`: `meeting-bad-repeat`, `meeting-bad-repeat-u
 `meeting-bad-series` (errors: `series:` beside `repeat`, or a file that is not `<slug of the series>-<day>` of the same
 area), `meeting-series-missing` (warning: the series is gone or no series any more), `meeting-series-off-day` (hint:
 the day of an occurrence file is no day of its series any more); a series takes no part in `meeting-overlap`.
+
+### Contacts (`CONTACTS/`)
+
+A contact is a person, in a file of its own: `<area>/CONTACTS/<slug>.md`, or `<area>/CONTACTS/<slug>/<slug>.md` once
+something was attached to it. The id is `<area>/<slug>` and shares the namespace of the area with tasks, plans,
+projects, paths, meetings and milestones (`vault.has_plan_or_project` asks for contacts too; `check` says
+`contact-id-taken` when a file of another kind has the id, and `move_area` refuses a task whose slug a contact of the
+target area has: a contact itself never moves and names no task, so nothing else follows a `move_area`). A contact
+lives in any area: the engine does not ask whether the vault may hold personal data of others, and says nothing about
+it (decision D3 of the Office concept).
+
+```markdown
+---
+name: "Rick Beispiel"      # needed
+org: "Beispiel GmbH"
+role: "Support, T2"
+emails: [rick@example.org]
+phones: ["+43 1 2345678"]
+tz: Europe/Vienna          # optional; only its form is checked
+tags: [t2, kunde]
+created: 2026-11-24
+updated: 2026-11-24
+---
+
+Free text; its first paragraph is the `summary`.
+
+## Notizen
+What the person likes, what was agreed (the `notes` of the document; `## Notes` in English).
+```
+
+**No mail address and no phone number in a message.** Mail and phone are personal data of a third party; the contract
+names them only where they are the data (the `emails` and `phones` of an entry, the fields of an inverse that puts
+them back). Every text the engine writes about a contact (a `check` finding, the `problems` and `incomplete` of a
+document, the error of an operation, a note) goes through `contacts.scrub`, and the messages of the engine say which
+field is wrong, never its value (`emails[2] is no mail address`). `scrub` also takes out a value that got into a
+message from elsewhere (a file named after a number, a mail address in the field `tz`); a version tag (`sha256:...`)
+and a calendar day are no numbers and stay. The ids and the `file` of a document are names, not messages: a file named
+after a number has that number in its id.
+
+`check`: `contact-name-missing`, `contact-bad-email`, `contact-bad-phone`, `contact-bad-tz`, `contact-too-many` (more
+than 20 mails or numbers) and the codes every file has (`slug`, `frontmatter-missing`), all errors, and
+`contact-id-taken` (error). Writing: `contact_new` (an id from the name, `-2`, `-3` when taken), `contact_set` (the old
+values in the `inverse`), `contact_delete` (the inverse makes the file again from what it held; a contact folder that
+holds more than its file is not deleted). All three take the lock of the file and refuse a symbolic link.
 
 ### Learning paths (`ROADMAP/paths/`)
 

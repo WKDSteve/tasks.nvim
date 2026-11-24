@@ -1,0 +1,92 @@
+{
+  "area": "lib.nvim",
+  "digest": "sha256:d4f81eaf0603f821",
+  "engine": {
+    "git": "0000000",
+    "nvim": "0.0.0",
+    "version": "0.1.0-test"
+  },
+  "generated_at": "2026-01-01T00:00:00Z",
+  "incomplete": [],
+  "items": [
+    {
+      "area": "lib.nvim",
+      "emails": [
+        "anna@example.org"
+      ],
+      "etag": "sha256:35a1a78b77ec123a",
+      "file": "lib.nvim/CONTACTS/anna-muster.md",
+      "id": "lib.nvim/anna-muster",
+      "name": "Anna Muster",
+      "org": "Muster AG",
+      "phones": [],
+      "problems": [],
+      "slug": "anna-muster",
+      "summary": "Sales.",
+      "tags": [
+        "kunde"
+      ],
+      "valid": true
+    },
+    {
+      "area": "lib.nvim",
+      "emails": [],
+      "etag": "sha256:6a4e44a59062b43a",
+      "file": "lib.nvim/CONTACTS/bad-zone.md",
+      "id": "lib.nvim/bad-zone",
+      "name": "Bad Zone",
+      "phones": [],
+      "problems": [
+        {
+          "code": "contact-bad-tz",
+          "msg": "tz is no time zone (Area/City or UTC): Vienna"
+        }
+      ],
+      "slug": "bad-zone",
+      "summary": "Wrong zone.",
+      "tags": [],
+      "valid": false
+    },
+    {
+      "area": "lib.nvim",
+      "assets": [
+        "assets/card.png"
+      ],
+      "created": "2026-01-02",
+      "emails": [
+        "rick@example.org",
+        "r.beispiel@example.org"
+      ],
+      "etag": "sha256:e2075463480adb03",
+      "file": "lib.nvim/CONTACTS/rick-beispiel/rick-beispiel.md",
+      "folder": true,
+      "id": "lib.nvim/rick-beispiel",
+      "name": "Rick Beispiel",
+      "org": "Beispiel GmbH",
+      "phones": [
+        "+43 1 2345678"
+      ],
+      "problems": [],
+      "role": "Support, T2",
+      "slug": "rick-beispiel",
+      "summary": "Contact at the customer for the T2 cases.",
+      "tags": [
+        "t2",
+        "kunde"
+      ],
+      "tz": "Europe/Vienna",
+      "updated": "2026-01-09",
+      "valid": true
+    }
+  ],
+  "kind": "tasks.contacts",
+  "limit": 100,
+  "offset": 0,
+  "plugin": "tasks.nvim",
+  "rev": "rev:8ef795",
+  "schema": 1,
+  "total": 3,
+  "vault": {
+    "id": "vault"
+  }
+}

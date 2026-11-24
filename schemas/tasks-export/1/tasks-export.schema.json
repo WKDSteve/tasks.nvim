@@ -80,6 +80,12 @@
       "$ref": "#/$defs/MeetingParse"
     },
     {
+      "$ref": "#/$defs/Contacts"
+    },
+    {
+      "$ref": "#/$defs/ContactDocument"
+    },
+    {
       "$ref": "#/$defs/Paths"
     },
     {
@@ -1262,6 +1268,83 @@
         "given_on": { "type": "string", "format": "date" }
       },
       "additionalProperties": false
+    },
+    "ContactEntry": {
+      "description": "One contact (`<area>/CONTACTS/<slug>.md`, capability `contacts`): a person, not a task. A broken contact is still here (`valid: false`, `problems`); a problem never names a mail address or a phone number. The addresses and numbers of `emails` and `phones` are the data of a third party: a reader that logs or sends them on is answerable for them.",
+      "type": "object",
+      "required": [
+        "id",
+        "area",
+        "slug",
+        "name",
+        "emails",
+        "phones",
+        "tags",
+        "summary",
+        "file",
+        "valid",
+        "problems"
+      ],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[^/]+/[^/]+$" },
+        "area": { "type": "string" },
+        "slug": { "type": "string" },
+        "name": { "type": "string" },
+        "org": { "type": "string" },
+        "role": { "type": "string" },
+        "emails": { "type": "array", "items": { "type": "string" } },
+        "phones": { "type": "array", "items": { "type": "string" } },
+        "tz": { "type": "string", "description": "An IANA time zone (only its form is checked)." },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "summary": { "type": "string", "description": "The first paragraph of the text." },
+        "created": { "$ref": "#/$defs/Date" },
+        "updated": { "$ref": "#/$defs/Date" },
+        "folder": { "const": true },
+        "assets": { "$ref": "#/$defs/PlanAssets" },
+        "assets_truncated": { "$ref": "#/$defs/PlanAssetsTruncated" },
+        "file": { "type": "string" },
+        "etag": { "$ref": "#/$defs/Etag" },
+        "valid": { "type": "boolean" },
+        "problems": { "type": "array", "items": { "$ref": "#/$defs/Problem" } }
+      },
+      "additionalProperties": false
+    },
+    "Contacts": {
+      "description": "tasks.contacts: the contacts of the vault (or of an area, a tag, an organisation), by name, one page. Capability `contacts`.",
+      "allOf": [{ "$ref": "#/$defs/Head" }],
+      "type": "object",
+      "required": ["kind", "rev", "digest", "total", "offset", "limit", "items", "incomplete"],
+      "properties": {
+        "kind": { "const": "tasks.contacts" },
+        "rev": { "$ref": "#/$defs/Rev" },
+        "digest": { "$ref": "#/$defs/Digest" },
+        "area": { "type": "string" },
+        "tag": { "type": "string" },
+        "org": { "type": "string" },
+        "total": { "type": "integer", "minimum": 0 },
+        "offset": { "type": "integer", "minimum": 0 },
+        "limit": { "type": "integer", "minimum": 1 },
+        "next_offset": { "type": "integer", "minimum": 1 },
+        "items": { "type": "array", "items": { "$ref": "#/$defs/ContactEntry" } },
+        "incomplete": { "type": "array", "items": { "type": "string" } }
+      },
+      "unevaluatedProperties": false
+    },
+    "ContactDocument": {
+      "description": "tasks.contact: one contact with its text and its notes (`## Notizen` / `## Notes`). Capability `contacts`.",
+      "allOf": [{ "$ref": "#/$defs/Head" }],
+      "type": "object",
+      "required": ["kind", "rev", "digest", "contact", "body", "body_truncated", "notes"],
+      "properties": {
+        "kind": { "const": "tasks.contact" },
+        "rev": { "$ref": "#/$defs/Rev" },
+        "digest": { "$ref": "#/$defs/Digest" },
+        "contact": { "$ref": "#/$defs/ContactEntry" },
+        "body": { "type": "string", "description": "The file after the frontmatter, untrusted text." },
+        "body_truncated": { "type": "boolean" },
+        "notes": { "type": "string", "description": "The text of the notes section, trimmed; empty when there is none." }
+      },
+      "unevaluatedProperties": false
     },
     "MeetingParse": {
       "description": "tasks.meetingparse: one line of the quick capture read into a proposal of a meeting (capability `meeting_parse`). Nothing is written and no file is read: the front end shows the proposal in its form and sends `meeting_new` only when the person says so. `fields` are the keys `meeting_new` takes, as far as the line names them; `date` is always there (`assumed` holds `date` when the line named no day: today). `problems` are words that looked like a field but are none (`!soon`, `#nothing`); they are not in the title.",
@@ -4767,7 +4850,7 @@
       "required": ["op", "id"],
       "properties": {
         "op": {
-          "enum": ["set", "reorder", "tick_step", "answer", "set_body", "set_section", "move_area", "view_save", "view_delete", "plan_set", "project_set", "meeting_set", "meeting_attend", "path_set", "node_set", "unpromote", "path_reward", "path_levels", "milestone_set"]
+          "enum": ["set", "reorder", "tick_step", "answer", "set_body", "set_section", "move_area", "view_save", "view_delete", "plan_set", "project_set", "meeting_set", "meeting_attend", "path_set", "node_set", "unpromote", "path_reward", "path_levels", "milestone_set", "contact_new", "contact_set", "contact_delete"]
         },
         "xp": {
           "description": "`node_set` that wrote XP: the XP the point had (capability `xp`).",
@@ -4873,6 +4956,10 @@
           "type": "object"
         },
         "patch": {
+          "type": "object"
+        },
+        "fields": {
+          "description": "`contact_new` as the inverse of `contact_delete`: the frontmatter fields the contact had.",
           "type": "object"
         },
         "after": {
@@ -4985,7 +5072,7 @@
           "minimum": 1
         },
         "op": {
-          "enum": ["set", "new", "reorder", "done", "move_area", "plan_new", "plan_set", "plan_close", "project_new", "project_set", "project_close", "tick_step", "add_steps", "answer", "append_note", "reopen", "set_body", "set_section", "view_save", "view_delete", "attach", "claim", "release", "history_record", "meeting_new", "meeting_set", "meeting_close", "meeting_capture", "meeting_attend", "meeting_followups", "board_save", "path_new", "path_set", "path_close", "node_set", "promote", "unpromote", "path_reward", "path_levels", "milestone_new", "milestone_set"]
+          "enum": ["set", "new", "reorder", "done", "move_area", "plan_new", "plan_set", "plan_close", "project_new", "project_set", "project_close", "tick_step", "add_steps", "answer", "append_note", "reopen", "set_body", "set_section", "view_save", "view_delete", "attach", "claim", "release", "history_record", "meeting_new", "meeting_set", "meeting_close", "meeting_capture", "meeting_attend", "meeting_followups", "board_save", "path_new", "path_set", "path_close", "node_set", "promote", "unpromote", "path_reward", "path_levels", "milestone_new", "milestone_set", "contact_new", "contact_set", "contact_delete"]
         },
         "id": {
           "type": "string"

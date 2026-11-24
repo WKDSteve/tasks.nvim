@@ -96,6 +96,11 @@
 ---    `meeting-bad-repeat`, `meeting-bad-repeat-until`, `meeting-bad-except`, `meeting-bad-series` (errors),
 ---    `meeting-series-missing` (warning: `series:` names no series of the area), `meeting-series-off-day` (hint: the
 ---    day of an occurrence file is no day of its series any more)
+---  - contacts (`<area>/CONTACTS/`, `tasks_nvim.contacts`): a broken contact file is reported with its own codes
+---    (`contact-name-missing`, `contact-bad-email`, `contact-bad-phone`, `contact-bad-tz`, `contact-too-many`);
+---    `contact-id-taken` (error): a task (open or finished), plan, project, path or meeting of the area has the same
+---    slug. A contact is checked wherever it lies (no check of the place); no message names a mail address or a
+---    phone number.
 ---  - learning paths (`<area>/ROADMAP/paths/`, `tasks_nvim.paths`): a broken path file with the codes of a plan file
 ---    as `path-...` (and `path-no-stages`); `path-id-taken` (error); `path-reason-missing`, `path-duplicate-key`,
 ---    `path-bad-key`, `path-bad-mark`, `path-image-outside`, `path-arrow-dangling`, `path-image-missing`, `path-cycle`,
@@ -133,6 +138,7 @@
 ---
 --- Not its job: fixing anything (`index.write_area` regenerates an index).
 
+local contacts = require("tasks_nvim.contacts")
 local exercise = require("tasks_nvim.exercise")
 local fsio = require("tasks_nvim.fsio")
 
@@ -958,6 +964,50 @@ local function meeting_findings(
           break
         end
         hint("meeting-overlap", b, ("at the same time as %s (%s)"):format(a.id, a.start))
+      end
+    end
+  end
+end
+
+---The findings of the contact files of the areas checked: a broken file with its own codes and an id another file of the
+---area has. No message names a mail address or a phone number (`contacts.scrub`).
+---@param findings Tasks.Finding[]
+---@param open_ids table<string, Tasks.Task>
+---@param names string[]
+---@param scan_opts table
+---@param is_finished fun(id: string): boolean
+local function contact_findings(findings, open_ids, names, scan_opts, is_finished)
+  local root = scan_opts.root
+  for _, name in ipairs(names) do
+    local list, errs = contacts.area(name, scan_opts)
+    for _, e in ipairs(type(errs) == "table" and errs or {}) do
+      add(
+        findings,
+        "error",
+        "unreadable",
+        { area = name, path = vault.contacts_dir(root, name) },
+        contacts.scrub(e)
+      )
+    end
+    for _, c in ipairs(list or {}) do
+      for i, msg in ipairs(c.errors) do
+        add(findings, "error", c.error_codes[i] or "frontmatter-invalid", c, msg)
+      end
+      -- ids are global: a finished task of the same id counts as much as an open one
+      local clash = open_ids[c.id] ~= nil or is_finished(c.id)
+      for _, kind in ipairs({ "plan", "project", "path" }) do
+        clash = clash or vault.resolve_plan(root, kind, c.area, c.slug) ~= nil
+      end
+      clash = clash or vault.resolve_meeting(root, c.area, c.slug) ~= nil
+      if clash then
+        add(
+          findings,
+          "error",
+          "contact-id-taken",
+          c,
+          "a task (open or finished), plan, project, path or meeting of the area has the same id: "
+            .. c.id
+        )
       end
     end
   end
@@ -2272,6 +2322,7 @@ function M.run(opts)
   plan_file_findings(findings, open_ids, names, scan_opts, is_finished, repos)
   project_findings(findings, open_ids, names, scan_opts, is_finished, repos)
   meeting_findings(findings, hints, open_ids, names, scan_opts, is_finished, today, repos)
+  contact_findings(findings, open_ids, names, scan_opts, is_finished)
   path_findings(findings, open_ids, names, scan_opts, is_finished, hints, repos)
   requires_findings(findings, names, scan_opts)
   competence_findings(findings, names, scan_opts)
