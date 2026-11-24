@@ -1,0 +1,5 @@
+Name;Firma;E-Mail;Telefon;Zeitzone;Kategorien;Notizen;Geburtstag
+Zoë Ångström;Büro "Nord";zoe@example.org;+46 8 1234567;Europe/Stockholm;kunde;"Zeile eins
+Zeile zwei; mit Semikolon";1990-01-01
+Karl Test;;karl@example.org;;;;;
+;;nobody@example.org;;;;;

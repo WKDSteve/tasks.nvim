@@ -1,0 +1,30 @@
+BEGIN:VCARD
+VERSION:4.0
+FN:Rick Beispiel
+EMAIL:RICK@example.org
+TEL;VALUE=uri:tel:+43-1-2345678
+TZ:Europe/Vienna
+CATEGORIES:t2
+END:VCARD
+BEGIN:VCARD
+VERSION:4.0
+FN:Rick Doppelt
+EMAIL:rick@EXAMPLE.org
+END:VCARD
+BEGIN:VCARD
+VERSION:4.0
+N:Meier;Eva;;;
+EMAIL:eva@example.org
+TZ:+01:00
+TEL:abc
+EMAIL:not-a-mail
+END:VCARD
+BEGIN:VCARD
+VERSION:4.0
+EMAIL:nameless@example.org
+END:VCARD
+BEGIN:VCARD
+VERSION:4.0
+FN:Existing Person
+EMAIL:held@example.org
+END:VCARD

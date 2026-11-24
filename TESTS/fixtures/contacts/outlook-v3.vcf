@@ -1,0 +1,25 @@
+BEGIN:VCARD
+VERSION:3.0
+PRODID:-//Example Mail//EN
+N:Müller;Jörg;;Dr.;
+FN:Dr. Jörg Müller
+ORG:Beispiel GmbH;Support
+TITLE:Senior Engineer\, T2
+EMAIL;TYPE=INTERNET,WORK:joerg.mueller@example.org
+EMAIL;TYPE=INTERNET:j.mueller@example.net
+TEL;TYPE=CELL:+43 660 1234567
+TEL;TYPE=WORK:+49 (30) 1234 5678
+ADR;TYPE=WORK:;;Hauptstrasse 1;Wien;;1010;Austria
+BDAY:1980-05-17
+PHOTO;ENCODING=b;TYPE=JPEG:/9j/4AAQSkZJRgABAQAAAQABAAD
+NOTE:Prefers mail.\nCalls only after 10\, please.
+CATEGORIES:kunde,t2
+X-CUSTOM-FIELD:something
+REV:20261101T120000Z
+END:VCARD
+BEGIN:VCARD
+VERSION:3.0
+FN:Anna A Very Long Display Name That Forces The Folding Of The Line At Seventy-Five Octets Surely
+ Indeed
+EMAIL:anna@example.org
+END:VCARD

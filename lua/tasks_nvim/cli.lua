@@ -187,6 +187,11 @@ commands:
   contact show <id> [--format=json]       the contact with its text and notes (tasks.contact)
   contacts [area] [--tag=] [--org=] [--format=json]
                                           the contacts by name (tasks.contacts); no message names a mail or a number
+  contacts import <file> --area=<area> [--as=vcf|csv] [--delimiter=,|;|tab] [--dry-run] [--lang=de|en] [--format=json]
+                                          make contacts of a vCard (3.0, 4.0) or CSV file; a mail already held is a
+                                          duplicate: reported, never overwritten; what has no field is named
+  contacts export --format=vcf|csv [<area>] [--tag=] [--org=] [--version=3|4] [--delimiter=] [--bom] [--out=<file>]
+                                          the contacts as one vCard or CSV text (stdout, or the file)
   plan-close <area>/<slug>                finish a plan by hand (refused while a member task is open); the project it
                                           belongs to is finished after it when nothing else holds it open
   project-close <area>/<slug>             finish a project by hand (refused while an own task, or an open plan or
@@ -629,7 +634,10 @@ local SPECS = {
     value = { "name", "org", "role", "emails", "phones", "tz", "tags", "slug", "lang", "format" },
     flag = { "dry-run" },
   },
-  contacts = { value = { "tag", "org", "format" }, flag = {} },
+  contacts = {
+    value = { "tag", "org", "format", "area", "as", "delimiter", "version", "out", "lang" },
+    flag = { "dry-run", "bom" },
+  },
   index = { value = {}, flag = { "check", "all", "staged", "no-history" } },
   hook = { value = {}, flag = {} },
   push = { value = { "attempts" }, flag = { "dry-run", "no-sync" } },
@@ -2677,11 +2685,135 @@ commands.contact = function(ctx)
   return run(ctx, vim.list_slice(ctx.args.pos, 2))
 end
 
----`tasks contacts [area] [--tag= --org=] [--format=tsv|json]`: the contacts by name (`tasks.contacts`).
+---`tasks contacts import <file> --area=<area> ...`: contact files from a vCard or CSV file (`contacts_io`).
+---@param ctx Tasks.CliCtx
+---@param rest string[]
+---@return integer code
+local function contacts_import(ctx, rest)
+  local opt = ctx.args.opt
+  local file = rest[1]
+  if not file or not opt.area or #rest > 1 then
+    ctx.warn(
+      "error: usage: contacts import <file> --area=<area> [--as=vcf|csv] [--delimiter=,|;|tab] [--dry-run]"
+    )
+    return 2
+  end
+  local rep, err = require("tasks_nvim.contacts_io").import_file(
+    require("tasks_nvim.fsio").doc_path(file),
+    opt.area --[[@as string]],
+    {
+      root = ctx.eo.root,
+      today = ctx.eo.today,
+      dry_run = opt["dry-run"] == true,
+      lang = opt.lang --[[@as "de"|"en"|nil]],
+      format = opt["as"] --[[@as string|nil]],
+      delimiter = opt.delimiter --[[@as string|nil]],
+    }
+  )
+  if not rep then
+    ctx.warn("error: " .. tostring(err))
+    return 2
+  end
+  if opt.format == "json" then
+    ctx.out(vim.json.encode(rep) .. "\n")
+    return 0
+  end
+  for _, m in ipairs(rep.messages) do
+    ctx.warn("note: " .. m)
+  end
+  local verb = rep.dry_run and "would-create" or "created"
+  for _, c in ipairs(rep.created) do
+    ctx.say(("%s\t%s\t#%d\t%s"):format(verb, c.id, c.index, c.name))
+  end
+  for _, d in ipairs(rep.duplicates) do
+    ctx.say(("duplicate\t%s\t#%d\t%s"):format(d.of, d.index, d.name))
+  end
+  for _, r in ipairs(rep.refused) do
+    ctx.say(("refused\t#%d\t%s\t%s"):format(r.index, r.name or "", r.reason))
+  end
+  for _, p in ipairs(rep.problems) do
+    ctx.warn(("warn: #%d %s: %s"):format(p.index, p.name or "", p.text))
+  end
+  ctx.say(
+    ("%s: %d, duplicates: %d, refused: %d"):format(
+      verb,
+      #rep.created,
+      #rep.duplicates,
+      #rep.refused
+    )
+  )
+  return 0
+end
+
+---`tasks contacts export --format=vcf|csv [<area>] ...`: the contacts as a vCard or CSV text.
+---@param ctx Tasks.CliCtx
+---@param rest string[]
+---@return integer code
+local function contacts_export(ctx, rest)
+  local opt = ctx.args.opt
+  local io = require("tasks_nvim.contacts_io")
+  if opt.format ~= "vcf" and opt.format ~= "csv" then
+    ctx.warn(
+      "error: usage: contacts export --format=vcf|csv [<area>] [--tag=] [--org=] [--out=<file>]"
+    )
+    return 2
+  end
+  local list, err
+  if rest[1] then
+    list, err = require("tasks_nvim.contacts").area(rest[1], { root = ctx.eo.root })
+  else
+    list, err = require("tasks_nvim.contacts").all({ root = ctx.eo.root })
+  end
+  if not list then
+    ctx.warn("error: " .. require("tasks_nvim.contacts").scrub(tostring(err)))
+    return 1
+  end
+  local kept = {}
+  for _, c in ipairs(list) do
+    local org_ok = opt.org == nil or (c.org or ""):lower() == tostring(opt.org):lower()
+    local tag_ok = opt.tag == nil or vim.tbl_contains(c.tags, opt.tag)
+    if c.valid and org_ok and tag_ok then
+      kept[#kept + 1] = c
+    end
+  end
+  table.sort(kept, function(a, b)
+    return a.id < b.id
+  end)
+  local text, xerr = io.export(kept, {
+    format = opt.format --[[@as string]],
+    version = opt.version --[[@as string|nil]],
+    delimiter = opt.delimiter --[[@as string|nil]],
+    bom = opt.bom == true,
+  })
+  if not text then
+    ctx.warn("error: " .. tostring(xerr))
+    return 2
+  end
+  if opt.out then
+    local path = require("tasks_nvim.fsio").doc_path(opt.out --[[@as string]])
+    local ok, werr = require("tasks_nvim.fsio").write_atomic(path, text)
+    if not ok then
+      ctx.warn("error: " .. require("tasks_nvim.contacts").scrub(tostring(werr)))
+      return 1
+    end
+    ctx.say(("exported\t%d\t%s"):format(#kept, opt.format))
+    return 0
+  end
+  ctx.out(text)
+  return 0
+end
+
+---`tasks contacts [area] [--tag= --org=] [--format=tsv|json]`: the contacts by name (`tasks.contacts`); `import` and
+---`export` read and write vCard and CSV (an area named `import` or `export` cannot be listed by its name).
 ---@param ctx Tasks.CliCtx
 ---@return integer code
 commands.contacts = function(ctx)
   local opt = ctx.args.opt
+  if ctx.args.pos[1] == "import" then
+    return contacts_import(ctx, vim.list_slice(ctx.args.pos, 2))
+  elseif ctx.args.pos[1] == "export" then
+    return contacts_export(ctx, vim.list_slice(ctx.args.pos, 2))
+  end
   local doc, err = contract.contacts(
     { area = ctx.args.pos[1], tag = opt.tag, org = opt.org },
     { root = ctx.eo.root }

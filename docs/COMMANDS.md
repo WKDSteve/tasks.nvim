@@ -1235,6 +1235,27 @@ The contacts of the vault (`<area>/CONTACTS/`, [Contacts](ENGINE.md#contacts-con
 [<area>] [--tag=] [--org=] [--format=tsv|json]` lists them by name (`tasks.contacts`). The write commands go through the
 write door (`contact_new`, `contact_set`, `contact_delete`); an error names the field, never a mail address or a number.
 
+**Import and export** (vCard and CSV, no account, no network; [Contacts](ENGINE.md#contacts-contacts)):
+
+- `tasks contacts import <file> --area=<area> [--as=vcf|csv] [--delimiter=,|;|tab] [--dry-run] [--lang=de|en] [--format=json]`
+  reads a vCard file (3.0 and 4.0; `FN`, `N` when `FN` is missing, `ORG`, `TITLE`, `EMAIL`, `TEL`, `TZ`, `NOTE`,
+  `CATEGORIES`) or a CSV file (UTF-8, a BOM is removed; the header needs a name column, `name`, `FN` or `full name`;
+  `org`/`company`/`firma`, `role`/`title`, `email`/`e-mail`, `phone`/`tel`/`telefon`, `tz`, `tags`/`categories`,
+  `notes`/`notizen` are read, other columns are named and skipped). The format comes from the extension, else `--as`. The
+  delimiter of a CSV is the one of `,` `;` tab the header has most often (named on stderr as `note: delimiter: ;`).
+  Output: one line `created<TAB><id><TAB>#<n><TAB><name>` per contact (`would-create` with `--dry-run`, which writes
+  nothing), `duplicate<TAB><id of the holder><TAB>#<n><TAB><name>`, `refused<TAB>#<n><TAB><name><TAB><reason>`, a summary
+  line, and on stderr `warn: #<n> <name>: <text>` for what was dropped (a vCard property or CSV column with no field,
+  an invalid mail, number or zone). **A duplicate is a record whose mail is held by a contact of the vault (any area) or by
+  an earlier record of the file; it is never imported and never overwrites.** Records without a mail are not checked
+  against anything. A card or row without a name is refused. No line names a mail address or a number.
+- `tasks contacts export --format=vcf|csv [<area>] [--tag=] [--org=] [--version=3|4] [--delimiter=,|;|tab] [--bom]
+  [--out=<file>]` writes the valid contacts by id. vCard 4.0 (or 3.0), `FN` and `N`, folded at 75 octets; CSV header
+  `name,org,role,emails,phones,tz,tags,notes`, several values in one cell joined by `;`, `--bom` adds the byte order mark
+  that Excel wants. Without `--out` the text goes to stdout, where the CLI drops control characters (so CR): `--out`
+  keeps CRLF. A leading `=`, `+`, `-` or `@` in a cell is not neutralised against spreadsheet formulas.
+- An area called `import` or `export` cannot be listed by name (`tasks contacts import` is the verb).
+
 ### Headless: `import --from-rules` and `bootstrap` (rules.nvim)
 
 A run of [rules.nvim](https://github.com/WKDSteve/rules.nvim) written as a work list (`rules-work-list/1`, see
