@@ -1,0 +1,179 @@
+{
+  "client_op_id": "golden-checklists",
+  "digest": "sha256:6a73b69506b0dba6",
+  "dry_run": false,
+  "engine": {
+    "git": "0000000",
+    "nvim": "0.0.0",
+    "version": "0.1.0-test"
+  },
+  "generated_at": "2026-01-01T00:00:00Z",
+  "kind": "tasks.result",
+  "ok": false,
+  "plugin": "tasks.nvim",
+  "results": [
+    {
+      "changed_ids": [
+        "_list-support-faelle"
+      ],
+      "etag_after": "sha256:6b88af9fb014cc4d",
+      "file": "_list-support-faelle/list.md",
+      "id": "_list-support-faelle",
+      "inverse": {
+        "id": "_list-support-faelle",
+        "op": "checklist_delete"
+      },
+      "n": 1,
+      "ok": true,
+      "op": "checklist_new",
+      "outcome": "created"
+    },
+    {
+      "changed_ids": [
+        "_list-support-faelle"
+      ],
+      "etag_after": "sha256:df4b4d5a8e2c07a6",
+      "etag_before": "sha256:6b88af9fb014cc4d",
+      "file": "_list-support-faelle/list.md",
+      "id": "_list-support-faelle",
+      "inverse": {
+        "id": "_list-support-faelle",
+        "if_match": "sha256:df4b4d5a8e2c07a6",
+        "op": "checklist_set",
+        "title": "Support Fälle"
+      },
+      "n": 2,
+      "ok": true,
+      "op": "checklist_set",
+      "outcome": "changed"
+    },
+    {
+      "changed_ids": [
+        "_list-support-faelle/20260112-070000-ticket"
+      ],
+      "etag_after": "sha256:f4bc95b6cc48d2a5",
+      "file": "_list-support-faelle/20260112-070000-ticket.md",
+      "id": "_list-support-faelle/20260112-070000-ticket",
+      "inverse": {
+        "id": "_list-support-faelle/20260112-070000-ticket",
+        "if_match": "sha256:f4bc95b6cc48d2a5",
+        "op": "entry_delete"
+      },
+      "n": 3,
+      "ok": true,
+      "op": "entry_add",
+      "outcome": "created",
+      "slug": "20260112-070000-ticket"
+    },
+    {
+      "changed_ids": [
+        "_list-support-faelle/20260112-070000-ticket"
+      ],
+      "etag_after": "sha256:5fd375ff81933397",
+      "etag_before": "sha256:f4bc95b6cc48d2a5",
+      "file": "_list-support-faelle/20260112-070000-ticket.md",
+      "id": "_list-support-faelle/20260112-070000-ticket",
+      "inverse": {
+        "body": "",
+        "done": false,
+        "id": "_list-support-faelle/20260112-070000-ticket",
+        "if_match": "sha256:5fd375ff81933397",
+        "op": "entry_set",
+        "tags": [
+          "sap",
+          "hiva"
+        ]
+      },
+      "n": 4,
+      "ok": true,
+      "op": "entry_set",
+      "outcome": "changed"
+    },
+    {
+      "changed_ids": [],
+      "error": {
+        "code": "conflict",
+        "details": {
+          "actual": "sha256:4053e0add073448d",
+          "expected": "sha256:0000000000000000"
+        },
+        "message": "_list-einkauf/20260110-090000-milch-kaufen is not the version the change was made on (it is sha256:4053e0add073448d, the change was made on sha256:0000000000000000)",
+        "retryable": false
+      },
+      "n": 5,
+      "ok": false,
+      "op": "entry_set",
+      "outcome": "failed"
+    },
+    {
+      "changed_ids": [
+        "_list-einkauf/20260109-080000-anrufen"
+      ],
+      "etag_before": "sha256:bd1b658fd0be425c",
+      "file": "_list-einkauf/20260109-080000-anrufen.md",
+      "id": "_list-einkauf/20260109-080000-anrufen",
+      "inverse": {
+        "fields": {
+          "created": "2026-01-09T08:00:00Z",
+          "done": "2026-01-09"
+        },
+        "id": "_list-einkauf/20260109-080000-anrufen",
+        "op": "entry_add",
+        "tags": [
+          "laden"
+        ],
+        "title": "Anrufen"
+      },
+      "n": 6,
+      "ok": true,
+      "op": "entry_delete",
+      "outcome": "deleted"
+    },
+    {
+      "changed_ids": [
+        "lib.nvim/skizze",
+        "_list-einkauf/20260111-100000-skizze"
+      ],
+      "etag_after": "sha256:af1b2e0b6a796a66",
+      "file": "lib.nvim/ROADMAP/tasks/skizze/skizze.md",
+      "from": "_list-einkauf/20260111-100000-skizze",
+      "id": "lib.nvim/skizze",
+      "index": {
+        "action": "written"
+      },
+      "n": 7,
+      "ok": true,
+      "op": "entry_promote",
+      "outcome": "created"
+    },
+    {
+      "changed_ids": [],
+      "error": {
+        "code": "not_found",
+        "message": "no entry _list-einkauf/20990101-000000-nichts",
+        "retryable": false
+      },
+      "n": 8,
+      "ok": false,
+      "op": "entry_delete",
+      "outcome": "failed"
+    },
+    {
+      "changed_ids": [],
+      "error": {
+        "code": "conflict",
+        "details": {},
+        "message": "_list-einkauf holds entries: delete them first",
+        "retryable": false
+      },
+      "n": 9,
+      "ok": false,
+      "op": "checklist_delete",
+      "outcome": "failed"
+    }
+  ],
+  "schema": 1,
+  "vault": {
+    "id": "vault"
+  }
+}

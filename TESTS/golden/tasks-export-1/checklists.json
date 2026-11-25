@@ -1,0 +1,42 @@
+{
+  "digest": "sha256:ae01a998055d1792",
+  "engine": {
+    "git": "0000000",
+    "nvim": "0.0.0",
+    "version": "0.1.0-test"
+  },
+  "generated_at": "2026-01-01T00:00:00Z",
+  "items": [
+    {
+      "created": "2026-01-01T08:00:00Z",
+      "etag": "sha256:6ec5433b8b7fb27f",
+      "id": "_list-einkauf",
+      "open": 3,
+      "title": "Einkauf",
+      "total": 4
+    },
+    {
+      "created": "2026-01-02T08:00:00Z",
+      "etag": "sha256:f443e6aec0c10696",
+      "id": "_list-ideen",
+      "open": 0,
+      "title": "Ideen",
+      "total": 0
+    },
+    {
+      "created": "",
+      "etag": "sha256:e3b0c44298fc1c14",
+      "id": "_list-ohne-datei",
+      "open": 0,
+      "title": "ohne-datei",
+      "total": 0
+    }
+  ],
+  "kind": "tasks.checklists",
+  "plugin": "tasks.nvim",
+  "rev": "rev:3097bf",
+  "schema": 1,
+  "vault": {
+    "id": "vault"
+  }
+}

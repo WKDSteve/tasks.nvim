@@ -86,6 +86,12 @@
       "$ref": "#/$defs/ContactDocument"
     },
     {
+      "$ref": "#/$defs/Checklists"
+    },
+    {
+      "$ref": "#/$defs/ChecklistDocument"
+    },
+    {
       "$ref": "#/$defs/Paths"
     },
     {
@@ -1326,6 +1332,101 @@
         "limit": { "type": "integer", "minimum": 1 },
         "next_offset": { "type": "integer", "minimum": 1 },
         "items": { "type": "array", "items": { "$ref": "#/$defs/ContactEntry" } },
+        "incomplete": { "type": "array", "items": { "type": "string" } }
+      },
+      "unevaluatedProperties": false
+    },
+    "ChecklistEntry": {
+      "description": "One entry of a checklist (`_list-<list>/<slug>.md`, capability `checklists`): a short note without the weight of a task. With attachments it is in the folder form (`_list-<list>/<slug>/<slug>.md`, `assets/<kind>/...`).",
+      "type": "object",
+      "required": ["id", "slug", "title", "created", "tags", "text", "file", "etag"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^_list-[^/]+/[^/]+$" },
+        "slug": { "type": "string" },
+        "title": { "type": "string" },
+        "created": {
+          "description": "When the entry was made, `YYYY-MM-DDTHH:MM:SSZ` (the order of the list: newest first); what the file says when it was written by hand, empty when it says nothing.",
+          "type": "string"
+        },
+        "done": { "description": "The day the entry was ticked; absent while it is open.", "$ref": "#/$defs/Date" },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "text": { "type": "string", "description": "The Markdown after the frontmatter, trimmed and cut; untrusted text." },
+        "folder": { "const": true },
+        "assets": { "$ref": "#/$defs/PlanAssets" },
+        "assets_truncated": { "$ref": "#/$defs/PlanAssetsTruncated" },
+        "file": { "type": "string" },
+        "etag": { "$ref": "#/$defs/Etag" }
+      },
+      "additionalProperties": false
+    },
+    "Checklists": {
+      "description": "tasks.checklists: the checklists of the vault (`_list-<slug>/`), by title, with how many entries each holds and how many are open. Capability `checklists`; written with `checklist_new`, `checklist_set`, `checklist_delete`.",
+      "allOf": [{ "$ref": "#/$defs/Head" }],
+      "type": "object",
+      "required": ["kind", "rev", "digest", "items"],
+      "properties": {
+        "kind": { "const": "tasks.checklists" },
+        "rev": { "$ref": "#/$defs/Rev" },
+        "digest": { "$ref": "#/$defs/Digest" },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "title", "created", "total", "open", "etag"],
+            "properties": {
+              "id": { "type": "string", "pattern": "^_list-[^/]+$" },
+              "title": { "type": "string" },
+              "created": { "type": "string" },
+              "total": { "type": "integer", "minimum": 0 },
+              "open": { "type": "integer", "minimum": 0 },
+              "etag": { "$ref": "#/$defs/Etag" }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "unevaluatedProperties": false
+    },
+    "ChecklistDocument": {
+      "description": "tasks.checklist: the entries of one checklist, newest first, that the filter lets through (`since`, `until`: the day made; `tag`; `q`: every word in the title, text or tags; `state`), one page. `tags` counts the tags of the whole list. Capability `checklists`; entries are written with `entry_add`, `entry_set`, `entry_delete`, `entry_promote`, attachments with `attach` and `board_save`.",
+      "allOf": [{ "$ref": "#/$defs/Head" }],
+      "type": "object",
+      "required": ["kind", "rev", "digest", "list", "state", "total", "matching", "offset", "limit", "tags", "items", "incomplete"],
+      "properties": {
+        "kind": { "const": "tasks.checklist" },
+        "rev": { "$ref": "#/$defs/Rev" },
+        "digest": { "$ref": "#/$defs/Digest" },
+        "list": {
+          "type": "object",
+          "required": ["id", "title", "created", "etag"],
+          "properties": {
+            "id": { "type": "string" },
+            "title": { "type": "string" },
+            "created": { "type": "string" },
+            "etag": { "$ref": "#/$defs/Etag" }
+          },
+          "additionalProperties": false
+        },
+        "since": { "$ref": "#/$defs/Date" },
+        "until": { "$ref": "#/$defs/Date" },
+        "tag": { "type": "string" },
+        "q": { "type": "string" },
+        "state": { "enum": ["open", "done", "all"] },
+        "total": { "type": "integer", "minimum": 0 },
+        "matching": { "type": "integer", "minimum": 0 },
+        "offset": { "type": "integer", "minimum": 0 },
+        "limit": { "type": "integer", "minimum": 1 },
+        "next_offset": { "type": "integer", "minimum": 1 },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["tag", "count"],
+            "properties": { "tag": { "type": "string" }, "count": { "type": "integer", "minimum": 1 } },
+            "additionalProperties": false
+          }
+        },
+        "items": { "type": "array", "items": { "$ref": "#/$defs/ChecklistEntry" } },
         "incomplete": { "type": "array", "items": { "type": "string" } }
       },
       "unevaluatedProperties": false
@@ -4881,7 +4982,7 @@
       "required": ["op", "id"],
       "properties": {
         "op": {
-          "enum": ["set", "reorder", "tick_step", "answer", "set_body", "set_section", "move_area", "view_save", "view_delete", "plan_set", "project_set", "meeting_set", "meeting_attend", "path_set", "node_set", "unpromote", "path_reward", "path_levels", "milestone_set", "contact_new", "contact_set", "contact_delete"]
+          "enum": ["set", "reorder", "tick_step", "answer", "set_body", "set_section", "move_area", "view_save", "view_delete", "plan_set", "project_set", "meeting_set", "meeting_attend", "path_set", "node_set", "unpromote", "path_reward", "path_levels", "milestone_set", "contact_new", "contact_set", "contact_delete", "checklist_new", "checklist_set", "checklist_delete", "entry_add", "entry_set", "entry_delete"]
         },
         "xp": {
           "description": "`node_set` that wrote XP: the XP the point had (capability `xp`).",
@@ -4990,8 +5091,17 @@
           "type": "object"
         },
         "fields": {
-          "description": "`contact_new` as the inverse of `contact_delete`: the frontmatter fields the contact had.",
+          "description": "`contact_new` as the inverse of `contact_delete`: the frontmatter fields the contact had; `checklist_new` and `entry_add` as the inverse of a delete: `created` (and `done`) of the list or entry (capability `checklists`).",
           "type": "object"
+        },
+        "title": {
+          "description": "`checklist_new`, `checklist_set`, `entry_add`, `entry_set`: the title the list or entry had (capability `checklists`).",
+          "type": "string"
+        },
+        "tags": {
+          "description": "`entry_add`, `entry_set`: the tags the entry had (capability `checklists`).",
+          "type": "array",
+          "items": { "type": "string" }
         },
         "after": {
           "type": "string"
@@ -5103,7 +5213,7 @@
           "minimum": 1
         },
         "op": {
-          "enum": ["set", "new", "reorder", "done", "move_area", "plan_new", "plan_set", "plan_close", "project_new", "project_set", "project_close", "tick_step", "add_steps", "answer", "append_note", "reopen", "set_body", "set_section", "view_save", "view_delete", "attach", "claim", "release", "history_record", "meeting_new", "meeting_set", "meeting_close", "meeting_capture", "meeting_attend", "meeting_followups", "board_save", "path_new", "path_set", "path_close", "node_set", "promote", "unpromote", "path_reward", "path_levels", "milestone_new", "milestone_set", "contact_new", "contact_set", "contact_delete"]
+          "enum": ["set", "new", "reorder", "done", "move_area", "plan_new", "plan_set", "plan_close", "project_new", "project_set", "project_close", "tick_step", "add_steps", "answer", "append_note", "reopen", "set_body", "set_section", "view_save", "view_delete", "attach", "claim", "release", "history_record", "meeting_new", "meeting_set", "meeting_close", "meeting_capture", "meeting_attend", "meeting_followups", "board_save", "path_new", "path_set", "path_close", "node_set", "promote", "unpromote", "path_reward", "path_levels", "milestone_new", "milestone_set", "contact_new", "contact_set", "contact_delete", "checklist_new", "checklist_set", "checklist_delete", "entry_add", "entry_set", "entry_delete", "entry_promote"]
         },
         "id": {
           "type": "string"
@@ -5202,6 +5312,10 @@
             "given": { "type": "boolean" }
           },
           "additionalProperties": false
+        },
+        "from": {
+          "description": "`entry_promote`: the entry of a checklist the new task was made from, `_list-<list>/<slug>` (capability `checklists`); `id` is the new task.",
+          "type": "string"
         },
         "promoted_from": {
           "description": "`promote`: the learning point the new task came from, `<container>#<key>` (capability `promote`).",

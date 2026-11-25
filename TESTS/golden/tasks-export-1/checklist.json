@@ -1,0 +1,90 @@
+{
+  "digest": "sha256:45ff71962be02ec3",
+  "engine": {
+    "git": "0000000",
+    "nvim": "0.0.0",
+    "version": "0.1.0-test"
+  },
+  "generated_at": "2026-01-01T00:00:00Z",
+  "incomplete": [],
+  "items": [
+    {
+      "assets": [
+        "assets/images/board.png"
+      ],
+      "created": "2026-01-11T10:00:00Z",
+      "etag": "sha256:e89d9a2c9f0cac99",
+      "file": "_list-einkauf/20260111-100000-skizze/20260111-100000-skizze.md",
+      "folder": true,
+      "id": "_list-einkauf/20260111-100000-skizze",
+      "slug": "20260111-100000-skizze",
+      "tags": [],
+      "text": "",
+      "title": "Skizze"
+    },
+    {
+      "created": "2026-01-10T09:00:00Z",
+      "etag": "sha256:4053e0add073448d",
+      "file": "_list-einkauf/20260110-090000-milch-kaufen.md",
+      "id": "_list-einkauf/20260110-090000-milch-kaufen",
+      "slug": "20260110-090000-milch-kaufen",
+      "tags": [
+        "laden",
+        "bio"
+      ],
+      "text": "Die laktosefreie.",
+      "title": "Milch kaufen"
+    },
+    {
+      "created": "2026-01-09T08:00:00Z",
+      "done": "2026-01-09",
+      "etag": "sha256:bd1b658fd0be425c",
+      "file": "_list-einkauf/20260109-080000-anrufen.md",
+      "id": "_list-einkauf/20260109-080000-anrufen",
+      "slug": "20260109-080000-anrufen",
+      "tags": [
+        "laden"
+      ],
+      "text": "",
+      "title": "Anrufen"
+    },
+    {
+      "created": "",
+      "etag": "sha256:151e274fcaa59fa4",
+      "file": "_list-einkauf/by-hand.md",
+      "id": "_list-einkauf/by-hand",
+      "slug": "by-hand",
+      "tags": [],
+      "text": "# Einfach so notiert\n\nOhne Kopf.",
+      "title": "Einfach so notiert"
+    }
+  ],
+  "kind": "tasks.checklist",
+  "limit": 100,
+  "list": {
+    "created": "2026-01-01T08:00:00Z",
+    "etag": "sha256:6ec5433b8b7fb27f",
+    "id": "_list-einkauf",
+    "title": "Einkauf"
+  },
+  "matching": 4,
+  "offset": 0,
+  "plugin": "tasks.nvim",
+  "rev": "rev:c6fd58",
+  "schema": 1,
+  "state": "all",
+  "tags": [
+    {
+      "count": 1,
+      "tag": "bio"
+    },
+    {
+      "count": 2,
+      "tag": "laden"
+    }
+  ],
+  "total": 4,
+  "vault": {
+    "id": "vault"
+  }
+}

@@ -476,6 +476,37 @@ function G.write_meetings(root)
   write(dir .. "/someday.md", "---\ntitle: Someday\nstatus: planned\n---\n\nNo date yet.\n")
 end
 
+---Write the checklists of the golden cases `checklists`, `checklist` and `result-checklists` into `root` (made-up
+---entries): a list "Einkauf" with an open entry with a text and tags, a ticked one, one with an attachment (folder form)
+---and one written by hand without a title; an empty list "Ideen"; a folder `_list-ohne-datei/` without its `list.md`.
+---@param root string
+function G.write_checklists(root)
+  local function write(path, text)
+    vim.fn.mkdir(vim.fs.dirname(path), "p")
+    local fh = assert(io.open(path, "wb"))
+    fh:write(text)
+    fh:close()
+  end
+  local dir = root .. "/_list-einkauf"
+  write(dir .. "/list.md", "---\ntitle: Einkauf\ncreated: 2026-01-01T08:00:00Z\n---\n")
+  write(
+    dir .. "/20260110-090000-milch-kaufen.md",
+    "---\ntitle: Milch kaufen\ncreated: 2026-01-10T09:00:00Z\ntags: [laden, bio]\nupdated: 2026-01-10\n---\n\nDie laktosefreie.\n"
+  )
+  write(
+    dir .. "/20260109-080000-anrufen.md",
+    "---\ntitle: Anrufen\ncreated: 2026-01-09T08:00:00Z\ndone: 2026-01-09\ntags: [laden]\nupdated: 2026-01-09\n---\n"
+  )
+  write(
+    dir .. "/20260111-100000-skizze/20260111-100000-skizze.md",
+    "---\ntitle: Skizze\ncreated: 2026-01-11T10:00:00Z\nupdated: 2026-01-11\n---\n"
+  )
+  write(dir .. "/20260111-100000-skizze/assets/images/board.png", "png")
+  write(dir .. "/by-hand.md", "# Einfach so notiert\n\nOhne Kopf.\n")
+  write(root .. "/_list-ideen/list.md", "---\ntitle: Ideen\ncreated: 2026-01-02T08:00:00Z\n---\n")
+  vim.fn.mkdir(root .. "/_list-ohne-datei", "p")
+end
+
 ---Write the contacts of the golden cases `contacts` and `contact` into `root`: one with every field and a folder, one
 ---plain, one with a zone that is none (still listed, with its problem).
 ---@param root string
@@ -1033,6 +1064,39 @@ G.cases = {
     end,
   },
   {
+    -- the checklists of the vault by title, with their counts (capability `checklists`); a folder without its list.md is
+    -- a list named by its slug
+    name = "checklists",
+    method = "checklists",
+    fresh = true,
+    request = function(root)
+      G.write_checklists(root)
+      return '{"params":{}}'
+    end,
+  },
+  {
+    -- one checklist, newest first (capability `checklists`): an entry with an attachment (folder form), an open one with
+    -- a text and tags, a ticked one; an entry written by hand without a title is named by its heading and sorts last;
+    -- the tags of the whole list with their counts
+    name = "checklist",
+    method = "checklist",
+    fresh = true,
+    request = function(root)
+      G.write_checklists(root)
+      return '{"params":{"id":"_list-einkauf"}}'
+    end,
+  },
+  {
+    -- the filter: open entries with the tag `laden` that hold the word "LAKTOSE" (case folded), made from 2026-01-10
+    name = "checklist-filter",
+    method = "checklist",
+    fresh = true,
+    request = function(root)
+      G.write_checklists(root)
+      return '{"params":{"id":"_list-einkauf","since":"2026-01-10","tag":"laden","q":"LAKTOSE","state":"open"}}'
+    end,
+  },
+  {
     -- one contact with its text and its notes (capability `contacts`)
     name = "contact",
     method = "contact",
@@ -1419,6 +1483,52 @@ G.cases = {
           { op = "meeting_attend", id = id, n = 1 },
           { op = "meeting_followups", id = id },
           { op = "meeting_close", id = id, result = "Vereinbart." },
+        },
+      })
+    end,
+  },
+  {
+    -- checklists for real (capability `checklists`): a list made and renamed (the inverses delete and put back), an
+    -- entry made with `#tags` in its line (the inverse deletes), changed (the inverse puts back), deleted (the inverse
+    -- makes it again), made a task of an area with its attachment (the entry is gone), a stale version a conflict, an
+    -- id of no entry not found, a list that holds entries not deleted
+    name = "result-checklists",
+    method = "ops",
+    fresh = true,
+    request = function(root)
+      G.write_checklists(root)
+      return encode({
+        client_op_id = "golden-checklists",
+        ops = {
+          {
+            op = "checklist_new",
+            title = "Support Fälle",
+            fields = { created = "2026-01-12T06:00:00Z" },
+          },
+          { op = "checklist_set", id = "_list-support-faelle", title = "Support" },
+          {
+            op = "entry_add",
+            id = "_list-support-faelle/20260112-070000-ticket",
+            title = "Ticket #sap anlegen #Hiva",
+            fields = { created = "2026-01-12T07:00:00Z" },
+          },
+          {
+            op = "entry_set",
+            id = "_list-support-faelle/20260112-070000-ticket",
+            done = true,
+            tags = { "sap" },
+            body = "Mit Log.",
+          },
+          {
+            op = "entry_set",
+            id = "_list-einkauf/20260110-090000-milch-kaufen",
+            done = true,
+            if_match = "sha256:0000000000000000",
+          },
+          { op = "entry_delete", id = "_list-einkauf/20260109-080000-anrufen" },
+          { op = "entry_promote", id = "_list-einkauf/20260111-100000-skizze", area = "lib.nvim" },
+          { op = "entry_delete", id = "_list-einkauf/20990101-000000-nichts" },
+          { op = "checklist_delete", id = "_list-einkauf" },
         },
       })
     end,

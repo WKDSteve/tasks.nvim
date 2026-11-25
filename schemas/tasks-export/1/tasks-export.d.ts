@@ -31,6 +31,8 @@ export type TasksExport =
   | MeetingParse
   | Contacts
   | ContactDocument
+  | Checklists
+  | ChecklistDocument
   | Paths
   | PathDocument
   | LearnNext
@@ -1146,6 +1148,52 @@ export type ContactDocument = Head & {
    * More meetings than the list holds.
    */
   history_truncated?: true;
+};
+/**
+ * tasks.checklists: the checklists of the vault (`_list-<slug>/`), by title, with how many entries each holds and how many are open. Capability `checklists`; written with `checklist_new`, `checklist_set`, `checklist_delete`.
+ */
+export type Checklists = Head & {
+  kind: "tasks.checklists";
+  rev: Rev;
+  digest: Digest;
+  items: {
+    id: string;
+    title: string;
+    created: string;
+    total: number;
+    open: number;
+    etag: Etag;
+  }[];
+};
+/**
+ * tasks.checklist: the entries of one checklist, newest first, that the filter lets through (`since`, `until`: the day made; `tag`; `q`: every word in the title, text or tags; `state`), one page. `tags` counts the tags of the whole list. Capability `checklists`; entries are written with `entry_add`, `entry_set`, `entry_delete`, `entry_promote`, attachments with `attach` and `board_save`.
+ */
+export type ChecklistDocument = Head & {
+  kind: "tasks.checklist";
+  rev: Rev;
+  digest: Digest;
+  list: {
+    id: string;
+    title: string;
+    created: string;
+    etag: Etag;
+  };
+  since?: Date;
+  until?: Date;
+  tag?: string;
+  q?: string;
+  state: "open" | "done" | "all";
+  total: number;
+  matching: number;
+  offset: number;
+  limit: number;
+  next_offset?: number;
+  tags: {
+    tag: string;
+    count: number;
+  }[];
+  items: ChecklistEntry[];
+  incomplete: string[];
 };
 /**
  * tasks.paths: the open learning paths of the vault or of an area (with `include_done` the finished ones too, `stage: done`, after them), each with its progress; no tree (that is tasks.path). Capability `paths`.
@@ -2523,6 +2571,32 @@ export interface ContactEntry {
   problems: Problem[];
 }
 /**
+ * One entry of a checklist (`_list-<list>/<slug>.md`, capability `checklists`): a short note without the weight of a task. With attachments it is in the folder form (`_list-<list>/<slug>/<slug>.md`, `assets/<kind>/...`).
+ */
+export interface ChecklistEntry {
+  id: string;
+  slug: string;
+  title: string;
+  /**
+   * When the entry was made, `YYYY-MM-DDTHH:MM:SSZ` (the order of the list: newest first); what the file says when it was written by hand, empty when it says nothing.
+   */
+  created: string;
+  /**
+   * A calendar day, YYYY-MM-DD.
+   */
+  done?: string;
+  tags: string[];
+  /**
+   * The Markdown after the frontmatter, trimmed and cut; untrusted text.
+   */
+  text: string;
+  folder?: true;
+  assets?: PlanAssets;
+  assets_truncated?: PlanAssetsTruncated;
+  file: string;
+  etag: Etag;
+}
+/**
  * A learning path (`<area>/ROADMAP/paths/<slug>.md`): the head of its file, its progress over the leaves of its tree (optional ones apart, `optional`), its version.
  */
 export interface PathEntry {
@@ -3034,7 +3108,14 @@ export interface ResultEntry {
     | "milestone_set"
     | "contact_new"
     | "contact_set"
-    | "contact_delete";
+    | "contact_delete"
+    | "checklist_new"
+    | "checklist_set"
+    | "checklist_delete"
+    | "entry_add"
+    | "entry_set"
+    | "entry_delete"
+    | "entry_promote";
   id?: string;
   /**
    * `meeting_close`: the meeting has no `## Ergebnis` afterwards (allowed: a hint for the front end).
@@ -3105,6 +3186,10 @@ export interface ResultEntry {
     line: number;
     given: boolean;
   };
+  /**
+   * `entry_promote`: the entry of a checklist the new task was made from, `_list-<list>/<slug>` (capability `checklists`); `id` is the new task.
+   */
+  from?: string;
   /**
    * The learning point a task was promoted from: `<container id>#<key>`, the container a learning path or a task with `## Lernpunkte` (capability `outcome`).
    */
@@ -3259,7 +3344,13 @@ export interface Inverse {
     | "milestone_set"
     | "contact_new"
     | "contact_set"
-    | "contact_delete";
+    | "contact_delete"
+    | "checklist_new"
+    | "checklist_set"
+    | "checklist_delete"
+    | "entry_add"
+    | "entry_set"
+    | "entry_delete";
   /**
    * `node_set` that wrote XP: the XP the point had (capability `xp`).
    */
@@ -3356,9 +3447,17 @@ export interface Inverse {
   view?: {};
   patch?: {};
   /**
-   * `contact_new` as the inverse of `contact_delete`: the frontmatter fields the contact had.
+   * `contact_new` as the inverse of `contact_delete`: the frontmatter fields the contact had; `checklist_new` and `entry_add` as the inverse of a delete: `created` (and `done`) of the list or entry (capability `checklists`).
    */
   fields?: {};
+  /**
+   * `checklist_new`, `checklist_set`, `entry_add`, `entry_set`: the title the list or entry had (capability `checklists`).
+   */
+  title?: string;
+  /**
+   * `entry_add`, `entry_set`: the tags the entry had (capability `checklists`).
+   */
+  tags?: string[];
   after?: string;
   before?: string;
   if_match?: Etag;

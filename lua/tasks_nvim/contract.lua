@@ -67,6 +67,8 @@ M.CAPABILITIES = {
   "attach",
   "bodies",
   "check",
+  "checklist",
+  "checklists",
   "ci",
   "claims",
   "competences",
@@ -3484,6 +3486,164 @@ function M.contacts(params, opts)
     doc.incomplete = vim.tbl_map(function(e)
       return contact_message(root, tostring(e))
     end, type(errors) == "table" and errors or {})
+    return seal(doc, builder.rev_of(lines)), nil
+  end)
+end
+
+---The entry of one item of a checklist (`checklist.parse`).
+---@param root string
+---@param e Tasks.ChecklistEntry
+---@return table
+local function checklist_entry(root, e)
+  local entry = {
+    id = e.id,
+    slug = e.slug,
+    title = clip(e.title, M.LIMITS.title),
+    created = e.created,
+    done = e.done,
+    tags = vim.list_slice(e.tags, 1),
+    text = clip(e.body, M.LIMITS.body_bytes),
+    file = relative(root, e.path) or vim.fs.basename(e.path),
+    etag = e.etag,
+  }
+  if e.folder then
+    entry.folder = true
+    local assets, truncated = require("tasks_nvim.plans").assets(e, M.LIMITS.list_items)
+    entry.assets = assets
+    entry.assets_truncated = truncated or nil
+  end
+  return entry
+end
+
+---`tasks.checklists`: the checklists of the vault (`_list-<slug>/`), by title, with how many entries each holds and how
+---many of them are open. Capability `checklists`.
+---@param _ table|nil
+---@param opts? { root?: string }
+---@return table|nil doc
+---@return Tasks.ContractError|string|nil err
+function M.checklists(_, opts)
+  return fsio.read_scope(function()
+    local root, rerr = vault.root(opts)
+    if not root then
+      return nil, rerr
+    end
+    local checklist = require("tasks_nvim.checklist")
+    local doc = M.head("tasks.checklists", root)
+    local items, lines = {}, {}
+    for _, l in ipairs(checklist.lists(root)) do
+      local entries = checklist.entries(root, l.id)
+      local open = 0
+      for _, e in ipairs(entries) do
+        if not e.done then
+          open = open + 1
+        end
+        lines[#lines + 1] = e.id .. "\t" .. e.etag
+      end
+      items[#items + 1] = {
+        id = l.id,
+        title = clip(l.title, M.LIMITS.title),
+        created = l.created,
+        total = #entries,
+        open = open,
+        etag = l.etag,
+      }
+      lines[#lines + 1] = l.id .. "\t" .. l.etag
+    end
+    doc.items = items
+    return seal(doc, builder.rev_of(lines)), nil
+  end)
+end
+
+---`tasks.checklist`: the entries of one checklist, newest first, that the filter lets through (`checklist.filter`:
+---`since`, `until`, `tag`, `q`, `state`), one page; `tags` are the tags of the whole list with how often each stands.
+---Capability `checklists`.
+---@param params { id: string, since?: string, until?: string, tag?: string, q?: string, state?: string, limit?: integer, offset?: integer }
+---@param opts? { root?: string }
+---@return table|nil doc
+---@return Tasks.ContractError|string|nil err
+function M.checklist(params, opts)
+  params = params or {}
+  local limit = params.limit or M.LIMITS.list_items
+  local offset = params.offset or 0
+  if
+    type(limit) ~= "number"
+    or limit < 1
+    or limit > M.LIMITS.list_items
+    or limit ~= math.floor(limit)
+  then
+    return nil, bad_argument(("limit must be 1..%d"):format(M.LIMITS.list_items))
+  end
+  if type(offset) ~= "number" or offset < 0 or offset ~= math.floor(offset) then
+    return nil, bad_argument("offset must be a whole number of 0 or more")
+  end
+  for _, key in ipairs({ "since", "until" }) do
+    if params[key] ~= nil and not model.is_date(params[key]) then
+      return nil, bad_argument(key .. " must be a date (YYYY-MM-DD)")
+    end
+  end
+  local state = params.state or "all"
+  if state ~= "open" and state ~= "done" and state ~= "all" then
+    return nil, bad_argument("state must be open, done or all")
+  end
+  return fsio.read_scope(function()
+    local root, rerr = vault.root(opts)
+    if not root then
+      return nil, rerr
+    end
+    local checklist = require("tasks_nvim.checklist")
+    local l, lerr, linfo = checklist.list(root, params.id)
+    if not l then
+      return nil,
+        {
+          code = (linfo and linfo.code == "not_found") and "not_found" or "invalid_argument",
+          message = M.redact(root, tostring(lerr)),
+          retryable = false,
+        }
+    end
+    local all, errors = checklist.entries(root, l.id)
+    local counts = {}
+    for _, e in ipairs(all) do
+      for _, t in ipairs(e.tags) do
+        counts[t] = (counts[t] or 0) + 1
+      end
+    end
+    local tags = {}
+    for name, n in pairs(counts) do
+      tags[#tags + 1] = { tag = name, count = n }
+    end
+    table.sort(tags, function(a, b)
+      return a.tag < b.tag
+    end)
+    local matching = checklist.filter(all, {
+      since = params.since,
+      ["until"] = params["until"],
+      tag = params.tag,
+      q = params.q,
+      state = state,
+    })
+    local doc = M.head("tasks.checklist", root)
+    doc.list =
+      { id = l.id, title = clip(l.title, M.LIMITS.title), created = l.created, etag = l.etag }
+    doc.since, doc["until"], doc.tag, doc.q = params.since, params["until"], params.tag, params.q
+    doc.state = state
+    doc.total = #all
+    doc.matching = #matching
+    doc.offset = offset
+    doc.limit = limit
+    doc.tags = tags
+    local items, lines = {}, { l.id .. "\t" .. l.etag }
+    for i = offset + 1, math.min(#matching, offset + limit) do
+      local e = matching[i]
+      items[#items + 1] = checklist_entry(root, e)
+      lines[#lines + 1] = e.id .. "\t" .. e.etag
+    end
+    doc.items = items
+    if offset + limit < #matching then
+      doc.next_offset = offset + limit
+    end
+    doc.incomplete = vim.tbl_map(function(e)
+      return M.redact(root, tostring(e))
+    end, errors)
     return seal(doc, builder.rev_of(lines)), nil
   end)
 end

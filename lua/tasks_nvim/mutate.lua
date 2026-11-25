@@ -92,6 +92,11 @@ end
 ---@return Tasks.Task|{ id: string, area: string, slug: string, path: string, folder: boolean, file_kind: "plan"|"project" }|nil target
 ---@return string|nil err
 function M.attach_target(id, root, drafts)
+  -- an entry of a checklist (`_list-<list>/<slug>`): its folder is no area
+  local checklist = require("tasks_nvim.checklist")
+  if checklist.is_entry_id(id) then
+    return checklist.target(id, root)
+  end
   local task, ferr = M.find_open(id, root, drafts)
   if task then
     return task, nil
@@ -3519,6 +3524,8 @@ local function to_folder(root, task)
   local dest
   if task.file_kind == "meeting" then
     dest = vault.meetings_dir(root, task.area) .. "/" .. task.slug .. "/" .. task.slug .. ".md"
+  elseif task.file_kind == "checklist" then
+    dest = task.folder_path
   elseif task.file_kind then
     dest = vault.plan_folder_path(root, task.file_kind, task.area, task.slug)
   else
@@ -3634,7 +3641,7 @@ function M.folderize(id, opts)
   if opts.relink ~= false then
     result.relinked = relink.follow(root, { { from = task.path, to = dest } }, { skip = { dest } })
   end
-  if opts.index ~= false then
+  if opts.index ~= false and task.file_kind ~= "checklist" then
     result.index, result.index_err = index.write_area(task.area, { root = root })
   end
   return result, nil
@@ -3746,7 +3753,7 @@ function M.attach(id, src, opts)
       return nil, why
     end
     -- It stays a folder task, so keep the index true to what is on disk.
-    if opts.index ~= false then
+    if opts.index ~= false and task.file_kind ~= "checklist" then
       index.write_area(task.area, { root = root })
     end
     return nil,
@@ -3777,7 +3784,7 @@ function M.attach(id, src, opts)
   if folderized and opts.relink ~= false then
     result.relinked = relink.follow(root, { { from = task.path, to = path } }, { skip = { path } })
   end
-  if opts.index ~= false then
+  if opts.index ~= false and task.file_kind ~= "checklist" then
     result.index, result.index_err = index.write_area(task.area, { root = root })
   end
   return result, nil

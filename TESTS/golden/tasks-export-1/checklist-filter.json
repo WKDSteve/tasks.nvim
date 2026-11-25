@@ -1,0 +1,56 @@
+{
+  "digest": "sha256:4b80e7ba4c2b63db",
+  "engine": {
+    "git": "0000000",
+    "nvim": "0.0.0",
+    "version": "0.1.0-test"
+  },
+  "generated_at": "2026-01-01T00:00:00Z",
+  "incomplete": [],
+  "items": [
+    {
+      "created": "2026-01-10T09:00:00Z",
+      "etag": "sha256:4053e0add073448d",
+      "file": "_list-einkauf/20260110-090000-milch-kaufen.md",
+      "id": "_list-einkauf/20260110-090000-milch-kaufen",
+      "slug": "20260110-090000-milch-kaufen",
+      "tags": [
+        "laden",
+        "bio"
+      ],
+      "text": "Die laktosefreie.",
+      "title": "Milch kaufen"
+    }
+  ],
+  "kind": "tasks.checklist",
+  "limit": 100,
+  "list": {
+    "created": "2026-01-01T08:00:00Z",
+    "etag": "sha256:6ec5433b8b7fb27f",
+    "id": "_list-einkauf",
+    "title": "Einkauf"
+  },
+  "matching": 1,
+  "offset": 0,
+  "plugin": "tasks.nvim",
+  "q": "LAKTOSE",
+  "rev": "rev:fe0893",
+  "schema": 1,
+  "since": "2026-01-10",
+  "state": "open",
+  "tag": "laden",
+  "tags": [
+    {
+      "count": 1,
+      "tag": "bio"
+    },
+    {
+      "count": 2,
+      "tag": "laden"
+    }
+  ],
+  "total": 4,
+  "vault": {
+    "id": "vault"
+  }
+}

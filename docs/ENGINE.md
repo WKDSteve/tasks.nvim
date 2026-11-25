@@ -74,6 +74,7 @@ TESTS/              specs (run with scripts/test.sh, i.e. testing.nvim)
 | `tasks_nvim.plans` | Plan files, `<area>/ROADMAP/plans/<slug>.md` (or the folder form `<slug>/<slug>.md`, whose other files are assets: `assets` lists them): frontmatter `title`, `status` (planning / doing / parked / done), `areas`, `target`, `phase_order`, `gate` (`hard`), `links` (http/https), dates; no task list. `parse` / `from_file` always return a plan (a broken one carries errors), `area` / `all` / `find` read them, `members` picks the tasks that name one, `new` creates one (never overwrites), `close` finishes one like a task (moved to `Backlog/FEATURES/`, a README row, snapshot and rollback), `summary` says what a finished plan amounted to. | `parse`, `area`, `all`, `find`, `members`, `new`, `close`, `summary` |
 | `tasks_nvim.contacts_io` | Contacts as vCard (3.0, 4.0) and CSV: `parse_vcf`, `parse_csv`, `write_vcf`, `write_csv`, `import_file`, `export`; offline, see [Contacts](#contacts-contacts) |
 | `tasks_nvim.contacts` / `tasks_nvim.contact_write` | Contact files, `<area>/CONTACTS/<slug>.md` (or the folder form `<slug>/<slug>.md`), see [Contacts](#contacts-contacts): `parse` (`name`, `org`, `role`, `emails`, `phones`, `tz`, `tags`, the text and the notes section), `area`/`all`/`find`, `is_email`, `is_phone`, `scrub` (takes a mail address and a phone number out of a text); `contact_write.new`/`set`/`delete` under the lock of the file, on the version the caller read |
+| `tasks_nvim.checklist` | Checklists, see [Checklists](#checklists-_list-): lists as folders `_list-<slug>/` (`list.md`: the name), an entry per file (`title`, `created`, `done`, `tags`, Markdown text; the folder form with `assets/`); `lists`/`list`/`list_new`/`list_set`/`list_delete`, `entries`/`find`/`filter`, `split_tags` (the `#words` of a typed line), `add`/`set`/`delete`/`promote` under the lock of the file, on the version the caller read |
 | `tasks_nvim.meetings` | Meeting files, `<area>/MEETINGS/<slug>.md` (or the folder form `<slug>/<slug>.md`), see [Meetings](#meetings-meetings): a meeting is no task and names its tasks (`tasks:`); `by_task` derives the meetings of a task. `parse` / `from_file` always return a meeting (a broken one carries errors; a parse cache by mtime and size), `area` / `all` / `find` read them, `online_service` tells the service of an address, `parse_duration`, `parse_notify`, `is_tz` read the fields; a series (`repeat`) is computed into its occurrences (`occurrence_days`, `expand`), `find_any` also reads an occurrence without a file. | `parse`, `from_file`, `area`, `all`, `find`, `find_any`, `by_task`, `less`, `online_service`, `occurrence_days`, `occurrence`, `expand` |
 | `tasks_nvim.meeting_write` | Writing meetings under the file lock, on the version read: `new`, `set`, `close`, `capture` (one line of the minutes), `attend`, `followups` (tasks of the follow-ups), `board_save` (a whiteboard, replaced only on the version read); `renames_for_move` and `tick_done` for `move_area` and `done`; pure body helpers (`capture_body`, `attend_body`, `tick_item`, `add_items`, `append_to_section`, `set_section`). | `new`, `set`, `close`, `capture`, `attend`, `followups`, `board_save`, `edit` |
 | `tasks_nvim.meeting_quick` | The quick capture of a meeting: one line (day, time, duration, all-day, address, `@place`, `#task`, `!notify`, the rest the title) read into a proposal of the fields of `meeting_new`, with what it assumed and the words it could not read. Pure. | `parse` |
@@ -535,6 +536,26 @@ occurrences without a file. `check`: `meeting-bad-repeat`, `meeting-bad-repeat-u
 `meeting-bad-series` (errors: `series:` beside `repeat`, or a file that is not `<slug of the series>-<day>` of the same
 area), `meeting-series-missing` (warning: the series is gone or no series any more), `meeting-series-off-day` (hint:
 the day of an occurrence file is no day of its series any more); a series takes no part in `meeting-overlap`.
+
+### Checklists (`_list-*/`)
+
+Lists of short entries without the weight of a task, several per vault (a list of support tasks, a list of things
+learned, a scratch list), shown in their own tab of tasks-desktop and tasks-web. Every list is a folder of the vault
+root whose name starts with `_list-` (so it is no area), with its name in `list.md`:
+
+```
+_list-support/list.md                                  the list: frontmatter title, created
+_list-support/20261125-204107-sap-ticket.md            an entry
+_list-support/20261125-204107-sap-ticket/<same>.md     an entry with attachments (assets/images/..., assets/boards/...)
+```
+
+An entry is one file: frontmatter `title`, `created` (`YYYY-MM-DDTHH:MM:SSZ`, the order of the list, newest first),
+`done` (the day it was ticked), `tags`, `updated`; below it free Markdown (text, code, tables, images). One file per
+entry, so two devices adding at the same time never touch one file. A file written by hand without frontmatter is an
+entry too (its first line is the title). A `#word` in a typed line becomes a tag. An entry gets attachments like a task
+(`attach`, `board_save`) and can become a task of an area (`entry_promote`), which takes its title, text, tags and
+attachments along. The documents `tasks.checklists` and `tasks.checklist` (with the filter `since`, `until`, `tag`,
+`q`, `state`) and the operations are in [CONTRACT.md](CONTRACT.md).
 
 ### Contacts (`CONTACTS/`)
 

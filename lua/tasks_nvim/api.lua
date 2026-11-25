@@ -242,6 +242,28 @@ local methods = {
       return contract.contacts(params, opts)
     end,
   },
+  checklists = {
+    params = {},
+    run = function(params, opts)
+      return contract.checklists(params, opts)
+    end,
+  },
+  checklist = {
+    params = {
+      id = "string",
+      since = "string",
+      ["until"] = "string",
+      tag = "string",
+      q = "string",
+      state = "string",
+      limit = "integer",
+      offset = "integer",
+    },
+    required = { "id" },
+    run = function(params, opts)
+      return contract.checklist(params, opts)
+    end,
+  },
   contact = {
     params = { id = "string" },
     required = { "id" },

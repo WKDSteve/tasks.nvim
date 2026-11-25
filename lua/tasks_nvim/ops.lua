@@ -191,6 +191,13 @@ M.OPS = {
   "contact_new",
   "contact_set",
   "contact_delete",
+  "checklist_new",
+  "checklist_set",
+  "checklist_delete",
+  "entry_add",
+  "entry_set",
+  "entry_delete",
+  "entry_promote",
 }
 
 ---The operations after which the milestones are brought in line (`milestones.settle`); `done` does it in its flow.
@@ -384,6 +391,27 @@ local FIELDS = {
   },
   contact_set = { id = "string", patch = "object", if_match = "string" },
   contact_delete = { id = "string", if_match = "string" },
+  checklist_new = { id = "string", title = "string", fields = "object" },
+  checklist_set = { id = "string", title = "string", if_match = "string" },
+  checklist_delete = { id = "string" },
+  entry_add = {
+    list = "string",
+    id = "string",
+    title = "string",
+    tags = "strings",
+    body = "string",
+    fields = "object",
+  },
+  entry_set = {
+    id = "string",
+    title = "string",
+    done = "boolean",
+    tags = "strings",
+    body = "string",
+    if_match = "string",
+  },
+  entry_delete = { id = "string", if_match = "string" },
+  entry_promote = { id = "string", area = "string", if_match = "string", lang = "string" },
   promote = {
     container = "string",
     point = "string",
@@ -2820,7 +2848,9 @@ local function do_attach(op, ctx)
   if r.updated_err then
     entry.notes = { "updated was not set: " .. contract.redact(ctx.root, r.updated_err) }
   end
-  ctx.touched[task.area] = true
+  if task.file_kind ~= "checklist" then
+    ctx.touched[task.area] = true
+  end
   return entry
 end
 
@@ -3214,7 +3244,7 @@ local function do_board_save(op, ctx)
     return meeting_failure(ctx, err, info)
   end
   local area = r.id:match("^([^/]+)/")
-  if not ctx.dry then
+  if not ctx.dry and not require("tasks_nvim.checklist").is_entry_id(r.id) then
     ctx.touched[area] = true
   end
   return {
@@ -3228,6 +3258,335 @@ local function do_board_save(op, ctx)
     etag = r.etag,
     created = r.created,
     changed_ids = ctx.dry and {} or { r.id },
+  }
+end
+
+-- ── checklists ───────────────────────────────────────────────────────────────
+
+---`created` of `fields` (the inverse of a delete carries it), or nil and why it is not one.
+---@param fields any
+---@param allowed table<string, boolean>
+---@return table|nil
+---@return string|nil err
+local function created_fields(fields, allowed)
+  fields = fields or {}
+  for key, value in pairs(fields) do
+    if not allowed[key] or type(value) ~= "string" then
+      local names = vim.tbl_keys(allowed)
+      table.sort(names)
+      return nil, "fields takes " .. table.concat(names, " and ") .. ", as text"
+    end
+  end
+  return fields, nil
+end
+
+---`checklist_new` { title, id?, fields? }: make a checklist (`_list-<slug>/list.md`, `checklist.list_new`). The inverse
+---is `checklist_delete`. `id` and `fields.created` carry a list made again (the inverse of `checklist_delete`).
+---@param op table
+---@param ctx Tasks.OpsCtx
+---@return table entry
+local function do_checklist_new(op, ctx)
+  if op.title == nil then
+    return refuse("invalid_argument", "checklist_new needs title")
+  end
+  if has_control(op.title) or any_control(op.fields) then
+    return refuse("invalid_argument", "the list contains a control character")
+  end
+  if over_limit("title", op.title) then
+    return refuse("payload_too_large", "title is too long")
+  end
+  local fields, ferr = created_fields(op.fields, { created = true })
+  if not fields then
+    return refuse("invalid_argument", "checklist_new: " .. ferr)
+  end
+  local r, err, info = require("tasks_nvim.checklist").list_new(op.title, {
+    root = ctx.root,
+    today = ctx.today,
+    id = op.id,
+    created = fields.created,
+    dry_run = ctx.dry,
+  })
+  if not r then
+    return meeting_failure(ctx, err, info)
+  end
+  local entry = {
+    ok = true,
+    id = r.id,
+    outcome = ctx.dry and "would_create" or "created",
+    file = rel(ctx, r.path),
+    changed_ids = ctx.dry and {} or { r.id },
+  }
+  if not ctx.dry then
+    entry.etag_after = etag_of_file(r.path)
+    entry.inverse = json.object({ op = "checklist_delete", id = r.id })
+  end
+  return entry
+end
+
+---`checklist_set` { id, title, if_match? }: rename a checklist; the answer has an `inverse`.
+---@param op table
+---@param ctx Tasks.OpsCtx
+---@return table entry
+local function do_checklist_set(op, ctx)
+  if op.id == nil or op.title == nil then
+    return refuse("invalid_argument", "checklist_set needs id and title")
+  end
+  if has_control(op.title) then
+    return refuse("invalid_argument", "the title contains a control character")
+  end
+  if over_limit("title", op.title) then
+    return refuse("payload_too_large", "title is too long")
+  end
+  local r, err, info = require("tasks_nvim.checklist").list_set(
+    op.id,
+    op.title,
+    { root = ctx.root, today = ctx.today, if_match = op.if_match, dry_run = ctx.dry }
+  )
+  if not r then
+    return meeting_failure(ctx, err, info)
+  end
+  local entry = {
+    ok = true,
+    id = r.id,
+    outcome = r.changed and (ctx.dry and "would_change" or "changed") or "unchanged",
+    file = rel(ctx, r.path),
+    etag_before = r.etag_before,
+    etag_after = r.etag_after,
+    changed_ids = (r.changed and not ctx.dry) and { r.id } or {},
+  }
+  if r.changed and not ctx.dry then
+    entry.inverse =
+      json.object({ op = "checklist_set", id = r.id, title = r.before, if_match = r.etag_after })
+  end
+  return entry
+end
+
+---`checklist_delete` { id }: delete a checklist that holds no entries. The inverse makes it again.
+---@param op table
+---@param ctx Tasks.OpsCtx
+---@return table entry
+local function do_checklist_delete(op, ctx)
+  if op.id == nil then
+    return refuse("invalid_argument", "checklist_delete needs id")
+  end
+  local r, err, info = require("tasks_nvim.checklist").list_delete(op.id, {
+    root = ctx.root,
+    dry_run = ctx.dry,
+  })
+  if not r then
+    return meeting_failure(ctx, err, info)
+  end
+  local entry = {
+    ok = true,
+    id = r.id,
+    outcome = ctx.dry and "would_delete" or "deleted",
+    file = rel(ctx, r.path),
+    changed_ids = ctx.dry and {} or { r.id },
+  }
+  if not ctx.dry then
+    local back = { op = "checklist_new", id = r.id, title = r.title }
+    if r.created ~= "" then
+      back.fields = json.object({ created = r.created })
+    end
+    entry.inverse = json.object(back)
+  end
+  return entry
+end
+
+---`entry_add` { list, title, tags?, body?, id?, fields? }: make an entry of a checklist (`checklist.add`); `#words` of
+---the title become tags. The inverse is `entry_delete` on the version just written. `id` (`_list-<list>/<slug>`, in
+---place of `list`) and `fields` (`created`, `done`) carry an entry made again: the inverse of `entry_delete`.
+---@param op table
+---@param ctx Tasks.OpsCtx
+---@return table entry
+local function do_entry_add(op, ctx)
+  if op.title == nil or (op.list == nil and op.id == nil) then
+    return refuse("invalid_argument", "entry_add needs list (or id) and title")
+  end
+  if
+    has_control(op.title)
+    or has_control(op.body)
+    or any_control(op.fields)
+    or any_control(op.tags)
+  then
+    return refuse("invalid_argument", "the entry contains a control character")
+  end
+  if op.body and too_long(op.body, M.MAX_BODY) then
+    return refuse("payload_too_large", ("body is longer than %d characters"):format(M.MAX_BODY))
+  end
+  if over_limit("title", op.title) then
+    return refuse("payload_too_large", "title is too long")
+  end
+  local checklist = require("tasks_nvim.checklist")
+  local list, slug = op.list, nil
+  if op.id ~= nil then
+    local id_list, id_slug = checklist.split_id(op.id)
+    if not id_list then
+      return refuse("invalid_argument", id_slug)
+    end
+    if list ~= nil and list ~= id_list then
+      return refuse("invalid_argument", "entry_add: id names another list than list")
+    end
+    list, slug = id_list, id_slug
+  end
+  local fields, ferr = created_fields(op.fields, { created = true, done = true })
+  if not fields then
+    return refuse("invalid_argument", "entry_add: " .. ferr)
+  end
+  local r, err, info = checklist.add(list, op.title, {
+    root = ctx.root,
+    today = ctx.today,
+    slug = slug,
+    created = fields.created,
+    done = fields.done,
+    tags = op.tags,
+    body = op.body,
+    dry_run = ctx.dry,
+  })
+  if not r then
+    return meeting_failure(ctx, err, info)
+  end
+  local etag = (not ctx.dry) and etag_of_file(r.path) or nil
+  local entry = {
+    ok = true,
+    id = r.id,
+    outcome = ctx.dry and "would_create" or "created",
+    file = rel(ctx, r.path),
+    slug = r.slug,
+    etag_after = etag,
+    changed_ids = ctx.dry and {} or { r.id },
+  }
+  if etag then
+    entry.inverse = json.object({ op = "entry_delete", id = r.id, if_match = etag })
+  end
+  return entry
+end
+
+---`entry_set` { id, title?, done?, tags?, body?, if_match? }: change an entry of a checklist: its title, tick it
+---(`done: true`) or open it again (`done: false`), its tags (the whole list) or its text; the answer has an `inverse`.
+---@param op table
+---@param ctx Tasks.OpsCtx
+---@return table entry
+local function do_entry_set(op, ctx)
+  if op.id == nil or (op.title == nil and op.done == nil and op.tags == nil and op.body == nil) then
+    return refuse("invalid_argument", "entry_set needs id and title, done, tags or body")
+  end
+  if has_control(op.title) or has_control(op.body) or any_control(op.tags) then
+    return refuse("invalid_argument", "the change contains a control character")
+  end
+  if op.title ~= nil and over_limit("title", op.title) then
+    return refuse("payload_too_large", "title is too long")
+  end
+  if op.body and too_long(op.body, M.MAX_BODY) then
+    return refuse("payload_too_large", ("body is longer than %d characters"):format(M.MAX_BODY))
+  end
+  local r, err, info = require("tasks_nvim.checklist").set(
+    op.id,
+    { title = op.title, done = op.done, tags = op.tags, body = op.body },
+    { root = ctx.root, today = ctx.today, if_match = op.if_match, dry_run = ctx.dry }
+  )
+  if not r then
+    return meeting_failure(ctx, err, info)
+  end
+  local entry = {
+    ok = true,
+    id = r.id,
+    outcome = r.changed and (ctx.dry and "would_change" or "changed") or "unchanged",
+    file = rel(ctx, r.path),
+    etag_before = r.etag_before,
+    etag_after = r.etag_after,
+    changed_ids = (r.changed and not ctx.dry) and { r.id } or {},
+  }
+  if r.changed and not ctx.dry then
+    local back = { op = "entry_set", id = r.id, if_match = r.etag_after }
+    back.title = r.before.title
+    back.done = r.before.done
+    back.tags = r.before.tags
+    back.body = r.before.body
+    entry.inverse = json.object(back)
+  end
+  return entry
+end
+
+---`entry_delete` { id, if_match? }: delete an entry of a checklist with its attachments. An entry without attachments
+---can be made again: its inverse is `entry_add` with its id, title, tags, text, time and state; one with attachments has
+---no inverse (the files are gone; the vault's history has them).
+---@param op table
+---@param ctx Tasks.OpsCtx
+---@return table entry
+local function do_entry_delete(op, ctx)
+  if op.id == nil then
+    return refuse("invalid_argument", "entry_delete needs id")
+  end
+  local r, err, info = require("tasks_nvim.checklist").delete(op.id, {
+    root = ctx.root,
+    if_match = op.if_match,
+    dry_run = ctx.dry,
+  })
+  if not r then
+    return meeting_failure(ctx, err, info)
+  end
+  local entry = {
+    ok = true,
+    id = r.id,
+    outcome = ctx.dry and "would_delete" or "deleted",
+    file = rel(ctx, r.path),
+    etag_before = r.etag_before,
+    changed_ids = ctx.dry and {} or { r.id },
+  }
+  local e = r.entry
+  if not ctx.dry and not r.had_assets and e.created ~= "" then
+    local back = {
+      op = "entry_add",
+      id = e.id,
+      title = e.title,
+      fields = json.object({ created = e.created, done = e.done }),
+    }
+    if #e.tags > 0 then
+      back.tags = e.tags
+    end
+    if e.body ~= "" then
+      back.body = e.body
+    end
+    entry.inverse = json.object(back)
+  end
+  return entry
+end
+
+---`entry_promote` { id, area, if_match?, lang? }: make an entry of a checklist a task of `area` (`checklist.promote`):
+---the task gets its title, text, tags and attachments, the entry is gone. `id` of the answer is the new task; `from`
+---the entry. No inverse.
+---@param op table
+---@param ctx Tasks.OpsCtx
+---@return table entry
+local function do_entry_promote(op, ctx)
+  if op.id == nil or op.area == nil then
+    return refuse("invalid_argument", "entry_promote needs id and area")
+  end
+  if op.lang ~= nil and op.lang ~= "de" and op.lang ~= "en" then
+    return refuse("invalid_argument", "lang must be de or en")
+  end
+  local r, err, info = require("tasks_nvim.checklist").promote(op.id, op.area, {
+    root = ctx.root,
+    today = ctx.today,
+    if_match = op.if_match,
+    lang = op.lang,
+    dry_run = ctx.dry,
+  })
+  if not r then
+    return meeting_failure(ctx, err, info)
+  end
+  if not ctx.dry then
+    ctx.touched[r.area] = true
+  end
+  return {
+    ok = true,
+    id = r.id,
+    from = r.from,
+    outcome = ctx.dry and "would_create" or "created",
+    file = rel(ctx, r.path),
+    etag_after = (not ctx.dry) and etag_of_file(r.path) or nil,
+    changed_ids = ctx.dry and {} or { r.id, r.from },
   }
 end
 
@@ -3575,6 +3934,13 @@ local HANDLERS = {
   contact_new = do_contact_new,
   contact_set = do_contact_set,
   contact_delete = do_contact_delete,
+  checklist_new = do_checklist_new,
+  checklist_set = do_checklist_set,
+  checklist_delete = do_checklist_delete,
+  entry_add = do_entry_add,
+  entry_set = do_entry_set,
+  entry_delete = do_entry_delete,
+  entry_promote = do_entry_promote,
   meeting_new = do_meeting_new,
   meeting_set = do_meeting_set,
   meeting_close = do_meeting_close,
