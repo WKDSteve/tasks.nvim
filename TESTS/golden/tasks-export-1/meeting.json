@@ -11,9 +11,27 @@
       "ticked": false
     }
   ],
+  "agenda_proposals": [
+    {
+      "kind": "task",
+      "task": "lib.nvim/alpha",
+      "text": "Alpha \u003cscript>alert(1)\u003c/script> & \"quotes\" \\ slash"
+    },
+    {
+      "key": "q1",
+      "kind": "question",
+      "task": "lib.nvim/alpha",
+      "text": "Which format? (Alpha \u003cscript>alert(1)\u003c/script> & \"quotes\" \\ slash)"
+    },
+    {
+      "kind": "task",
+      "task": "lib.nvim/beta",
+      "text": "Beta waits for alpha"
+    }
+  ],
   "body": "\nWhere alpha stands.\n\n## Agenda\n- [x] State\n- [ ] Next steps\n\n## Teilnehmer\n- [x] Rick \u003crick@example.org> (Organisator)\n- [ ] Stefan (Ich)\n\n## Unterlagen\n- [Slides](assets/slides.pdf)\n- https://example.org/wiki\n\n## Folgeaufgaben\n- [ ] Write it down -> lib.nvim/gamma\n- [x] Ask Rick\n",
   "body_truncated": false,
-  "digest": "sha256:45e90dc39f05aaa7",
+  "digest": "sha256:2752d354746ab0c1",
   "documents": [
     {
       "href": "assets/slides.pdf",
@@ -135,7 +153,7 @@
     }
   ],
   "plugin": "tasks.nvim",
-  "rev": "rev:58cac2",
+  "rev": "rev:429d34",
   "schema": 1,
   "vault": {
     "id": "vault"

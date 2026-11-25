@@ -72,6 +72,26 @@ return function(H)
     dir .. "/after.md",
     { "title: After", "status: planned", "date: 2026-10-20", 'time: "11:00"', "duration: 30m" }
   )
+  -- `overlap: ok` lets one of two share its time; two zones are not compared; the same zone is
+  local function timed(slug, date, time, extra)
+    meeting(
+      dir .. "/" .. slug .. ".md",
+      vim.list_extend({
+        "title: " .. slug,
+        "status: planned",
+        "date: " .. date,
+        'time: "' .. time .. '"',
+        "duration: 1h",
+      }, extra or {})
+    )
+  end
+  timed("ok-a", "2026-10-21", "10:00")
+  timed("ok-b", "2026-10-21", "10:30", { "overlap: ok" })
+  timed("here", "2026-10-22", "10:00")
+  timed("there", "2026-10-22", "10:15", { "tz: America/New_York" })
+  timed("vie-a", "2026-10-23", "10:00", { "tz: Europe/Vienna" })
+  timed("vie-b", "2026-10-23", "10:15", { "tz: Europe/Vienna" })
+  timed("bad-overlap", "2026-10-24", "10:00", { "overlap: yes" })
 
   local res = check.run({ root = root, area = "lib.nvim", today = F.TODAY, ui_words = false })
   ---@param list Tasks.Finding[]
@@ -104,6 +124,11 @@ return function(H)
     "a meeting that begins when the other ends is no overlap"
   )
   eq(codes(res.hints, "lib.nvim/one"), {})
+  eq(codes(res.hints, "lib.nvim/ok-b"), {}, "overlap: ok shares its time")
+  eq(codes(res.hints, "lib.nvim/ok-a"), {}, "nor is the other one told")
+  eq(codes(res.hints, "lib.nvim/there"), {}, "two zones are no comparison for the engine")
+  eq(codes(res.hints, "lib.nvim/vie-b"), { "meeting-overlap" }, "the same zone is")
+  eq(codes(res.findings, "lib.nvim/bad-overlap"), { "meeting-bad-overlap" })
   ok(not res.ok, "a broken meeting fails the run")
 
   -- a finished task is no dangling one

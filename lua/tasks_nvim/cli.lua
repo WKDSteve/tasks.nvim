@@ -167,7 +167,8 @@ commands:
                                           projects, paths and meetings of this vault; reached when they are all done
   milestones [<area>] [--format=tsv|json]  the milestones: id, status, due, progress (members done/all), title
   meeting new <area> <title> --date=YYYY-MM-DD [--time=HH:MM] [--end=HH:MM|--duration=45m] [--location=]
-              [--online=url] [--tasks=a/b,c/d] [--notify=-15m,-1d@18:00] [--tags=] [--quick="<line>"] [--dry-run]
+              [--online=url] [--tasks=a/b,c/d] [--notify=-15m,-1d@18:00] [--tags=] [--overlap=ok]
+              [--prep] [--prep-title=] [--quick="<line>"] [--dry-run]
                                           make <area>/MEETINGS/<slug>.md (slug: title and date); --quick reads one
                                           line ("Mo 14:00-15:00 Sync @teams https://... #area/task !-15m"), the
                                           options win over it
@@ -618,6 +619,7 @@ local SPECS = {
       "image",
       "recording",
       "summary",
+      "overlap",
       "status",
       "title",
       "slug",
@@ -627,8 +629,9 @@ local SPECS = {
       "n",
       "area",
       "format",
+      "prep-title",
     },
-    flag = { "dry-run", "absent" },
+    flag = { "dry-run", "absent", "prep" },
   },
   meetings = { value = { "since", "until", "task", "format" }, flag = {} },
   contact = {
@@ -2315,6 +2318,7 @@ local MEETING_FIELD_OPTS = {
   "image",
   "recording",
   "summary",
+  "overlap",
   "status",
   "title",
 }
@@ -2402,6 +2406,9 @@ MEETING_SUBS.new = function(ctx, rest)
     fields = fields,
     slug = opt.slug,
     lang = opt.lang,
+    -- a preparation task due the day before, named in `tasks:` of the meeting
+    prep = opt.prep == true or nil,
+    prep_title = opt["prep-title"],
   }, opt["dry-run"] == true)
   return code
 end

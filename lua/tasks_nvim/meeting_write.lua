@@ -44,6 +44,7 @@ M.KEYS = {
   "tags",
   "recording",
   "summary",
+  "overlap",
   "repeat",
   "repeat_until",
   "except",

@@ -6,9 +6,22 @@
       "ticked": false
     }
   ],
+  "agenda_proposals": [
+    {
+      "kind": "task",
+      "task": "lib.nvim/alpha",
+      "text": "Alpha \u003cscript>alert(1)\u003c/script> & \"quotes\" \\ slash"
+    },
+    {
+      "key": "q1",
+      "kind": "question",
+      "task": "lib.nvim/alpha",
+      "text": "Which format? (Alpha \u003cscript>alert(1)\u003c/script> & \"quotes\" \\ slash)"
+    }
+  ],
   "body": "\n## Agenda\n- [ ] Blockers\n\n## Protokoll\n",
   "body_truncated": false,
-  "digest": "sha256:711aae85511ccdd0",
+  "digest": "sha256:26621ee0ab85653d",
   "documents": [],
   "engine": {
     "git": "0000000",
@@ -62,7 +75,7 @@
   },
   "participants": [],
   "plugin": "tasks.nvim",
-  "rev": "rev:192aad",
+  "rev": "rev:9324ea",
   "schema": 1,
   "vault": {
     "id": "vault"

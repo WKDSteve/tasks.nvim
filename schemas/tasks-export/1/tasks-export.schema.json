@@ -276,6 +276,10 @@
           "type": "string",
           "pattern": "^[Hh][Tt][Tt][Pp][Ss]?://"
         },
+        "overlap": {
+          "const": "ok",
+          "description": "`overlap: ok`: the meeting may share its time with another one; `check` gives no `meeting-overlap` for it and a front end draws no conflict (capability `meeting_overlap_ok`). Absent: a meeting at the same time as another one of its area is a conflict."
+        },
         "created": {
           "$ref": "#/$defs/Date"
         },
@@ -1639,6 +1643,34 @@
                 "type": "string",
                 "pattern": "^[^/]+/[^/]+$",
                 "description": "The task made of the line (`-> <id>`)."
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "agenda_proposals": {
+          "type": "array",
+          "maxItems": 50,
+          "description": "What the agenda could take from the tasks of the meeting (capability `meeting_agenda_proposals`): each open task it names (its title), then each open question of that task (`<question> (<task title>)`), in the order of `tasks:`; a finished task proposes nothing, a text the agenda already has is left out. Nothing is written: the front end lets the person choose and writes the chosen texts with `add_steps` (section `agenda`).",
+          "items": {
+            "type": "object",
+            "required": ["text", "task", "kind"],
+            "properties": {
+              "text": {
+                "type": "string",
+                "description": "The line the agenda would get."
+              },
+              "task": {
+                "type": "string",
+                "pattern": "^[^/]+/[^/]+$",
+                "description": "The task the proposal comes from."
+              },
+              "kind": {
+                "enum": ["task", "question"]
+              },
+              "key": {
+                "type": "string",
+                "description": "A question: its key (`q1`), when it has one."
               }
             },
             "additionalProperties": false
@@ -5391,6 +5423,16 @@
         "slug": {
           "description": "`plan_new`: the file name (without `.md`) the plan got or would get.",
           "type": "string"
+        },
+        "prep": {
+          "description": "`meeting_new` with `prep` (capability `meeting_prep`): the preparation task made with the meeting (due the day before it, named in its `tasks:`). A dry run names the id it would get.",
+          "type": "object",
+          "required": ["id"],
+          "properties": {
+            "id": { "type": "string", "pattern": "^[^/]+/[^/]+$" },
+            "file": { "type": "string" }
+          },
+          "additionalProperties": false
         },
         "renamed": {
           "description": "`plan_new`: the slug asked for was taken, so another one was chosen.",

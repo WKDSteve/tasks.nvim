@@ -1048,6 +1048,26 @@ export type MeetingDocument = Head & {
      */
     task?: string;
   }[];
+  /**
+   * What the agenda could take from the tasks of the meeting (capability `meeting_agenda_proposals`): each open task it names (its title), then each open question of that task (`<question> (<task title>)`), in the order of `tasks:`; a finished task proposes nothing, a text the agenda already has is left out. Nothing is written: the front end lets the person choose and writes the chosen texts with `add_steps` (section `agenda`).
+   *
+   * @maxItems 50
+   */
+  agenda_proposals?: {
+    /**
+     * The line the agenda would get.
+     */
+    text: string;
+    /**
+     * The task the proposal comes from.
+     */
+    task: string;
+    kind: "task" | "question";
+    /**
+     * A question: its key (`q1`), when it has one.
+     */
+    key?: string;
+  }[];
 };
 /**
  * tasks.meetingparse: one line of the quick capture read into a proposal of a meeting (capability `meeting_parse`). Nothing is written and no file is read: the front end shows the proposal in its form and sends `meeting_new` only when the person says so. `fields` are the keys `meeting_new` takes, as far as the line names them; `date` is always there (`assumed` holds `date` when the line named no day: today). `problems` are words that looked like a field but are none (`!soon`, `#nothing`); they are not in the title.
@@ -2486,6 +2506,10 @@ export interface MeetingEntry {
   icon?: Icon;
   tags: string[];
   recording?: string;
+  /**
+   * `overlap: ok`: the meeting may share its time with another one; `check` gives no `meeting-overlap` for it and a front end draws no conflict (capability `meeting_overlap_ok`). Absent: a meeting at the same time as another one of its area is a conflict.
+   */
+  overlap?: "ok";
   created?: Date;
   updated?: Date;
   summary: string;
@@ -3232,6 +3256,13 @@ export interface ResultEntry {
    * `plan_new`: the file name (without `.md`) the plan got or would get.
    */
   slug?: string;
+  /**
+   * `meeting_new` with `prep` (capability `meeting_prep`): the preparation task made with the meeting (due the day before it, named in its `tasks:`). A dry run names the id it would get.
+   */
+  prep?: {
+    id: string;
+    file?: string;
+  };
   /**
    * `plan_new`: the slug asked for was taken, so another one was chosen.
    */

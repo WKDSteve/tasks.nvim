@@ -96,8 +96,11 @@ M.CAPABILITIES = {
   "list",
   "lists",
   "meeting",
+  "meeting_agenda_proposals",
   "meeting_ops",
+  "meeting_overlap_ok",
   "meeting_parse",
+  "meeting_prep",
   "meeting_series",
   "meetings",
   "milestone",
@@ -3144,6 +3147,8 @@ local function meeting_entry(root, m)
     icon = M.icon_entry(m.icon),
     tags = vim.list_slice(m.tags, 1),
     recording = m.recording,
+    -- `overlap: ok` as the file writes it (capability `meeting_overlap_ok`)
+    overlap = m.overlap_ok and "ok" or nil,
     created = m.created,
     updated = m.updated,
     summary = clip(m.summary or "", M.LIMITS.summary),
@@ -3306,8 +3311,52 @@ function M.meetings(params, opts)
   end)
 end
 
+---The most agenda proposals a meeting document carries.
+M.AGENDA_PROPOSALS_MAX = 50
+
+---What the agenda of a meeting could take from its tasks (capability `meeting_agenda_proposals`, concept 4.4): each
+---open task the meeting names (its title), then each open question of that task (`<question> (<task title>)`), in
+---the order of `tasks:`. A finished task proposes nothing; a text the agenda already has (trimmed) is left out. The
+---front end lets the person choose and writes the chosen ones with `add_steps` (section `agenda`); nothing is written
+---here.
+---@param m Tasks.Meeting
+---@param open table<string, Tasks.Task> the open tasks of `m.tasks`, by id
+---@return table[]
+local function agenda_proposals(m, open)
+  local have = {}
+  for _, a in ipairs(m.agenda or {}) do
+    have[vim.trim(a.text)] = true
+  end
+  local out = {}
+  local function add(entry)
+    if #out < M.AGENDA_PROPOSALS_MAX and not have[entry.text] then
+      have[entry.text] = true
+      out[#out + 1] = json.object(entry)
+    end
+  end
+  for _, task_id in ipairs(m.tasks or {}) do
+    local t = open[task_id]
+    if t and type(t.title) == "string" then
+      local title = vim.trim(fsio.clean(t.title))
+      add({ text = title, task = t.id, kind = "task" })
+      for _, q in ipairs(t.questions and t.questions.items or {}) do
+        if not q.answered then
+          add({
+            text = ("%s (%s)"):format(vim.trim(q.title), title),
+            task = t.id,
+            kind = "question",
+            key = q.key,
+          })
+        end
+      end
+    end
+  end
+  return out
+end
+
 ---`tasks.meeting`: one meeting with its body (cut at `body_bytes`) and the sections the engine reads: the agenda, the
----participants, the documents and the follow-ups.
+---participants, the documents and the follow-ups; and what the agenda could take from the open tasks of the meeting
+---(`agenda_proposals`).
 ---@param id string
 ---@param opts? { root?: string }
 ---@return table|nil doc
@@ -3358,7 +3407,15 @@ function M.meeting(id, opts)
     doc.followups = vim.tbl_map(function(f)
       return json.object({ n = f.n, text = f.text, ticked = f.ticked, task = f.task })
     end, m.followups)
-    return seal(doc, builder.rev_of({ m.id .. "\t" .. (m.etag or "") })), nil
+    -- read from the task files: their etags are part of the revision, an answered question changes the document
+    local open, lines = {}, { m.id .. "\t" .. (m.etag or "") }
+    for _, task_id in ipairs(m.tasks or {}) do
+      local t = scan.find(task_id, { root = root })
+      open[task_id] = t
+      lines[#lines + 1] = task_id .. "\t" .. (t and t.etag or "")
+    end
+    doc.agenda_proposals = agenda_proposals(m, open)
+    return seal(doc, builder.rev_of(lines)), nil
   end)
 end
 

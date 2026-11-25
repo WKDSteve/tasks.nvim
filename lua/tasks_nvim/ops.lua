@@ -431,6 +431,8 @@ local FIELDS = {
     body = "string",
     slug = "string",
     lang = "string",
+    prep = "boolean",
+    prep_title = "string",
   },
   meeting_set = { id = "string", patch = "object", if_match = "string" },
   meeting_close = { id = "string", result = "string", if_match = "string" },
@@ -2942,12 +2944,90 @@ local function any_control(t)
   return false
 end
 
----`meeting_new` { area, title, fields?, body?, slug?, lang? }: make a meeting file (`meeting_write.new`); a dry run names
----the id it would get.
+---The title of the preparation task of a meeting (`meeting_new` with `prep`).
+---@param op table
+---@return string
+local function prep_title_of(op)
+  if type(op.prep_title) == "string" and vim.trim(op.prep_title) ~= "" then
+    return vim.trim(op.prep_title)
+  end
+  return (op.lang == "en" and "Prepare: " or "Vorbereitung: ") .. vim.trim(op.title)
+end
+
+local do_new_meeting_file
+
+---`meeting_new` { area, title, fields?, body?, slug?, lang?, prep?, prep_title? }: make a meeting file
+---(`meeting_write.new`); a dry run names the id it would get. With `prep` (capability `meeting_prep`, concept 4.4) a
+---task of the same area comes first: `prep_title` or "Vorbereitung: <title>" ("Prepare: " in English), `due` the day
+---before the meeting; the meeting names it in `tasks:`. The meeting is judged (a dry run) before the task is made, and
+---the task is taken back when the meeting cannot be written after all. The answer names the task (`prep`).
 ---@param op table
 ---@param ctx Tasks.OpsCtx
 ---@return table entry
 local function do_meeting_new(op, ctx)
+  if not op.prep then
+    return do_new_meeting_file(op, ctx)
+  end
+  local date = type(op.fields) == "table" and op.fields.date or nil
+  if type(date) ~= "string" or not model.is_date(date) then
+    return refuse(
+      "invalid_argument",
+      "prep needs the date of the meeting (fields.date, YYYY-MM-DD)"
+    )
+  end
+  if has_control(op.prep_title) then
+    return refuse("invalid_argument", "prep_title contains a control character")
+  end
+  local over = op.prep_title and over_limit("title", op.prep_title)
+  if over then
+    return refuse("payload_too_large", over)
+  end
+  -- the meeting as it would be, before anything is written
+  local probe = do_new_meeting_file(op, vim.tbl_extend("force", ctx, { dry = true }))
+  if not probe.ok then
+    return probe
+  end
+  local task = do_new({
+    area = op.area,
+    title = prep_title_of(op),
+    fields = { due = model.add_days(date, -1) },
+  }, ctx)
+  if not task.ok then
+    return task
+  end
+  local with_prep = vim.deepcopy(op)
+  with_prep.fields = vim.deepcopy(op.fields)
+  local tasks = type(with_prep.fields.tasks) == "table" and with_prep.fields.tasks
+    or (type(with_prep.fields.tasks) == "string" and vim.split(
+      with_prep.fields.tasks,
+      ",",
+      { plain = true }
+    ))
+    or {}
+  -- a dry run made no task file: the meeting cannot name it yet (its `tasks:` is judged against the disk)
+  if not ctx.dry then
+    tasks[#tasks + 1] = task.id
+  end
+  with_prep.fields.tasks = tasks
+  local entry = do_new_meeting_file(with_prep, ctx)
+  if not entry.ok then
+    if not ctx.dry and task.file then
+      os.remove(ctx.root .. "/" .. task.file)
+    end
+    return entry
+  end
+  entry.prep = json.object({ id = task.id, file = task.file })
+  if not ctx.dry then
+    entry.changed_ids = { entry.id, task.id }
+  end
+  return entry
+end
+
+---A meeting file, as `meeting_new` without `prep` makes it.
+---@param op table
+---@param ctx Tasks.OpsCtx
+---@return table entry
+do_new_meeting_file = function(op, ctx)
   if op.area == nil or op.title == nil then
     return refuse("invalid_argument", "meeting_new needs area and title")
   end

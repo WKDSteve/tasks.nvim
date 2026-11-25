@@ -1,8 +1,9 @@
 {
   "agenda": [],
+  "agenda_proposals": [],
   "body": "\nDaily.\n\n## Teilnehmer\n- [x] [Rick](lib.nvim/rick-beispiel) (Lead)\n- [ ] Anna \u003cANNA@example.org>\n- [ ] Stranger \u003cstranger@example.org>\n",
   "body_truncated": false,
-  "digest": "sha256:40335cabff99ddcf",
+  "digest": "sha256:e3076d783a38a668",
   "documents": [],
   "engine": {
     "git": "0000000",

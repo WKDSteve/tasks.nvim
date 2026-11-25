@@ -88,7 +88,7 @@
 ---  - meetings (`<area>/MEETINGS/`, `tasks_nvim.meetings`): a broken meeting file is reported with its own codes
 ---    (`meeting-bad-status`, `meeting-bad-date`, `meeting-bad-time`, `meeting-end-and-duration`,
 ---    `meeting-end-before-start`, `meeting-end-without-time`, `meeting-bad-duration`, `meeting-bad-tz`,
----    `meeting-bad-online`, `meeting-bad-recording`, `meeting-bad-task`, `meeting-bad-notify`, `meeting-bad-notify-to`,
+---    `meeting-bad-online`, `meeting-bad-recording`, `meeting-bad-overlap`, `meeting-bad-task`, `meeting-bad-notify`, `meeting-bad-notify-to`,
 ---    `meeting-bad-image`, `meeting-bad-cover`, `meeting-bad-icon`, ...); `meeting-id-taken` (error): an open task, plan or project of the
 ---    area has the same slug; `meeting-task-dangling`, `meeting-image-missing`, `meeting-icon-missing`,
 ---    `meeting-done-in-future` (warnings): `tasks:` names a task that exists nowhere, `cover:` (or `image:`) or an icon
@@ -989,7 +989,11 @@ local function meeting_findings(
         if b.start >= a.ends then
           break
         end
-        hint("meeting-overlap", b, ("at the same time as %s (%s)"):format(a.id, a.start))
+        -- `overlap: ok` lets a meeting share its time; two zones are no comparison here (the engine reckons no
+        -- zones, decision F5: the clients do)
+        if not (a.overlap_ok or b.overlap_ok) and (a.tz or "") == (b.tz or "") then
+          hint("meeting-overlap", b, ("at the same time as %s (%s)"):format(a.id, a.start))
+        end
       end
     end
   end

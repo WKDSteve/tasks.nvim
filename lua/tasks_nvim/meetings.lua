@@ -14,7 +14,8 @@
 --- none: all day), `end` (`HH:MM`) or `duration` (`45m`, `2h`, `1h30m`), `tz` (an IANA zone, only checked for its
 --- form: the clients convert), `location`, `online` (an http(s) address; the service is told from its host),
 --- `tasks`, `notify` (`-15m`, `-2h`, `-1d@18:00`), `notify_to`, `image`, `icon`, `tags`, `recording`, `summary`,
---- `created`, `updated`; a series `repeat`, `repeat_until`, `except`, an occurrence of one `series`.
+--- `overlap` (`ok`: the meeting may share its time with another one, no `meeting-overlap`), `created`, `updated`; a
+--- series `repeat`, `repeat_until`, `except`, an occurrence of one `series`.
 ---
 --- A series (`repeat`) is the template of its occurrences: the engine computes them (`occurrence_days`, `expand`), and
 --- an occurrence becomes the file `<slug of the series>-<day>.md` with `series:` only on its first entry
@@ -452,6 +453,7 @@ end
 ---@field icon? Tasks.Icon           # `icon:` (`model.icon_of`): an emoji, an asset or a word of `ICONS`.
 ---@field tags string[]
 ---@field recording? string
+---@field overlap_ok? boolean       # `overlap: ok`: the meeting may share its time with another one.
 ---@field created? string
 ---@field updated? string
 ---@field summary string
@@ -707,6 +709,12 @@ function M.parse(text, ctx)
     bad("meeting-bad-recording", "recording is no http(s) address: " .. recording)
   else
     m.recording = recording
+  end
+  local overlap = model.field_text(meta.overlap, "overlap", bad)
+  if overlap == "ok" then
+    m.overlap_ok = true
+  elseif overlap then
+    bad("meeting-bad-overlap", "overlap takes only the word ok: " .. overlap)
   end
 
   for _, id in ipairs(model.field_list(meta.tasks, "tasks", bad)) do

@@ -465,6 +465,7 @@ notify_to: [me@example.org]
 image: assets/images/cover.png   # a file below the meeting folder; or icon: handshake
 tags: [sync]
 recording: https://...
+overlap: ok                # optional: this meeting may share its time with another one (no meeting-overlap)
 ---
 
 Sync on the install.
@@ -500,10 +501,18 @@ to say. The services of `online`: `teams` (`teams.microsoft.com`, `teams.live.co
 
 The codes of `check`: a broken file with its own codes (`meeting-bad-status`, `meeting-bad-date`, `meeting-bad-time`,
 `meeting-end-and-duration`, `meeting-end-before-start`, `meeting-end-without-time`, `meeting-bad-duration`,
-`meeting-bad-tz`, `meeting-bad-online`, `meeting-bad-recording`, `meeting-bad-task`, `meeting-bad-notify`,
-`meeting-bad-notify-to`, `meeting-bad-image`, `meeting-bad-icon`), `meeting-id-taken` (error), `meeting-task-dangling`,
-`meeting-image-missing`, `meeting-done-in-future` (warnings), and the hints `meeting-done-without-result` (allowed) and
-`meeting-overlap` (two planned meetings of an area at the same time).
+`meeting-bad-tz`, `meeting-bad-online`, `meeting-bad-recording`, `meeting-bad-overlap`, `meeting-bad-task`,
+`meeting-bad-notify`, `meeting-bad-notify-to`, `meeting-bad-image`, `meeting-bad-icon`), `meeting-id-taken` (error),
+`meeting-task-dangling`, `meeting-image-missing`, `meeting-done-in-future` (warnings), and the hints
+`meeting-done-without-result` (allowed) and `meeting-overlap` (two planned meetings of an area at the same time; not
+when one of them says `overlap: ok`, and only for two meetings in the same zone `tz`: the engine reckons no zones, the
+clients compare meetings of two zones).
+
+The agenda of a meeting can be filled from its tasks: `tasks.meeting` carries `agenda_proposals`, each open task the
+meeting names (its title) and each open question of that task (`<question> (<task title>)`); the front end lets the
+person choose and writes the chosen lines with `add_steps` (section `agenda`). `meeting_new` with `prep` makes a
+preparation task of the same area first ("Vorbereitung: <title>", "Prepare: <title>" in English, or `prep_title`), due
+the day before the meeting, and the meeting names it in `tasks:`.
 
 Writing meetings is `tasks_nvim.meeting_write`, through the write door (`meeting_new`, `meeting_set`, `meeting_close`,
 `meeting_capture`, `meeting_attend`, `meeting_followups`, `board_save`; [CONTRACT.md](CONTRACT.md#writing-tasks-ops1)):
