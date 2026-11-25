@@ -234,4 +234,55 @@ return function(H)
     ok(fsio.is_file(outside .. "/keep.txt"), "what the link points at is untouched")
     vim.uv.fs_unlink(link)
   end
+
+  -- ── a list folder that is a link: nothing is written through it ─────────────
+  local elsewhere = H.tmpdir() .. "/elsewhere"
+  H.write(elsewhere .. "/list.md", "---\ntitle: Elsewhere\n---\n")
+  H.write(elsewhere .. "/e1.md", "---\ntitle: Outside\ncreated: 2026-01-01T00:00:00Z\n---\n")
+  local linked_list = root .. "/_list-linked"
+  if not vim.uv.fs_symlink(elsewhere, linked_list, { junction = true, dir = true }) then
+    print("n/a  no symbolic link or junction can be made here")
+  else
+    local through = one({ op = "entry_delete", id = "_list-linked/e1" })
+    eq(through.ok, false, vim.inspect(through))
+    ok(fsio.is_file(elsewhere .. "/e1.md"), "the entry behind the link is untouched")
+    H.write(uploads .. "/y", "y")
+    local att2 =
+      one({ op = "attach", id = "_list-linked/e1", from = "upload", upload = "y", name = "y.txt" })
+    eq(att2.ok, false, vim.inspect(att2))
+    ok(not fsio.is_dir(elsewhere .. "/e1"), "no attachment written through the link")
+    vim.uv.fs_unlink(linked_list)
+  end
+
+  -- ── the ways back: the day of a tick, a #word of a title, a list with what a system leaves ──
+  local dated = one({
+    op = "entry_add",
+    list = list,
+    title = "Datiert",
+    fields = { created = "2026-01-02T08:00:00Z", done = "2026-01-03" },
+  })
+  local again = one({ op = "entry_set", id = dated.id, done = true })
+  eq(again.outcome, "unchanged", "a ticked entry ticked again keeps its day")
+  local opened = one({ op = "entry_set", id = dated.id, done = false })
+  eq(opened.inverse.done_on, "2026-01-03", vim.inspect(opened.inverse))
+  eq(one(vim.deepcopy(opened.inverse)).outcome, "changed")
+  eq(assert(checklist.find(dated.id, root)).done, "2026-01-03", "ticked on its day again")
+
+  local hashed = one({ op = "entry_add", list = list, title = "Mit Wort" })
+  eq(one({ op = "entry_set", id = hashed.id, title = "C und #wort im Titel" }).ok, true)
+  local removed = one({ op = "entry_delete", id = hashed.id })
+  eq(one(vim.deepcopy(removed.inverse)).outcome, "created")
+  local back_entry = assert(checklist.find(hashed.id, root))
+  eq(
+    { back_entry.title, back_entry.tags },
+    { "C und #wort im Titel", {} },
+    "the title comes back as it was"
+  )
+
+  local bare = one({ op = "checklist_new", title = "Leer mit System" })
+  H.write(root .. "/" .. bare.id .. "/desktop.ini", "[x]")
+  H.write(root .. "/" .. bare.id .. "/.DS_Store", "x")
+  local dropped = one({ op = "checklist_delete", id = bare.id })
+  eq(dropped.outcome, "deleted", vim.inspect(dropped))
+  ok(not fsio.is_dir(root .. "/" .. bare.id), "the folder is gone with what the system left in it")
 end

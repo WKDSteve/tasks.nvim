@@ -406,6 +406,7 @@ local FIELDS = {
     id = "string",
     title = "string",
     done = "boolean",
+    done_on = "string",
     tags = "strings",
     body = "string",
     if_match = "string",
@@ -3468,7 +3469,16 @@ end
 ---@param ctx Tasks.OpsCtx
 ---@return table entry
 local function do_entry_set(op, ctx)
-  if op.id == nil or (op.title == nil and op.done == nil and op.tags == nil and op.body == nil) then
+  if
+    op.id == nil
+    or (
+      op.title == nil
+      and op.done == nil
+      and op.done_on == nil
+      and op.tags == nil
+      and op.body == nil
+    )
+  then
     return refuse("invalid_argument", "entry_set needs id and title, done, tags or body")
   end
   if has_control(op.title) or has_control(op.body) or any_control(op.tags) then
@@ -3482,7 +3492,7 @@ local function do_entry_set(op, ctx)
   end
   local r, err, info = require("tasks_nvim.checklist").set(
     op.id,
-    { title = op.title, done = op.done, tags = op.tags, body = op.body },
+    { title = op.title, done = op.done, done_on = op.done_on, tags = op.tags, body = op.body },
     { root = ctx.root, today = ctx.today, if_match = op.if_match, dry_run = ctx.dry }
   )
   if not r then
@@ -3500,7 +3510,12 @@ local function do_entry_set(op, ctx)
   if r.changed and not ctx.dry then
     local back = { op = "entry_set", id = r.id, if_match = r.etag_after }
     back.title = r.before.title
-    back.done = r.before.done
+    -- the way back of a tick opens it (`done: false`); that of an opening ticks it on its day again (`done_on`)
+    if type(r.before.done) == "string" then
+      back.done_on = r.before.done
+    else
+      back.done = r.before.done
+    end
     back.tags = r.before.tags
     back.body = r.before.body
     entry.inverse = json.object(back)
@@ -3535,7 +3550,14 @@ local function do_entry_delete(op, ctx)
     changed_ids = ctx.dry and {} or { r.id },
   }
   local e = r.entry
-  if not ctx.dry and not r.had_assets and e.created ~= "" then
+  -- made again only from what `entry_add` takes: a time stamp of `created` (a file written by hand may hold another)
+  -- and a text it would not refuse
+  if
+    not ctx.dry
+    and not r.had_assets
+    and e.created:match("^%d%d%d%d%-%d%d%-%d%dT%d%d:%d%d:%d%dZ$")
+    and not too_long(e.body, M.MAX_BODY)
+  then
     local back = {
       op = "entry_add",
       id = e.id,

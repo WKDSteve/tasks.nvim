@@ -366,6 +366,14 @@ function M.list_set(id, title, opts)
   return result, nil
 end
 
+---Whether `name` is a file a system leaves in a folder (a hidden file, `desktop.ini`, `Thumbs.db`): no entry.
+---@param name string
+---@return boolean
+local function system_file(name)
+  local lower = name:lower()
+  return name:sub(1, 1) == "." or lower == "desktop.ini" or lower == "thumbs.db"
+end
+
 ---Delete a list that holds no entries (an entry is never lost by deleting its list: delete the entries first).
 ---@param id string
 ---@param opts { root?: string, dry_run?: boolean }
@@ -382,14 +390,22 @@ function M.list_delete(id, opts)
   if not l then
     return nil, lerr, linfo
   end
-  for name in vim.fs.dir(l.dir) do
+  local leftovers = {}
+  for name, kind in vim.fs.dir(l.dir) do
     if name ~= M.LIST_FILE then
-      return nil, id .. " holds entries: delete them first", { code = "conflict", id = id }
+      if kind == "file" and system_file(name) then
+        leftovers[#leftovers + 1] = l.dir .. "/" .. name
+      else
+        return nil, id .. " holds entries: delete them first", { code = "conflict", id = id }
+      end
     end
   end
   local result = { id = id, path = l.path, title = l.title, created = l.created }
   if opts.dry_run then
     return result, nil
+  end
+  for _, path in ipairs(leftovers) do
+    fsio.remove(path)
   end
   if fsio.is_file(l.path) then
     local removed, derr = fsio.remove(l.path)
@@ -438,11 +454,14 @@ function M.target(id, root)
     return nil, slug
   end
   ---@cast slug string
+  local dir = M.dir(root, list)
+  if fsio.is_link(dir) then
+    return nil, list .. " is a symbolic link or junction: it is not written through"
+  end
   local path, folder = M.resolve(root, list, slug)
   if not path then
     return nil, folder --[[@as string]]
   end
-  local dir = M.dir(root, list)
   return {
     id = list .. "/" .. slug,
     area = list,
@@ -694,7 +713,11 @@ function M.add(list, title, opts)
   if type(title) ~= "string" then
     return nil, "title must be one non-empty line", { code = "invalid_argument" }
   end
-  local line, from_line = M.split_tags(title)
+  -- an entry made again (the inverse of `delete`, named by its slug) keeps its title: its tags come in `opts.tags`
+  local line, from_line = title, {}
+  if opts.slug == nil then
+    line, from_line = M.split_tags(title)
+  end
   local t, terr = clean_title(line)
   if not t then
     return nil, terr, { code = "invalid_argument" }
@@ -791,7 +814,11 @@ local function locked(id, root, if_match, fn)
   if not found then
     return nil, ferr, finfo
   end
-  if fsio.is_link(found.path) or (found.folder and fsio.is_link(fsio.dirname(found.path))) then
+  if
+    fsio.is_link(found.path)
+    or fsio.is_link(M.dir(root, found.list))
+    or (found.folder and fsio.is_link(fsio.dirname(found.path)))
+  then
     return nil,
       id .. " is a symbolic link or junction: it is not written through",
       { code = "forbidden" }
@@ -824,7 +851,7 @@ end
 ---Change an entry: `patch.title` (one line), `patch.done` (true ticks it today, false opens it again), `patch.tags`
 ---(the whole list) and `patch.body` (its text). The answer has the values before (`before`) for an undo.
 ---@param id string
----@param patch { title?: string, done?: boolean, tags?: string[], body?: string }
+---@param patch { title?: string, done?: boolean, done_on?: string, tags?: string[], body?: string }
 ---@param opts { root?: string, today?: string, if_match?: string, dry_run?: boolean }
 ---@return { id: string, path: string, changed: boolean, etag_before: string, etag_after: string, before: table }|nil
 ---@return string|nil err
@@ -839,7 +866,13 @@ function M.set(id, patch, opts)
     return nil, "the patch is empty", { code = "invalid_argument" }
   end
   for key in pairs(patch) do
-    if key ~= "title" and key ~= "done" and key ~= "tags" and key ~= "body" then
+    if
+      key ~= "title"
+      and key ~= "done"
+      and key ~= "done_on"
+      and key ~= "tags"
+      and key ~= "body"
+    then
       return nil,
         ("unknown field '%s' (an entry takes: title, done, tags, body)"):format(
           fsio.clean(tostring(key))
@@ -849,6 +882,11 @@ function M.set(id, patch, opts)
   end
   if patch.done ~= nil and type(patch.done) ~= "boolean" then
     return nil, "done must be true or false", { code = "invalid_argument" }
+  end
+  if patch.done_on ~= nil and (not model.is_date(patch.done_on) or patch.done == false) then
+    return nil,
+      "done_on must be a date (YYYY-MM-DD), not with done false",
+      { code = "invalid_argument" }
   end
   if patch.body ~= nil and type(patch.body) ~= "string" then
     return nil, "body must be a text", { code = "invalid_argument" }
@@ -876,12 +914,15 @@ function M.set(id, patch, opts)
       list[#list + 1] = { "title", title }
       before.title = entry.title
     end
-    if patch.done == true and entry.done == nil then
-      list[#list + 1] = { "done", today }
-      before.done = false
+    -- `done_on` ticks it on that day; `done: true` ticks an open entry today and leaves a ticked one as it is
+    local day = patch.done_on or (patch.done == true and entry.done == nil and today) or nil
+    if day and entry.done ~= day then
+      list[#list + 1] = { "done", day }
+      before.done = entry.done or false
     elseif patch.done == false and entry.done ~= nil then
       list[#list + 1] = { "done", fm.REMOVE }
-      before.done = true
+      -- the day it was ticked on, so that the way back ticks it on that day again
+      before.done = entry.done
     end
     -- compared as text: the web variant runs this in a VM whose shim of `vim` has no `deep_equal`
     if tags ~= nil and table.concat(tags, " ") ~= table.concat(entry.tags, " ") then

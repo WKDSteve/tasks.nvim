@@ -3455,6 +3455,10 @@ export interface Inverse {
    */
   title?: string;
   /**
+   * A calendar day, YYYY-MM-DD.
+   */
+  done_on?: string;
+  /**
    * `entry_add`, `entry_set`: the tags the entry had (capability `checklists`).
    */
   tags?: string[];

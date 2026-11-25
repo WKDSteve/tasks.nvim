@@ -1508,13 +1508,13 @@ G.cases = {
           { op = "checklist_set", id = "_list-support-faelle", title = "Support" },
           {
             op = "entry_add",
-            id = "_list-support-faelle/20260112-070000-ticket",
+            list = "_list-support-faelle",
             title = "Ticket #sap anlegen #Hiva",
             fields = { created = "2026-01-12T07:00:00Z" },
           },
           {
             op = "entry_set",
-            id = "_list-support-faelle/20260112-070000-ticket",
+            id = "_list-support-faelle/20260112-070000-ticket-anlegen",
             done = true,
             tags = { "sap" },
             body = "Mit Log.",

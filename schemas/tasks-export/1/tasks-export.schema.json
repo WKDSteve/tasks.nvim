@@ -5098,6 +5098,10 @@
           "description": "`checklist_new`, `checklist_set`, `entry_add`, `entry_set`: the title the list or entry had (capability `checklists`).",
           "type": "string"
         },
+        "done_on": {
+          "description": "`entry_set` as the inverse of opening an entry: the day it was ticked on (capability `checklists`).",
+          "$ref": "#/$defs/Date"
+        },
         "tags": {
           "description": "`entry_add`, `entry_set`: the tags the entry had (capability `checklists`).",
           "type": "array",
