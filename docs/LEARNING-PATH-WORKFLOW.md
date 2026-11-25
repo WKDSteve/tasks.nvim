@@ -2,7 +2,7 @@
 
 Everything you need in one place to create a learning path (and, where it applies, a plan or project around it), with
 checklists. The reference documents say *what* each command does ([COMMANDS.md](COMMANDS.md), [ENGINE.md](ENGINE.md));
-the rules are `LP-01` to `LP-20` in `$RULES_VAULT/rulesets/arbeit/regeln/LERNPLAENE.md`; this document says *in which order
+the rules are `LP-01` to `LP-21` in `$RULES_VAULT/rulesets/arbeit/regeln/LERNPLAENE.md`; this document says *in which order
 you do things, what to look up first and how you know you are done*. It is the same for the editor, the CLI, the desktop
 app, the web variant and the mobile page: they all read the same file, `<area>/ROADMAP/paths/<slug>.md`.
 
@@ -109,15 +109,23 @@ Checklist for **every point**:
 - [ ] It names the **source or the file** it works on, as a link.
 - [ ] It has **XP** if the path counts XP (`xp-missing` hint shows the gaps).
 
-Checklist for **every exercise or result point** (labels starting with "Üben", "Aufgabe", "Übung", "Ergebnis"):
+Checklist for **every exercise point** (`LP-21`; labels starting with "Üben:", "Übung:", "Aufgabe:", "Projekt:" or
+"Mini-Projekt", the prefixes the engine reads in `lua/tasks_nvim/exercise.lua`):
 
 - [ ] The point is a **title; the task is written out** under it as a quote block of four lines, the format decided on 2026-11-23
-  (`tasks-vault/ALL/Lernpunkt-Aufgabenblock-Format-2026-11-23.md`): `> **Aufgabe:**` (what exactly is done: place, commands, inputs),
-  `> **Erwartet:**` (how you can tell it worked), `> **Nachweis:**` (what to enter when ticking), `> **Ergebnis:**` (left empty, the learner fills it).
-- [ ] The proof is named (note, table, protocol, screenshot as an asset) because "done" means proof, not "read" (`LP-04`); `[x]` needs a non-empty Ergebnis.
+  (`tasks-vault/ALL/Lernpunkt-Aufgabenblock-Format-2026-11-23.md`, [ENGINE.md](ENGINE.md) "exercise block"): `> **Aufgabe:**` (what
+  exactly is done: place, commands, inputs), `> **Fertig, wenn:**` (how you can tell it worked), `> **Nachweis:**` (what to enter
+  when ticking), `> **Ergebnis:**` (left empty, the learner fills it). The labels are read literally: another word (`Erwartet:`)
+  is not a part of the block.
+- [ ] The proof is named (note, table, protocol, screenshot as an asset) because "done" means proof, not "read" (`LP-04`); `[x]`
+  needs a non-empty Ergebnis (`tasks point <id> <key> --result=… --state=learned` writes both; the desktop app and the web variant
+  open the block in a float with a result field; in the editor it is the note under the point).
 - [ ] If the text is longer than about 10 lines or needs its own sub-points: **promote** it (`promote <path>#<key>`), the task then holds the steps as checkboxes (`LP-05`).
 - [ ] Nothing in the point needs another AI prompt to become doable. A point like "Üben: `ls`, `ls -l`" without steps is a
   description, not a task; that mistake was found in 321 points of earlier paths (`tasks.nvim/uebungspunkte-mit-ausformulierter-aufgabe`).
+  `tasks check` lists such points per path as the hint `path-exercise-vague`.
+- [ ] A new path, or one made by a generator from an old note, gets its blocks right away. An existing path with
+  `path-exercise-vague` gets them **when it is started** (status `doing`), not all paths in advance (decided 2026-11-24).
 
 Closing a stage: a point `Ergebnis: …` with the artefact. Closing the path: the self-check, then the write-back list.
 
