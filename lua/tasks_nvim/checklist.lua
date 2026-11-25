@@ -883,7 +883,8 @@ function M.set(id, patch, opts)
       list[#list + 1] = { "done", fm.REMOVE }
       before.done = true
     end
-    if tags ~= nil and not vim.deep_equal(tags, entry.tags) then
+    -- compared as text: the web variant runs this in a VM whose shim of `vim` has no `deep_equal`
+    if tags ~= nil and table.concat(tags, " ") ~= table.concat(entry.tags, " ") then
       list[#list + 1] = { "tags", #tags > 0 and tags or fm.REMOVE }
       before.tags = entry.tags
     end
