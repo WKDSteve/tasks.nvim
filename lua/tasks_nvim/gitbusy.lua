@@ -1,3 +1,4 @@
+---@module 'tasks_nvim.gitbusy'
 -- lua/tasks_nvim/gitbusy.lua -- is git rewriting the working tree of a vault right now?
 
 ---A vault is usually a git checkout that several sessions share. While one of them pulls with a rebase and an

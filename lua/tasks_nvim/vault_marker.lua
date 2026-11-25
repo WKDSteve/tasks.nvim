@@ -1,3 +1,4 @@
+---@module 'tasks_nvim.vault_marker'
 ---@brief The optional marker file `tasks-vault.json` in the root of a vault.
 ---@description
 --- It marks a folder as a "tasks vault" and carries the layout version, extra areas and defaults. Without it every

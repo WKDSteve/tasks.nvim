@@ -1,3 +1,4 @@
+---@module 'tasks_nvim.views'
 ---The saved views of the tasks, in the vault: one small Markdown file each at `<area>/ROADMAP/views/<slug>.md` (a view
 ---of tasks of several areas lives in the area `ALL`, like a task of several). A view is a selection (which tasks), a
 ---grouping (by which field, and for a matrix by a second one) and a way to draw it; it holds no task and no rule. The

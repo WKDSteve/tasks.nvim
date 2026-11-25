@@ -1,3 +1,4 @@
+---@module 'tasks_nvim.exercise'
 ---The exercise block under a learning point: the note (`> ` lines) of a point that is an exercise carries four labelled
 ---parts, so the point itself stays a title and the task behind it can be done and proven.
 ---

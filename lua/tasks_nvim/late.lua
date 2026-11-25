@@ -1,3 +1,4 @@
+---@module 'tasks_nvim.late'
 -- lua/tasks_nvim/late.lua -- a blocker that is due later than the task waiting on it begins (or, without a start, is
 -- due): the rule behind the `blocker-late` hint of `check` and the `late_blockers` of a task entry in `tasks-export/1`.
 -- Pure over the open tasks; nothing is read or written. `blocked_by` is a hard wait, `after` a soft one: both are
