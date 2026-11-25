@@ -201,6 +201,9 @@ return function(H)
   )
   eq(task.tags, { "ai" }, "the tags moved along")
   has(H.read(task.path), "Mit **Text**.")
+  for name in vim.fs.dir(fsio.dirname(task.path)) do
+    ok(not name:find("%.lock"), "the lock of the entry does not move into the task: " .. name)
+  end
   ok(not fsio.is_dir(root .. "/" .. second.id), "the entry is gone")
   eq(#checklist.entries(root, list), 0)
 

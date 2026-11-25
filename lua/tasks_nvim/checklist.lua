@@ -932,15 +932,29 @@ function M.set(id, patch, opts)
   return result, nil
 end
 
----Everything below `dir`, deepest first; nil and why when something there is a link (it is not followed).
+---Whether `name` is a lock file of the entry file `own` (`lib.nvim.fs.with_lock`: `.<own>.lock`, `.<own>.lock.takeover`):
+---held while the entry is written, it belongs to the lock and never to the entry's attachments.
+---@param name string
+---@param own string  # the file name of the entry
+---@return boolean
+local function own_lock(name, own)
+  return name == "." .. own .. ".lock" or name == "." .. own .. ".lock.takeover"
+end
+
+---Everything below `dir`, deepest first, but the lock files of `own` beside it; nil and why when something there is a
+---link (it is not followed).
 ---@param dir string
+---@param own string  # the file name of the entry
 ---@return { path: string, dir: boolean }[]|nil
 ---@return string|nil err
-local function tree_of(dir)
+local function tree_of(dir, own)
   local out = {}
   local function walk(d)
     for name in vim.fs.dir(d) do
       local p = d .. "/" .. name
+      if d == dir and own_lock(name, own) then
+        goto continue
+      end
       local st = uv.fs_lstat(p)
       if not st or st.type == "link" or fsio.is_link(p) then
         return false
@@ -953,6 +967,7 @@ local function tree_of(dir)
       else
         out[#out + 1] = { path = p, dir = false }
       end
+      ::continue::
     end
     return true
   end
@@ -979,7 +994,7 @@ function M.delete(id, opts)
   local ok, err, info = locked(id, root, opts.if_match, function(entry)
     local tree = {}
     if entry.folder then
-      local t, terr = tree_of(fsio.dirname(entry.path))
+      local t, terr = tree_of(fsio.dirname(entry.path), vim.fs.basename(entry.path))
       if not t then
         return nil, terr, { code = "forbidden" }
       end
@@ -1088,7 +1103,7 @@ function M.promote(id, area, opts)
       local to_dir = fsio.dirname(made.path)
       local own = vim.fs.basename(entry.path)
       for name in vim.fs.dir(folder_of_entry) do
-        if name ~= own then
+        if name ~= own and not own_lock(name, own) then
           local from, to = folder_of_entry .. "/" .. name, to_dir .. "/" .. name
           if fsio.is_link(from) then
             return undo(("%s holds a link: it is not moved"):format(id))
