@@ -28,6 +28,7 @@ the version is not tagged yet (the repository is not published).
 
 ### Fixed
 
+- `tasks contacts export --format=csv` no longer writes a cell that starts like a spreadsheet formula (`=`, `+`, `-`, `@` after blanks, a tab or a CR) unchanged: a name `=HYPERLINK(...)` or a phone `+49 30 1234` is written with a leading `'`, so it is text when the file is opened. The import takes the `'` away again (also for a file a spreadsheet saved), a `'` that was part of the value is doubled, so export and import round-trip exactly; `--raw` writes the cells as they are. Spec `tasks_contacts_io_spec`.
 - `:'<,'>Tasks new` writes the `refs:` entry of a selection relative to the git root of the file and with the whole range (`lua/a.lua:5-12`); it was relative to the working directory of the editor (a wrong path from any other folder) and named only the first line.
 - `tasks push` no longer reports `pushed` for a pick that could not be committed (signing, a hook, a lock): only a pick that leaves nothing staged is skipped, any other failure is an error with git's words; the pushed list is taken before the push, and a push counts only when the head is on the remote afterwards (`nothing new landed` as a note otherwise).
 

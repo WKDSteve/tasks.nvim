@@ -245,6 +245,69 @@ return function(H)
   has(assert(io.open(target, "rb")):read("*a"), "BEGIN:VCARD\r\nVERSION:4.0\r\n")
   eq(run({ "contacts", "export" }).code, 2, "export needs a format")
 
+  -- ── a CSV cell that starts like a spreadsheet formula is text (`'` in front), and comes back unchanged ──
+  local risky = {
+    {
+      name = '=HYPERLINK("http://x","y")',
+      org = "+49 Org",
+      role = "-1",
+      emails = {},
+      phones = { "+49 30 1234", "030 5678" },
+      tz = nil,
+      tags = { "@home" },
+      notes = "\t=1+1",
+    },
+    -- a value that really begins with `'` before a formula start must survive the round trip too
+    {
+      name = "'=kept",
+      org = "'plain",
+      emails = {},
+      phones = {},
+      tags = {},
+      notes = "  @ blank first",
+    },
+    { name = "Plain Name", org = "a=b", emails = {}, phones = {}, tags = {}, notes = "x-y" },
+  }
+  local guarded = io_.write_csv(risky)
+  has(guarded, "'=HYPERLINK(", "a formula in a name is guarded")
+  has(guarded, ",'+49 Org,", "a leading + is guarded")
+  has(guarded, ",'-1,", "a leading - is guarded")
+  has(guarded, ",'+49 30 1234;030 5678,", "a phone cell that starts with + is guarded once")
+  has(guarded, ",'@home,", "a leading @ is guarded")
+  has(guarded, "'\t=1+1", "a leading tab before a formula is guarded")
+  has(
+    guarded,
+    "\r\nPlain Name,a=b,",
+    "a cell with no formula start, and an = inside one, are untouched"
+  )
+  local back_rows = assert(io_.parse_csv(guarded))
+  eq(back_rows[1].name, risky[1].name, "the name comes back without the guard")
+  eq(back_rows[1].org, "+49 Org")
+  eq(back_rows[1].role, "-1")
+  eq(back_rows[1].phones, { "+49 30 1234", "030 5678" }, "the phones come back as the same numbers")
+  eq(back_rows[1].tags, { "@home" })
+  eq(
+    back_rows[2].name,
+    "'=kept",
+    "a value that begins with ' and a formula start is not changed by the trip"
+  )
+  eq(back_rows[2].org, "'plain", "a ' before ordinary text is left alone")
+  eq(back_rows[3].org, "a=b")
+  -- a spreadsheet writes a leading ' for text typed with a leading +: the import takes it away
+  eq(assert(io_.parse_csv("name,phones\nJo,'+49 30 1\n"))[1].phones, { "+49 30 1" })
+  -- `raw` writes the cells as they are
+  local plain = io_.write_csv(risky, { raw = true })
+  has(plain, ",+49 Org,", "raw leaves a leading + alone")
+  ok(not plain:find("'", 1, true) or plain:find("'=kept", 1, true), "raw adds no guard")
+  -- through the CLI: a real contact with a phone that starts with + (Dr. Jörg Müller)
+  local safe_cli = run({ "contacts", "export", "--format=csv", "--tag=kunde" })
+  eq(safe_cli.code, 0, safe_cli.err)
+  has(safe_cli.out, "'+43 660 1234567", "the CLI guards a phone that starts with +")
+  local raw_cli = run({ "contacts", "export", "--format=csv", "--tag=kunde", "--raw" })
+  eq(raw_cli.code, 0, raw_cli.err)
+  has(raw_cli.out, ",+43 660 1234567", "--raw writes it as it is")
+  ok(not raw_cli.out:find("'+43", 1, true), "--raw adds no guard")
+
   -- ── the writers escape and fold ──
   local long = {
     {

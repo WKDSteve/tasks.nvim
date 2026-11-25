@@ -190,8 +190,9 @@ commands:
   contacts import <file> --area=<area> [--as=vcf|csv] [--delimiter=,|;|tab] [--dry-run] [--lang=de|en] [--format=json]
                                           make contacts of a vCard (3.0, 4.0) or CSV file; a mail already held is a
                                           duplicate: reported, never overwritten; what has no field is named
-  contacts export --format=vcf|csv [<area>] [--tag=] [--org=] [--version=3|4] [--delimiter=] [--bom] [--out=<file>]
-                                          the contacts as one vCard or CSV text (stdout, or the file)
+  contacts export --format=vcf|csv [<area>] [--tag=] [--org=] [--version=3|4] [--delimiter=] [--bom] [--raw] [--out=<file>]
+                                          the contacts as one vCard or CSV text (stdout, or the file); a CSV cell that
+                                          starts like a spreadsheet formula gets a leading ' (--raw: written as is)
   plan-close <area>/<slug>                finish a plan by hand (refused while a member task is open); the project it
                                           belongs to is finished after it when nothing else holds it open
   project-close <area>/<slug>             finish a project by hand (refused while an own task, or an open plan or
@@ -636,7 +637,7 @@ local SPECS = {
   },
   contacts = {
     value = { "tag", "org", "format", "area", "as", "delimiter", "version", "out", "lang" },
-    flag = { "dry-run", "bom" },
+    flag = { "dry-run", "bom", "raw" },
   },
   index = { value = {}, flag = { "check", "all", "staged", "no-history" } },
   hook = { value = {}, flag = {} },
@@ -2784,6 +2785,7 @@ local function contacts_export(ctx, rest)
     version = opt.version --[[@as string|nil]],
     delimiter = opt.delimiter --[[@as string|nil]],
     bom = opt.bom == true,
+    raw = opt.raw == true,
   })
   if not text then
     ctx.warn("error: " .. tostring(xerr))

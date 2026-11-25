@@ -1249,11 +1249,14 @@ write door (`contact_new`, `contact_set`, `contact_delete`); an error names the 
   an invalid mail, number or zone). **A duplicate is a record whose mail is held by a contact of the vault (any area) or by
   an earlier record of the file; it is never imported and never overwrites.** Records without a mail are not checked
   against anything. A card or row without a name is refused. No line names a mail address or a number.
-- `tasks contacts export --format=vcf|csv [<area>] [--tag=] [--org=] [--version=3|4] [--delimiter=,|;|tab] [--bom]
+- `tasks contacts export --format=vcf|csv [<area>] [--tag=] [--org=] [--version=3|4] [--delimiter=,|;|tab] [--bom] [--raw]
   [--out=<file>]` writes the valid contacts by id. vCard 4.0 (or 3.0), `FN` and `N`, folded at 75 octets; CSV header
   `name,org,role,emails,phones,tz,tags,notes`, several values in one cell joined by `;`, `--bom` adds the byte order mark
   that Excel wants. Without `--out` the text goes to stdout, where the CLI drops control characters (so CR): `--out`
-  keeps CRLF. A leading `=`, `+`, `-` or `@` in a cell is not neutralised against spreadsheet formulas.
+  keeps CRLF. A CSV cell that starts like a spreadsheet formula (after blanks `=`, `+`, `-` or `@`, or a tab or CR) gets
+  a leading `'`, so a phone number `+49 30 1234` or a name `=HYPERLINK(...)` is text when the file is opened; the
+  import takes that `'` away again (a `'` that was really part of the value is doubled, so the round trip is exact), and
+  so does it for a file a spreadsheet saved. `--raw` writes the cells as they are.
 - An area called `import` or `export` cannot be listed by name (`tasks contacts import` is the verb).
 
 ### Headless: `import --from-rules` and `bootstrap` (rules.nvim)

@@ -583,6 +583,46 @@ local function cell_list(cell)
   return out
 end
 
+---Whether a spreadsheet (Excel, LibreOffice, Sheets) would read a CSV cell as a formula: it starts, after
+---blanks, with `=`, `+`, `-` or `@`, or with a tab or a carriage return. A `'` in front of such a start is
+---itself a start that needs a guard, so that a value that really begins with `'=` comes back unchanged.
+---@param s string
+---@return boolean
+local function formula_start(s)
+  local rest = s:gsub("^ +", "")
+  local first = rest:sub(1, 1)
+  if first == "'" then
+    return formula_start(rest:sub(2))
+  end
+  return first == "="
+    or first == "+"
+    or first == "-"
+    or first == "@"
+    or first == "\t"
+    or first == "\r"
+end
+
+---The cell of a CSV that is text and never a formula: a value that starts like one gets a leading `'`.
+---`unguard` is its exact inverse.
+---@param s string
+---@return string
+local function guard(s)
+  if formula_start(s) then
+    return "'" .. s
+  end
+  return s
+end
+
+---Take the `'` away that `guard` (or a spreadsheet, which writes it for text typed with a leading `+`) put in front.
+---@param s string
+---@return string
+local function unguard(s)
+  if s:sub(1, 1) == "'" and formula_start(s:sub(2)) then
+    return s:sub(2)
+  end
+  return s
+end
+
 ---Read the records of a CSV text.
 ---@param text string
 ---@param opts? { delimiter?: string }
@@ -636,7 +676,7 @@ function M.parse_csv(text, opts)
     local rec = new_record(#records + 1)
     for ci, cell in ipairs(rows[ri]) do
       local field = cols[ci]
-      local t = vim.trim(cell)
+      local t = unguard(vim.trim(cell))
       if field and t ~= "" then
         if field == "emails" or field == "phones" or field == "tags" then
           vim.list_extend(rec[field], cell_list(t))
@@ -658,12 +698,15 @@ end
 
 ---The CSV text of contacts.
 ---@param list Tasks.Contact[]
----@param opts? { delimiter?: string, bom?: boolean }
+---@param opts? { delimiter?: string, bom?: boolean, raw?: boolean }  # `raw`: no guard against spreadsheet formulas
 ---@return string
 function M.write_csv(list, opts)
   opts = opts or {}
   local delim = opts.delimiter == "tab" and "\t" or opts.delimiter or ","
   local function cell(s)
+    if not opts.raw then
+      s = guard(s)
+    end
     if s:find("[" .. vim.pesc(delim) .. '"\r\n]') then
       return '"' .. s:gsub('"', '""') .. '"'
     end
@@ -921,7 +964,7 @@ function M.export(list, opts)
     if d ~= nil and d ~= "," and d ~= ";" and d ~= "tab" and d ~= "\t" then
       return nil, "the delimiter must be , or ; or tab"
     end
-    return M.write_csv(list, { delimiter = d, bom = opts.bom })
+    return M.write_csv(list, { delimiter = d, bom = opts.bom, raw = opts.raw })
   end
   return nil, "the format must be vcf or csv"
 end
