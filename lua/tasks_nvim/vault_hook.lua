@@ -44,11 +44,7 @@ local function plugin_root()
 end
 
 ---A value for a single-quoted shell word.
----@param s string
----@return string
-local function sh_quote(s)
-  return "'" .. s:gsub("'", "'\\''") .. "'"
-end
+local sh_quote = require("lib.nvim.cross.shell_quote.single")
 
 ---The text of the hook.
 ---@param prefix string  the vault's folder in its repository (`""` or `sub/dir/`)
