@@ -146,6 +146,7 @@ return function(H)
     "view_save",
     "late_blockers",
     "participant_contacts",
+    "contacts_import",
     "waits_for",
     "xp",
   }) do
