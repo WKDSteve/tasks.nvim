@@ -3,7 +3,7 @@
 ## Command
 
 `:Tasks <verb>` (a `lib.nvim` composer verb, `<Tab>` completes verbs, areas, task ids and values). No default
-keymaps and no autocommands at load time (the browser preview adds a short-lived `TasksPreviewTemp` group while a temporary file exists; the learning tree view adds buffer-local ones in the group `TasksLearn` while it is on, and `learning = { auto = true }` the group `TasksLearnAuto`). Set `vim.g.tasks_nvim_no_command = true` to register your own verb from
+keymaps and no autocommands at load time (the browser preview adds a short-lived `TasksPreviewTemp` group while a temporary file exists; the learning tree view adds buffer-local ones in the group `TasksLearn` while it is on, and `learning = { auto = true }` the group `TasksLearnAuto`; a checklist buffer redraws itself on entering it, group `TasksChecklist<buf>`, gone with the buffer). Set `vim.g.tasks_nvim_no_command = true` to register your own verb from
 `tasks_nvim.ui.routes` instead.
 
 | Verb | Arguments | Does |
@@ -13,7 +13,8 @@ keymaps and no autocommands at load time (the browser preview adds a short-lived
 | `new` | `[<area> [title...]] [kind= prio= effort= tags= category= severity= status=] [--folder]` | create a task (without arguments: the Markdown form) |
 | `set` | `<id> key=value ...` | change frontmatter |
 | `done` | `<id> [done_in= commits= date=] [--yes]` | finish after confirmation, move to `Backlog/` |
-| `attach` | `<id> <file> [name=]` | copy a file into the task's `assets/` |
+| `attach` | `<id> <file> [name=]` | copy a file into the task's `assets/` (an entry of a checklist, `_list-<list>/<slug>`, takes one too) |
+| `checklist` | `[<list>]`, `new <title...>`, `add <list> <line...>` | the checklists (`_list-<slug>/`): pick or name one and it opens in a buffer of its own (keys below); make a list; add an entry (`#word` = tag) |
 | `folderize` | `<id>` | turn a plain task into a folder task |
 | `template` | `[--to=]` | the task file template |
 | `open` | `[<id>] [--desktop\|--web]` | open the file of a task; `--desktop` / `--web` show the task alone in tasks-desktop or tasks-web (no id: the task of the buffer, else the one created last) |
@@ -61,14 +62,34 @@ require("tasks_nvim").setup({
     dashboard_input = { sort = "<M-t>", filter = false },  -- input window (normal and insert mode)
     form = { cancel = false, submit = "<C-CR>" },    -- `:Tasks new` form
     learning = { cycle = "<localleader>x" },          -- learning tree view (none by default)
+    checklist = { toggle = "<Space>", promote = false }, -- checklist buffer
   },
 })
 ```
 
 An action that is not named keeps its default. Dashboard actions: `status prio done filter sort export rescan
 backlog roadmap preview view assign move_down move_up help`, and while the AI functions are on `agent agent_run` (`gh` / `gH`:
-the task under the cursor to `:Tasks agent`, prefill / run). Form actions: `tick_space tick_enter submit cancel cancel_ctrl help icon`. Learning tree actions: `cycle promote unpromote image follow xp`. An unknown
+the task under the cursor to `:Tasks agent`, prefill / run). Form actions: `tick_space tick_enter submit cancel cancel_ctrl help icon`. Learning tree actions: `cycle promote unpromote image follow xp`. Checklist actions: `add toggle open delete promote
+filter clear state refresh lists close help`. An unknown
 action name is reported (and listed in `:checkhealth`), never bound. The help (`g?`) lists the default keys.
+
+## Checklist (`:Tasks checklist`, buffer-local, `g?` shows them)
+
+| Key | Action | Does |
+| --- | --- | --- |
+| `a` | `add` | add an entry; a `#word` of the line becomes a tag |
+| `x` | `toggle` | tick the entry under the cursor, or open it again |
+| `<CR>` | `open` | open the entry as a Markdown file |
+| `D` | `delete` | delete it with its attachments (asks first) |
+| `T` | `promote` | make it a task of an area (picked) |
+| `f` / `F` | `filter` / `clear` | filter (`#tag since:<day> until:<day> state:open\|done\|all words`) / clear the filter |
+| `s` | `state` | show all, the open or the done entries |
+| `r` | `refresh` | read the files again |
+| `gl` | `lists` | pick another list |
+| `q` | `close` | close the list buffer |
+| `g?` | `help` | the keys in a float |
+
+No key takes a count.
 
 ## Learning tree (`:Tasks learn`, buffer-local, none by default)
 

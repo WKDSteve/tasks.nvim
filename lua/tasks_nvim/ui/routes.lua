@@ -293,6 +293,15 @@ function M.register_types()
       if not root then
         return false, nil, tostring(err)
       end
+      -- an entry of a checklist (`_list-<list>/<slug>`) where the route takes one (`attach`): its folder is no area
+      local checklist = require("tasks_nvim.checklist")
+      if spec and spec.allow_entry and checklist.is_entry_id(raw) then
+        local entry, entry_err = checklist.find(raw, root)
+        if entry then
+          return true, entry.id, nil
+        end
+        return false, nil, tostring(entry_err)
+      end
       local area, slug, id_err = vault.parse_id(raw)
       if not area or not slug then
         return false, nil, id_err or ("expected <area>/<slug>, got '%s'"):format(raw)
@@ -428,6 +437,38 @@ function M.register_types()
         names[#names + 1] = e.name
       end
       return prefix_ci(names, arg_lead)
+    end,
+  })
+
+  -- a checklist of the vault (`_list-<slug>/`), by its id or its slug; the value is always the id
+  composer.register_type("TASK_CHECKLIST", {
+    desc = "A checklist of the vault: its id (_list-<slug>) or its slug",
+    validate = function(raw)
+      local root, err = vault.root()
+      if not root then
+        return false, nil, tostring(err)
+      end
+      local id = require("tasks_nvim.ui.checklist_view").list_id(raw)
+      local l, lerr = require("tasks_nvim.checklist").list(root, id)
+      if not l then
+        return false, nil, tostring(lerr)
+      end
+      return true, l.id, nil
+    end,
+    complete = function(arg_lead)
+      local root = vault.root()
+      if not root then
+        return {}
+      end
+      local checklist = require("tasks_nvim.checklist")
+      local lead = arg_lead:lower()
+      local out = {}
+      for _, l in ipairs(checklist.lists(root)) do
+        if l.id:lower():sub(1, #lead) == lead or l.slug:lower():sub(1, #lead) == lead then
+          out[#out + 1] = l.id
+        end
+      end
+      return out
     end,
   })
 
@@ -1184,7 +1225,8 @@ local function nested_routes()
         {
           name = "id",
           type = "TASK_ID",
-          desc = "Id of the task to attach the file to, as area/slug",
+          allow_entry = true,
+          desc = "Id of the task to attach the file to, as area/slug (or of a checklist entry, _list-<list>/<slug>)",
         },
         {
           name = "file",
@@ -1848,6 +1890,42 @@ local function nested_routes()
       desc = "Mark a meeting done (at any time, with or without a result)",
       run = function(ctx)
         require("tasks_nvim.ui.meeting_cmd").close(ctx)
+      end,
+    },
+
+    {
+      path = { "checklist" },
+      args = {
+        {
+          name = "list",
+          type = "TASK_CHECKLIST",
+          optional = true,
+          desc = "The list to show (default: pick one)",
+        },
+      },
+      desc = "The checklists of the vault (_list-<slug>/): pick one (title, open entries) or name it, and it opens in a buffer of its own, newest entry first; there a adds, x ticks, <CR> opens the entry as a file, D deletes, T makes a task, f filters (g? lists the keys)",
+      run = function(ctx)
+        require("tasks_nvim.ui.checklist_view").cmd(ctx)
+      end,
+    },
+
+    {
+      path = { "checklist", "new" },
+      args = {},
+      desc = "Make a checklist named by the rest of the line and show it",
+      run = function(ctx)
+        require("tasks_nvim.ui.checklist_view").cmd_new(ctx)
+      end,
+    },
+
+    {
+      path = { "checklist", "add" },
+      args = {
+        { name = "list", type = "TASK_CHECKLIST", desc = "The list to add the entry to" },
+      },
+      desc = "Add the rest of the line to a checklist as an entry; a #word becomes a tag (`Ticket #sap` -> Ticket, tag sap)",
+      run = function(ctx)
+        require("tasks_nvim.ui.checklist_view").cmd_add(ctx)
       end,
     },
 

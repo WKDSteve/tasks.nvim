@@ -65,6 +65,9 @@ return function(H)
   local ONLY_COMPOSER = {
     -- `agent` hands the task of the editor to ai-desktop (or ai.nvim); tasks-desktop has its own button
     "agent",
+    -- `checklist` shows a checklist in a buffer of its own (pick, add, tick, filter, promote); the CLI and the hubs
+    -- write through `tasks call` (entry_*, checklist_*) and read `tasks.checklists` / `tasks.checklist`
+    "checklist",
     "folder",
     -- `point` works on the learning tree in the buffer under the cursor; tasks-ops/1 `node_set` is the headless way
     -- to change a mark (`learn` is in both tables, see OPTIONS)

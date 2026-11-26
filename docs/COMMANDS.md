@@ -1226,6 +1226,35 @@ title), makes the meeting through the write door and opens it at its agenda. `cl
 [--result=]` marks it done (at any time; the message says when it has no result). The headless
 twins: `tasks meeting new|set|close|followups|attend|show|parse` and `tasks meetings`.
 
+### `:Tasks checklist [<list>]`, `checklist new`, `checklist add`
+
+The checklists of the vault (folders `_list-<slug>/`, [Checklists](ENGINE.md#checklists-_list-)) in the editor. (The
+name is not `lists`: `:Tasks lists` is the picker of the named task lists of the dashboard.)
+
+- `:Tasks checklist` is a `vim.ui.select` over the lists (title, open entries of all, id); `:Tasks checklist <list>`
+  shows one directly. A list is named by its id (`_list-support`) or its slug (`support`); `<Tab>` completes both.
+- The list opens in a buffer of its own (`tasks-checklist://<id>`, one per list): its title with the open count, the
+  filter in force, then one line per entry, newest first: `[ ]`/`[x]`, the day it was made, the title, the tags and,
+  for a ticked one, the day it was ticked (dimmed). The buffer is drawn again from the files each time you enter it,
+  so an entry edited as a file shows its new title.
+- Its keys (buffer-local, `g?` shows them, `keys.checklist` moves or switches them off, [BINDINGS.md](BINDINGS.md)):
+  `a` adds an entry (a `#word` of the line becomes a tag: `SAP Ticket #sap` -> `SAP Ticket`, tag `sap`), `x` ticks the
+  entry under the cursor or opens it again, `<CR>` opens it as a Markdown file (edit its text like any other),
+  `D` deletes it with its attachments (asks first), `T` makes it a task of an area (picked; title, text, tags and
+  attachments go along, the entry is gone), `f` filters, `F` clears the filter, `s` shows all, the open or the done
+  ones, `r` reads the files again, `gl` picks another list, `q` closes it.
+- The filter line (`f`, the filter in force is its default): `#tag`, `since:<day>`, `until:<day>` (a day is
+  `YYYY-MM-DD`, `today`, `7d` for seven days ago or `2w`), `state:open|done|all`; every other word must be in the
+  title, the text or a tag. It runs through `checklist.filter`, the filter of the `tasks.checklist` document; a word
+  it cannot read is named and left out.
+- `:Tasks checklist new <title...>` makes a list and shows it; `:Tasks checklist add <list> <line...>` adds an entry
+  without opening the list (a list shown is drawn again).
+
+Every write goes through the write door (`checklist_new`, `entry_add`, `entry_set`, `entry_delete`, `entry_promote`)
+on the version the buffer read: an entry changed elsewhere in between is refused with a message, `r` reads it again.
+Attachments of an entry: `:Tasks attach _list-<list>/<slug> <file>`. Headless: `tasks call` with those operations and
+the documents `tasks.checklists` / `tasks.checklist`.
+
 ### Headless: `contact` and `contacts`
 
 The contacts of the vault (`<area>/CONTACTS/`, [Contacts](ENGINE.md#contacts-contacts)): `tasks contact new <area>

@@ -48,7 +48,13 @@ local SCHEMA = {
   ai = "ai",
   new = { open_after = "open_after", private_areas = "string_list", private_vaults = "string_list" },
   open = { web_dir = "string" },
-  keys = { dashboard = "keymap", dashboard_input = "keymap", form = "keymap", learning = "keymap" },
+  keys = {
+    dashboard = "keymap",
+    dashboard_input = "keymap",
+    form = "keymap",
+    learning = "keymap",
+    checklist = "keymap",
+  },
 }
 
 ---What `validate` threw away (each message once), for `:checkhealth`: a one-time notification is easy to miss.

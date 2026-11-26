@@ -54,6 +54,7 @@
 ---@field dashboard_input Tasks.KeyMap  Keys in the dashboard input window (normal and insert mode).
 ---@field form Tasks.KeyMap             Buffer-local keys of the `:Tasks new` form.
 ---@field learning Tasks.KeyMap         Buffer-local keys of the learning tree view (`:Tasks learn`): `cycle`, `promote`, `unpromote`, `image`, `follow`, `xp`. None by default.
+---@field checklist Tasks.KeyMap        Buffer-local keys of a checklist buffer (`:Tasks checklist`): `add`, `toggle`, `open`, `delete`, `promote`, `filter`, `clear`, `state`, `refresh`, `lists`, `close`, `help`.
 
 ---@class Tasks.Opts
 ---@field vault string|nil          Vault folder (one folder per area). `nil`: `$TASKS_VAULT` is read.
@@ -185,6 +186,20 @@ return {
       image = false,
       follow = false,
       xp = false,
+    },
+    checklist = {
+      add = "a",
+      toggle = "x",
+      open = "<CR>",
+      delete = "D",
+      promote = "T",
+      filter = "f",
+      clear = "F",
+      state = "s",
+      refresh = "r",
+      lists = "gl",
+      close = "q",
+      help = "g?",
     },
   },
 }

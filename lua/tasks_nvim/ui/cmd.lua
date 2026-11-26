@@ -2810,7 +2810,15 @@ function M.task_attach(ctx)
     notify.error("unexpected argument: " .. table.concat(ctx.rest, " "))
     return
   end
-  local before = scan.find(ctx.args.id)
+  local checklist = require("tasks_nvim.checklist")
+  local before
+  if checklist.is_entry_id(ctx.args.id) then
+    -- an entry of a checklist: its file moves into a folder of its own like a task's on the first attachment
+    local root = vault.root()
+    before = root and checklist.find(ctx.args.id, root) or nil
+  else
+    before = scan.find(ctx.args.id)
+  end
   local from = ctx.kv.from ~= "" and ctx.kv.from or nil
   local name = ctx.kv.name ~= "" and ctx.kv.name or nil
   local kind = ctx.kv.kind ~= "" and ctx.kv.kind or nil
