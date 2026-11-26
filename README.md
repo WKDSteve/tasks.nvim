@@ -54,8 +54,10 @@ sessions that run without an editor. Nothing is stored anywhere but in the files
   staged tasks (`tasks index --staged --check`), and `tasks commit <path>... --message=<text>` commits only your
   own paths with the generated files that go with them, whatever else is staged in a checkout shared by several
   sessions. `tasks push` sends them to `origin/main` from a throwaway worktree (retrying when the remote moves,
-  solving conflicts in generated files, never `--no-verify`), and `tasks merge-driver install` makes a conflict in a
-  generated `TASKS.md` no conflict at all.
+  solving conflicts in generated files, never `--no-verify`): the commits you name, or without a name every local
+  commit by your `user.email` that the remote does not have by patch; one that cannot be picked is skipped and named
+  instead of stopping the others. `tasks merge-driver install` makes a conflict in a generated `TASKS.md` no conflict
+  at all, and `tasks ci --own-since=origin/main` (the vault's pre-push gate) is not blocked by another area's findings.
 - **Plan and next**: stages, what is ready, which decision unlocks most, the critical path (`:Tasks plan`); the best
   next task with the reason and an honest empty answer (`:Tasks next`, and a dialog after `done`); sums that say what
   is missing (`:Tasks estimate`)

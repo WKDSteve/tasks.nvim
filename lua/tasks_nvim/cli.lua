@@ -241,8 +241,11 @@ commands:
                                           another session's staged files stay staged and out; signed when
                                           commit.gpgsign is set; runs no hooks; does not push
   push [<sha>...] [--attempts=n] [--dry-run] [--no-sync]
-                                          push your own commits (the given ones, else every local commit not on
-                                          origin/main) from a throwaway worktree on origin/main, so the pre-push hook
+                                          push your own commits from a throwaway worktree on origin/main: the given
+                                          ones (together or not at all), else every local commit by your user.email
+                                          whose patch origin/main does not have (left-out names the rest; a commit
+                                          that cannot be picked is skipped and named, the others still go out; a
+                                          stale TASKS.md the pre-commit hook refuses is rendered anew), so the pre-push hook
                                           sees only what goes out; a conflict in a generated file (TASKS.md,
                                           Backlog/README.md, history jsonl) is solved by rendering/union, any other
                                           conflict names the file; a rejected push starts again (default 5 times);
@@ -2028,6 +2031,9 @@ commands.push = function(ctx)
     ctx.warn("error: " .. tostring(err))
     return 1
   end
+  for _, lo in ipairs(res.left_out or {}) do
+    ctx.say(("left-out	%s	%s"):format(lo.sha:sub(1, 9), lo.why))
+  end
   if #res.picked == 0 then
     ctx.say("nothing to push")
     return 0
@@ -2040,6 +2046,9 @@ commands.push = function(ctx)
   end
   for _, s in ipairs(res.pushed) do
     ctx.say(("pushed	%s	try %d"):format(s:sub(1, 9), res.attempt))
+  end
+  for _, sk in ipairs(res.skipped or {}) do
+    ctx.warn(("skipped	%s	%s (it stays local)"):format(sk.sha:sub(1, 9), sk.why))
   end
   ctx.say(res.sync == "synced" and "synced" or ("sync	" .. res.sync))
   for _, n in ipairs(res.notes) do

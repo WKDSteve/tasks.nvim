@@ -20,6 +20,12 @@
 ---     and the stash is dropped once everything else in it is in the tree
 ---  6. remove the worktree with `git worktree remove`; when that fails the path is reported, never `rm -rf`
 ---
+--- Which commits: the ones named (`tasks push <sha>...`), which go out together or not at all; without a name every
+--- local commit by the repository's `user.email` that the remote does not have by patch (`own_commits`), and one that
+--- cannot be picked (a conflict in a file that is not generated, a commit that cannot be made) is skipped and named
+--- instead of holding up the others; when none can be picked the push fails with the reasons. A pick the pre-commit
+--- hook refuses for a stale `TASKS.md` gets its index rendered anew and staged, as `tasks index --staged` would.
+---
 --- Never `--no-verify`. Commits are signed when `commit.gpgsign` is set (the cherry-pick signs them).
 ---
 --- Not its job: committing (`tasks_nvim.vault_commit`), or the merge driver (`tasks_nvim.vault_merge`).
@@ -44,6 +50,8 @@ M.PAUSE_MS = 700
 ---@field notes string[]
 ---@field leftover string|nil  the worktree that could not be removed
 ---@field sync string  `synced`, `skipped (...)` or `failed: <why>`
+---@field left_out { sha: string, why: string }[]  without a sha: local commits not taken (another author, landed)
+---@field skipped { sha: string, why: string }[]   without a sha: commits that could not be picked and stay local
 
 ---@param dir string
 ---@param args string[]
@@ -173,15 +181,45 @@ local function solve_conflicts(wt, prefix, areas, side)
   return nil
 end
 
----A pick without conflicts that still has to be committed (or that `--continue` just failed to commit). Only a
----pick that leaves nothing staged is skipped (the remote has the change already); any other failure (signing, a
----hook, a lock) is an error, never a silent skip.
+---Render the index of every area a stopped pick stages, from the pick's own tree, and stage it: what
+---`tasks index <area> --staged` does by hand when the vault's pre-commit hook refuses a commit whose `TASKS.md` is
+---stale (a commit of an older engine, a hand-made one). The tree of the throwaway worktree is the staged state.
 ---@param wt string
+---@param prefix string
+---@param areas table<string, boolean>  filled with the areas rendered
+---@return string[] rendered  the areas whose index changed
+local function restage_indexes(wt, prefix, areas)
+  local root = vault_in(wt, prefix)
+  local rendered, seen = {}, {}
+  local staged = git(wt, { "diff", "--cached", "--name-only", "--no-renames" }) or ""
+  for _, f in ipairs(lines_of(staged)) do
+    local area = rel_of(prefix, f):match("^([^/]+)/ROADMAP/")
+    if area and not seen[area] and vault.has_area(root, area) then
+      seen[area], areas[area] = true, true
+      local r = index.write_area(area, { root = root })
+      if r and (r.action == "written" or r.action == "removed") then
+        run(wt, { "add", "-A", "--", prefix .. area .. "/ROADMAP/TASKS.md" })
+        rendered[#rendered + 1] = area
+      end
+    end
+  end
+  table.sort(rendered)
+  return rendered
+end
+
+---A pick without conflicts that still has to be committed (or that `--continue` just failed to commit). Only a
+---pick that leaves nothing staged is skipped (the remote has the change already). A refusal for a stale generated
+---index is solved by rendering it anew (never `--no-verify`); any other failure (signing, a hook, a lock) is an
+---error, never a silent skip.
+---@param wt string
+---@param prefix string
 ---@param sha string
+---@param areas table<string, boolean>
+---@param notes string[]
 ---@param continued boolean|nil  `--continue` was already tried
 ---@return boolean ok
 ---@return string|nil err
-local function finish_pick(wt, sha, continued)
+local function finish_pick(wt, prefix, sha, areas, notes, continued)
   local err, code
   if not continued then
     local _, e, c = run(wt, { "cherry-pick", "--continue" })
@@ -194,6 +232,18 @@ local function finish_pick(wt, sha, continued)
   if staged == 0 then
     run(wt, { "cherry-pick", "--skip" })
     return true
+  end
+  local rendered = restage_indexes(wt, prefix, areas)
+  if #rendered > 0 then
+    local _, e, c = run(wt, { "cherry-pick", "--continue" })
+    if c == 0 then
+      notes[#notes + 1] = ("%s carried a stale index: rendered %s anew"):format(
+        sha:sub(1, 9),
+        table.concat(rendered, ", ")
+      )
+      return true
+    end
+    err = e
   end
   local text = err
   if not text or text == "" then
@@ -209,9 +259,10 @@ end
 ---@param prefix string
 ---@param sha string
 ---@param areas table<string, boolean>
+---@param notes string[]
 ---@return boolean ok
 ---@return string|nil err
-local function pick(wt, prefix, sha, areas)
+local function pick(wt, prefix, sha, areas, notes)
   local _, _, code = run(wt, { "cherry-pick", sha })
   if code == 0 then
     return true
@@ -219,7 +270,7 @@ local function pick(wt, prefix, sha, areas)
   for _ = 1, 8 do
     local unmerged = git(wt, { "diff", "--name-only", "--diff-filter=U" }) or ""
     if unmerged == "" then
-      return finish_pick(wt, sha)
+      return finish_pick(wt, prefix, sha, areas, notes)
     end
     local bad = solve_conflicts(wt, prefix, areas, "theirs")
     if bad then
@@ -231,7 +282,7 @@ local function pick(wt, prefix, sha, areas)
       return true
     end
     if (git(wt, { "diff", "--name-only", "--diff-filter=U" }) or "") == "" then
-      return finish_pick(wt, sha, true)
+      return finish_pick(wt, prefix, sha, areas, notes, true)
     end
   end
   run(wt, { "cherry-pick", "--abort" })
@@ -379,6 +430,38 @@ local function sync_checkout(top, prefix, remote_ref, notes)
   return "synced"
 end
 
+---The commits `tasks push` without a sha takes: every local commit (no merges) not on `remote_ref` whose author is
+---the repository's `user.email`, oldest first, minus those whose patch the remote already has (the local original of
+---a commit an earlier push cherry-picked: `git cherry`). The others are named in `left_out`.
+---@param top string
+---@param remote_ref string
+---@return string[] shas
+---@return { sha: string, why: string }[] left_out
+function M.own_commits(top, remote_ref)
+  local me = (run(top, { "config", "user.email" })):lower()
+  local landed = {}
+  for line in (run(top, { "cherry", remote_ref, "HEAD" }) .. "\n"):gmatch("([^\n]*)\n") do
+    local sha = line:match("^%- (%x+)")
+    if sha then
+      landed[sha] = true
+    end
+  end
+  local shas, left_out = {}, {}
+  local log =
+    run(top, { "log", "--reverse", "--no-merges", "--format=%H%x09%ae", remote_ref .. "..HEAD" })
+  for _, line in ipairs(lines_of(log)) do
+    local sha, author = line:match("^(%x+)\t(.*)$")
+    if sha and landed[sha] then
+      left_out[#left_out + 1] = { sha = sha, why = "its patch is on " .. remote_ref .. " already" }
+    elseif sha and me ~= "" and author:lower() ~= me then
+      left_out[#left_out + 1] = { sha = sha, why = "another author (push it by its sha)" }
+    elseif sha then
+      shas[#shas + 1] = sha
+    end
+  end
+  return shas, left_out
+end
+
 ---Push local commits of the vault's repository to `origin/main` from a throwaway worktree.
 ---@param o? { root?: string, shas?: string[], attempts?: integer, remote?: string, branch?: string, sync?: boolean, pause_ms?: integer, dry_run?: boolean }
 ---@return Tasks.PushResult|nil
@@ -401,8 +484,9 @@ function M.push(o)
   if ferr then
     return nil, ferr
   end
-  local list = {}
-  if o.shas and #o.shas > 0 then
+  local list, left_out = {}, {}
+  local named = o.shas ~= nil and #o.shas > 0
+  if named then
     for _, s in ipairs(o.shas) do
       local full, e = git(top, { "rev-parse", "--verify", s .. "^{commit}" })
       if not full then
@@ -411,8 +495,7 @@ function M.push(o)
       list[#list + 1] = full
     end
   else
-    list =
-      lines_of(git(top, { "rev-list", "--reverse", "--no-merges", remote_ref .. "..HEAD" }) or "")
+    list, left_out = M.own_commits(top, remote_ref)
   end
   local todo = {}
   for _, s in ipairs(list) do
@@ -422,7 +505,15 @@ function M.push(o)
     end
   end
   ---@type Tasks.PushResult
-  local res = { pushed = {}, picked = todo, attempt = 0, notes = {}, sync = "skipped" }
+  local res = {
+    pushed = {},
+    picked = todo,
+    attempt = 0,
+    notes = {},
+    sync = "skipped",
+    left_out = left_out,
+    skipped = {},
+  }
   if #todo == 0 or o.dry_run then
     return res
   end
@@ -449,18 +540,32 @@ function M.push(o)
     end
     run(wt, { "cherry-pick", "--abort" })
     git(wt, { "reset", "-q", "--hard", remote_ref })
-    local areas, bad = {}, nil
+    local areas, bad, notes = {}, nil, {}
+    res.skipped = {}
     for _, s in ipairs(todo) do
-      local ok, perr = pick(wt, prefix, s, areas)
-      if not ok then
+      local ok, perr = pick(wt, prefix, s, areas, notes)
+      if not ok and named then
+        -- the commits you named go out together or not at all
         bad = perr
         break
+      elseif not ok then
+        -- without names, one commit that cannot be picked (another session's, a conflict) does not hold up the rest
+        res.skipped[#res.skipped + 1] = { sha = s, why = tostring(perr) }
       end
     end
     if bad then
       fail = bad
       break
     end
+    if #res.skipped == #todo then
+      local whys = {}
+      for _, sk in ipairs(res.skipped) do
+        whys[#whys + 1] = sk.why
+      end
+      fail = "no commit could be picked: " .. table.concat(whys, "; ")
+      break
+    end
+    res.notes = notes
     local ierr = refresh_index(wt, prefix, remote_ref, areas)
     if ierr then
       fail = ierr
