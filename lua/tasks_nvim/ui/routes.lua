@@ -200,29 +200,15 @@ end
 ---The ids `done_ids` offers (exported for the specs).
 M.done_ids = done_ids
 
----The ids of the entries of every checklist (`_list-<list>/<slug>`), from the names in the list folders: no entry is
----read. Fails soft: no vault, no ids.
+---The ids of the entries of every checklist (`checklist.entry_ids`: from the file names, nothing read). Fails soft:
+---no vault, no ids.
 ---@return string[]
 local function entry_ids()
   local root = vault.root()
   if not root then
     return {}
   end
-  local checklist = require("tasks_nvim.checklist")
-  local ids = {}
-  for _, l in ipairs(checklist.lists(root)) do
-    for name, kind in vim.fs.dir(l.dir) do
-      local slug = (kind == "file" and name:sub(-3) == ".md" and name ~= checklist.LIST_FILE)
-          and name:sub(1, -4)
-        or (kind == "directory" and name)
-        or nil
-      if slug and vault.valid_slug(slug) then
-        ids[#ids + 1] = l.id .. "/" .. slug
-      end
-    end
-  end
-  table.sort(ids)
-  return ids
+  return require("tasks_nvim.checklist").entry_ids(root)
 end
 
 ---Complete the item under the cursor of a comma list (`ui,do` -> `ui,docs`); what is before it stays, a leading
@@ -1255,7 +1241,7 @@ local function nested_routes()
           name = "id",
           type = "TASK_ID",
           allow_entry = true,
-          desc = "Id of the task to attach the file to, as area/slug (or of a checklist entry, _list-<list>/<slug>)",
+          desc = "Task (area/slug) or checklist entry (_list-<list>/<slug>) to attach to",
         },
         {
           name = "file",

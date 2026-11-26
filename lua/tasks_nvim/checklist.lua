@@ -571,6 +571,29 @@ function M.entries(root, list)
   return out, errors
 end
 
+---The ids of the entries of every list (`_list-<list>/<slug>`), sorted, from the names in the list folders: no entry
+---is read (for a completion; `entries` reads them).
+---@param root string
+---@return string[]
+function M.entry_ids(root)
+  local ids = {}
+  for _, l in ipairs(M.lists(root)) do
+    for name, kind in vim.fs.dir(l.dir) do
+      local slug
+      if kind == "file" and name:sub(-3) == ".md" and name ~= M.LIST_FILE then
+        slug = name:sub(1, -4)
+      elseif kind == "directory" then
+        slug = name
+      end
+      if slug and vault.valid_slug(slug) then
+        ids[#ids + 1] = l.id .. "/" .. slug
+      end
+    end
+  end
+  table.sort(ids)
+  return ids
+end
+
 ---@class Tasks.ChecklistFilter
 ---@field since? string   # `YYYY-MM-DD`: made on that day or later
 ---@field until? string   # `YYYY-MM-DD`: made on that day or earlier
