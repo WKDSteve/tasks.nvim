@@ -1125,7 +1125,9 @@ A stale index or a broken task in an area the push does not touch is another ses
 and everything counts when the push changes `tasks-vault.json`, `area-groups.json` or `TOOLS/scripts/md_lint.lua`, or
 when the diff cannot be read. Without the option (the pipeline on the runner) every finding counts as before. A pipeline step
 sets it as `TASKS_CI_OWN_SINCE=origin/main` in its environment rather than as an option: an older tasks.nvim refuses an
-unknown option (every push of the vault would fail) but ignores the variable and runs the whole gate.
+unknown option (every push of the vault would fail) but ignores the variable and runs the whole gate. The line is
+drawn by area, not by cause: a finding the push brings into an area it does not touch (a link there to a task it
+deletes) is not counted by the hook; the full gate of the pipeline finds it after the push.
 
 A pipeline for a vault repo runs `scripts/tasks-ci.lua` with `TASKS_VAULT` set (checkout this plugin and `lib.nvim` next to it).
 

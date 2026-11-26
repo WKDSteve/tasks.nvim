@@ -139,6 +139,9 @@ function M.fix_lines(done_in_roadmap, stale_areas)
   return lines
 end
 
+---Areas the info line about indexes of another engine names before it only counts the rest.
+M.OTHER_ENGINE_SHOWN = 8
+
 ---Files the gate reads for every area: a push that changes one of them owns every finding.
 M.GLOBAL_FILES = {
   ["tasks-vault.json"] = true,
@@ -361,6 +364,7 @@ function M.run(opts, say)
     fail("index", tostring(errors and errors[1]))
   else
     local stale, skipped, foreign_stale = 0, 0, 0
+    local other_engine = {} ---@type string[]
     for _, r in ipairs(results) do
       local theirs = own ~= nil and not own.areas[r.area]
       if r.action == "stale" and theirs then
@@ -390,15 +394,21 @@ function M.run(opts, say)
           indexes[#indexes + 1] = vault.index_path(root, r.area)
         end
         if r.other_render then
-          out(
-            ("info: index: %s was rendered by another engine (render %d, this one %d): only its summaries may differ, not counted"):format(
-              r.area,
-              r.other_render,
-              index.RENDER_VERSION
-            )
-          )
+          other_engine[#other_engine + 1] = ("%s (render %d)"):format(r.area, r.other_render)
         end
       end
+    end
+    -- one line, not one per area: right after an engine update every index of the vault is another engine's
+    if #other_engine > 0 then
+      local shown = vim.list_slice(other_engine, 1, M.OTHER_ENGINE_SHOWN)
+      out(
+        ("info: index: %d index(es) rendered by another engine (this one: render %d), only their summaries may differ, not counted: %s%s"):format(
+          #other_engine,
+          index.RENDER_VERSION,
+          table.concat(shown, ", "),
+          #other_engine > #shown and (", … (%d more)"):format(#other_engine - #shown) or ""
+        )
+      )
     end
     if skipped > 0 then
       out(
