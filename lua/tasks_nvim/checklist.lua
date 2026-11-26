@@ -571,22 +571,25 @@ function M.entries(root, list)
   return out, errors
 end
 
----The ids of the entries of every list (`_list-<list>/<slug>`), sorted, from the names in the list folders: no entry
----is read (for a completion; `entries` reads them).
+---The ids of the entries of every list (`_list-<list>/<slug>`), sorted, each once, from the names in the list folders
+---(a folder only when it holds `<slug>/<slug>.md`): no entry is read, only the `list.md` of each list (for a
+---completion; `entries` reads them).
 ---@param root string
 ---@return string[]
 function M.entry_ids(root)
-  local ids = {}
+  local ids, seen = {}, {}
   for _, l in ipairs(M.lists(root)) do
     for name, kind in vim.fs.dir(l.dir) do
       local slug
       if kind == "file" and name:sub(-3) == ".md" and name ~= M.LIST_FILE then
         slug = name:sub(1, -4)
-      elseif kind == "directory" then
+      elseif kind == "directory" and fsio.is_file(l.dir .. "/" .. name .. "/" .. name .. ".md") then
         slug = name
       end
-      if slug and vault.valid_slug(slug) then
-        ids[#ids + 1] = l.id .. "/" .. slug
+      local id = slug and l.id .. "/" .. slug
+      if id and vault.valid_slug(slug) and not seen[id] then
+        seen[id] = true
+        ids[#ids + 1] = id
       end
     end
   end

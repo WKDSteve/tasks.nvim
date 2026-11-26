@@ -49,6 +49,11 @@ return function(H)
   eq(cv.format_filter({ state = "all" }), "")
   eq(cv.list_id("support"), "_list-support")
   eq(cv.list_id("_list-support"), "_list-support")
+  eq(cv.list_id("Support"), "_list-support", "a slug is lower case, as <Tab> offers it")
+  eq(cv.list_id("_list-Support"), "_list-support")
+  f, problems = cv.parse_filter("#a #b", "2026-11-25")
+  eq(f.tag, "a", "the first tag stays")
+  eq(problems, { "#b" }, "a second tag is named: the filter takes one")
 
   -- ── the lines of a list (pure) ──────────────────────────────────────────────
   local list = { id = "_list-x", title = "Support\nFälle", slug = "x" }
@@ -261,9 +266,58 @@ return function(H)
   ok(#vim.api.nvim_buf_get_keymap(buf, "n") > 0, "the list shown again has its keys")
   has(line(1), "Support Fälle")
 
-  -- q closes it
+  -- two windows on one list: the key works in the window it was pressed in
+  vim.cmd("Tasks checklist add support-faelle Erster")
+  vim.cmd("Tasks checklist add support-faelle Zweiter")
+  vim.cmd("vsplit")
+  -- into the right window: the left one is the first that shows the list (`bufwinid`)
+  vim.cmd("wincmd l")
+  local other = vim.fn.win_getid(vim.fn.winnr("#"))
+  vim.api.nvim_win_set_cursor(other, { 4, 0 })
+  vim.api.nvim_win_set_cursor(0, { 5, 0 })
+  answers[1] = "Dritter"
+  press("a")
+  has(
+    line(vim.api.nvim_win_get_cursor(0)[1]),
+    "Dritter",
+    "the cursor of this window is on the new entry"
+  )
+  eq(vim.api.nvim_win_get_cursor(other)[1], 4, "the other window keeps its line")
+
+  -- an entry changed on disk: the refused tick draws the list again, the change is shown
+  -- (entries made in the same second are ordered by their slug: the line is looked up by the title)
+  local function row_of(title)
+    for n, l in ipairs(vim.api.nvim_buf_get_lines(0, 0, -1, false)) do
+      if l:find("  " .. title, 1, true) then
+        return n
+      end
+    end
+  end
+  vim.api.nvim_win_set_cursor(0, { assert(row_of("Erster")), 0 })
+  local first = cursor_entry()
+  eq(first.title, "Erster")
+  local text = fsio.read(first.path)
+  H.write(first.path, (text:gsub("title: Erster", "title: Erster geaendert")))
+  press("x")
+  local changed = assert(row_of("Erster geaendert"), "drawn again after the refusal")
+  eq(line(changed):sub(1, 3), "[ ]", "not ticked: the version had changed")
+
+  -- q in one of two windows: both show another buffer, none is closed
+  local wins = #vim.api.nvim_tabpage_list_wins(0)
   press("q")
   ok(not vim.api.nvim_buf_is_valid(buf), "q wipes the list buffer")
+  eq(#vim.api.nvim_tabpage_list_wins(0), wins, "the second window stays open")
+  vim.cmd("only")
+
+  -- the entry ids of <Tab>: a folder without its file is no entry, a file and a folder of one slug are one id
+  local ids_list = assert(checklist.list_new("Ids", { root = root }))
+  H.write(root .. "/" .. ids_list.id .. "/a.md", "---\ntitle: A\n---\n")
+  H.write(root .. "/" .. ids_list.id .. "/a/a.md", "---\ntitle: A\n---\n")
+  vim.fn.mkdir(root .. "/" .. ids_list.id .. "/stray", "p")
+  local ids = vim.tbl_filter(function(id)
+    return id:find(ids_list.id .. "/", 1, true) == 1
+  end, checklist.entry_ids(root))
+  eq(ids, { ids_list.id .. "/a" })
 
   vim.ui.input, vim.ui.select, confirm.yesno = input_was, select_was, yesno_was
   vim.env.TASKS_VAULT = env_was

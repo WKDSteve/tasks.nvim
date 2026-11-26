@@ -73,7 +73,12 @@ function M.parse_filter(line, today)
     local key, value = word:match("^(%a+):(.+)$")
     key = key and key:lower()
     if word:match("^#.") then
-      f.tag = word:sub(2):lower()
+      if f.tag then
+        -- the filter takes one tag: a second one is named, not silently put in place of the first
+        problems[#problems + 1] = word
+      else
+        f.tag = word:sub(2):lower()
+      end
     elseif key == "since" or key == "from" then
       f.since = filter_day(value, today)
       if not f.since then
@@ -206,14 +211,15 @@ function M.label(l)
   return ("%s  (%d open of %d)  %s"):format(one_line(l.title), l.open, l.total, l.id)
 end
 
----The id of a list named by its id (`_list-support`) or its slug (`support`).
+---The id of a list named by its id (`_list-support`) or its slug (`support`); a slug is lower case, so `Support`
+---names `_list-support` (as `<Tab>` offers it for `Sup`).
 ---@param name string
 ---@return string
 function M.list_id(name)
   if name:sub(1, #checklist.PREFIX) == checklist.PREFIX then
-    return name
+    return checklist.PREFIX .. name:sub(#checklist.PREFIX + 1):lower()
   end
-  return checklist.PREFIX .. name
+  return checklist.PREFIX .. name:lower()
 end
 
 -- ── the write door ───────────────────────────────────────────────────────────
@@ -277,7 +283,10 @@ function M.refresh(buf, focus)
   local shown = checklist.filter(all, st.filter)
   local lines, rows, marks = M.render(list, all, shown, st.filter)
 
-  local win = vim.fn.bufwinid(buf)
+  -- the window the key was pressed in when it shows the list (a second window on the same list keeps its own cursor),
+  -- else the first one that shows it
+  local win = vim.api.nvim_get_current_buf() == buf and vim.api.nvim_get_current_win()
+    or vim.fn.bufwinid(buf)
   local old = win ~= -1 and vim.api.nvim_win_get_cursor(win) or nil
   focus = focus or (old and st.rows[old[1]] and st.rows[old[1]].id) or nil
 
@@ -376,9 +385,9 @@ local function actions(buf)
       desc = "tick or open again",
       fn = function()
         with_entry(buf, function(e)
-          if run_op({ op = "entry_set", id = e.id, done = not e.done, if_match = e.etag }) then
-            M.refresh(buf, e.id)
-          end
+          -- drawn again also when it was refused: a version changed elsewhere is then the one shown
+          run_op({ op = "entry_set", id = e.id, done = not e.done, if_match = e.etag })
+          M.refresh(buf, e.id)
         end)
       end,
     },
@@ -402,7 +411,8 @@ local function actions(buf)
             e.folder and " with its attachments" or ""
           )
           require("tasks_nvim.ui.confirm").yesno(msg, "delete", function(yes)
-            if yes and run_op({ op = "entry_delete", id = e.id, if_match = e.etag }) then
+            if yes then
+              run_op({ op = "entry_delete", id = e.id, if_match = e.etag })
               M.refresh(buf)
             end
           end)
@@ -428,8 +438,8 @@ local function actions(buf)
             local made = run_op({ op = "entry_promote", id = e.id, area = area, if_match = e.etag })
             if made then
               notify.info(("%s is now the task %s"):format(e.id, tostring(made.id)))
-              M.refresh(buf)
             end
+            M.refresh(buf)
           end)
         end)
       end,
@@ -488,9 +498,13 @@ local function actions(buf)
     close = {
       desc = "close the list",
       fn = function()
+        -- every window on the list shows the alternate buffer (else one empty buffer) first (UI-55): wiping the list
+        -- would close them
         local alt = vim.fn.bufnr("#")
-        if alt > 0 and alt ~= buf and vim.fn.buflisted(alt) == 1 then
-          vim.api.nvim_win_set_buf(0, alt)
+        local target = (alt > 0 and alt ~= buf and vim.fn.buflisted(alt) == 1) and alt or nil
+        for _, w in ipairs(vim.fn.win_findbuf(buf)) do
+          target = target or vim.api.nvim_create_buf(true, false)
+          vim.api.nvim_win_set_buf(w, target)
         end
         if vim.api.nvim_buf_is_valid(buf) then
           vim.api.nvim_buf_delete(buf, { force = true })
