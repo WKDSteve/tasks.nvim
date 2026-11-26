@@ -129,6 +129,16 @@ return function(H)
   vim.cmd("Tasks checklist add support-faelle SAP Ticket #sap")
   eq(line(4):match("^%[ %] %d+%-%d+%-%d+  SAP Ticket  #sap$") ~= nil, true, line(4))
 
+  -- <Tab>: the lists by slug, and `attach` offers the entries once `_` is typed
+  eq(
+    vim.fn.getcompletion("Tasks checklist add supp", "cmdline"),
+    { "_list-support-faelle" },
+    "a list completes from its slug"
+  )
+  local offered_ids = vim.fn.getcompletion("Tasks attach _list-supp", "cmdline")
+  eq(#offered_ids, 1, vim.inspect(offered_ids))
+  ok(offered_ids[1]:match("^_list%-support%-faelle/%d+%-%d+%-sap%-ticket$"), offered_ids[1])
+
   -- a adds; the cursor lands on the new entry (the newest: first)
   answers[1] = "Zweiter #hiva"
   press("a")

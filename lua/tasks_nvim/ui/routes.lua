@@ -200,6 +200,31 @@ end
 ---The ids `done_ids` offers (exported for the specs).
 M.done_ids = done_ids
 
+---The ids of the entries of every checklist (`_list-<list>/<slug>`), from the names in the list folders: no entry is
+---read. Fails soft: no vault, no ids.
+---@return string[]
+local function entry_ids()
+  local root = vault.root()
+  if not root then
+    return {}
+  end
+  local checklist = require("tasks_nvim.checklist")
+  local ids = {}
+  for _, l in ipairs(checklist.lists(root)) do
+    for name, kind in vim.fs.dir(l.dir) do
+      local slug = (kind == "file" and name:sub(-3) == ".md" and name ~= checklist.LIST_FILE)
+          and name:sub(1, -4)
+        or (kind == "directory" and name)
+        or nil
+      if slug and vault.valid_slug(slug) then
+        ids[#ids + 1] = l.id .. "/" .. slug
+      end
+    end
+  end
+  table.sort(ids)
+  return ids
+end
+
 ---Complete the item under the cursor of a comma list (`ui,do` -> `ui,docs`); what is before it stays, a leading
 ---`[` of a `blocked_by=[a, b]` value too.
 ---@param lead string
@@ -339,6 +364,10 @@ function M.register_types()
         end
         table.sort(both)
         return prefix_ci(both, arg_lead)
+      end
+      if spec and spec.allow_entry and arg_lead:sub(1, 1) == "_" then
+        -- the entries of the checklists, from the names of their files (nothing is read): only once `_` is typed
+        return prefix_ci(entry_ids(), arg_lead)
       end
       return prefix_ci(open_ids(), arg_lead)
     end,
