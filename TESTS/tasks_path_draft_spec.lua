@@ -268,6 +268,65 @@ return function(H)
   code, _, err = run({ "path-new", A, "--from=" .. sound, "--areas=x" })
   eq(code, 2)
   has(err, "--areas goes into the draft's frontmatter")
+  -- ── badges and images beside the draft: allowed and copied along, the path is written as a folder ──
+  local bdir = dir .. "/mit-badges"
+  vim.fn.mkdir(bdir .. "/assets/badges", "p")
+  H.write(bdir .. "/assets/badges/stern.svg", "<svg/>")
+  H.write(bdir .. "/assets/bild.png", "png")
+  local badged = bdir .. "/entwurf.md"
+  H.write(badged, table.concat({
+    "---",
+    "title: Mit Badges",
+    "---",
+    "",
+    "## Lernpunkte",
+    "",
+    "- [ ] Lesen ![Bild](assets/bild.png) {xp=10} {#lesen}",
+    "",
+    "## Level",
+    "",
+    "- [ ] 5 XP · Anfang · Badge assets/badges/stern.svg",
+    "",
+  }, "\n") .. "\n")
+  local folder = root .. "/" .. A .. "/ROADMAP/paths/mit-badges"
+  code, out, err = run({ "path-new", A, "--from=" .. badged, "--dry-run" })
+  eq(code, 0, err)
+  has(out, "would-copy\tassets/badges/stern.svg")
+  has(out, "would-copy\tassets/bild.png")
+  has(out, "would-create\t" .. A .. "/mit-badges\t")
+  eq(vim.fn.isdirectory(folder), 0, "a dry run writes nothing")
+  code, out, err = run({ "path-new", A, "--from=" .. badged })
+  eq(code, 0, err)
+  lacks(err, "level-badge-missing")
+  lacks(err, "path-image-missing")
+  has(out, "created\t" .. A .. "/mit-badges\t")
+  eq(H.read(folder .. "/assets/badges/stern.svg"), "<svg/>")
+  eq(H.read(folder .. "/assets/bild.png"), "png")
+  ok(H.read(folder .. "/mit-badges.md"), "the folder form holds the path")
+  eq(vim.fn.filereadable(path_file("mit-badges")), 0, "no plain file beside the folder")
+  -- the written path is sound for `check` as well
+  local res = assert(check.run({ root = root, area = A, today = TODAY }))
+  for _, f in ipairs(res.findings) do
+    ok(not (f.path or ""):find("mit-badges", 1, true), "check of the written path: " .. f.code)
+  end
+
+  -- a badge that is not beside the draft either is still refused, and nothing is copied
+  vim.fn.delete(bdir .. "/assets/badges/stern.svg")
+  H.write(badged, (H.read(badged):gsub("title: Mit Badges", "title: Ohne Stern")))
+  code, out, err = run({ "path-new", A, "--from=" .. badged })
+  eq(code, 1, out)
+  has(err, "warn\tlevel-badge-missing\tline 11:")
+  eq(vim.fn.isdirectory(root .. "/" .. A .. "/ROADMAP/paths/ohne-stern"), 0)
+  -- a link that climbs out of the draft's folder is never looked up
+  H.write(dir .. "/aussen.svg", "<svg/>")
+  H.write(
+    badged,
+    (H.read(badged):gsub("assets/badges/stern.svg", "assets/badges/../../../aussen.svg"))
+  )
+  code, _, err = run({ "path-new", A, "--from=" .. badged })
+  eq(code, 1)
+  has(err, "level-badge")
+
   code, _, err = run({ "path-new", A, "Titel", "--from=" .. sound })
   eq(code, 2)
   has(err, "usage: path-new <area> --from=<draft.md>")

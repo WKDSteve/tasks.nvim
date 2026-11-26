@@ -168,7 +168,7 @@ XP are never computed from a scheme; each point states its own (`LP-18`). A path
 
 ## 9. Traps seen so far
 
-- `path-new --from` refuses a draft with `Badge assets/badges/…` (`level-badge-missing`): create the path **without** the badge text, attach the files, then add the text (`tasks.nvim/path-new-from-badges-neben-dem-entwurf`). The script `tasks-vault/TOOLS/scripts/learning-path/mkpath.py` does these steps in one call.
+- `path-new --from` takes badges and images: put them beside the draft (`<folder of the draft>/assets/badges/…`, `assets/…`); the path is written as a folder and the files are copied. A badge that is not there is still refused (`level-badge-missing`).
 - `attach` puts files in `assets/`, not `assets/badges/`: move them.
 - Folder form (after `attach`) breaks relative links by one level (`tasks.nvim/folderize-bricht-relative-links`): add one `../`.
 - `attach` on your own claimed task needs `--by=<name>`.

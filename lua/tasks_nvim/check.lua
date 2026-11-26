@@ -455,23 +455,34 @@ end
 
 ---Whether the file a link target names exists below `dir`. A target is a URL
 ---part: `assets/two%20words.png` is the file `two words.png`.
+---`M.asset_file` names the file (relative to `dir`, as written or decoded) that is there.
 ---@param dir string
 ---@param target string
 ---@return boolean
 local function asset_exists(dir, target)
-  -- A link that climbs out of the task's folder (`assets/../../x`, also percent-encoded) names no asset of
-  -- this task: it counts as dangling without asking the file system, so a hand-edited body cannot use the
-  -- check to probe which files exist elsewhere.
+  return M.asset_file(dir, target) ~= nil
+end
+
+---The path below `dir` of the file a link target names (`target` itself, or its percent-decoded form), or `nil`.
+---A link that climbs out of the folder (`assets/../../x`, also percent-encoded) names no asset: it is `nil` without
+---asking the file system, so a hand-edited body cannot use the check to probe which files exist elsewhere.
+---@param dir string
+---@param target string
+---@return string|nil rel
+function M.asset_file(dir, target)
   local decoded = target:gsub("%%(%x%x)", function(hex)
     return string.char(tonumber(hex, 16))
   end)
   if target:find("..", 1, true) or decoded:find("..", 1, true) then
-    return false
+    return nil
   end
   if fsio.is_file(dir .. "/" .. target) then
-    return true
+    return target
   end
-  return decoded ~= target and fsio.is_file(dir .. "/" .. decoded)
+  if decoded ~= target and fsio.is_file(dir .. "/" .. decoded) then
+    return decoded
+  end
+  return nil
 end
 
 ---Relative `assets/...` links of a folder task's body that point at no file.
@@ -1234,6 +1245,8 @@ end
 ---@field is_finished fun(id: string): boolean
 ---@field scan_opts table
 ---@field text? string  # The path's text when it is not on disk yet (a draft, `tasks_nvim.path_draft`).
+---@field assets_dir? string  # A draft's own folder: an image or badge (`assets/...`) found there is not missing
+---(`path_draft` copies it along).
 ---@field repos? Tasks.AbsentRepos  # The run's count of links into absent neighbour repos; without it the path gives its own `link-repo-absent` hints.
 
 ---The findings of ONE learning path (`Tasks.PlanFile` of kind `path`), as `check` reports them for an area: a broken
@@ -1316,6 +1329,7 @@ function M.path_file_findings(findings, hints, p, c)
         and l.badge:match("^assets/badges/")
         and not l.badge:find("..", 1, true)
         and not (p.folder and fsio.is_file(dir .. "/" .. l.badge))
+        and not (c.assets_dir and asset_exists(c.assets_dir, l.badge))
       then
         add(
           findings,
@@ -1387,6 +1401,7 @@ function M.path_file_findings(findings, hints, p, c)
       and node.image:match("^assets/")
       and not node.image:find("..", 1, true)
       and not (p.folder and asset_exists(dir, node.image))
+      and not (c.assets_dir and asset_exists(c.assets_dir, node.image))
     then
       add(
         findings,

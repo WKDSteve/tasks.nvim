@@ -113,7 +113,9 @@ commands:
                                           the whole path from a draft file: checked as check checks a path (keys,
                                           marks, XP, arrows, links, levels, images), written only when nothing is
                                           wrong; every finding names the draft's line and its code (exit 1, nothing
-                                          written); --dry-run says what would be made and writes nothing
+                                          written); --dry-run says what would be made and writes nothing;
+                                          images and badges (assets/...) beside the draft are copied along
+                                          (the path becomes a folder)
   path <area>/<slug> [--machine=private|workstation|wsl|env|all] [--format=text|json]  the XP overview of a learning path: points (all, open, without XP), XP in
                                           all and per stage (a root of ## Lernpunkte), and for each level the point
                                           at which it is reached when the points are learned in their order; the
@@ -1623,6 +1625,8 @@ local function path_from_draft(ctx)
     today = eo.today,
     slug = args.opt.slug --[[@as string|nil]],
     dry_run = args.opt["dry-run"] == true,
+    -- images and badges beside the draft go along (the path becomes a folder)
+    assets_dir = fsio.dirname(vim.fn.fnamemodify(source, ":p")),
   })
   if not res then
     ctx.warn("error: " .. tostring(err))
@@ -1641,6 +1645,9 @@ local function path_from_draft(ctx)
   if #res.findings > 0 then
     ctx.warn(("refused\t%d finding(s); nothing written"):format(#res.findings))
     return 1
+  end
+  for _, rel in ipairs(res.assets or {}) do
+    ctx.say(("%s\t%s"):format(res.written and "copied" or "would-copy", rel))
   end
   ctx.say(("%s\t%s\t%s"):format(res.written and "created" or "would-create", res.id, res.path))
   if res.renamed then

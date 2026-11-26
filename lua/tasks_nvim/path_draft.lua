@@ -40,6 +40,8 @@ local M = {}
 ---@field hints Tasks.PathDraftFinding[]
 ---@field written boolean
 ---@field dry_run boolean
+---@field assets string[]  # The images and badges (`assets/...`) copied from beside the draft (or, dry, that would be).
+---@field folder boolean   # Written as a folder (`paths/<slug>/<slug>.md`): it carries `assets`.
 
 ---The lines before the body of `text` (its frontmatter block), or 0.
 ---@param text string
@@ -175,13 +177,44 @@ local function refused(code, message)
     hints = {},
     written = false,
     dry_run = false,
+    assets = {},
+    folder = false,
   }
+end
+
+---The images of the tree and the badges of the levels (`assets/...`) of `file` that lie beside the draft, in `dir`:
+---the path below `dir` of each, once, in the order of the file. A link (symlink or junction) is never taken.
+---@param file Tasks.PlanFile
+---@param dir string
+---@return string[] rels
+local function assets_beside(file, dir)
+  local targets = {}
+  for _, node in ipairs(file.tree and file.tree.nodes or {}) do
+    targets[#targets + 1] = node.image
+  end
+  local lv = file.levels
+  if lv and lv.has_section then
+    for _, l in ipairs(vim.list_extend(vim.list_slice(lv.levels, 1), { lv.final })) do
+      targets[#targets + 1] = l.badge
+    end
+  end
+  local out, seen = {}, {}
+  for _, target in ipairs(targets) do
+    local rel = target and target:match("^assets/") and check.asset_file(dir, target)
+    if rel and not seen[rel] and not fsio.is_link(dir .. "/" .. rel) then
+      seen[rel] = true
+      out[#out + 1] = rel
+    end
+  end
+  return out
 end
 
 ---Check a draft of a learning path and write it to `<area>/ROADMAP/paths/<slug>.md` when nothing is wrong.
 ---@param area string
 ---@param draft string  # The whole file: frontmatter and body.
----@param opts { root?: string, today?: string, slug?: string, dry_run?: boolean }
+---With `assets_dir` (the draft's own folder) an image or badge found there is not missing: the path is written as a
+---folder and the files are copied into it (`result.assets`); one that is not there either is refused as before.
+---@param opts { root?: string, today?: string, slug?: string, dry_run?: boolean, assets_dir?: string }
 ---@return Tasks.PathDraftResult|nil result  # `findings` not empty: refused, nothing written.
 ---@return string|nil err                    # The call itself cannot run (no vault, no such area, a bad `slug`).
 ---@return table|nil info
@@ -246,24 +279,30 @@ function M.run(area, draft, opts)
       open_ids[t.id] = t
     end
   end
+  local assets = opts.assets_dir and assets_beside(file, opts.assets_dir) or {}
   local raw, raw_hints = {}, {}
   check.path_file_findings(raw, raw_hints, file, {
     open_ids = open_ids,
     is_finished = scan.finished_lookup(scan_opts),
     scan_opts = scan_opts,
     text = text,
+    assets_dir = #assets > 0 and opts.assets_dir or nil,
   })
+  -- files to copy: the path is a folder, `paths/<slug>/<slug>.md`, with its `assets/`
+  local target = #assets > 0 and vault.plan_folder_path(root, "path", area, slot.slug) or slot.path
   local fm_end = body_offset(draft)
   local shift = body_offset(text) - fm_end
   local result = {
     id = slot.id,
-    path = slot.path,
+    path = target,
     slug = slot.slug,
     renamed = slot.renamed,
     findings = {},
     hints = {},
     written = false,
     dry_run = opts.dry_run == true,
+    assets = assets,
+    folder = #assets > 0,
   }
   for _, f in ipairs(raw) do
     result.findings[#result.findings + 1] = draft_finding(f, draft, fm_end, shift)
@@ -282,14 +321,33 @@ function M.run(area, draft, opts)
   if #result.findings > 0 or opts.dry_run then
     return result
   end
-  local dir = vault.paths_dir(root, area)
+  local dir = fsio.dirname(target)
+  if result.folder and (fsio.is_file(slot.path) or fsio.stat(dir)) then
+    -- the slot was free as a file; a folder of the same name (or a file of the slug) is somebody else's
+    return nil,
+      ("cannot create %s: %s exists"):format(target, fsio.is_file(slot.path) and slot.path or dir)
+  end
   local mk_ok, mk_err = fsio.mkdirp(dir)
   if not mk_ok then
     return nil, "cannot create " .. dir .. ": " .. tostring(mk_err)
   end
-  local ok, werr = fsio.create_exclusive(slot.path, text)
+  local ok, werr = fsio.create_exclusive(target, text)
   if not ok then
-    return nil, "cannot create " .. slot.path .. ": " .. tostring(werr)
+    return nil, "cannot create " .. target .. ": " .. tostring(werr)
+  end
+  local copied = {}
+  for _, rel in ipairs(assets) do
+    local cp_ok, cerr = fsio.copy_whole(opts.assets_dir .. "/" .. rel, dir .. "/" .. rel)
+    if not cp_ok then
+      -- a half-made folder is worse than none: take back what this run wrote
+      for i = #copied, 1, -1 do
+        vim.uv.fs_unlink(dir .. "/" .. copied[i])
+      end
+      vim.uv.fs_unlink(target)
+      vim.fn.delete(dir, "rf")
+      return nil, ("cannot copy %s: %s (nothing written)"):format(rel, tostring(cerr))
+    end
+    copied[#copied + 1] = rel
   end
   result.written = true
   return result

@@ -7,6 +7,10 @@ the version is not tagged yet (the repository is not published).
 
 ### Added
 
+- `path-new --from` takes the images and badges (`assets/...`) that lie beside the draft: `check` counts them as there
+  (`Tasks.PathCheckCtx.assets_dir`, `check.asset_file`), the path is written as a folder and the files are copied
+  (`copied` / `would-copy` lines, `Tasks.PathDraftResult.assets`, `folder`). Before, every badge was refused as
+  `level-badge-missing`. Spec in `tasks_path_draft_spec`.
 - `check` warns `empty-template-body`: an open task in `ROADMAP/tasks/` that still holds a template comment of
   `tasks new` (`model.TEMPLATE_PLACEHOLDERS`, `model.template_placeholders_in`); `Backlog/` is left out. `tasks check`
   and `tasks ci` say the count per area in one line (`check.count_line`). A warning: the vault gate stays green unless
