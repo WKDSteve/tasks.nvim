@@ -835,7 +835,8 @@ function M.import_records(area, records, opts)
     duplicates = {},
     refused = {},
     problems = {},
-    messages = vim.list_slice(opts.messages or {}, 1),
+    -- a note on the file can name what the file holds (a header cell of a CSV that is half data): scrubbed like the rest
+    messages = vim.tbl_map(contacts.scrub, opts.messages or {}),
     dry_run = opts.dry_run == true,
   }
   local planned_slugs = {}

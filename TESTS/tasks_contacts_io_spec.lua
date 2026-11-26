@@ -373,6 +373,17 @@ return function(H)
     ops_call({ op = "contacts_import", area = "cascade.nvim", text = csv_text, as = "csv" }, true)
   eq(csv_doc.results[1].ok, true, vim.inspect(csv_doc))
   ok(#csv_doc.results[1].report.created > 0)
+  -- a header cell that is a mail address or a number (a file whose header is half data) is named scrubbed in messages
+  local leaky = ops_call({
+    op = "contacts_import",
+    area = "cascade.nvim",
+    text = "name;leak@example.org;+49 30 1234567\nAnna;x;y\n",
+    as = "csv",
+  }, true)
+  eq(leaky.results[1].ok, true, vim.inspect(leaky))
+  local said = table.concat(leaky.results[1].report.messages, " | ")
+  has(said, "columns not imported", said)
+  no_personal(said, "the messages of the report")
   local bad_as =
     ops_call({ op = "contacts_import", area = "lib.nvim", text = v3, as = "ics" }, true)
   eq(bad_as.results[1].error.code, "invalid_argument")
