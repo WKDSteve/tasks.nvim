@@ -280,6 +280,22 @@ function M.run(area, draft, opts)
     end
   end
   local assets = opts.assets_dir and assets_beside(file, opts.assets_dir) or {}
+  -- files to copy: the path is a folder, `paths/<slug>/<slug>.md`, with its `assets/`
+  local target = #assets > 0 and vault.plan_folder_path(root, "path", area, slot.slug) or slot.path
+  if target ~= slot.path then
+    -- judged from where it will lie: a relative link of the draft is one folder deeper than in the plain file
+    file = paths.with_xp(
+      plans.parse(text, {
+        path = target,
+        area = area,
+        slug = slot.slug,
+        kind = "path",
+        folder = true,
+        link_resolver = resolver,
+      }),
+      root
+    )
+  end
   local raw, raw_hints = {}, {}
   check.path_file_findings(raw, raw_hints, file, {
     open_ids = open_ids,
@@ -288,8 +304,6 @@ function M.run(area, draft, opts)
     text = text,
     assets_dir = #assets > 0 and opts.assets_dir or nil,
   })
-  -- files to copy: the path is a folder, `paths/<slug>/<slug>.md`, with its `assets/`
-  local target = #assets > 0 and vault.plan_folder_path(root, "path", area, slot.slug) or slot.path
   local fm_end = body_offset(draft)
   local shift = body_offset(text) - fm_end
   local result = {

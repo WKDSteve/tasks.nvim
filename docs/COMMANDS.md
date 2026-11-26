@@ -667,7 +667,8 @@ nothing; the frontmatter options (`--areas`, `--tags`, …) are refused beside `
 badge of `## Level` (`assets/...`) that lies beside the draft (`<folder of the draft>/assets/...`) is not missing: the
 path is written as a folder (`paths/<slug>/<slug>.md`) and each file is copied into it (`copied\t<file>`, dry:
 `would-copy\t<file>`). One that is not there either is refused as before; a link that climbs out of the folder (`..`)
-or a linked file is never copied.
+or a linked file is never copied. A relative link of such a draft is judged from the folder, one level deeper than a
+plain path file (`../../tasks/x.md`, not `../tasks/x.md`).
 
 Headless `path <area>/<slug> [--format=text|json]` is the XP overview of a path while it is planned (`path_stats`):
 

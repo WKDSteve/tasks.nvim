@@ -327,6 +327,43 @@ return function(H)
   eq(code, 1)
   has(err, "level-badge")
 
+  -- with assets the path lies one folder deeper: a relative link is judged from there, as `check` reads it later
+  local ldir = dir .. "/mit-link"
+  vim.fn.mkdir(ldir .. "/assets/badges", "p")
+  H.write(ldir .. "/assets/badges/mond.svg", "<svg/>")
+  local function linked_draft(title, link)
+    local p = ldir .. "/entwurf.md"
+    H.write(p, table.concat({
+      "---",
+      "title: " .. title,
+      "---",
+      "",
+      "## Lernpunkte",
+      "",
+      "- [ ] Lesen {xp=10} {#lesen} – [die Aufgabe](" .. link .. ")",
+      "",
+      "## Level",
+      "",
+      "- [ ] 5 XP · Anfang · Badge assets/badges/mond.svg",
+      "",
+    }, "\n") .. "\n")
+    return p
+  end
+  -- right for a plain file, wrong for the folder the badge makes
+  code, out, err =
+    run({ "path-new", A, "--from=" .. linked_draft("Link flach", "../tasks/lua-tabellen.md") })
+  eq(code, 1, out)
+  has(err, "path-link-missing")
+  eq(vim.fn.isdirectory(root .. "/" .. A .. "/ROADMAP/paths/link-flach"), 0)
+  code, out, err =
+    run({ "path-new", A, "--from=" .. linked_draft("Link tief", "../../tasks/lua-tabellen.md") })
+  eq(code, 0, err)
+  has(out, "created\t" .. A .. "/link-tief\t")
+  res = assert(check.run({ root = root, area = A, today = TODAY }))
+  for _, f in ipairs(res.findings) do
+    ok(not (f.path or ""):find("link-tief", 1, true), "check of the written path: " .. f.code)
+  end
+
   code, _, err = run({ "path-new", A, "Titel", "--from=" .. sound })
   eq(code, 2)
   has(err, "usage: path-new <area> --from=<draft.md>")
