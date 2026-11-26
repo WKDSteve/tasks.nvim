@@ -56,6 +56,12 @@ return {
     docs = "docs/COMMANDS.md",
   },
   {
+    id = "tasks.checklist",
+    title = ":Tasks checklist [new|add]: the checklists in a buffer of their own, writes through the write door, whose documents carry the engine's commit",
+    surface = { "command:Tasks checklist" },
+    docs = "docs/COMMANDS.md",
+  },
+  {
     id = "tasks.learning-tree",
     title = ":Tasks learn|point|promote|unpromote: the learning tree in the buffer, its marks, progress, folds and images",
     surface = {
