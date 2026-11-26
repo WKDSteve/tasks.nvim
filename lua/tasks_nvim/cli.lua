@@ -377,6 +377,7 @@ commands:
                                           --trust-vault-lint (or TASKS_TRUST_VAULT_LINT=1); else --md-lint=<own copy> or --no-lint
                                           --own-since=<rev> (pre-push of a shared vault): only findings in the areas <rev>...HEAD
                                           changes count; the others are printed as foreign: and never fail
+                                          ($TASKS_CI_OWN_SINCE does the same; an older engine ignores it)
   areas [--format=names|tsv|json]        list the vault's areas (tsv: with the open counts, then the area groups as
                                           <name> <open> group <members>; json: the tasks.areas document with area_groups)
                                           (an area group of <vault>/area-groups.json, e.g. nvim = *.nvim, stands for its
@@ -4357,13 +4358,19 @@ function commands.ci(ctx)
     return 2
   end
   local opt = ctx.args.opt
+  -- `$TASKS_CI_OWN_SINCE` is the same as `--own-since`: a vault's pipeline sets it in the environment of its step, so
+  -- an older tasks.nvim (which refuses an unknown option) still runs the whole gate instead of failing every push
+  local own_since = opt["own-since"] --[[@as string|nil]]
+  if own_since == nil and vim.env.TASKS_CI_OWN_SINCE and vim.env.TASKS_CI_OWN_SINCE ~= "" then
+    own_since = vim.env.TASKS_CI_OWN_SINCE
+  end
   local res = require("tasks_nvim.ci").run({
     root = ctx.eo.root,
     strict = opt.strict == true,
     lint = opt["no-lint"] ~= true,
     trust_vault_lint = opt["trust-vault-lint"] == true,
     md_lint = opt["md-lint"] --[[@as string|nil]],
-    own_since = opt["own-since"] --[[@as string|nil]],
+    own_since = own_since,
   }, ctx.say)
   return res.code
 end

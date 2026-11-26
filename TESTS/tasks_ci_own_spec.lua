@@ -159,4 +159,13 @@ return function(H)
   said = {}
   code = cli.run({ "ci", "--no-lint", "--vault=" .. root }, { out = put, err = put })
   eq(code, 1, "the full gate still sees the stale index")
+
+  -- $TASKS_CI_OWN_SINCE does the same (a vault's step sets it: an older engine ignores it instead of refusing)
+  local before = vim.env.TASKS_CI_OWN_SINCE
+  vim.env.TASKS_CI_OWN_SINCE = base
+  said = {}
+  code = cli.run({ "ci", "--no-lint", "--vault=" .. root }, { out = put, err = put })
+  vim.env.TASKS_CI_OWN_SINCE = before
+  eq(code, 0, table.concat(said, "\n"))
+  has(table.concat(said, "\n"), "own area(s): lib.nvim")
 end

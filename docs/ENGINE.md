@@ -1123,7 +1123,9 @@ snapshot of the pushed commit with `--own-since=origin/main`: only findings in t
 A stale index or a broken task in an area the push does not touch is another session's; it is printed as
 `foreign: ...` and does not fail the run (its index is not linted either). Findings outside the areas count always,
 and everything counts when the push changes `tasks-vault.json`, `area-groups.json` or `TOOLS/scripts/md_lint.lua`, or
-when the diff cannot be read. Without the option (the pipeline on the runner) every finding counts as before.
+when the diff cannot be read. Without the option (the pipeline on the runner) every finding counts as before. A pipeline step
+sets it as `TASKS_CI_OWN_SINCE=origin/main` in its environment rather than as an option: an older tasks.nvim refuses an
+unknown option (every push of the vault would fail) but ignores the variable and runs the whole gate.
 
 A pipeline for a vault repo runs `scripts/tasks-ci.lua` with `TASKS_VAULT` set (checkout this plugin and `lib.nvim` next to it).
 
