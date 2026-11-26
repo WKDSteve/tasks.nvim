@@ -358,7 +358,10 @@ that ends the options).
 
 `tasks new <area> <title> --context=<text> --acceptance=<text> --notes=<text>` writes the sections (one checkbox per line of
 `--acceptance`); beside any of them an empty section is only its heading, without the template comment that `check`
-warns about (`empty-template-body`). For scripts that make many tasks at once.
+warns about (`empty-template-body`). For scripts that make many tasks at once. The sections are the built-in ones,
+also in a vault with its own `TEMPLATES/task.md`. A line break inside a value does not pass through `bin/tasks.cmd`
+(cmd.exe ends the line there): on Windows call the long form (`nvim -n -i NONE --headless -u NONE -l
+<checkout>/scripts/tasks.lua new ...`) from PowerShell or Git Bash for more than one acceptance line.
 
 `tasks new` writes the file as asked even when the `plan`, `project` or `phase` it names exists nowhere yet (a plan may follow), and says
 so on stderr as `warn: <id>: plan X is no plan file ...`; `tasks check` reports it later as `plan-unknown` and the like.
