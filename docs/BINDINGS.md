@@ -20,7 +20,7 @@ keymaps and no autocommands at load time (the browser preview adds a short-lived
 | `preview` | `<id>` | browser preview through mdview.nvim |
 | `folder` | `<area> [tasks\|roadmap\|backlog\|handover\|notes\|all] [--action=] [--list] [--to=]` | picker over an area folder |
 | `learn` | `[toggle\|on\|off\|image\|follow]` | the learning tree view in this buffer: progress, folds, image placeholders; the image or the promoted task of the point under the cursor |
-| `point` | `[next\|open\|learned\|seen\|dropped\|blocked] [reason...]` | the mark of the learning point under the cursor; `[~]` and `[-]` ask for the reason |
+| `point` | `[next\|open\|learned\|seen\|dropped\|blocked] [reason...]` | the mark of the learning point under the cursor; `[~]` and `[-]` ask for the reason, and `[x]` on an exercise point whose `Nachweis` has no `Ergebnis` yet asks for the result |
 | `promote` | `[<area>/<slug>#<key\|n>] [--area= --title= --actor= --dry-run --no-index]` | make a task of a learning point (default: the one under the cursor) and open it |
 | `unpromote` | `[<area>/<slug>#<key\|n>] [--dry-run --no-index]` | take a promotion back while the task holds no work |
 
@@ -76,7 +76,7 @@ The view maps no key unless `keys.learning` names one; then the key is buffer-lo
 
 | Action | Does |
 | --- | --- |
-| `cycle` | next mark of the point under the cursor: `[ ]` -> `[x]` -> `[~]` -> `[-]` -> `[ ]` (`[~]` and `[-]` ask for the reason) |
+| `cycle` | next mark of the point under the cursor: `[ ]` -> `[x]` -> `[~]` -> `[-]` -> `[ ]` (`[~]` and `[-]` ask for the reason; `[x]` on an exercise point with a `Nachweis` and no `Ergebnis` asks for the result) |
 | `promote` | promote the point under the cursor to a task (`:Tasks promote`) |
 | `unpromote` | take its promotion back (`:Tasks unpromote`) |
 | `image` | show its image: images.nvim, else mdview.nvim's browser preview, else the path |

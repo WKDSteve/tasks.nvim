@@ -119,8 +119,10 @@ Checklist for **every exercise point** (`LP-21`; labels starting with "Üben:", 
   is not a part of the block.
 - [ ] The proof is named (note, table, protocol, screenshot as an asset) because "done" means proof, not "read" (`LP-04`); `[x]`
   needs a non-empty Ergebnis (`tasks point <id> <key> --result=… --state=learned` writes both; the desktop app and the web variant
-  open the block in a float with a result field, the mobile page in a sheet with the same field; in the editor it is the
-  note under the point).
+  open the block in a float with a result field, the mobile page in a sheet with the same field; in the editor the block is
+  the note under the point, and ticking the point off in the learn mode asks for the result, naming the `Nachweis`: the
+  answer is written as the `**Ergebnis:**` line in the same step as the state, a cancelled question changes nothing, an
+  empty answer is refused; under `{safety}` the reader is asked first whether the text was read).
 - [ ] If the text is longer than about 10 lines or needs its own sub-points: **promote** it (`promote <path>#<key>`), the task then holds the steps as checkboxes (`LP-05`).
 - [ ] Nothing in the point needs another AI prompt to become doable. A point like "Üben: `ls`, `ls -l`" without steps is a
   description, not a task; that mistake was found in 321 points of earlier paths (`tasks.nvim/uebungspunkte-mit-ausformulierter-aufgabe`).

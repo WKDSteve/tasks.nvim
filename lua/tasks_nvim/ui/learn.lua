@@ -22,6 +22,7 @@
 local fm = require("lib.nvim.markdown.frontmatter")
 local notify = require("lib.nvim.notify").create("[tasks]")
 
+local exercise = require("tasks_nvim.exercise")
 local fsio = require("tasks_nvim.fsio")
 local lernbaum = require("tasks_nvim.lernbaum")
 local lernlevel = require("tasks_nvim.lernlevel")
@@ -350,9 +351,10 @@ end
 ---@param state string
 ---@param reason? string
 ---@param ack? boolean  # The reader said they read the `{safety}` mark the point is under.
+---@param result? string  # The `**Ergebnis:**` of an exercise point, written in the same step as the state.
 ---@return Tasks.LernNode|nil node   # The point as it is now.
 ---@return string|nil err
-function M.set_point(buf, row, state, reason, ack)
+function M.set_point(buf, row, state, reason, ack, result)
   local snap = M.snapshot(buf)
   local node = M.node_at(snap, row)
   if not node then
@@ -383,6 +385,7 @@ function M.set_point(buf, row, state, reason, ack)
       root = loc.root,
       if_match = fsio.etag(disk),
       ack = ack == true,
+      result = result,
     })
     if not res then
       return nil, err
@@ -392,6 +395,31 @@ function M.set_point(buf, row, state, reason, ack)
       notify.info(("routine %s starts: due %s"):format(r.id, r.due))
     end
     return reload_following(buf, row, node), nil
+  end
+  if result ~= nil then
+    -- the result is lines under the point: the lines after it move, so the whole tree is written back, not one line.
+    -- Everything the state step can refuse is checked first, so a refused state leaves the buffer as it was.
+    if #node.children > 0 or not lernbaum.MARK_OF[state] then
+      return nil, select(2, lernbaum.set_state(snap.tree, node.index, state, reason))
+    end
+    local old_n = #vim.split(lernbaum.render(snap.tree), "\n", { plain = true })
+    local written, werr = lernbaum.set_result(snap.tree, node.index, result)
+    if not written then
+      return nil, werr
+    end
+    local changed, err = lernbaum.set_state(snap.tree, node.index, state, reason)
+    if not changed then
+      return nil, err
+    end
+    local lines = vim.split(lernbaum.render(snap.tree), "\n", { plain = true })
+    for i, l in ipairs(lines) do
+      lines[i] = l:gsub("\r$", "")
+    end
+    vim.api.nvim_buf_set_lines(buf, snap.offset, snap.offset + old_n, false, lines)
+    if attached[buf] then
+      M.refresh(buf)
+    end
+    return changed, nil
   end
   local changed, err = lernbaum.set_state(snap.tree, node.index, state, reason)
   if not changed then
@@ -442,7 +470,38 @@ function M.set_point_asking(buf, row, state, reason, done)
   M.set_point_reasoned(buf, row, state, reason, false, done)
 end
 
----The second half of `set_point_asking`: ask for the reason when the state needs one, then set the state.
+---The last step of `set_point_asking`: an exercise point whose `Nachweis` has no `Ergebnis` yet is learned with a
+---result, so the result is asked for (the prompt names the `Nachweis`) and written in the same step as the state.
+---A cancelled question changes nothing; an empty answer is refused.
+---@param buf integer
+---@param row integer
+---@param state string
+---@param reason? string
+---@param ack boolean
+---@param done fun(node: Tasks.LernNode|nil, err: string|nil)
+function M.set_point_resulting(buf, row, state, reason, ack, done)
+  local node = M.node_at(M.snapshot(buf), row)
+  if not (state == "learned" and node and exercise.needs_result(node.note)) then
+    return done(M.set_point(buf, row, state, reason, ack))
+  end
+  vim.ui.input({
+    prompt = ("Ergebnis (Nachweis: %s): "):format(exercise.parse(node.note).nachweis or ""),
+  }, function(answer)
+    if answer == nil then
+      return done(nil, nil)
+    end
+    if not vim.api.nvim_buf_is_valid(buf) then
+      return done(nil, "the buffer is gone")
+    end
+    if answer:match("^%s*$") then
+      return done(nil, "learned needs a result: write what the Nachweis asks for (LP-04)")
+    end
+    done(M.set_point(buf, row, state, reason, ack, answer))
+  end)
+end
+
+---The second half of `set_point_asking`: ask for the reason when the state needs one, then set the state (asking for the
+---result of an exercise point, `set_point_resulting`).
 ---@param buf integer
 ---@param row integer
 ---@param state string
@@ -451,7 +510,7 @@ end
 ---@param done fun(node: Tasks.LernNode|nil, err: string|nil)
 function M.set_point_reasoned(buf, row, state, reason, ack, done)
   if not lernbaum.NEEDS_REASON[state] or (reason and reason ~= "") then
-    return done(M.set_point(buf, row, state, reason, ack))
+    return M.set_point_resulting(buf, row, state, reason, ack, done)
   end
   local node = M.node_at(M.snapshot(buf), row)
   if not node then
