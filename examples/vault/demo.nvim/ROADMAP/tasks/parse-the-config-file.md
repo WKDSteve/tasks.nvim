@@ -16,12 +16,13 @@ Read the user's config and report unknown keys.
 
 ## Context
 
-<!-- Why, where this came from. -->
+Users mistype keys and nothing tells them; the plugin should say so on startup.
 
 ## Acceptance
 
-<!-- what must be true at the end, as a checklist -->
+- [ ] a known key is read
+- [ ] an unknown key is named in one warning
 
 ## Notes
 
-<!-- Decisions, dead ends, references. -->
+Part of the first release, stage core.

@@ -12,12 +12,13 @@ Install, quickstart, configuration.
 
 ## Context
 
-<!-- Why, where this came from. -->
+New users need to see how to install and start before anything else.
 
 ## Acceptance
 
-<!-- what must be true at the end, as a checklist -->
+- [ ] install, quickstart and configuration sections
+- [ ] every example runs as written
 
 ## Notes
 
-<!-- Decisions, dead ends, references. -->
+Comes after the config parser (`after:`), so the configuration section can describe it.

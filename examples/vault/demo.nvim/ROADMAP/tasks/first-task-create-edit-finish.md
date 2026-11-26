@@ -10,12 +10,13 @@ An example task: change it, set status=doing and finish it with done.
 
 ## Context
 
-<!-- Why, where this came from. -->
+Shows the life of a task: created with `tasks new`, worked on, finished with `tasks done`.
 
 ## Acceptance
 
-<!-- what must be true at the end, as a checklist -->
+- [ ] status set to doing
+- [ ] finished with `tasks done demo.nvim/first-task-create-edit-finish`
 
 ## Notes
 
-<!-- Decisions, dead ends, references. -->
+`done` moves the file to `Backlog/TASKS/` and rewrites the index.

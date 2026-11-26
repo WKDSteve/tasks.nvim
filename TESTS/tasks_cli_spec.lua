@@ -252,7 +252,13 @@ return function(H)
   has(r.out, "lib.nvim/ROADMAP/tasks/notify-unify-channels.md  warn ui-tag-without-ux")
   -- the three fixture tasks without a body text get the `summary-missing` hint (no finding, no warning)
   has(r.out, "ALL/ROADMAP/tasks/via-option.md  info summary-missing")
-  has(r.out, "check: 2 finding(s) (0 error, 2 warning, 3 hint) in 5 area(s), 4 task file(s) read")
+  -- the four tasks made above with a bare `new` keep the template comments: a warning each, counted per area
+  has(r.out, "ALL/ROADMAP/tasks/via-option.md  warn empty-template-body")
+  eq(
+    r.out:match("empty%-template%-body: [^\n]*"),
+    "empty-template-body: 4 task(s) in 3 area(s): lib.nvim 2, ALL 1, cascade.nvim 1"
+  )
+  has(r.out, "check: 6 finding(s) (0 error, 6 warning, 3 hint) in 5 area(s), 4 task file(s) read")
   F.task(H, root, "lib.nvim", "bad", F.meta("Bad", "wip"))
   r = run({ "check" })
   eq(r.code, 1)
@@ -441,7 +447,9 @@ return function(H)
 
   local c3 = child({ "check" })
   eq(c3.code, 0, c3.stdout .. c3.stderr)
-  has(c3.stdout, "check: 0 finding(s)")
+  -- the two tasks made with a bare `new` keep the template comments: warnings only, the run stays green
+  has(c3.stdout, "check: 2 finding(s) (0 error, 2 warning")
+  has(c3.stdout, "empty-template-body: 2 task(s) in 2 area(s)")
 
   H.write(
     root .. "/migrate.nvim/ROADMAP/TASKS.md",

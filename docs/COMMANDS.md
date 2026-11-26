@@ -356,6 +356,10 @@ On the command line `tasks new <area> <title> --created=YYYY-MM-DD` puts a task 
 down later; `updated` stays today). A title that starts with `--` goes in as `--title=--diagnose ...` (or after a `--`
 that ends the options).
 
+`tasks new <area> <title> --context=<text> --acceptance=<text> --notes=<text>` writes the sections (one checkbox per line of
+`--acceptance`); beside any of them an empty section is only its heading, without the template comment that `check`
+warns about (`empty-template-body`). For scripts that make many tasks at once.
+
 `tasks new` writes the file as asked even when the `plan`, `project` or `phase` it names exists nowhere yet (a plan may follow), and says
 so on stderr as `warn: <id>: plan X is no plan file ...`; `tasks check` reports it later as `plan-unknown` and the like.
 

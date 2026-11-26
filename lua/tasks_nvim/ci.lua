@@ -343,6 +343,11 @@ function M.run(opts, say)
     for _, h in ipairs(res.hints or {}) do
       out(check.format(h, root))
     end
+    -- many old files share this warning: one line says where they are (all areas, own or foreign)
+    local empty_line = check.count_line(res.findings, "empty-template-body")
+    if empty_line then
+      out("tasks-ci: " .. empty_line)
+    end
     local bad = res.errors + (strict and res.warnings or 0)
     local line = ("check: %d error(s), %d warning(s) in %d area(s), %d task file(s) read"):format(
       res.errors,

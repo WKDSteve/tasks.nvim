@@ -230,7 +230,8 @@ return function(H)
   local function codes_of(res, id)
     local found = {}
     for _, f in ipairs(res.findings or {}) do
-      if f.id == id then
+      -- nor the template comments a task made without text keeps (tasks_empty_template_body_spec)
+      if f.id == id and f.code ~= "empty-template-body" then
         found[#found + 1] = f.code
       end
     end

@@ -26,6 +26,8 @@
 ---    that has neither the category `ux` nor a UI tag. Never an error or a warning, not in the contract document;
 ---    `opts.ui_words = false` switches it off (`setup({ check = { ui_words_off = { "<vault name>" } } })`)
 ---  - `effort-without-plan` (warning): an open task (not `parked`) bigger than L and in no plan
+---  - `empty-template-body` (warning): an open task still holds a template comment of `tasks new`
+---    (`model.TEMPLATE_PLACEHOLDERS`) in a section; `M.count_line` counts them per area
 ---  - `overdue` (warning): an open task (not `parked`) whose `due` date is before today (`opts.today`)
 ---  - `severity-without-bug-or-security` (warning): `severity` on a task that is
 ---    neither `kind: bug` nor in the bug/security category
@@ -2170,6 +2172,19 @@ function M.run(opts)
       seen_slug[t.id] = t.path
       -- a folder task's own `assets/` links are `asset-dangling`'s
       local text = fsio.read(t.path)
+      -- an open task whose sections still hold the comments of the template: nobody wrote what it is about there
+      local empty = text and model.template_placeholders_in(text) or {}
+      if #empty > 0 then
+        add(
+          findings,
+          "warn",
+          "empty-template-body",
+          t,
+          ("the template comment is still in section(s) %s: write the section or delete the comment"):format(
+            table.concat(empty, ", ")
+          )
+        )
+      end
       link_findings(findings, t, "link-missing", function(l)
         return t.folder == true and mdlinks.is_asset(l.target)
       end, text, repos)
@@ -2398,6 +2413,39 @@ function M.run(opts)
     hints = hints,
   },
     nil
+end
+
+---One line that counts the findings of `code` per area (`<code>: N task(s) in M area(s): a 3, b 1`, most first,
+---then by name), or `nil` when there are none. For a warning many old files share, so the log says where they are.
+---@param findings Tasks.Finding[]
+---@param code string
+---@return string|nil line
+function M.count_line(findings, code)
+  local per, total = {}, 0
+  for _, f in ipairs(findings) do
+    if f.code == code then
+      local area = f.area or "?"
+      per[area] = (per[area] or 0) + 1
+      total = total + 1
+    end
+  end
+  if total == 0 then
+    return nil
+  end
+  local names = vim.tbl_keys(per)
+  table.sort(names, function(a, b)
+    if per[a] ~= per[b] then
+      return per[a] > per[b]
+    end
+    return a < b
+  end)
+  local parts = {}
+  for _, name in ipairs(names) do
+    parts[#parts + 1] = ("%s %d"):format(name, per[name])
+  end
+  return fsio.clean(
+    ("%s: %d task(s) in %d area(s): %s"):format(code, total, #names, table.concat(parts, ", "))
+  )
 end
 
 ---`<path relative to the vault>  <code>  <message>`, forward slashes.

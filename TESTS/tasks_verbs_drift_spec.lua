@@ -196,9 +196,12 @@ return function(H)
       -- `--draft` asks ai-desktop or ai.nvim for the fields of the form: the editor's form only, the CLI has none
       composer = { "draft" },
       cli = {
+        -- the section texts of a script; the editor's form has the sections themselves
+        "acceptance",
         "actor",
         "after",
         "category",
+        "context",
         -- history written down later: a shell flag, not a field of the form
         "cover",
         "created",
@@ -209,6 +212,7 @@ return function(H)
         "lang",
         "links",
         "no-index",
+        "notes",
         "order",
         -- `outcome=` / `outcome_reason=` in the editor, as every field of `new` there
         "outcome",

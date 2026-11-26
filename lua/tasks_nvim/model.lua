@@ -325,6 +325,53 @@ M.SEVERITIES = { "low", "medium", "high", "critical" }
 ---@type string[]
 M.OUTCOMES = { "learned", "seen", "not-applicable" }
 
+---The invisible placeholders (HTML comments) `tasks new` writes into an empty section, per language and section.
+---`check` warns `empty-template-body` for an open task that still holds one on a line of its own.
+---@type table<"de"|"en", { context: string, acceptance: string, notes: string }>
+M.TEMPLATE_PLACEHOLDERS = {
+  de = {
+    context = "<!-- Warum, woher kam das. -->",
+    acceptance = "<!-- was am Ende wahr sein muss, als Checkliste -->",
+    notes = "<!-- Entscheidungen, Sackgassen, Verweise. -->",
+  },
+  en = {
+    context = "<!-- Why, where this came from. -->",
+    acceptance = "<!-- what must be true at the end, as a checklist -->",
+    notes = "<!-- Decisions, dead ends, references. -->",
+  },
+}
+
+---The sections of `body` that still hold a template placeholder (`context`, `acceptance`, `notes`, body order, each
+---once), from a line that is nothing but the placeholder. Text in a fenced code block does not count.
+---@param body string
+---@return string[] keys
+function M.template_placeholders_in(body)
+  local by_text = {}
+  for _, set in pairs(M.TEMPLATE_PLACEHOLDERS) do
+    for key, text in pairs(set) do
+      by_text[text] = key
+    end
+  end
+  local found, seen, fence = {}, {}, false
+  for line in (fsio.lf(body) .. "\n"):gmatch("([^\n]*)\n") do
+    local trimmed = vim.trim(line)
+    if trimmed:match("^```") or trimmed:match("^~~~") then
+      fence = not fence
+    elseif not fence then
+      local key = by_text[trimmed]
+      if key and not seen[key] then
+        seen[key] = true
+        found[#found + 1] = key
+      end
+    end
+  end
+  local order = { context = 1, acceptance = 2, notes = 3 }
+  table.sort(found, function(a, b)
+    return order[a] < order[b]
+  end)
+  return found
+end
+
 ---The outcomes that need an `outcome_reason`.
 ---@type table<string, boolean>
 M.OUTCOME_NEEDS_REASON = { seen = true, ["not-applicable"] = true }

@@ -172,7 +172,8 @@ return function(H)
     local res = check.run({ root = root, today = TODAY })
     local out = {}
     for _, f in ipairs(res.findings) do
-      if f.id == id then
+      -- a task made without text keeps the template comments (tasks_empty_template_body_spec)
+      if f.id == id and f.code ~= "empty-template-body" then
         out[#out + 1] = f.code
       end
     end

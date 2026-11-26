@@ -7,6 +7,11 @@ the version is not tagged yet (the repository is not published).
 
 ### Added
 
+- `check` warns `empty-template-body`: an open task in `ROADMAP/tasks/` that still holds a template comment of
+  `tasks new` (`model.TEMPLATE_PLACEHOLDERS`, `model.template_placeholders_in`); `Backlog/` is left out. `tasks check`
+  and `tasks ci` say the count per area in one line (`check.count_line`). A warning: the vault gate stays green unless
+  it runs `--strict`. `tasks new --context= --acceptance= --notes=` writes the sections; beside any text an empty
+  section keeps no comment (`mutate.body_sections`). Spec `tasks_empty_template_body_spec`.
 - `tasks ci --own-since=<rev>` (`ci.run{ own_since }`, `ci.changed_paths`, `ci.ownership`): only findings in the areas
   that `<rev>...HEAD` changes fail the gate; findings of other areas are printed as `foreign:` and not counted (their
   indexes are not linted). Everything counts when the push changes `tasks-vault.json`, `area-groups.json` or

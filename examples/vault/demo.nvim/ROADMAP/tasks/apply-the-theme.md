@@ -13,12 +13,13 @@ Use the decided theme everywhere.
 
 ## Context
 
-<!-- Why, where this came from. -->
+The first release ships one look; it waits for the decision on the default.
 
 ## Acceptance
 
-<!-- what must be true at the end, as a checklist -->
+- [ ] every highlight group uses the decided theme
+- [ ] the README shows a screenshot of it
 
 ## Notes
 
-<!-- Decisions, dead ends, references. -->
+Blocked by the decision task; once it is answered this task becomes open again.

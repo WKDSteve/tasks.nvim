@@ -274,7 +274,11 @@ commands:
        [--category=c,d] [--scope=a,b] [--severity=low|medium|high|critical] [--due=YYYY-MM-DD] [--start=YYYY-MM-DD] [--repeat=8w|1w,4w,12w] [--repeat-from=done|due] [--repeat-after=<id>|<path id>#<key>] [--refs=path,repo@sha] [--links=https://...,...]
        [--summary=text] [--slug=slug] [--status=s] [--waits-for=key] [--outcome=learned|seen|not-applicable] [--reason=text]
        [--icon=<emoji|assets/x.svg|word>] [--cover=assets/x.png]
+       [--context=text] [--acceptance=text] [--notes=text]
        [--lang=de|en] [--folder]             create a task file (--lang: body headings;
+                                               --context/--acceptance/--notes: the text of the section, one
+                                               checkbox per line of --acceptance; beside them an empty section
+                                               keeps no template comment;
                                                --folder: a folder task that can hold assets;
                                                --waits-for: created parked, waiting for that key;
                                                scopes: @SCOPES@)
@@ -688,6 +692,9 @@ local SPECS = {
       "waits-for",
       "outcome",
       "reason",
+      "context",
+      "acceptance",
+      "notes",
     },
     flag = { "no-index", "folder" },
   },
@@ -3282,6 +3289,21 @@ function commands.new(ctx)
     folder = opt.folder == true,
     index = not opt["no-index"],
   }
+  -- the text of the sections, for a script that makes many tasks at once: beside it an empty section gets no
+  -- template comment (`check` warns `empty-template-body` about those)
+  local texts = {}
+  for _, key in ipairs({ "context", "acceptance", "notes" }) do
+    if opt[key] ~= nil then
+      if type(opt[key]) ~= "string" or vim.trim(opt[key]) == "" then
+        ctx.warn(("error: --%s needs a text"):format(key))
+        return 2
+      end
+      texts[key] = opt[key]
+    end
+  end
+  if next(texts) then
+    new_opts.body = mutate.body_sections(texts, new_opts.lang)
+  end
   -- `a,b`: one task in each area, the same text in all; every area is tried as a dry run first, so a bad one
   -- stops the whole thing before anything is written
   local made, merr = mutate.new_many(area, new_opts)
@@ -4338,6 +4360,10 @@ function commands.check(ctx)
   end
   for _, f in ipairs(res.hints or {}) do
     ctx.say(check.format(f, root))
+  end
+  local empty_line = check.count_line(res.findings, "empty-template-body")
+  if empty_line then
+    ctx.say(empty_line)
   end
   ctx.say(
     ("check: %d finding(s) (%d error, %d warning, %d hint) in %d area(s), %d task file(s) read"):format(

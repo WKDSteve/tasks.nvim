@@ -295,7 +295,10 @@ return function(H)
   assert(index.write_area("ALL", { root = root, today = F.TODAY }))
   local codes = {}
   for _, f in ipairs(assert(check.run({ root = root })).findings) do
-    codes[#codes + 1] = f.code
+    -- a task the door made without text keeps the template comments (tasks_empty_template_body_spec)
+    if f.code ~= "empty-template-body" then
+      codes[#codes + 1] = f.code
+    end
   end
   eq(codes, {}, "everything the door made checks clean")
 

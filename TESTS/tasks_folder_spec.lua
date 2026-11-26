@@ -306,14 +306,26 @@ return function(H)
   local function codes(r)
     local out = {}
     for _, fnd in ipairs(r.findings) do
-      out[#out + 1] = (fnd.severity == "warn" and "warn:" or "") .. fnd.code
+      -- a bare task of `tasks new` keeps the template comments: tasks_empty_template_body_spec's subject
+      if fnd.code ~= "empty-template-body" then
+        out[#out + 1] = (fnd.severity == "warn" and "warn:" or "") .. fnd.code
+      end
     end
     table.sort(out)
     return out
   end
+  --- The first finding of `code` (a bare task of `tasks new` adds `empty-template-body` before it).
+  local function first(r, code)
+    for _, fnd in ipairs(r.findings) do
+      if fnd.code == code then
+        return fnd
+      end
+    end
+    return { message = "" }
+  end
   -- the screenshot was attached but its link was never put into the text: an unused image
   eq(codes(res), { "warn:asset-unused" }, "an attached image nobody links is reported")
-  has(res.findings[1].message, "assets/Screen-Shot-1.PNG", "the finding names the asset")
+  has(first(res, "asset-unused").message, "assets/Screen-Shot-1.PNG", "the finding names the asset")
   ok(res.ok, "an unused asset is only a warning")
   local linked = root .. "/lib.nvim/ROADMAP/tasks/needs-shot/needs-shot.md"
   H.write(linked, H.read(linked) .. "\n" .. att.link .. "\n")
@@ -333,7 +345,7 @@ return function(H)
   assert(index.write_area("lib.nvim", { root = root }))
   res = assert(check.run({ root = root }))
   eq(codes(res), { "warn:asset-dangling" })
-  has(res.findings[1].message, "assets/gone.png")
+  has(first(res, "asset-dangling").message, "assets/gone.png")
   ok(res.ok, "a dangling asset is only a warning")
 
   -- a link that climbs out of the folder is dangling, even though the file it reaches exists

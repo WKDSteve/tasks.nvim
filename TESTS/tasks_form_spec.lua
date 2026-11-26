@@ -203,12 +203,13 @@ return function(H)
   -- nothing typed: no body, the engine writes its own sections
   local plain = assert(form.validate(form.parse(tb), { "ALL" }))
   eq(plain.opts.body, nil)
-  -- one section typed: the others keep the invisible placeholder
+  -- one section typed: the others are bare headings, no template comment beside text (`check` would warn
+  -- `empty-template-body`)
   local one = vim.deepcopy(tb)
   table.insert(one, find(one, "## Notizen") + 1, "n")
   local ov = assert(form.validate(form.parse(one), { "ALL" }))
-  has(ov.opts.body, "## Kontext\n\n<!--")
-  has(ov.opts.body, "## Notizen\n\nn")
+  has(ov.opts.body, "## Kontext\n\n## Akzeptanz\n\n## Notizen\n\nn")
+  ok(ov.opts.body:find("<!--", 1, true) == nil, "no placeholder beside text")
   -- English headings are read as well, and the body follows the language asked for
   local en = form.template({ area = "ALL", title = "T", lang = "en" })
   table.insert(en, find(en, "## Context") + 1, "ctx")
@@ -359,6 +360,7 @@ return function(H)
 
   -- ── the headings and hints of the body sections: the same text as the capture dialog of tasks-desktop ──
   -- `ui/src/lib/fields.test.ts` there pins the same two strings; change one side and the other names it.
+  -- Beside text an empty section is its bare heading (no template comment, `check` warns `empty-template-body`).
   local sample = { context = "Why", acceptance = "works\n- [x] kept", notes = "" }
   eq(
     require("tasks_nvim.mutate").body_sections(sample, "en"),
@@ -374,8 +376,6 @@ return function(H)
       "",
       "## Notes",
       "",
-      "<!-- Decisions, dead ends, references. -->",
-      "",
     }, "\n")
   )
   eq(
@@ -383,11 +383,7 @@ return function(H)
     table.concat({
       "## Kontext",
       "",
-      "<!-- Warum, woher kam das. -->",
-      "",
       "## Akzeptanz",
-      "",
-      "<!-- was am Ende wahr sein muss, als Checkliste -->",
       "",
       "## Notizen",
       "",

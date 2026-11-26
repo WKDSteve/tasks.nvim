@@ -84,7 +84,10 @@ return function(H)
   local function codes(res)
     local out = {}
     for _, f in ipairs(res.findings) do
-      out[#out + 1] = (f.severity == "warn" and "warn:" or "") .. f.code
+      -- a bare task of `tasks new` keeps the template comments: tasks_empty_template_body_spec's subject
+      if f.code ~= "empty-template-body" then
+        out[#out + 1] = (f.severity == "warn" and "warn:" or "") .. f.code
+      end
     end
     table.sort(out)
     return out

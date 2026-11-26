@@ -11,12 +11,12 @@ The help said 'teh'.
 
 ## Context
 
-<!-- Why, where this came from. -->
+A user reported the typo.
 
 ## Acceptance
 
-<!-- what must be true at the end, as a checklist -->
+- [x] the help says 'the'
 
 ## Notes
 
-<!-- Decisions, dead ends, references. -->
+Fixed by hand, no commit to name.

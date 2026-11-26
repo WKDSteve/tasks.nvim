@@ -288,83 +288,67 @@ local TEMPLATE_BODY = {
   }, "\n"),
 }
 
----Invisible placeholders (HTML comments): a task created without a summary must
----not get a placeholder sentence as its index summary.
----@type table<Tasks.Lang, string>
-local NEW_BODY_SECTIONS = {
-  de = table.concat({
-    "## Kontext",
-    "",
-    "<!-- Warum, woher kam das. -->",
-    "",
-    "## Akzeptanz",
-    "",
-    "<!-- was am Ende wahr sein muss, als Checkliste -->",
-    "",
-    "## Notizen",
-    "",
-    "<!-- Entscheidungen, Sackgassen, Verweise. -->",
-    "",
-  }, "\n"),
-  en = table.concat({
-    "## Context",
-    "",
-    "<!-- Why, where this came from. -->",
-    "",
-    "## Acceptance",
-    "",
-    "<!-- what must be true at the end, as a checklist -->",
-    "",
-    "## Notes",
-    "",
-    "<!-- Decisions, dead ends, references. -->",
-    "",
-  }, "\n"),
-}
-
----Headings and the invisible placeholder of an empty section, per language, in body order.
+---Headings and the invisible placeholder (HTML comment, `model.TEMPLATE_PLACEHOLDERS`) of an empty section, per
+---language, in body order. A placeholder, not a sentence: a task created without a summary must not get a placeholder
+---sentence as its index summary.
 ---@type table<Tasks.Lang, { key: string, heading: string, placeholder: string }[]>
 local SECTION_DEFS = {
   de = {
-    { key = "context", heading = "## Kontext", placeholder = "<!-- Warum, woher kam das. -->" },
+    {
+      key = "context",
+      heading = "## Kontext",
+      placeholder = model.TEMPLATE_PLACEHOLDERS.de.context,
+    },
     {
       key = "acceptance",
       heading = "## Akzeptanz",
-      placeholder = "<!-- was am Ende wahr sein muss, als Checkliste -->",
+      placeholder = model.TEMPLATE_PLACEHOLDERS.de.acceptance,
     },
-    {
-      key = "notes",
-      heading = "## Notizen",
-      placeholder = "<!-- Entscheidungen, Sackgassen, Verweise. -->",
-    },
+    { key = "notes", heading = "## Notizen", placeholder = model.TEMPLATE_PLACEHOLDERS.de.notes },
   },
   en = {
     {
       key = "context",
       heading = "## Context",
-      placeholder = "<!-- Why, where this came from. -->",
+      placeholder = model.TEMPLATE_PLACEHOLDERS.en.context,
     },
     {
       key = "acceptance",
       heading = "## Acceptance",
-      placeholder = "<!-- what must be true at the end, as a checklist -->",
+      placeholder = model.TEMPLATE_PLACEHOLDERS.en.acceptance,
     },
-    {
-      key = "notes",
-      heading = "## Notes",
-      placeholder = "<!-- Decisions, dead ends, references. -->",
-    },
+    { key = "notes", heading = "## Notes", placeholder = model.TEMPLATE_PLACEHOLDERS.en.notes },
   },
 }
 
+---The body of a task created without any text: the three sections, each with its placeholder.
+---@type table<Tasks.Lang, string>
+local NEW_BODY_SECTIONS = {}
+for lang, defs in pairs(SECTION_DEFS) do
+  local lines = {}
+  for _, def in ipairs(defs) do
+    vim.list_extend(lines, { def.heading, "", def.placeholder, "" })
+  end
+  NEW_BODY_SECTIONS[lang] = table.concat(lines, "\n")
+end
+
 ---The body sections of a new task from the text the caller wrote per section (`context`, `acceptance`,
----`notes`; missing or blank = the invisible placeholder of the template). Every non-blank acceptance line
+---`notes`; missing or blank = the invisible placeholder of the template, but only while no section has text: beside
+---text an empty section is just its heading). Every non-blank acceptance line
 ---becomes a checkbox (`- [ ] text`) unless it is one already (`- [ ]`, `- [x]`, `- `, `* `).
 ---@param texts { context?: string, acceptance?: string, notes?: string }
 ---@param lang? Tasks.Lang  default `de`
 ---@return string body  # Sections only, no summary line; `nil`-free
 function M.body_sections(texts, lang)
   local defs = SECTION_DEFS[lang or "de"] or SECTION_DEFS.de
+  -- once the caller wrote any section, an empty one stays an empty heading: a placeholder left beside real text is
+  -- what `check` warns about (`empty-template-body`)
+  local written = false
+  for _, def in ipairs(defs) do
+    if vim.trim(tostring(texts[def.key] or "")) ~= "" then
+      written = true
+    end
+  end
   local out = {}
   for _, def in ipairs(defs) do
     local text = vim.trim(fsio.lf(tostring(texts[def.key] or "")))
@@ -381,8 +365,10 @@ function M.body_sections(texts, lang)
     end
     out[#out + 1] = def.heading
     out[#out + 1] = ""
-    out[#out + 1] = text ~= "" and text or def.placeholder
-    out[#out + 1] = ""
+    if text ~= "" or not written then
+      out[#out + 1] = text ~= "" and text or def.placeholder
+      out[#out + 1] = ""
+    end
   end
   return table.concat(out, "\n")
 end

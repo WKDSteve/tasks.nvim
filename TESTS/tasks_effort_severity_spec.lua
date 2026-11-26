@@ -279,10 +279,22 @@ return function(H)
   local function codes(r)
     local out = {}
     for _, fnd in ipairs(r.findings) do
-      out[#out + 1] = (fnd.severity == "warn" and "warn:" or "") .. fnd.code
+      -- a bare task of `tasks new` keeps the template comments: tasks_empty_template_body_spec's subject
+      if fnd.code ~= "empty-template-body" then
+        out[#out + 1] = (fnd.severity == "warn" and "warn:" or "") .. fnd.code
+      end
     end
     table.sort(out)
     return out
+  end
+  --- The first finding of `code` (a bare task of `tasks new` adds `empty-template-body` before it).
+  local function first(r, code)
+    for _, fnd in ipairs(r.findings) do
+      if fnd.code == code then
+        return fnd
+      end
+    end
+    return { message = "" }
   end
   assert(mutate.set(made.id, { severity = "high" }, o))
   assert(index.write_area("lib.nvim", { root = root }))
@@ -295,7 +307,7 @@ return function(H)
   res = assert(check.run({ root = root }))
   eq(codes(res), { "warn:severity-without-bug-or-security" })
   ok(res.ok, "only a warning")
-  has(res.findings[1].message, "bug or security")
+  has(first(res, "severity-without-bug-or-security").message, "bug or security")
   assert(mutate.set(misplaced.id, { category = "security" }, o))
   res = assert(check.run({ root = root }))
   eq(codes(res), {}, "a security category makes it fit")

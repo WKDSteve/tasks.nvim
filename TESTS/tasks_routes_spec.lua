@@ -1519,7 +1519,9 @@ return function(H)
         has(twin, "links: [https://example.org/twin]")
         has(twin, "## Kontext\n\nBecause of the form")
         has(twin, "- [ ] it works in both")
-        has(twin, "## Notizen\n\n<!--")
+        -- beside text an empty section is its bare heading, no template comment
+        has(twin, "## Notizen\n")
+        ok(twin:find("<!--", 1, true) == nil, "no template comment beside text: " .. twin)
       end
       has(said(), "created lib.nvim/twin-task, cascade.nvim/twin-task")
       ok(not vim.api.nvim_buf_is_valid(form_buf), "the form is closed")

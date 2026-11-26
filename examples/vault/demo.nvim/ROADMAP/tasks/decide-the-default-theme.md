@@ -11,12 +11,13 @@ Light or dark by default; the options and a recommendation are in the context.
 
 ## Context
 
-<!-- Why, where this came from. -->
+Options: light (reads well in daylight) or dark (most users run a dark terminal). Recommendation: dark.
 
 ## Acceptance
 
-<!-- what must be true at the end, as a checklist -->
+- [ ] the default is written down in the Notes
+- [ ] the theme task is unblocked
 
 ## Notes
 
-<!-- Decisions, dead ends, references. -->
+A decision task waits for you (`actor: me`, `status: decision`).
