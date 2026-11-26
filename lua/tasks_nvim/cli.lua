@@ -63,7 +63,9 @@ M.stdio = {
 }
 
 local USAGE = [[
-usage: nvim --headless -u NONE -l scripts/tasks.lua <command> [args]
+usage: tasks <command> [args]          (bin/ of the checkout on the PATH: bin/tasks, bin/tasks.cmd)
+       nvim -n -i NONE --headless -u NONE -l <checkout>/scripts/tasks.lua <command> [args]
+                                        (the same in any shell without bin/ on the PATH)
 
 commands:
   list [<area>] [--status=a,b] [--prio=1,2|<=2] [--effort=S,M|<=M] [--kind=k] [--tag=t]
