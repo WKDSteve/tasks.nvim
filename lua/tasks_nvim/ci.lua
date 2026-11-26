@@ -16,6 +16,12 @@
 --- (no `md_lint.lua`, no Neovim to run it) fails unless `lint = false`: a gate
 --- that silently skips a check is not a gate.
 ---
+--- `own_since = <rev>` (`--own-since=<rev>`, the pre-push hook of a shared vault): only findings in the areas that
+--- `<rev>...HEAD` changes count. A finding in an area the push does not touch is another session's (a stale index it
+--- left on `origin`, an index another engine wrote) and is printed as `foreign:`, never counted. A finding outside the
+--- areas counts always, and so does everything when the push changes a file the gate reads for all areas
+--- (`tasks-vault.json`, `area-groups.json`, `TOOLS/scripts/md_lint.lua`) or when the diff cannot be read.
+---
 --- Key responsibilities:
 ---  - run the steps, collect the lines, print a short summary
 ---  - `run_lint` is injectable so a spec does not start a child Neovim
@@ -41,6 +47,8 @@ M.LINT_CHUNK = 40
 ---@field nvim? string                # Neovim executable for md_lint (default: the running one).
 ---@field timeout_ms? integer          # Per md_lint call before it is killed (default `ci.lint_timeout_ms` of `setup()`).
 ---@field run_lint? fun(files: string[], md_lint: string): integer, string  # Replaces the child process (specs): exit code, output.
+---@field own_since? string           # Count only findings in the areas `<rev>...HEAD` changes (see the module head).
+---@field changed_paths? fun(root: string, rev: string): string[]|nil, string|nil  # Replaces `git diff` (specs).
 
 ---@class Tasks.CiResult
 ---@field ok boolean
@@ -131,6 +139,93 @@ function M.fix_lines(done_in_roadmap, stale_areas)
   return lines
 end
 
+---Files the gate reads for every area: a push that changes one of them owns every finding.
+M.GLOBAL_FILES = {
+  ["tasks-vault.json"] = true,
+  ["area-groups.json"] = true,
+  ["TOOLS/scripts/md_lint.lua"] = true,
+}
+
+---The paths `<rev>...HEAD` changes in the repository of `root`, relative to `root` (renames as a deletion and an
+---addition, so the area a task left counts too). Paths outside `root` are left out.
+---@param root string
+---@param rev string
+---@return string[]|nil paths
+---@return string|nil err
+function M.changed_paths(root, rev)
+  local function git(args)
+    local ok, res = pcall(function()
+      return vim.system(vim.list_extend({ "git", "-C", root }, args), { text = true }):wait()
+    end)
+    if not ok then
+      return nil, tostring(res)
+    end
+    if res.code ~= 0 then
+      return nil, vim.trim(res.stderr or "")
+    end
+    return res.stdout or ""
+  end
+  local prefix, perr = git({ "rev-parse", "--show-prefix" })
+  if not prefix then
+    return nil, "git rev-parse: " .. tostring(perr)
+  end
+  prefix = vim.trim(prefix)
+  local out, derr =
+    git({ "diff", "--name-only", "--no-renames", "-z", rev .. "...HEAD", "--", "." })
+  if not out then
+    return nil, ("git diff %s...HEAD: %s"):format(rev, tostring(derr))
+  end
+  local paths = {}
+  for path in out:gmatch("[^%z]+") do
+    if path:sub(1, #prefix) == prefix then
+      paths[#paths + 1] = path:sub(#prefix + 1)
+    end
+  end
+  return paths
+end
+
+---@class Tasks.CiOwnership
+---@field all boolean                    # every finding counts (a global file changed)
+---@field areas table<string, boolean>   # the areas the push changes
+---@field why? string                    # the global file that made `all` true
+
+---Which areas a push owns.
+---@param root string
+---@param paths string[]  relative to `root`
+---@return Tasks.CiOwnership
+function M.ownership(root, paths)
+  local own = { all = false, areas = {} }
+  for _, path in ipairs(paths) do
+    if M.GLOBAL_FILES[path] then
+      own.all, own.why = true, path
+    end
+    local first = path:match("^([^/]+)/")
+    if first and vault.has_area(root, first) then
+      own.areas[first] = true
+    end
+  end
+  return own
+end
+
+---The area of a vault path (absolute or relative to `root`), nil outside the areas.
+---@param root string
+---@param path string|nil
+---@return string|nil
+local function area_of(root, path)
+  if not path then
+    return nil
+  end
+  local rel = fsio.norm(path)
+  if rel:sub(1, #root + 1) == root .. "/" then
+    rel = rel:sub(#root + 2)
+  end
+  local first = rel:match("^([^/]+)/")
+  if first and vault.has_area(root, first) then
+    return first
+  end
+  return nil
+end
+
 ---Run the gate.
 ---@param opts? Tasks.CiOpts
 ---@param say? fun(line: string)  # Default: collect only.
@@ -169,17 +264,77 @@ function M.run(opts, say)
 
   local done_in_roadmap, stale_areas = {}, {}
 
+  -- 0. which findings are this push's (`own_since`): nil = all of them
+  ---@type Tasks.CiOwnership|nil
+  local own
+  if opts.own_since then
+    local paths, perr = (opts.changed_paths or M.changed_paths)(root, opts.own_since)
+    if not paths then
+      -- a gate that cannot tell whose a finding is counts all of them (never green by not knowing)
+      out(
+        ("tasks-ci: own-since %s: %s -- every finding counts"):format(
+          opts.own_since,
+          tostring(perr)
+        )
+      )
+    else
+      own = M.ownership(root, paths)
+      local names = vim.tbl_keys(own.areas)
+      table.sort(names)
+      if own.all then
+        out(
+          ("tasks-ci: own-since %s: %s changed -- every finding counts"):format(
+            opts.own_since,
+            own.why
+          )
+        )
+        own = nil
+      else
+        out(
+          ("tasks-ci: own-since %s: %d changed path(s), own area(s): %s"):format(
+            opts.own_since,
+            #paths,
+            #names > 0 and table.concat(names, ", ") or "none"
+          )
+        )
+      end
+    end
+  end
+  ---Is a finding at `path` another session's? Never without `own_since`, never outside the areas.
+  ---@param path string|nil
+  ---@return boolean
+  local function foreign(path)
+    if not own then
+      return false
+    end
+    local area = area_of(root, path)
+    return area ~= nil and not own.areas[area]
+  end
+  local foreign_count = 0
+
   -- 1. rule check
   local res, cerr = check.run({ root = root })
   if not res then
     fail("check", tostring(cerr))
   else
+    local errors, warnings = res.errors, res.warnings
     for _, f in ipairs(res.findings) do
-      out(check.format(f, root))
-      if f.code == "done-in-roadmap" and f.id then
-        done_in_roadmap[#done_in_roadmap + 1] = fsio.clean(f.id)
+      if foreign(f.path) then
+        foreign_count = foreign_count + 1
+        out("foreign: " .. check.format(f, root))
+        if f.severity == "warn" then
+          warnings = warnings - 1
+        else
+          errors = errors - 1
+        end
+      else
+        out(check.format(f, root))
+        if f.code == "done-in-roadmap" and f.id then
+          done_in_roadmap[#done_in_roadmap + 1] = fsio.clean(f.id)
+        end
       end
     end
+    res = vim.tbl_extend("force", res, { errors = errors, warnings = warnings })
     -- hints (`info`) are shown, never counted: a link into a repository that is not checked out
     -- (`link-repo-absent`) is otherwise invisible in the log of the gate, `--strict` included
     for _, h in ipairs(res.hints or {}) do
@@ -205,15 +360,52 @@ function M.run(opts, say)
   if not results then
     fail("index", tostring(errors and errors[1]))
   else
-    local stale = 0
+    local stale, skipped, foreign_stale = 0, 0, 0
     for _, r in ipairs(results) do
-      if r.action == "stale" then
+      local theirs = own ~= nil and not own.areas[r.area]
+      if r.action == "stale" and theirs then
+        foreign_count, foreign_stale = foreign_count + 1, foreign_stale + 1
+        out(("foreign: index: %s is %s: %s"):format(r.area, r.reason or "stale", r.path))
+      elseif r.action == "stale" then
         stale = stale + 1
         stale_areas[#stale_areas + 1] = fsio.clean(r.area)
-        out(("index: %s is %s: %s"):format(r.area, r.reason or "stale", r.path))
+        out(
+          ("index: %s is %s: %s%s"):format(
+            r.area,
+            r.reason or "stale",
+            r.path,
+            r.other_render
+                and (" (rendered by another engine: render %d, this one %d)"):format(
+                  r.other_render,
+                  index.RENDER_VERSION
+                )
+              or ""
+          )
+        )
       elseif r.action ~= "removed" and fsio.is_file(vault.index_path(root, r.area)) then
-        indexes[#indexes + 1] = vault.index_path(root, r.area)
+        if theirs then
+          -- another session's index: its lint findings are not this push's either
+          skipped = skipped + 1
+        else
+          indexes[#indexes + 1] = vault.index_path(root, r.area)
+        end
+        if r.other_render then
+          out(
+            ("info: index: %s was rendered by another engine (render %d, this one %d): only its summaries may differ, not counted"):format(
+              r.area,
+              r.other_render,
+              index.RENDER_VERSION
+            )
+          )
+        end
       end
+    end
+    if skipped > 0 then
+      out(
+        ("tasks-ci: md_lint leaves out %d index(es) of areas this push does not touch"):format(
+          skipped
+        )
+      )
     end
     for _, e in ipairs(errors or {}) do
       out("index: error: " .. tostring(e))
@@ -224,7 +416,12 @@ function M.run(opts, say)
         ("%d stale, %d error(s) in %d area(s)"):format(stale, #(errors or {}), #results)
       )
     else
-      out(("tasks-ci: index --check: %d area(s) up to date -- ok"):format(#results))
+      out(
+        ("tasks-ci: index --check: %d area(s) up to date%s -- ok"):format(
+          #results - foreign_stale,
+          foreign_stale > 0 and (", %d foreign stale not counted"):format(foreign_stale) or ""
+        )
+      )
     end
   end
 
@@ -298,6 +495,13 @@ function M.run(opts, say)
     end
   end
 
+  if foreign_count > 0 then
+    out(
+      ("tasks-ci: %d finding(s) in areas this push does not touch (foreign:): not counted"):format(
+        foreign_count
+      )
+    )
+  end
   if result.ok then
     out("tasks-ci: OK")
   else

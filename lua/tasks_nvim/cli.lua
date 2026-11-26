@@ -372,6 +372,8 @@ commands:
                                           are shown as info lines and never fail).
                                           md_lint is a script RUN from the vault (TOOLS/scripts/md_lint.lua): it runs only with
                                           --trust-vault-lint (or TASKS_TRUST_VAULT_LINT=1); else --md-lint=<own copy> or --no-lint
+                                          --own-since=<rev> (pre-push of a shared vault): only findings in the areas <rev>...HEAD
+                                          changes count; the others are printed as foreign: and never fail
   areas [--format=names|tsv|json]        list the vault's areas (tsv: with the open counts, then the area groups as
                                           <name> <open> group <members>; json: the tasks.areas document with area_groups)
                                           (an area group of <vault>/area-groups.json, e.g. nvim = *.nvim, stands for its
@@ -728,7 +730,7 @@ local SPECS = {
     flag = { "all", "allow-host-change", "fix", "sources", "write" },
   },
   relink = { value = {}, flag = { "dry-run" } },
-  ci = { value = { "md-lint" }, flag = { "strict", "no-lint", "trust-vault-lint" } },
+  ci = { value = { "md-lint", "own-since" }, flag = { "strict", "no-lint", "trust-vault-lint" } },
   template = {
     value = { "title", "kind", "prio", "effort", "tags", "lang" },
     flag = { "with-plan" },
@@ -4352,6 +4354,7 @@ function commands.ci(ctx)
     lint = opt["no-lint"] ~= true,
     trust_vault_lint = opt["trust-vault-lint"] == true,
     md_lint = opt["md-lint"] --[[@as string|nil]],
+    own_since = opt["own-since"] --[[@as string|nil]],
   }, ctx.say)
   return res.code
 end

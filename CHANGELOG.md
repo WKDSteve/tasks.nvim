@@ -7,6 +7,17 @@ the version is not tagged yet (the repository is not published).
 
 ### Added
 
+- `tasks ci --own-since=<rev>` (`ci.run{ own_since }`, `ci.changed_paths`, `ci.ownership`): only findings in the areas
+  that `<rev>...HEAD` changes fail the gate; findings of other areas are printed as `foreign:` and not counted (their
+  indexes are not linted). Everything counts when the push changes `tasks-vault.json`, `area-groups.json` or
+  `TOOLS/scripts/md_lint.lua`, or when the diff cannot be read. For the pre-push hook of a shared vault, where another
+  session's stale index used to block every push. Spec `tasks_ci_own_spec`.
+- The generated `ROADMAP/TASKS.md` carries its render version in the marker line (`index.RENDER_VERSION`,
+  `index.render_version_of`, `index.skeleton`). An index written with another version is not out of date while it
+  lists the same tasks in the same state, only its summaries may differ (`Tasks.IndexResult.other_render`, an `info`
+  line of the gate): indexes no longer flip between sessions with different tasks.nvim. Spec
+  `tasks_index_render_version_spec` (also a guard: a change of the rendering must bump the version).
+
 - `:Tasks checklist [<list>]`, `:Tasks checklist new <title>`, `:Tasks checklist add <list> <line>` (new module `tasks_nvim.ui.checklist_view`, `docs/COMMANDS.md`): the checklists in the editor. A picker over the lists (title, open entries) or a list named by id or slug (type `TASK_CHECKLIST`, `<Tab>` completes it) opens in a buffer of its own, newest entry first, a ticked one dimmed; its keys (`keys.checklist`, `g?`) add an entry (`#word` = tag), tick and open again, open the entry as a file, delete it (asks), make it a task of an area, filter by tag, period (`since:`/`until:`, `7d`, `2w`, `today`), words and state through `checklist.filter`. Every write goes through the write door on the version read. (`:Tasks lists` stays the named lists of the dashboard.) `:Tasks attach` takes the id of a checklist entry (`_list-<list>/<slug>`, `<Tab>` offers them once `_` is typed), and a buffer of the entry follows it into the folder form. Spec `tasks_checklist_view_spec`.
 
 - Contacts import and export through the contract (`tasks-export/1` and `tasks-ops/1`, additive, capabilities `contacts_export`, `contacts_import`), so a front end that cannot start the CLI (tasks-desktop, the web variant) has the same way: the read method `contacts_export` answers `tasks.contacts_export`, the file text of `tasks contacts export` (vcf or csv, the filters, the formula guard and `raw`), and the operation `contacts_import` takes the text of a picked file and answers its `report` (made, duplicates with the id of the holder, refused, problems, messages); a dry run is the preview, a duplicate never overwrites, no text names a mail address or a number. `contacts_io.import_text` (the file import reads and calls it) and `contacts_io.select` (the selection the CLI and the method share). Spec `tasks_contacts_io_spec`, goldens `contacts-export`, `result-contacts-import`.
