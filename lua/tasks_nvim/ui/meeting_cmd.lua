@@ -105,23 +105,7 @@ function M.open(m, section)
 end
 
 ---Send one operation through the write door; nil and a message on failure.
----@param op table
----@return table|nil entry
-local function run_op(op)
-  -- the head of the answer names the engine's commit: asked in the background, the editor never waits for git
-  require("tasks_nvim.contract").prewarm()
-  local doc, err = require("tasks_nvim.ops").run({ ops = { op } }, {})
-  if not doc then
-    notify.error(tostring(type(err) == "table" and err.message or err))
-    return nil
-  end
-  local entry = doc.results[1]
-  if not entry.ok then
-    notify.error(tostring(entry.error.message))
-    return nil
-  end
-  return entry
-end
+local run_op = require("tasks_nvim.ui.write_door").run
 
 ---`:Tasks meeting list [area]`: pick a meeting and open it.
 ---@param ctx table
