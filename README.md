@@ -225,7 +225,7 @@ empty group and a member that is no area.
 
 A wrong key or value is reported (and listed in `:checkhealth`) and the default stays. Every key of the
 dashboard and the form can be moved or switched off with `keys = { dashboard = {...}, dashboard_input = {...},
-form = {...}, learning = {...} }`, for example `keys = { form = { cancel = false } }`; the learning tree view binds no
+form = {...}, learning = {...}, checklist = {...} }`, for example `keys = { form = { cancel = false } }`; the learning tree view binds no
 key unless `keys.learning` names one ([docs/BINDINGS.md](docs/BINDINGS.md)).
 
 ## Headless

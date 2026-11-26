@@ -121,6 +121,8 @@ blockers, plan or estimate is valid and stays visible everywhere.
                            "vsplit" or "current"; `:Tasks new mode=...` for one call.
   keys.form                Keys of the `:Tasks new` form.
                            Actions: see |tasks_nvim-keys|.
+  keys.checklist           Keys of a checklist buffer (`:Tasks checklist`).
+                           Actions: see |tasks_nvim-keys|.
 
 A wrong key or value is ignored with a message and listed in
 `:checkhealth tasks_nvim`; the default stays.
@@ -251,6 +253,11 @@ A wrong key or value is ignored with a message and listed in
   :Tasks meeting new {area} {line...}    Make a meeting from one line
                                          ("Mo 14:00-15:00 Sync @teams !-15m").
   :Tasks meeting close {id} [--result=]  Mark a meeting done.
+  :Tasks checklist [{list}]              The checklists (`_list-<slug>/`): pick
+                                         or name one, it opens in a buffer of
+                                         its own (keys: |tasks_nvim-keys|).
+  :Tasks checklist new {title...}        Make a checklist and show it.
+  :Tasks checklist add {list} {line...}  Add an entry; a `#word` is a tag.
 
   :TasksVault {verb} [{area}] [{part}] [--rel] [--file]
     verbs: open clipboard paste link find grep tree cdx; {part} is backlog (default),
@@ -282,6 +289,15 @@ In the input window the same actions are on `<M-s> <M-p> <M-d> <M-f> <M-l> <M-o>
 In the task form: `<Space>`/`<CR>` tick a line, `<C-s>` submit, `q`/`<C-q>`
 cancel (asks when text was typed), `g?` help, `<C-e>` pick the icon with
 emojis.nvim into the `Icon:` line (an emoji, `assets/<file>` or a word).
+
+In a checklist buffer (|:Tasks| checklist, `g?` shows this):
+
+  a add (a #word is a tag)   x tick / open again   <CR> open as a file
+  D delete (asks)            T make it a task      f filter   F clear filter
+  s all / open / done        r read again          gl other list   q close
+
+The filter line: `#tag since:<day> until:<day> state:open|done|all words`; a day
+is YYYY-MM-DD, today, 7d or 2w.
 
 ==============================================================================
 6. TASK FILE FORMAT                                            *tasks_nvim-format*
