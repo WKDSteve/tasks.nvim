@@ -74,6 +74,8 @@ M.CAPABILITIES = {
   "competences",
   "contact",
   "contacts",
+  "contacts_export",
+  "contacts_import",
   "done_preview",
   "eff_prio",
   "estimate",
@@ -3539,6 +3541,79 @@ function M.contacts(params, opts)
     doc.items = items
     if offset + limit < #matching then
       doc.next_offset = offset + limit
+    end
+    doc.incomplete = vim.tbl_map(function(e)
+      return contact_message(root, tostring(e))
+    end, type(errors) == "table" and errors or {})
+    return seal(doc, builder.rev_of(lines)), nil
+  end)
+end
+
+---`tasks.contacts_export`: the valid contacts of the vault (or of an area or group, a tag, an organisation) as one vCard
+---or CSV text, by id, as `tasks contacts export` writes it (`contacts_io.export`: a CSV cell that starts like a
+---spreadsheet formula gets a `'`, unless `raw`). The text holds mail addresses and numbers: it is for the person to
+---save, never to log. The revision is over the contacts written. Capability `contacts_export`.
+---@param params table
+---@param opts? { root?: string }
+---@return table|nil doc
+---@return Tasks.ContractError|string|nil err
+function M.contacts_export(params, opts)
+  local io_ = require("tasks_nvim.contacts_io")
+  if params.format ~= "vcf" and params.format ~= "csv" then
+    return nil, bad_argument("format must be vcf or csv")
+  end
+  if params.format ~= "vcf" and params.version ~= nil then
+    return nil, bad_argument("version is for vcf")
+  end
+  if
+    params.format ~= "csv" and (params.delimiter ~= nil or params.bom ~= nil or params.raw ~= nil)
+  then
+    return nil, bad_argument("delimiter, bom and raw are for csv")
+  end
+  return fsio.read_scope(function()
+    local root, rerr = vault.root(opts)
+    if not root then
+      return nil, rerr
+    end
+    local area_set
+    if params.area ~= nil then
+      local scope = vault.area_scope(root, params.area)
+      if not scope then
+        return nil,
+          {
+            code = "not_found",
+            message = "unknown area: " .. contacts.scrub(fsio.clean(tostring(params.area))),
+            retryable = false,
+          }
+      end
+      area_set = scope.set
+    end
+    local all, errors = contacts.all({ root = root })
+    local in_scope = {}
+    for _, c in ipairs(all or {}) do
+      if area_set == nil or area_set[c.area] then
+        in_scope[#in_scope + 1] = c
+      end
+    end
+    local kept = io_.select(in_scope, { tag = params.tag, org = params.org })
+    local text, xerr = io_.export(kept, {
+      format = params.format,
+      version = params.version,
+      delimiter = params.delimiter,
+      bom = params.bom == true,
+      raw = params.raw == true,
+    })
+    if not text then
+      return nil, bad_argument(tostring(xerr))
+    end
+    local doc = M.head("tasks.contacts_export", root)
+    doc.format = params.format
+    doc.area, doc.tag, doc.org = params.area, params.tag, params.org
+    doc.count = #kept
+    doc.text = text
+    local lines = {}
+    for _, c in ipairs(kept) do
+      lines[#lines + 1] = c.id .. "\t" .. (c.etag or "")
     end
     doc.incomplete = vim.tbl_map(function(e)
       return contact_message(root, tostring(e))

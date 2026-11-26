@@ -925,6 +925,22 @@ function M.import_file(path, area, opts)
   if not text then
     return nil, contacts.scrub("cannot read the file: " .. tostring(err))
   end
+  local o = vim.tbl_extend("force", {}, opts)
+  o.format = format
+  return M.import_text(text, area, o)
+end
+
+---Import the text of a vCard or CSV file (what a page read from a file the person picked). `format` is `vcf` or `csv`.
+---@param text string
+---@param area string
+---@param opts { root?: string, today?: string, dry_run?: boolean, lang?: "de"|"en", format: string, delimiter?: string }
+---@return Tasks.ContactImportReport|nil report
+---@return string|nil err
+function M.import_text(text, area, opts)
+  local format = opts.format
+  if format ~= "vcf" and format ~= "csv" then
+    return nil, "the format must be vcf or csv"
+  end
   local records, messages
   if format == "vcf" then
     if not M.is_utf8(text) then
@@ -942,9 +958,30 @@ function M.import_file(path, area, opts)
   return M.import_records(area, records, o)
 end
 
+---The contacts an export writes: the valid ones with the tag and of the organisation (case does not matter), by id.
+---@param list Tasks.Contact[]
+---@param opts? { tag?: string, org?: string }
+---@return Tasks.Contact[]
+function M.select(list, opts)
+  opts = opts or {}
+  local org = opts.org and tostring(opts.org):lower() or nil
+  local kept = {}
+  for _, c in ipairs(list) do
+    local org_ok = org == nil or (c.org or ""):lower() == org
+    local tag_ok = opts.tag == nil or vim.tbl_contains(c.tags, opts.tag)
+    if c.valid and org_ok and tag_ok then
+      kept[#kept + 1] = c
+    end
+  end
+  table.sort(kept, function(a, b)
+    return a.id < b.id
+  end)
+  return kept
+end
+
 ---Export contacts as one text.
 ---@param list Tasks.Contact[]
----@param opts { format: string, version?: string, delimiter?: string, bom?: boolean }
+---@param opts { format: string, version?: string, delimiter?: string, bom?: boolean, raw?: boolean }
 ---@return string|nil text
 ---@return string|nil err
 function M.export(list, opts)

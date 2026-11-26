@@ -31,6 +31,7 @@ export type TasksExport =
   | MeetingParse
   | Contacts
   | ContactDocument
+  | ContactsExport
   | Checklists
   | ChecklistDocument
   | Paths
@@ -1168,6 +1169,27 @@ export type ContactDocument = Head & {
    * More meetings than the list holds.
    */
   history_truncated?: true;
+};
+/**
+ * tasks.contacts_export: the valid contacts of the vault (or of an area or group, a tag, an organisation) as one vCard or CSV text, by id, as `tasks contacts export` writes it: a CSV cell that starts like a spreadsheet formula gets a leading `'` unless `raw`. The text holds the mail addresses and numbers of third parties: a reader saves it for the person and never logs it. Capability `contacts_export`.
+ */
+export type ContactsExport = Head & {
+  kind: "tasks.contacts_export";
+  rev: Rev;
+  digest: Digest;
+  format: "vcf" | "csv";
+  area?: string;
+  tag?: string;
+  org?: string;
+  /**
+   * The contacts in the text.
+   */
+  count: number;
+  /**
+   * The whole file: vCard 3.0 or 4.0, or CSV with a header row; lines end in CRLF, a CSV with `bom` starts with the byte order mark.
+   */
+  text: string;
+  incomplete: string[];
 };
 /**
  * tasks.checklists: the checklists of the vault (`_list-<slug>/`), by title, with how many entries each holds and how many are open. Capability `checklists`; written with `checklist_new`, `checklist_set`, `checklist_delete`.
@@ -3133,6 +3155,7 @@ export interface ResultEntry {
     | "contact_new"
     | "contact_set"
     | "contact_delete"
+    | "contacts_import"
     | "checklist_new"
     | "checklist_set"
     | "checklist_delete"
@@ -3141,6 +3164,7 @@ export interface ResultEntry {
     | "entry_delete"
     | "entry_promote";
   id?: string;
+  report?: ContactImportReport;
   /**
    * `meeting_close`: the meeting has no `## Ergebnis` afterwards (allowed: a hint for the front end).
    */
@@ -3337,6 +3361,32 @@ export interface ResultEntry {
     kind: "blocked_by" | "after" | "refs" | "plan_target" | "meeting";
     id: string;
   }[];
+}
+/**
+ * `contacts_import`: what was made of the text (a dry run: what would be).
+ */
+export interface ContactImportReport {
+  created: {
+    index: number;
+    id: string;
+    name: string;
+  }[];
+  duplicates: {
+    index: number;
+    name: string;
+    of: string;
+  }[];
+  refused: {
+    index: number;
+    name?: string;
+    reason: string;
+  }[];
+  problems: {
+    index: number;
+    name?: string;
+    text: string;
+  }[];
+  messages: string[];
 }
 /**
  * Progress over leaves, counted apart: learned, seen, dropped, open (blocked ones counted as open and once more as blocked).

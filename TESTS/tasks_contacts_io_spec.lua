@@ -327,4 +327,83 @@ return function(H)
   eq(rt[1].name, long[1].name, "folding cut a character")
   eq(rt[1].notes, long[1].notes)
   eq(rt[1].tags, { "a,b" })
+
+  -- ── the contract: `contacts_import` (an operation of `ops`) and `contacts_export` (a read method) ──
+  local api = require("tasks_nvim.api")
+  local root2 = F.vault(H)
+  local function ops_call(op, is_dry)
+    local text = api.call(
+      "ops",
+      vim.json.encode({ dry_run = is_dry == true, ops = { op } }),
+      { root = root2, today = F.TODAY }
+    )
+    return vim.json.decode(text), text
+  end
+  local function read_call(method, params)
+    local text = api.call(method, vim.json.encode({ params = params }), { root = root2 })
+    return vim.json.decode(text), text
+  end
+  -- a dry run names what would be made and writes nothing
+  local dry_doc, dry_text =
+    ops_call({ op = "contacts_import", area = "lib.nvim", text = v3, as = "vcf" }, true)
+  eq(dry_doc.kind, "tasks.result", dry_text)
+  eq(dry_doc.results[1].ok, true, dry_text)
+  eq(dry_doc.results[1].outcome, "would_create")
+  eq(#dry_doc.results[1].report.created, 2, dry_text)
+  eq(dry_doc.results[1].changed_ids, {})
+  eq(#(contacts.area("lib.nvim", { root = root2 })), 0, "a dry run wrote a contact")
+  no_personal(
+    vim.json.encode(dry_doc.results[1].report.problems)
+      .. vim.json.encode(dry_doc.results[1].report.messages),
+    "the report of the operation"
+  )
+  -- the real run makes them, a second run reports duplicates with the holder's id and makes nothing
+  local real = ops_call({ op = "contacts_import", area = "lib.nvim", text = v3, as = "vcf" })
+  eq(real.results[1].outcome, "created")
+  eq(#real.results[1].changed_ids, 2)
+  eq(#(contacts.area("lib.nvim", { root = root2 })), 2)
+  local twice = ops_call({ op = "contacts_import", area = "lib.nvim", text = v3, as = "vcf" })
+  eq(twice.results[1].outcome, "unchanged")
+  eq(#twice.results[1].report.duplicates, 2)
+  eq(twice.results[1].report.duplicates[1].of, real.results[1].changed_ids[1])
+  eq(#(contacts.area("lib.nvim", { root = root2 })), 2, "a duplicate was written")
+  -- a CSV text with its delimiter named in the messages; refusals of the shape
+  local csv_text = fixture("people-semicolon.csv")
+  local csv_doc =
+    ops_call({ op = "contacts_import", area = "cascade.nvim", text = csv_text, as = "csv" }, true)
+  eq(csv_doc.results[1].ok, true, vim.inspect(csv_doc))
+  ok(#csv_doc.results[1].report.created > 0)
+  local bad_as =
+    ops_call({ op = "contacts_import", area = "lib.nvim", text = v3, as = "ics" }, true)
+  eq(bad_as.results[1].error.code, "invalid_argument")
+  local no_area = ops_call({ op = "contacts_import", area = "nope", text = v3, as = "vcf" }, true)
+  eq(no_area.results[1].error.code, "not_found")
+  local huge = ops_call({
+    op = "contacts_import",
+    area = "lib.nvim",
+    text = ("x"):rep(require("tasks_nvim.ops").MAX_IMPORT_TEXT + 1),
+    as = "csv",
+  }, true)
+  eq(huge.results[1].error.code, "payload_too_large")
+  -- the export as a document: the same text as the CLI writes, the formula guard included
+  local xdoc, xtext = read_call("contacts_export", { format = "csv", area = "lib.nvim" })
+  eq(xdoc.kind, "tasks.contacts_export", xtext)
+  eq(xdoc.format, "csv")
+  eq(xdoc.count, 2)
+  has(xdoc.text, "'+43 660 1234567", "the export document guards a phone that starts with +")
+  local xraw = read_call("contacts_export", { format = "csv", area = "lib.nvim", raw = true })
+  has(xraw.text, ",+43 660 1234567")
+  local xv = read_call("contacts_export", { format = "vcf", version = "3", tag = "kunde" })
+  eq(xv.count, 1)
+  has(xv.text, "BEGIN:VCARD\r\nVERSION:3.0\r\n")
+  local round =
+    ops_call({ op = "contacts_import", area = "cascade.nvim", text = xdoc.text, as = "csv" }, true)
+  eq(
+    round.results[1].report.duplicates[1].of ~= nil,
+    true,
+    "the export comes back as the same contacts"
+  )
+  eq(read_call("contacts_export", { format = "pdf" }).code, "invalid_argument")
+  eq(read_call("contacts_export", { format = "vcf", bom = true }).code, "invalid_argument")
+  eq(read_call("contacts_export", { format = "csv", area = "nope" }).code, "not_found")
 end

@@ -10,7 +10,7 @@
 --- is `unsupported_schema`; `params` may be left out too. A parameter the method does not know is `invalid_argument`:
 --- a request that is silently half-understood is worse than one that is refused. A request is at most 256 KiB.
 ---
---- Read methods (`hello`, `snapshot`, `list`, `task`, `next`, `areas`, `finished`, `history`, `links`, `groupings`, `waits`, `meetings`, `meeting`, `meeting_parse`, `contacts`, `contact`,
+--- Read methods (`hello`, `snapshot`, `list`, `task`, `next`, `areas`, `finished`, `history`, `links`, `groupings`, `waits`, `meetings`, `meeting`, `meeting_parse`, `contacts`, `contact`, `contacts_export`,
 --- `paths`, `path`, `milestones`, `milestone`, `done_preview`) and the write door `ops`
 --- (`tasks_nvim.ops`: the fields of the request are its own, `null` is kept because it means "remove" in a patch).
 ---
@@ -240,6 +240,22 @@ local methods = {
     },
     run = function(params, opts)
       return contract.contacts(params, opts)
+    end,
+  },
+  contacts_export = {
+    params = {
+      format = "string",
+      area = "string",
+      tag = "string",
+      org = "string",
+      version = "string",
+      delimiter = "string",
+      bom = "boolean",
+      raw = "boolean",
+    },
+    required = { "format" },
+    run = function(params, opts)
+      return contract.contacts_export(params, opts)
     end,
   },
   checklists = {

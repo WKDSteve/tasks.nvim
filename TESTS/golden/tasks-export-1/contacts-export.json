@@ -1,0 +1,21 @@
+{
+  "area": "lib.nvim",
+  "count": 2,
+  "digest": "sha256:033db4c09bb215be",
+  "engine": {
+    "git": "0000000",
+    "nvim": "0.0.0",
+    "version": "0.1.0-test"
+  },
+  "format": "csv",
+  "generated_at": "2026-01-01T00:00:00Z",
+  "incomplete": [],
+  "kind": "tasks.contacts_export",
+  "plugin": "tasks.nvim",
+  "rev": "rev:6b415b",
+  "schema": 1,
+  "text": "name;org;role;emails;phones;tz;tags;notes\r\nAnna Muster;Muster AG;;anna@example.org;;;kunde;\r\nRick Beispiel;Beispiel GmbH;Support, T2;\"rick@example.org;r.beispiel@example.org\";'+43 1 2345678;Europe/Vienna;\"t2;kunde\";Prefers mail over calls.\r\n",
+  "vault": {
+    "id": "vault"
+  }
+}

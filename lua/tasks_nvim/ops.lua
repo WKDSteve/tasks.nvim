@@ -79,6 +79,10 @@
 ---    `path_close`, `meeting_close`, `meeting_set`, `milestone_new`, `milestone_set`) brings the milestones in line
 ---    afterwards (`milestones.settle`): `milestones_reached` and `milestones_reopened` in its entry name what changed
 ---
+---  - `contacts_import` { area, text, as, delimiter?, lang? }: make contacts of the text of a vCard or CSV file
+---    (`contacts_io.import_text`); the entry carries its `report`, a duplicate mail is reported and never overwrites, a
+---    dry run is the preview; no `inverse`
+---
 ---  - `meeting_new`, `meeting_set`, `meeting_close`, `meeting_capture`, `meeting_attend`, `meeting_followups`,
 ---    `board_save`: the meetings (`tasks_nvim.meeting_write`, docs/CONTRACT.md); `tick_step`, `add_steps`
 ---    (`section`), `append_note`, `set_section`, `set_body` and `attach` take a meeting id as well
@@ -191,6 +195,7 @@ M.OPS = {
   "contact_new",
   "contact_set",
   "contact_delete",
+  "contacts_import",
   "checklist_new",
   "checklist_set",
   "checklist_delete",
@@ -226,6 +231,9 @@ M.MAX_SECTION = 32768
 
 ---Longest entry of a list value (a tag, a ref, an id).
 M.MAX_ENTRY = 300
+
+---Longest `text` of `contacts_import`, in bytes (the request itself is at most 256 KiB).
+M.MAX_IMPORT_TEXT = 240000
 
 ---Who acts and whether a claim of somebody else may be passed: carried by every operation that changes an open task
 ---(`tasks_nvim.claims`; the answer to a claimed task is `conflict` with the owner's name in the message).
@@ -391,6 +399,13 @@ local FIELDS = {
   },
   contact_set = { id = "string", patch = "object", if_match = "string" },
   contact_delete = { id = "string", if_match = "string" },
+  contacts_import = {
+    area = "string",
+    text = "string",
+    as = "string",
+    delimiter = "string",
+    lang = "string",
+  },
   checklist_new = { id = "string", title = "string", fields = "object" },
   checklist_set = { id = "string", title = "string", if_match = "string" },
   checklist_delete = { id = "string" },
@@ -4029,6 +4044,63 @@ local function do_contact_delete(op, ctx)
   return entry
 end
 
+---`contacts_import` { area, text, as, delimiter?, lang? }: make contacts of the text of a vCard (`as` `vcf`) or CSV
+---(`csv`) file (`contacts_io.import_text`). A record whose mail a contact of the vault (or an earlier record) holds is a
+---duplicate: named with the id of the holder, never imported, never overwritten. The answer carries the `report`
+---(`created`, `duplicates`, `refused`, `problems`, `messages`); a dry run names the ids the contacts would get. No line
+---of it names a mail address or a number. No `inverse`: undo is `contact_delete` of each id made.
+---@param op table
+---@param ctx Tasks.OpsCtx
+---@return table entry
+local function do_contacts_import(op, ctx)
+  if op.area == nil or op.text == nil or op.as == nil then
+    return refuse("invalid_argument", "contacts_import needs area, text and as")
+  end
+  if op.as ~= "vcf" and op.as ~= "csv" then
+    return refuse("invalid_argument", "as must be vcf or csv")
+  end
+  if op.lang ~= nil and op.lang ~= "de" and op.lang ~= "en" then
+    return refuse("invalid_argument", "lang must be de or en")
+  end
+  if #op.text > M.MAX_IMPORT_TEXT then
+    return refuse("payload_too_large", ("text is longer than %d bytes"):format(M.MAX_IMPORT_TEXT))
+  end
+  if not vault.valid_area(op.area) or not vault.has_area(ctx.root, op.area) then
+    return refuse("not_found", "unknown area: " .. fsio.clean(tostring(op.area)):sub(1, 80))
+  end
+  local contacts = require("tasks_nvim.contacts")
+  local rep, err = require("tasks_nvim.contacts_io").import_text(op.text, op.area, {
+    root = ctx.root,
+    today = ctx.today,
+    dry_run = ctx.dry,
+    lang = op.lang,
+    format = op.as,
+    delimiter = op.delimiter,
+  })
+  if not rep then
+    return refuse("invalid_argument", contacts.scrub(contract.redact(ctx.root, tostring(err))))
+  end
+  local made = {}
+  if not ctx.dry then
+    for _, c in ipairs(rep.created) do
+      made[#made + 1] = c.id
+    end
+  end
+  local created = #rep.created > 0
+  return {
+    ok = true,
+    outcome = created and (ctx.dry and "would_create" or "created") or "unchanged",
+    report = json.object({
+      created = rep.created,
+      duplicates = rep.duplicates,
+      refused = rep.refused,
+      problems = rep.problems,
+      messages = rep.messages,
+    }),
+    changed_ids = made,
+  }
+end
+
 ---@type table<string, fun(op: table, ctx: Tasks.OpsCtx): table>
 local HANDLERS = {
   milestone_new = do_milestone_new,
@@ -4036,6 +4108,7 @@ local HANDLERS = {
   contact_new = do_contact_new,
   contact_set = do_contact_set,
   contact_delete = do_contact_delete,
+  contacts_import = do_contacts_import,
   checklist_new = do_checklist_new,
   checklist_set = do_checklist_set,
   checklist_delete = do_checklist_delete,

@@ -2776,17 +2776,10 @@ local function contacts_export(ctx, rest)
     ctx.warn("error: " .. require("tasks_nvim.contacts").scrub(tostring(err)))
     return 1
   end
-  local kept = {}
-  for _, c in ipairs(list) do
-    local org_ok = opt.org == nil or (c.org or ""):lower() == tostring(opt.org):lower()
-    local tag_ok = opt.tag == nil or vim.tbl_contains(c.tags, opt.tag)
-    if c.valid and org_ok and tag_ok then
-      kept[#kept + 1] = c
-    end
-  end
-  table.sort(kept, function(a, b)
-    return a.id < b.id
-  end)
+  local kept = io.select(list, {
+    tag = opt.tag --[[@as string|nil]],
+    org = opt.org --[[@as string|nil]],
+  })
   local text, xerr = io.export(kept, {
     format = opt.format --[[@as string]],
     version = opt.version --[[@as string|nil]],

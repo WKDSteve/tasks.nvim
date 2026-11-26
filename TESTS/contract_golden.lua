@@ -1097,6 +1097,17 @@ G.cases = {
     end,
   },
   {
+    -- the contacts of an area as one CSV text (capability `contacts_export`): the valid ones by id, a phone that starts
+    -- with + guarded by a leading ' against a spreadsheet formula, the broken one left out
+    name = "contacts-export",
+    method = "contacts_export",
+    fresh = true,
+    request = function(root)
+      G.write_contacts(root)
+      return '{"params":{"format":"csv","area":"lib.nvim","delimiter":";"}}'
+    end,
+  },
+  {
     -- one contact with its text and its notes (capability `contacts`)
     name = "contact",
     method = "contact",
@@ -1568,6 +1579,40 @@ G.cases = {
           },
           { op = "contact_delete", id = "lib.nvim/anna-muster" },
         },
+      })
+    end,
+  },
+  {
+    -- a vCard text imported as a dry run (capability `contacts_import`): one card would be made, one is a duplicate of
+    -- the contact that holds its mail (named by id, never overwritten), one without a name is refused, an address that
+    -- is none is named without its value
+    name = "result-contacts-import",
+    method = "ops",
+    fresh = true,
+    request = function(root)
+      G.write_contacts(root)
+      local card = table.concat({
+        "BEGIN:VCARD",
+        "VERSION:4.0",
+        "FN:Neu Person",
+        "EMAIL:neu@example.org",
+        "EMAIL:kaputt@@",
+        "END:VCARD",
+        "BEGIN:VCARD",
+        "VERSION:4.0",
+        "FN:Anna Zwei",
+        "EMAIL:ANNA@example.org",
+        "END:VCARD",
+        "BEGIN:VCARD",
+        "VERSION:4.0",
+        "EMAIL:noname@example.org",
+        "END:VCARD",
+        "",
+      }, "\r\n")
+      return encode({
+        client_op_id = "golden-contacts-import",
+        dry_run = true,
+        ops = { { op = "contacts_import", area = "lib.nvim", text = card, as = "vcf" } },
       })
     end,
   },

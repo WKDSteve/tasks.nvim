@@ -1,0 +1,61 @@
+{
+  "client_op_id": "golden-contacts-import",
+  "digest": "sha256:95f8d04ed04bc019",
+  "dry_run": true,
+  "engine": {
+    "git": "0000000",
+    "nvim": "0.0.0",
+    "version": "0.1.0-test"
+  },
+  "generated_at": "2026-01-01T00:00:00Z",
+  "kind": "tasks.result",
+  "ok": true,
+  "plugin": "tasks.nvim",
+  "results": [
+    {
+      "changed_ids": [],
+      "n": 1,
+      "ok": true,
+      "op": "contacts_import",
+      "outcome": "would_create",
+      "report": {
+        "created": [
+          {
+            "id": "lib.nvim/neu-person",
+            "index": 1,
+            "name": "Neu Person"
+          }
+        ],
+        "duplicates": [
+          {
+            "index": 2,
+            "name": "Anna Zwei",
+            "of": "lib.nvim/anna-muster"
+          }
+        ],
+        "messages": [],
+        "problems": [
+          {
+            "index": 1,
+            "name": "Neu Person",
+            "text": "an email address is invalid and was not imported"
+          },
+          {
+            "index": 3,
+            "text": "no FN (and no usable N): the card has no name"
+          }
+        ],
+        "refused": [
+          {
+            "index": 3,
+            "reason": "no name"
+          }
+        ]
+      }
+    }
+  ],
+  "schema": 1,
+  "vault": {
+    "id": "vault"
+  }
+}

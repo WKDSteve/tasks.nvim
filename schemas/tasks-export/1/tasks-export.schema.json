@@ -86,6 +86,9 @@
       "$ref": "#/$defs/ContactDocument"
     },
     {
+      "$ref": "#/$defs/ContactsExport"
+    },
+    {
       "$ref": "#/$defs/Checklists"
     },
     {
@@ -1470,6 +1473,89 @@
         "history_truncated": { "const": true, "description": "More meetings than the list holds." }
       },
       "unevaluatedProperties": false
+    },
+    "ContactsExport": {
+      "description": "tasks.contacts_export: the valid contacts of the vault (or of an area or group, a tag, an organisation) as one vCard or CSV text, by id, as `tasks contacts export` writes it: a CSV cell that starts like a spreadsheet formula gets a leading `'` unless `raw`. The text holds the mail addresses and numbers of third parties: a reader saves it for the person and never logs it. Capability `contacts_export`.",
+      "allOf": [{ "$ref": "#/$defs/Head" }],
+      "type": "object",
+      "required": ["kind", "rev", "digest", "format", "count", "text", "incomplete"],
+      "properties": {
+        "kind": { "const": "tasks.contacts_export" },
+        "rev": { "$ref": "#/$defs/Rev" },
+        "digest": { "$ref": "#/$defs/Digest" },
+        "format": { "enum": ["vcf", "csv"] },
+        "area": { "type": "string" },
+        "tag": { "type": "string" },
+        "org": { "type": "string" },
+        "count": { "type": "integer", "minimum": 0, "description": "The contacts in the text." },
+        "text": {
+          "type": "string",
+          "description": "The whole file: vCard 3.0 or 4.0, or CSV with a header row; lines end in CRLF, a CSV with `bom` starts with the byte order mark."
+        },
+        "incomplete": { "type": "array", "items": { "type": "string" } }
+      },
+      "unevaluatedProperties": false
+    },
+    "ContactImportReport": {
+      "description": "What `contacts_import` made of a vCard or CSV text (capability `contacts_import`): the contacts made (a dry run: would make, with the ids they would get), the duplicates (a mail a contact of the vault or an earlier record holds; `of` is the holder, which is never overwritten), the refused records, what was not taken over, and notes on the file (the delimiter found). `index` is the number of the card or row. No text names a mail address or a number.",
+      "type": "object",
+      "required": ["created", "duplicates", "refused", "problems", "messages"],
+      "properties": {
+        "created": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["index", "id", "name"],
+            "properties": {
+              "index": { "type": "integer", "minimum": 1 },
+              "id": { "type": "string", "pattern": "^[^/]+/[^/]+$" },
+              "name": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "duplicates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["index", "name", "of"],
+            "properties": {
+              "index": { "type": "integer", "minimum": 1 },
+              "name": { "type": "string" },
+              "of": { "type": "string", "pattern": "^[^/]+/[^/]+$" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "refused": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["index", "reason"],
+            "properties": {
+              "index": { "type": "integer", "minimum": 1 },
+              "name": { "type": "string" },
+              "reason": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "problems": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["index", "text"],
+            "properties": {
+              "index": { "type": "integer", "minimum": 1 },
+              "name": { "type": "string" },
+              "text": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "messages": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false
     },
     "MeetingParse": {
       "description": "tasks.meetingparse: one line of the quick capture read into a proposal of a meeting (capability `meeting_parse`). Nothing is written and no file is read: the front end shows the proposal in its form and sends `meeting_new` only when the person says so. `fields` are the keys `meeting_new` takes, as far as the line names them; `date` is always there (`assumed` holds `date` when the line named no day: today). `problems` are words that looked like a field but are none (`!soon`, `#nothing`); they are not in the title.",
@@ -5249,10 +5335,14 @@
           "minimum": 1
         },
         "op": {
-          "enum": ["set", "new", "reorder", "done", "move_area", "plan_new", "plan_set", "plan_close", "project_new", "project_set", "project_close", "tick_step", "add_steps", "answer", "append_note", "reopen", "set_body", "set_section", "view_save", "view_delete", "attach", "claim", "release", "history_record", "meeting_new", "meeting_set", "meeting_close", "meeting_capture", "meeting_attend", "meeting_followups", "board_save", "path_new", "path_set", "path_close", "node_set", "promote", "unpromote", "path_reward", "path_levels", "milestone_new", "milestone_set", "contact_new", "contact_set", "contact_delete", "checklist_new", "checklist_set", "checklist_delete", "entry_add", "entry_set", "entry_delete", "entry_promote"]
+          "enum": ["set", "new", "reorder", "done", "move_area", "plan_new", "plan_set", "plan_close", "project_new", "project_set", "project_close", "tick_step", "add_steps", "answer", "append_note", "reopen", "set_body", "set_section", "view_save", "view_delete", "attach", "claim", "release", "history_record", "meeting_new", "meeting_set", "meeting_close", "meeting_capture", "meeting_attend", "meeting_followups", "board_save", "path_new", "path_set", "path_close", "node_set", "promote", "unpromote", "path_reward", "path_levels", "milestone_new", "milestone_set", "contact_new", "contact_set", "contact_delete", "contacts_import", "checklist_new", "checklist_set", "checklist_delete", "entry_add", "entry_set", "entry_delete", "entry_promote"]
         },
         "id": {
           "type": "string"
+        },
+        "report": {
+          "$ref": "#/$defs/ContactImportReport",
+          "description": "`contacts_import`: what was made of the text (a dry run: what would be)."
         },
         "without_result": {
           "description": "`meeting_close`: the meeting has no `## Ergebnis` afterwards (allowed: a hint for the front end).",
