@@ -241,6 +241,16 @@ return function(H)
   has(picked, "Support Fälle  (0 open of 0)  _list-support-faelle")
   eq(vim.api.nvim_get_current_buf(), buf, "one buffer per list")
 
+  -- `:bdelete` drops the buffer's keys: the list shown again is a whole buffer, with its keys
+  vim.cmd("bdelete " .. buf)
+  vim.wait(100, function()
+    return not vim.api.nvim_buf_is_valid(buf)
+  end)
+  vim.cmd("Tasks checklist support-faelle")
+  buf = vim.api.nvim_get_current_buf()
+  ok(#vim.api.nvim_buf_get_keymap(buf, "n") > 0, "the list shown again has its keys")
+  has(line(1), "Support Fälle")
+
   -- q closes it
   press("q")
   ok(not vim.api.nvim_buf_is_valid(buf), "q wipes the list buffer")

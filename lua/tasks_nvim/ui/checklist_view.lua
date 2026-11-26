@@ -528,8 +528,15 @@ end
 ---@return integer buf
 local function make_buffer(id)
   define_highlights()
+  local bufname = M.SCHEME .. id
+  -- a buffer of that name without our state (one deleted halfway, see BufDelete below) would refuse the name
+  for _, b in ipairs(vim.api.nvim_list_bufs()) do
+    if not states[b] and vim.api.nvim_buf_get_name(b) == bufname then
+      pcall(vim.api.nvim_buf_delete, b, { force = true })
+    end
+  end
   local buf = vim.api.nvim_create_buf(true, true)
-  vim.api.nvim_buf_set_name(buf, M.SCHEME .. id)
+  vim.api.nvim_buf_set_name(buf, bufname)
   vim.bo[buf].buftype = "nofile"
   vim.bo[buf].bufhidden = "hide"
   vim.bo[buf].swapfile = false
@@ -558,6 +565,20 @@ local function make_buffer(id)
     callback = function()
       states[buf] = nil
       pcall(vim.api.nvim_del_augroup_by_id, group)
+    end,
+  })
+  -- `:bdelete` keeps the buffer but drops its keys and autocommands: a list shown in it again would be dead. So a
+  -- deleted list buffer is wiped (after the delete has finished), and the next `open` makes a whole one.
+  vim.api.nvim_create_autocmd("BufDelete", {
+    group = group,
+    buffer = buf,
+    callback = function()
+      states[buf] = nil
+      vim.schedule(function()
+        if vim.api.nvim_buf_is_valid(buf) then
+          pcall(vim.api.nvim_buf_delete, buf, { force = true })
+        end
+      end)
     end,
   })
   return buf

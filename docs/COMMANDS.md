@@ -1232,7 +1232,8 @@ The checklists of the vault (folders `_list-<slug>/`, [Checklists](ENGINE.md#che
 name is not `lists`: `:Tasks lists` is the picker of the named task lists of the dashboard.)
 
 - `:Tasks checklist` is a `vim.ui.select` over the lists (title, open entries of all, id); `:Tasks checklist <list>`
-  shows one directly. A list is named by its id (`_list-support`) or its slug (`support`); `<Tab>` completes both.
+  shows one directly. A list is named by its id (`_list-support`) or its slug (`support`); `<Tab>` completes both. A
+  list whose slug is `new` or `add` is named by its id (the word alone is the subcommand).
 - The list opens in a buffer of its own (`tasks-checklist://<id>`, one per list): its title with the open count, the
   filter in force, then one line per entry, newest first: `[ ]`/`[x]`, the day it was made, the title, the tags and,
   for a ticked one, the day it was ticked (dimmed). The buffer is drawn again from the files each time you enter it,
