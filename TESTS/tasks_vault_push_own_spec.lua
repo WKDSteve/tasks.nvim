@@ -70,6 +70,22 @@ return function(H)
     ok(H.read(check .. "/cascade.nvim/ROADMAP/tasks/mine.md"), "mine went out: " .. mine:sub(1, 9))
     ok(H.read(check .. "/lib.nvim/ROADMAP/tasks/keep.md"):find("theirs", 1, true), "theirs stays")
     ok(git(root, { "rev-list", "origin/main..HEAD" }):find(clash, 1, true), "the clash stays local")
+
+    -- with the sync: the skipped commit cannot be rebased either; the push still succeeded, so it is no failure, the
+    -- checkout stays as it was and the output says to rebase by hand
+    local next_one = add_task(root, "cascade.nvim", "next")
+    local head_before = git(root, { "rev-parse", "HEAD" })
+    code, said = run(root, { "push" })
+    eq(code, 0, "a skipped commit is no failed push: " .. said)
+    ok(
+      said:find("pushed\t", 1, true),
+      "the next one went out: " .. next_one:sub(1, 9) .. " " .. said
+    )
+    ok(said:find("sync\tskipped (", 1, true), "the sync is skipped, not failed: " .. said)
+    ok(said:find("rebase", 1, true), "and says what to do: " .. said)
+    eq(git(root, { "rev-parse", "HEAD" }), head_before, "the checkout stays where it was")
+    eq(git(root, { "diff", "--name-only", "--diff-filter=U" }), "", "nothing unmerged")
+    eq(git(root, { "stash", "list" }), "", "no autostash left")
   end
 
   -- 3. A local original of a commit already pushed by its sha, and another author's commit: left out ---------------

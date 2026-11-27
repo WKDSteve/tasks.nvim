@@ -613,6 +613,14 @@ function M.push(o)
   if o.sync ~= false then
     run(top, { "fetch", "-q", remote, branch })
     res.sync = sync_checkout(top, prefix, remote_ref, res.notes)
+    if #res.skipped > 0 and res.sync:find("^failed: conflict in ") then
+      -- the commit that could not be picked cannot be rebased either: the push did its job, the checkout stays as it
+      -- was (the rebase was aborted) and keeps the skipped commit for a rebase by hand
+      res.sync = ("skipped (the skipped commit conflicts with %s in %s: rebase it by hand)"):format(
+        remote_ref,
+        res.sync:sub(#"failed: conflict in " + 1)
+      )
+    end
   end
   return res
 end
