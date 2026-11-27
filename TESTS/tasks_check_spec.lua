@@ -271,7 +271,16 @@ return function(H)
       end
     end
     eq(got, { "lib.nvim/shot-first" }, "only the task without text gets the hint")
-    for _, slug in ipairs({ "shot-first", "shot-then-text", "summary-set" }) do
+    -- a file that is no valid task (here: a bad prio) has its error, not the hint on top
+    F.task(H, root, "lib.nvim", "bad-no-text", F.meta("T", "open", { { "prio", "9" } }), "\n")
+    reindex()
+    for _, h in ipairs(run().hints) do
+      ok(
+        not (h.code == "summary-missing" and h.id == "lib.nvim/bad-no-text"),
+        "an invalid task gets no summary-missing hint"
+      )
+    end
+    for _, slug in ipairs({ "shot-first", "shot-then-text", "summary-set", "bad-no-text" }) do
       remove(tasks .. slug .. ".md")
     end
     reindex()

@@ -2354,7 +2354,8 @@ function M.run(opts)
       ui_findings(findings, hints, t, words)
       -- an open task whose index cell would stay empty: nothing of real text in the file (a body that starts with a
       -- pasted screenshot, or none at all)
-      if t.status ~= "done" and (t.summary or "") == "" then
+      -- (a file that could not be read as a task has its error already: no hint on top)
+      if t.valid and t.status ~= "done" and (t.summary or "") == "" then
         hints[#hints + 1] = {
           code = "summary-missing",
           severity = "info",

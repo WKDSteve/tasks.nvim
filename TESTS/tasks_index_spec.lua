@@ -50,6 +50,22 @@ return function(H)
     ok(text:find("[w](https://x.org/a)", 1, true), "a URL stays")
     ok(text:find("[h](#top)", 1, true), "an anchor stays")
     ok(text:find("[d](tasks/notes.md)", 1, true), "a flat task is rebased to tasks/")
+    -- the vault itself lies below a folder named ROADMAP: the last one in the path counts
+    local deep = index.render("lib.nvim", {
+      linked("/x/ROADMAP/v/lib.nvim/ROADMAP/tasks/fold/fold.md", "[d](./notes.md)"),
+    })
+    ok(
+      deep:find("[d](tasks/fold/notes.md)", 1, true),
+      "the last /ROADMAP/ of the path counts: " .. deep
+    )
+    -- the all-areas overview lies elsewhere: the link goes through its prefix and the area
+    local global = index.render_global({
+      linked("/v/lib.nvim/ROADMAP/tasks/fold/fold.md", "![s](./assets/p.png)"),
+    }, { link_prefix = "../" })
+    ok(
+      global:find("![s](../lib.nvim/ROADMAP/tasks/fold/assets/p.png)", 1, true),
+      "the overview rebases through link_prefix and the area: " .. global
+    )
   end
 
   local MARK =

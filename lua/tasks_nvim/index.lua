@@ -139,12 +139,14 @@ end
 ---A summary is written beside its task file, but shown in `ROADMAP/TASKS.md`: a relative link or image in it
 ---(`./assets/x.png` of a folder task) is rebased to the folder of the task as seen from the index
 ---(`tasks/<slug>/assets/x.png`), or it points nowhere. URLs, `#anchors` and absolute paths stay as they are; a task
----outside `ROADMAP/` is left alone.
+---outside `ROADMAP/` is left alone. `base` goes in front for an index that lies elsewhere (the all-areas overview:
+---`<link_prefix><area>/ROADMAP/`). The last `/ROADMAP/` of the path counts: the vault's own folder may hold one too.
 ---@param text string
 ---@param path string  # the task file
+---@param base string  # the path from the index file to the area's `ROADMAP/`, "" for the area's own index
 ---@return string
-local function rebase_links(text, path)
-  local dir = (path or ""):match("/ROADMAP/(.*)/[^/]*$")
+local function rebase_links(text, path, base)
+  local dir = (path or ""):match("^.*/ROADMAP/(.*)/[^/]*$")
   if not dir or not text:find("](", 1, true) then
     return text
   end
@@ -153,16 +155,17 @@ local function rebase_links(text, path)
       if target:match("^[%a][%w+.-]*:") or target:match("^[/#<]") then
         return nil
       end
-      return open .. dir .. "/" .. target:gsub("^%./", "") .. close
+      return open .. base .. dir .. "/" .. target:gsub("^%./", "") .. close
     end)
   )
 end
 
 ---@param task Tasks.Task
 ---@param max integer
+---@param base? string  # see `rebase_links`; default "" (the area's own index)
 ---@return string
-local function summary_cell(task, max)
-  local text = truncate(rebase_links(task.summary, task.path), max)
+local function summary_cell(task, max, base)
+  local text = truncate(rebase_links(task.summary, task.path, base or ""), max)
   if #task.blocked_by > 0 then
     local ids = {}
     for i, id in ipairs(task.blocked_by) do
@@ -773,7 +776,7 @@ function M.render_global(tasks, opts)
       t.effort and cell(t.effort) or EN_DASH,
       cell(t.area),
       title,
-      summary_cell(t, max)
+      summary_cell(t, max, prefix .. link_target(t.area) .. "/ROADMAP/")
     )
   end
   return table.concat(lines, "\n") .. "\n", #open
