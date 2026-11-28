@@ -59,7 +59,18 @@ function F.vault(H)
   require("tasks_nvim.vault").configure({
     extra_areas = { "ALL", "nvim-config", "docmap-desktop", "migrate.nvim" },
   })
+  F.no_desktop(H)
   return root
+end
+
+--- Point the lookup of a running tasks-desktop (`$TASKS_DESKTOP_CONFIG_DIR`, its `hub.json`) at an empty folder: on a
+--- machine that runs tasks-desktop, `:Tasks new` would otherwise ask "Open … in tasks-desktop?", a prompt no spec
+--- answers. A spec about the hub sets its own folder after this.
+---@param H table
+function F.no_desktop(H)
+  local dir = H.tmpdir() .. "/no-tasks-desktop"
+  mkdir(dir)
+  vim.env.TASKS_DESKTOP_CONFIG_DIR = dir
 end
 
 --- A task file text. `meta` is an ordered list of `{ key, rawvalue }` lines
