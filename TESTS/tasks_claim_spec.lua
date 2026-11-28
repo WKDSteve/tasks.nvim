@@ -417,6 +417,17 @@ return function(H)
   has(u4.out, "unclaimed\t" .. elsewhere .. "\tdone")
   ok(not vim.uv.fs_stat(open_path), "no open file is written")
   eq(claims.read(root, elsewhere), nil)
+  -- a NEW task that reuses the slug of one finished long ago (another `created`) is given back as usual
+  local reused = task("reused-slug")
+  H.write(
+    root .. "/lib.nvim/Backlog/TASKS/2025-01-02_reused-slug.md",
+    "---\ntitle: Old\nstatus: done\ncreated: 2025-01-01\nupdated: 2025-01-02\n---\n\nOld.\n"
+  )
+  eq(run({ "claim", reused, "--by=agent-a" }).code, 0)
+  local u5 = run({ "unclaim", reused, "--by=agent-a" })
+  eq(u5.code, 0, u5.err)
+  has(u5.out, "unclaimed\t" .. reused .. "\topen", "an old namesake in the Backlog is another task")
+  has(H.read(scan.find(reused, { root = root }).path), "status: open")
 
   -- ── two processes claim the same task: exactly one wins ────────────────────
   local lib = vim.env.LIB_NVIM_DIR

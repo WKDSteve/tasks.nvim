@@ -510,7 +510,14 @@ function M.release(id, opts)
   end
   -- finished in another checkout of the vault (a worktree) and pulled in: an open file left beside it (a failed
   -- autostash keeps the `doing` copy) is no task to give back; only the claim goes, no file is written
-  local finished = scan.find_done(id, { root = root })
+  -- the SAME task only (its `created`): a new task may reuse the slug of one finished long ago
+  local finished
+  for _, f in ipairs(scan.find_done_all(id, { root = root })) do
+    if not task or (f.meta or {}).created == (task.meta or {}).created then
+      finished = f
+      break
+    end
+  end
   if finished then
     M.remove(root, id)
     local base = fsio.norm(root) .. "/"
