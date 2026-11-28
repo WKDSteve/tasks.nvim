@@ -297,6 +297,16 @@ function M.list_new(title, opts)
 end
 
 ---Rename a list (its `list.md`; made when the folder had none). The answer has the title before.
+---What every writer of a list locks: the list's folder, so the lock file (`lib.nvim.fs.with_lock`:
+---`._list-<slug>.lock`) lies beside the folder in the vault root, not in it. A folder that holds its own lock file
+---cannot be removed under that lock, and an `add` waiting for it could then still fill the folder `list_delete` has
+---just reported gone.
+---@param l { dir: string }
+---@return string
+local function lock_target(l)
+  return l.dir
+end
+
 ---@param id string
 ---@param title string
 ---@param opts { root?: string, today?: string, if_match?: string, dry_run?: boolean }
@@ -323,7 +333,10 @@ function M.list_set(id, title, opts)
       { code = "forbidden" }
   end
   local result
-  local ok, err, info = fsio.with_lock(l.path, function()
+  local ok, err, info = fsio.with_lock(lock_target(l), function()
+    if not fsio.is_dir(l.dir) then
+      return nil, "no list " .. id, { code = "not_found" }
+    end
     local cur = fsio.is_file(l.path) and fsio.read(l.path) or ""
     local etag = fsio.etag(cur or "")
     if opts.if_match ~= nil and opts.if_match ~= etag then
@@ -375,7 +388,8 @@ local function system_file(name)
 end
 
 ---Whether `name` is a lock file of the list file (`lib.nvim.fs.with_lock`: `.list.md.lock`, `.list.md.lock.takeover`):
----held while the list is deleted or an entry is added, it belongs to the lock and is no entry.
+---where tasks.nvim before 2026-11-28 locked a list, inside its folder. One that a writer of that version holds belongs
+---to its lock and is no entry.
 ---@param name string
 ---@return boolean
 local function list_lock(name)
@@ -383,9 +397,9 @@ local function list_lock(name)
 end
 
 ---Delete a list that holds no entries (an entry is never lost by deleting its list: delete the entries first).
----Check and removal run under the lock of `list.md`, the one `add` takes before it creates an entry: an entry added at
----the same moment either comes first (the list holds it: `conflict`) or finds the list gone (`not_found`), never a
----folder with the entry and without its `list.md`.
+---Check and removal, the folder included, run under the list's lock (`lock_target`, beside the folder), the one `add`
+---takes before it creates an entry: an entry added at the same moment either comes first (the list holds it:
+---`conflict`) or finds the list gone (`not_found`), never a folder with the entry, with or without its `list.md`.
 ---@param id string
 ---@param opts { root?: string, dry_run?: boolean, wait_ms?: integer }
 ---@return { id: string, path: string, title: string, created: string }|nil
@@ -402,10 +416,16 @@ function M.list_delete(id, opts)
     return nil, lerr, linfo
   end
   local result
-  local ok, err, info = fsio.with_lock(l.path, function()
+  local ok, err, info = fsio.with_lock(lock_target(l), function()
+    if not fsio.is_dir(l.dir) then
+      return nil, "no list " .. id, { code = "not_found" }
+    end
     local leftovers = {}
     for name, kind in vim.fs.dir(l.dir) do
-      if name ~= M.LIST_FILE and not list_lock(name) then
+      if list_lock(name) then
+        return nil, id .. " is locked by another writer", { code = "locked", retryable = true }
+      end
+      if name ~= M.LIST_FILE then
         if kind == "file" and system_file(name) then
           leftovers[#leftovers + 1] = l.dir .. "/" .. name
         else
@@ -430,15 +450,19 @@ function M.list_delete(id, opts)
         return nil, ("cannot delete %s: %s"):format(id, tostring(derr))
       end
     end
+    -- still under the lock (its file lies beside the folder): an `add` waiting for it finds the list gone
+    local gone, gerr = uv.fs_rmdir(l.dir)
+    if not gone then
+      return nil, ("cannot delete %s: %s"):format(id, tostring(gerr))
+    end
     return true
   end, { wait_ms = opts.wait_ms })
+  if M._seam_delete_unlocked then
+    -- the seam of the specs: another writer right after the lock was released
+    M._seam_delete_unlocked(l)
+  end
   if not ok then
     return nil, err, info
-  end
-  if not opts.dry_run then
-    -- after the lock file is gone; an `add` waiting for the lock keeps the folder and removes it once it found the
-    -- list gone
-    uv.fs_rmdir(l.dir)
   end
   return result, nil
 end
@@ -823,15 +847,17 @@ function M.add(list, title, opts)
   -- the list file existed when the list was read: gone under the lock means `list_delete` came first
   local had_file = fsio.is_file(l.path)
   local made
-  local ok, err, info = fsio.with_lock(l.path, function()
-    if had_file and not fsio.is_file(l.path) then
+  local ok, err, info = fsio.with_lock(lock_target(l), function()
+    -- `list_delete` removes the folder under this lock: gone now means it came first
+    if not fsio.is_dir(l.dir) or (had_file and not fsio.is_file(l.path)) then
       return nil, "no list " .. list, { code = "not_found" }
     end
     local count = 0
     for name in vim.fs.dir(l.dir) do
-      if not list_lock(name) then
-        count = count + 1
+      if list_lock(name) then
+        return nil, list .. " is locked by another writer", { code = "locked", retryable = true }
       end
+      count = count + 1
     end
     if count > M.MAX_ENTRIES then
       return nil,
@@ -865,14 +891,6 @@ function M.add(list, title, opts)
     return nil, "no free file name for the entry " .. base
   end, { wait_ms = opts.wait_ms })
   if not ok then
-    if not fsio.is_dir(l.dir) then
-      -- `list_delete` removed the folder before the lock could be taken in it
-      return nil, "no list " .. list, { code = "not_found" }
-    end
-    if info and info.code == "not_found" then
-      -- the folder `list_delete` could not remove while this call held its lock: empty now, so it goes
-      uv.fs_rmdir(l.dir)
-    end
     return nil, err, info
   end
   return made, nil

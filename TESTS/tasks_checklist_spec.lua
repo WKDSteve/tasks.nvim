@@ -302,24 +302,43 @@ return function(H)
   eq(late_info and late_info.code, "locked", "and says the list is locked")
   ok(not fsio.is_dir(root .. "/" .. racy.id), "no folder without its list.md is left")
 
-  -- a writer holding the lock (its lock file beside list.md): neither delete nor add goes past it, and the lock file
-  -- is no system file the delete would sweep away
-  local held = one({ op = "checklist_new", title = "Gesperrt" })
-  local lock = root .. "/" .. held.id .. "/.list.md.lock"
-  H.write(lock, "held")
-  local d2, _, d2_info = checklist.list_delete(held.id, { root = root, wait_ms = 100 })
-  eq(d2, nil, "a held lock stops the delete")
-  eq(d2_info and d2_info.code, "locked")
-  ok(fsio.is_file(root .. "/" .. held.id .. "/list.md"), "list.md stays")
-  ok(fsio.is_file(lock), "the lock file of the other writer stays")
-  local a2, _, a2_info = checklist.add(held.id, "Wartet", { root = root, wait_ms = 100 })
-  eq(a2, nil, "a held lock stops the add")
-  eq(a2_info and a2_info.code, "locked")
-  eq(#checklist.entries(root, held.id), 0, "no entry was written")
-  os.remove(lock)
-  eq(
-    one({ op = "checklist_delete", id = held.id }).outcome,
-    "deleted",
-    "free again: the delete goes through"
-  )
+  -- a list without list.md (a bare folder is a list too) and an `add` that gets the lock right after `list_delete`
+  -- released it: the folder went under the lock, so the add finds the list gone, and no folder with an entry is left
+  local bare_race = one({ op = "checklist_new", title = "Ohne Datei" })
+  os.remove(root .. "/" .. bare_race.id .. "/list.md")
+  local after, after_err, after_info
+  checklist._seam_delete_unlocked = function(l)
+    checklist._seam_delete_unlocked = nil
+    after, after_err, after_info = checklist.add(l.id, "Kommt danach", { root = root })
+  end
+  local dropped_bare, gerr = checklist.list_delete(bare_race.id, { root = root })
+  checklist._seam_delete_unlocked = nil
+  ok(dropped_bare ~= nil, "the delete of a list without list.md went through: " .. tostring(gerr))
+  eq(after, nil, "the add after it made no entry: " .. tostring(after_err))
+  eq(after_info and after_info.code, "not_found", "and says the list is gone")
+  ok(not fsio.is_dir(root .. "/" .. bare_race.id), "no folder is left, with or without an entry")
+
+  -- a writer holding the lock: neither delete nor add goes past it. Its lock file lies beside the list's folder; one of
+  -- a tasks.nvim before 2026-11-28 lies beside list.md, in the folder, and is no system file the delete would sweep away
+  for _, where in ipairs({ "beside", "inside" }) do
+    local held = one({ op = "checklist_new", title = "Gesperrt " .. where })
+    local lock = where == "beside" and (root .. "/." .. held.id .. ".lock")
+      or (root .. "/" .. held.id .. "/.list.md.lock")
+    H.write(lock, "held")
+    local d2, _, d2_info = checklist.list_delete(held.id, { root = root, wait_ms = 100 })
+    eq(d2, nil, where .. ": a held lock stops the delete")
+    eq(d2_info and d2_info.code, "locked")
+    ok(fsio.is_file(root .. "/" .. held.id .. "/list.md"), "list.md stays")
+    ok(fsio.is_file(lock), "the lock file of the other writer stays")
+    local a2, _, a2_info = checklist.add(held.id, "Wartet", { root = root, wait_ms = 100 })
+    eq(a2, nil, where .. ": a held lock stops the add")
+    eq(a2_info and a2_info.code, "locked")
+    eq(#checklist.entries(root, held.id), 0, "no entry was written")
+    os.remove(lock)
+    eq(
+      one({ op = "checklist_delete", id = held.id }).outcome,
+      "deleted",
+      "free again: the delete goes through"
+    )
+  end
 end
