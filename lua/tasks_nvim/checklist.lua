@@ -374,9 +374,20 @@ local function system_file(name)
   return name:sub(1, 1) == "." or lower == "desktop.ini" or lower == "thumbs.db"
 end
 
+---Whether `name` is a lock file of the list file (`lib.nvim.fs.with_lock`: `.list.md.lock`, `.list.md.lock.takeover`):
+---held while the list is deleted or an entry is added, it belongs to the lock and is no entry.
+---@param name string
+---@return boolean
+local function list_lock(name)
+  return name == "." .. M.LIST_FILE .. ".lock" or name == "." .. M.LIST_FILE .. ".lock.takeover"
+end
+
 ---Delete a list that holds no entries (an entry is never lost by deleting its list: delete the entries first).
+---Check and removal run under the lock of `list.md`, the one `add` takes before it creates an entry: an entry added at
+---the same moment either comes first (the list holds it: `conflict`) or finds the list gone (`not_found`), never a
+---folder with the entry and without its `list.md`.
 ---@param id string
----@param opts { root?: string, dry_run?: boolean }
+---@param opts { root?: string, dry_run?: boolean, wait_ms?: integer }
 ---@return { id: string, path: string, title: string, created: string }|nil
 ---@return string|nil err
 ---@return table|nil info
@@ -390,30 +401,45 @@ function M.list_delete(id, opts)
   if not l then
     return nil, lerr, linfo
   end
-  local leftovers = {}
-  for name, kind in vim.fs.dir(l.dir) do
-    if name ~= M.LIST_FILE then
-      if kind == "file" and system_file(name) then
-        leftovers[#leftovers + 1] = l.dir .. "/" .. name
-      else
-        return nil, id .. " holds entries: delete them first", { code = "conflict", id = id }
+  local result
+  local ok, err, info = fsio.with_lock(l.path, function()
+    local leftovers = {}
+    for name, kind in vim.fs.dir(l.dir) do
+      if name ~= M.LIST_FILE and not list_lock(name) then
+        if kind == "file" and system_file(name) then
+          leftovers[#leftovers + 1] = l.dir .. "/" .. name
+        else
+          return nil, id .. " holds entries: delete them first", { code = "conflict", id = id }
+        end
       end
     end
-  end
-  local result = { id = id, path = l.path, title = l.title, created = l.created }
-  if opts.dry_run then
-    return result, nil
-  end
-  for _, path in ipairs(leftovers) do
-    fsio.remove(path)
-  end
-  if fsio.is_file(l.path) then
-    local removed, derr = fsio.remove(l.path)
-    if not removed then
-      return nil, ("cannot delete %s: %s"):format(id, tostring(derr))
+    if M._seam_delete_checked then
+      -- the seam of the specs: another writer between the check and the removal
+      M._seam_delete_checked(l)
     end
+    result = { id = id, path = l.path, title = l.title, created = l.created }
+    if opts.dry_run then
+      return true
+    end
+    for _, path in ipairs(leftovers) do
+      fsio.remove(path)
+    end
+    if fsio.is_file(l.path) then
+      local removed, derr = fsio.remove(l.path)
+      if not removed then
+        return nil, ("cannot delete %s: %s"):format(id, tostring(derr))
+      end
+    end
+    return true
+  end, { wait_ms = opts.wait_ms })
+  if not ok then
+    return nil, err, info
   end
-  uv.fs_rmdir(l.dir)
+  if not opts.dry_run then
+    -- after the lock file is gone; an `add` waiting for the lock keeps the folder and removes it once it found the
+    -- list gone
+    uv.fs_rmdir(l.dir)
+  end
   return result, nil
 end
 
@@ -722,7 +748,7 @@ end
 ---an error). `opts.created` and `opts.done` carry an entry that is made again (the inverse of `delete`).
 ---@param list string
 ---@param title string
----@param opts { root?: string, today?: string, now?: integer, slug?: string, created?: string, done?: string, tags?: string[], body?: string, dry_run?: boolean }
+---@param opts { root?: string, today?: string, now?: integer, slug?: string, created?: string, done?: string, tags?: string[], body?: string, dry_run?: boolean, wait_ms?: integer }
 ---@return { id: string, slug: string, path: string, tags: string[] }|nil
 ---@return string|nil err
 ---@return table|nil info
@@ -794,37 +820,62 @@ function M.add(list, title, opts)
       list .. " is a symbolic link or junction: it is not written through",
       { code = "forbidden" }
   end
-  local count = 0
-  for _ in vim.fs.dir(l.dir) do
-    count = count + 1
-  end
-  if count > M.MAX_ENTRIES then
-    return nil,
-      ("the list holds %d entries already"):format(M.MAX_ENTRIES),
-      { code = "payload_too_large" }
-  end
-  for n = 1, 99 do
-    local slug = n == 1 and base or (base .. "-" .. n)
-    local path = l.dir .. "/" .. slug .. ".md"
-    local held = fsio.is_file(path) or fsio.is_dir(l.dir .. "/" .. slug)
-    if held and opts.slug then
-      return nil, ("the id %s/%s is taken"):format(list, slug), { code = "exists" }
+  -- the list file existed when the list was read: gone under the lock means `list_delete` came first
+  local had_file = fsio.is_file(l.path)
+  local made
+  local ok, err, info = fsio.with_lock(l.path, function()
+    if had_file and not fsio.is_file(l.path) then
+      return nil, "no list " .. list, { code = "not_found" }
     end
-    if not held then
-      local result = { id = list .. "/" .. slug, slug = slug, path = fsio.norm(path), tags = tags }
-      if opts.dry_run then
-        return result, nil
-      end
-      local ok, cerr = fsio.create_exclusive(path, text)
-      if ok then
-        return result, nil
-      end
-      if not fsio.is_exists(cerr) then
-        return nil, ("cannot create %s/%s: %s"):format(list, slug, tostring(cerr))
+    local count = 0
+    for name in vim.fs.dir(l.dir) do
+      if not list_lock(name) then
+        count = count + 1
       end
     end
+    if count > M.MAX_ENTRIES then
+      return nil,
+        ("the list holds %d entries already"):format(M.MAX_ENTRIES),
+        { code = "payload_too_large" }
+    end
+    for n = 1, 99 do
+      local slug = n == 1 and base or (base .. "-" .. n)
+      local path = l.dir .. "/" .. slug .. ".md"
+      local held = fsio.is_file(path) or fsio.is_dir(l.dir .. "/" .. slug)
+      if held and opts.slug then
+        return nil, ("the id %s/%s is taken"):format(list, slug), { code = "exists" }
+      end
+      if not held then
+        local result =
+          { id = list .. "/" .. slug, slug = slug, path = fsio.norm(path), tags = tags }
+        if opts.dry_run then
+          made = result
+          return true
+        end
+        local created_ok, cerr = fsio.create_exclusive(path, text)
+        if created_ok then
+          made = result
+          return true
+        end
+        if not fsio.is_exists(cerr) then
+          return nil, ("cannot create %s/%s: %s"):format(list, slug, tostring(cerr))
+        end
+      end
+    end
+    return nil, "no free file name for the entry " .. base
+  end, { wait_ms = opts.wait_ms })
+  if not ok then
+    if not fsio.is_dir(l.dir) then
+      -- `list_delete` removed the folder before the lock could be taken in it
+      return nil, "no list " .. list, { code = "not_found" }
+    end
+    if info and info.code == "not_found" then
+      -- the folder `list_delete` could not remove while this call held its lock: empty now, so it goes
+      uv.fs_rmdir(l.dir)
+    end
+    return nil, err, info
   end
-  return nil, "no free file name for the entry " .. base
+  return made, nil
 end
 
 ---Run `fn(entry, text)` under the lock of the entry's file, on the version `if_match` names.

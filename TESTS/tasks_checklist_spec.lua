@@ -285,4 +285,41 @@ return function(H)
   local dropped = one({ op = "checklist_delete", id = bare.id })
   eq(dropped.outcome, "deleted", vim.inspect(dropped))
   ok(not fsio.is_dir(root .. "/" .. bare.id), "the folder is gone with what the system left in it")
+
+  -- an entry added between the check and the removal of `checklist_delete`: the lock of list.md keeps them apart,
+  -- never a folder with the entry and without its list.md
+  local racy = one({ op = "checklist_new", title = "Gleichzeitig" })
+  local late, late_err, late_info
+  checklist._seam_delete_checked = function(l)
+    checklist._seam_delete_checked = nil
+    late, late_err, late_info =
+      checklist.add(l.id, "Kommt dazwischen", { root = root, wait_ms = 100 })
+  end
+  local raced, rerr = checklist.list_delete(racy.id, { root = root })
+  checklist._seam_delete_checked = nil
+  ok(raced ~= nil, "the delete went through: " .. tostring(rerr))
+  eq(late, nil, "the entry waited for the lock: " .. tostring(late_err))
+  eq(late_info and late_info.code, "locked", "and says the list is locked")
+  ok(not fsio.is_dir(root .. "/" .. racy.id), "no folder without its list.md is left")
+
+  -- a writer holding the lock (its lock file beside list.md): neither delete nor add goes past it, and the lock file
+  -- is no system file the delete would sweep away
+  local held = one({ op = "checklist_new", title = "Gesperrt" })
+  local lock = root .. "/" .. held.id .. "/.list.md.lock"
+  H.write(lock, "held")
+  local d2, _, d2_info = checklist.list_delete(held.id, { root = root, wait_ms = 100 })
+  eq(d2, nil, "a held lock stops the delete")
+  eq(d2_info and d2_info.code, "locked")
+  ok(fsio.is_file(root .. "/" .. held.id .. "/list.md"), "list.md stays")
+  ok(fsio.is_file(lock), "the lock file of the other writer stays")
+  local a2, _, a2_info = checklist.add(held.id, "Wartet", { root = root, wait_ms = 100 })
+  eq(a2, nil, "a held lock stops the add")
+  eq(a2_info and a2_info.code, "locked")
+  eq(#checklist.entries(root, held.id), 0, "no entry was written")
+  os.remove(lock)
+  eq(
+    one({ op = "checklist_delete", id = held.id }).outcome,
+    "deleted",
+    "free again: the delete goes through"
+  )
 end
