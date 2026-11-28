@@ -273,13 +273,27 @@ return function(H)
     local assets = vim.fn.glob(vim.fs.dirname(made.path) .. "/assets/screenshots/*", false, true)
     eq(#assets, 1, "with the screenshot in assets/screenshots/")
     -- the task is open in a window, so the link is put at its cursor (the buffer, not yet the file)
-    local text = ""
+    local text, lines = "", {}
     for _, b in ipairs(vim.api.nvim_list_bufs()) do
       if vim.fs.normalize(vim.api.nvim_buf_get_name(b)) == vim.fs.normalize(made.path) then
-        text = table.concat(vim.api.nvim_buf_get_lines(b, 0, -1, false), "\n")
+        lines = vim.api.nvim_buf_get_lines(b, 0, -1, false)
+        text = table.concat(lines, "\n")
       end
     end
     has(text, "![", "the link is in the new task")
+    -- the new task opens with the cursor in line 1, inside the frontmatter: the link must not go there
+    eq(lines[1], "---", "the frontmatter still opens with ---")
+    local fm_end, link_row
+    for i, l in ipairs(lines) do
+      if i > 1 and not fm_end and l == "---" then
+        fm_end = i
+      end
+      if not link_row and l:find("![", 1, true) then
+        link_row = i
+      end
+    end
+    ok(fm_end and link_row and link_row > fm_end, "the link is below the frontmatter: " .. text)
+    ok(lines[link_row]:match("^!%[") ~= nil, "on a line of its own: " .. tostring(lines[link_row]))
     has(said(), "created lib.nvim/form-with-a-shot", "created")
 
     -- the second answer is as before: a folder, no file

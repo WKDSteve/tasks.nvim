@@ -2740,7 +2740,29 @@ function M.task_folderize(ctx)
   notify.info(("%s is now a folder task"):format(res.id))
 end
 
----Put `text` at the cursor of the window that shows the file `path`, when there is one.
+---The last line (1-based) of the frontmatter of `buf` when the cursor row `row` is inside it, else nil. An unclosed
+---frontmatter counts to the end of the buffer.
+---@param buf integer
+---@param row integer
+---@return integer|nil
+local function frontmatter_end_at(buf, row)
+  local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+  if lines[1] ~= "---" then
+    return nil
+  end
+  local last = #lines
+  for i = 2, #lines do
+    if lines[i] == "---" then
+      last = i
+      break
+    end
+  end
+  return row <= last and last or nil
+end
+
+---Put `text` at the cursor of the window that shows the file `path`, when there is one. A cursor inside the
+---frontmatter (a task just opened has it in line 1) would break the `---` block: then the text goes in as a line of
+---its own after the summary, before the first `## ` heading (else at the end), and the cursor moves to it.
 ---@param path string
 ---@param text string
 ---@return boolean inserted
@@ -2753,6 +2775,28 @@ local function insert_at_cursor(path, text)
       and vim.fs.normalize(vim.api.nvim_buf_get_name(buf)) == want
       and vim.bo[buf].modifiable
     then
+      local fm_end = frontmatter_end_at(buf, vim.api.nvim_win_get_cursor(win)[1])
+      if fm_end then
+        local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+        local at = #lines
+        for i = fm_end + 1, #lines do
+          if lines[i]:match("^## ") then
+            at = i - 1
+            break
+          end
+        end
+        -- a paragraph of its own: a blank line to the text above (not to the closing `---`) and to a heading below
+        local ins = { text }
+        if at > fm_end and lines[at] ~= "" then
+          table.insert(ins, 1, "")
+        end
+        if at < #lines then
+          ins[#ins + 1] = ""
+        end
+        vim.api.nvim_buf_set_lines(buf, at, at, false, ins)
+        vim.api.nvim_win_set_cursor(win, { at + (ins[1] == "" and 2 or 1), 0 })
+        return true
+      end
       vim.api.nvim_win_call(win, function()
         vim.api.nvim_put({ text }, "c", true, true)
       end)
