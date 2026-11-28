@@ -327,6 +327,75 @@ return function(H)
   eq(run({ "check", "--sources", doc, "--spa-host=" }).code, 2, "an empty --spa-host is refused")
   eq(run({ "check", "--spa-host=x" }).code, 2, "--spa-host belongs to --sources")
 
+  -- ── --fix does not pin an evergreen link to today's version or date ──
+  local function moved_doc(urls)
+    local lines = {
+      "## Quellen",
+      "",
+      "| Quelle | Typ | Worauf achten | Zugang | Geprüft |",
+      "| --- | --- | --- | --- | --- |",
+    }
+    for _, u in ipairs(urls) do
+      lines[#lines + 1] = ("| [x](%s) | Doku | x | frei | ungeprüft |"):format(u)
+    end
+    return table.concat(lines, "\n") .. "\n"
+  end
+  -- the fakes of the HTTP access: every link moved, permanently, to the target of the table
+  local function fix_with(targets, extra)
+    return sources.check_text(
+      moved_doc(vim.tbl_keys(targets)),
+      vim.tbl_extend("force", {
+        fix = true,
+        probe = function(url, _, done)
+          done({ code = 200, redirects = 1, final = targets[url], timeout = false, method = "HEAD" })
+        end,
+        resolve = function(url, _, done)
+          done(targets[url])
+        end,
+      }, extra or {})
+    )
+  end
+  local function by_url(results)
+    local out = {}
+    for _, r in ipairs(results) do
+      out[r.row.url] = r
+    end
+    return out
+  end
+  local pins = {
+    ["https://learn.microsoft.com/en-us/aspnet/core/"] = "https://learn.microsoft.com/en-us/aspnet/core/?view=aspnetcore-11.0",
+    ["https://modelcontextprotocol.io"] = "https://modelcontextprotocol.io/docs/2026-07-28/getting-started/intro",
+    ["https://a.example/guide/latest/intro"] = "https://a.example/guide/3.2/intro",
+    ["https://a.example/old/page"] = "https://a.example/new/page",
+  }
+  local held = by_url(fix_with(pins))
+  has(held["https://learn.microsoft.com/en-us/aspnet/core/"].kept or "", "only a query was added")
+  has(held["https://modelcontextprotocol.io"].kept or "", "target path carries a version or date")
+  has(held["https://a.example/guide/latest/intro"].kept or "", "a version or date")
+  eq(
+    held["https://a.example/old/page"].fixed,
+    "https://a.example/new/page",
+    "an unversioned move is fixed"
+  )
+  for url, r in pairs(held) do
+    if url ~= "https://a.example/old/page" then
+      eq(r.fixed, nil, url .. " is not rewritten")
+    end
+  end
+  local taken = by_url(fix_with(pins, { allow_version_pin = true }))
+  eq(
+    taken["https://modelcontextprotocol.io"].fixed,
+    pins["https://modelcontextprotocol.io"],
+    "--allow-version-pin takes it"
+  )
+  eq(
+    sources.pins_version("https://a.example/v2/x", "https://a.example/v2/y"),
+    nil,
+    "a version it had"
+  )
+  has(sources.pins_version("https://a.example/x", "https://a.example/v2.1/x") or "", "version")
+  eq(run({ "check", "--allow-version-pin" }).code, 2, "--allow-version-pin belongs to --sources")
+
   -- usage
   eq(run({ "check", "--fix" }).code, 2, "--fix belongs to --sources")
   eq(run({ "check", "--sources", "--timeout=0" }).code, 2)

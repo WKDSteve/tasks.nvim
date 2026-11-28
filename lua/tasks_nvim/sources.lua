@@ -292,6 +292,56 @@ function M.safe_target(old, new, allow_host_change)
   return true
 end
 
+---The path of an `http(s)` address without query and fragment ("" for none).
+---@param url string
+---@return string
+local function path_of(url)
+  return ((url:match("^https?://[^/?#]*(.*)$") or ""):gsub("[#?].*$", ""))
+end
+
+---The query of an address without its fragment ("" for none).
+---@param url string
+---@return string
+local function query_of(url)
+  return ((url:gsub("#.*$", "")):match("%?(.*)$") or "")
+end
+
+---Whether a path segment names a version or a date: `2026-07-28`, `v2`, `v2.1`, `1.2.3`.
+---@param seg string
+---@return boolean
+local function versioned(seg)
+  return seg:match("^%d%d%d%d%-%d%d%-%d%d$") ~= nil
+    or seg:match("^[vV]%d+$") ~= nil
+    or seg:match("^[vV]?%d+%.%d+[%.%d]*$") ~= nil
+end
+
+---Why a permanent redirect would pin an evergreen link to today's version, or nil when it does not: a target that
+---differs only in its query (the server added its default `?view=...`), or a target path that carries a version or
+---date segment the old path did not have (a front page that lands on `/docs/2026-07-28/...`, `latest` turned into a
+---number). Both follow the server's current default, so the link would stay behind when it moves on.
+---@param old string
+---@param new string
+---@return string|nil reason
+function M.pins_version(old, new)
+  if
+    host_of(old) == host_of(new)
+    and path_of(old) == path_of(new)
+    and query_of(old) ~= query_of(new)
+  then
+    return "only a query was added"
+  end
+  local had = {}
+  for seg in path_of(old):gmatch("[^/]+") do
+    had[seg] = true
+  end
+  for seg in path_of(new):gmatch("[^/]+") do
+    if versioned(seg) and not had[seg] then
+      return "target path carries a version or date"
+    end
+  end
+  return nil
+end
+
 ---Follow an address by hand and return where its PERMANENT redirects (301, 308) lead: a temporary one (302, 303, 307)
 ---ends the walk, as does a plain answer. At most 5 hops. nil: it is not moved for good.
 ---@param url string
@@ -318,7 +368,8 @@ end
 ---@param timeout integer
 ---@param resolve? fun(url: string, timeout: integer, done: fun(target: string|nil))
 ---@param allow_host_change? boolean
-local function resolve_moved(results, timeout, resolve, allow_host_change)
+---@param allow_version_pin? boolean
+local function resolve_moved(results, timeout, resolve, allow_host_change, allow_version_pin)
   resolve = resolve or M.permanent_target
   for _, r in ipairs(results) do
     if r.state == "redirected" then
@@ -337,8 +388,11 @@ local function resolve_moved(results, timeout, resolve, allow_host_change)
           target = target .. frag
         end
         local ok, why = M.safe_target(r.row.url, target, allow_host_change)
+        local pin = ok and not allow_version_pin and M.pins_version(r.row.url, target) or nil
         if not ok then
           r.kept = why
+        elseif pin then
+          r.kept = pin .. " (--allow-version-pin)"
         elseif target == r.row.url then
           r.kept = "same address"
         else
@@ -351,7 +405,7 @@ end
 
 ---Ask about the web links of a path file's Quellen table (at most `M.CONCURRENCY` at a time). Blocks until all answered.
 ---@param text string
----@param opts? { timeout?: integer, fix?: boolean, allow_host_change?: boolean, spa_hosts?: string[], resolve?: function, probe?: fun(url: string, timeout: integer, done: fun(p: Tasks.SourceProbe)) }
+---@param opts? { timeout?: integer, fix?: boolean, allow_host_change?: boolean, allow_version_pin?: boolean, spa_hosts?: string[], resolve?: function, probe?: fun(url: string, timeout: integer, done: fun(p: Tasks.SourceProbe)) }
 ---@return Tasks.SourceResult[]
 function M.check_text(text, opts)
   opts = opts or {}
@@ -394,7 +448,7 @@ function M.check_text(text, opts)
       }
   end
   if opts.fix then
-    resolve_moved(results, timeout, opts.resolve, opts.allow_host_change)
+    resolve_moved(results, timeout, opts.resolve, opts.allow_host_change, opts.allow_version_pin)
   end
   return results
 end
@@ -478,7 +532,7 @@ end
 
 ---Ask about the links of one file and, with `write`, put the answers into it.
 ---@param path string
----@param opts? { timeout?: integer, write?: boolean, fix?: boolean, allow_host_change?: boolean, spa_hosts?: string[], today?: string, probe?: function, resolve?: function }
+---@param opts? { timeout?: integer, write?: boolean, fix?: boolean, allow_host_change?: boolean, allow_version_pin?: boolean, spa_hosts?: string[], today?: string, probe?: function, resolve?: function }
 ---@return Tasks.SourceResult[]|nil results
 ---@return string|nil err
 function M.check_file(path, opts)

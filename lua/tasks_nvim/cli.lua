@@ -357,7 +357,8 @@ commands:
                                           the sheet (testing sheets accept: only when it loads) or the bug task of
                                           the AI's answer; shown only, written with --yes
   check [<area>]                          rule check; exit 1 on any error
-  check --sources [<file|dir>] [--write] [--fix] [--allow-host-change] [--spa-host=<h,...>] [--timeout=<s>]
+  check --sources [<file|dir>] [--write] [--fix] [--allow-host-change] [--allow-version-pin]
+                [--spa-host=<h,...>] [--timeout=<s>]
                                           ask the web links of the `## Quellen` table of a learning path (all open
                                           paths without an argument) with HEAD (GET as fallback): dead (404),
                                           blocked (401/403/429), moved; exit 1 on a dead link. Needs the network, so
@@ -366,7 +367,9 @@ commands:
                                           (301, 308) into the link (`fixed` lines; a temporary one, a front page,
                                           a step back to http or ANOTHER HOST stays: `kept`; the host is compared
                                           without www., port and case; --allow-host-change takes a new host too,
-                                          look at the `fixed old -> new` lines first). A 2xx from a host that
+                                          look at the `fixed old -> new` lines first). A target that only adds
+                                          a query (?view=...) or a version/date segment (/2026-07-28/, /v2.1/)
+                                          pins an evergreen link: `kept` unless --allow-version-pin. A 2xx from a host that
                                           answers 200 for any path (single-page app: help.sap.com; more with
                                           --spa-host=) is `unverified`, check it in the browser; no exit 1
   relink [<area>] [--dry-run]             mend the dead relative links to .md files below ROADMAP/, Backlog/ and
@@ -744,7 +747,7 @@ local SPECS = {
   ["sheet-ai"] = { value = { "testing-cli", "from" }, flag = { "yes" } },
   check = {
     value = { "spa-host", "timeout" },
-    flag = { "all", "allow-host-change", "fix", "sources", "write" },
+    flag = { "all", "allow-host-change", "allow-version-pin", "fix", "sources", "write" },
   },
   relink = { value = {}, flag = { "dry-run" } },
   ci = { value = { "md-lint", "own-since" }, flag = { "strict", "no-lint", "trust-vault-lint" } },
@@ -4323,6 +4326,7 @@ local function check_sources(ctx)
       write = args.opt.write == true,
       fix = args.opt.fix == true,
       allow_host_change = args.opt["allow-host-change"] == true,
+      allow_version_pin = args.opt["allow-version-pin"] == true,
       spa_hosts = spa_hosts,
       today = today,
     })
@@ -4383,10 +4387,11 @@ function commands.check(ctx)
     or args.opt.timeout
     or args.opt.fix
     or args.opt["allow-host-change"]
+    or args.opt["allow-version-pin"]
     or args.opt["spa-host"]
   then
     ctx.warn(
-      "error: --write, --fix, --allow-host-change, --spa-host and --timeout belong to --sources"
+      "error: --write, --fix, --allow-host-change, --allow-version-pin, --spa-host and --timeout belong to --sources"
     )
     return 2
   end
