@@ -44,6 +44,33 @@ return function(H)
   eq(r.code, 2, "the exit code of the engine is handed through")
   says(r, "usage", "the engine's usage is printed")
 
+  -- Git Bash with MSYS_NO_PATHCONV=1 (briefs set it to keep `origin/main:path` whole): MSYS no longer turns the
+  -- `/e/...` path of the script into one the native nvim knows; the launcher must hand over a Windows path itself
+  if win then
+    local git_bash = "C:/Program Files/Git/bin/bash.exe"
+    if vim.fn.executable(git_bash) == 1 then
+      for _, conv in ipairs({ "1", "" }) do
+        local rb = vim
+          .system({ git_bash, bin .. "/tasks", "done" }, {
+            text = true,
+            env = {
+              PATH = nvim_dir .. ";" .. (os.getenv("PATH") or ""),
+              MSYS_NO_PATHCONV = conv ~= "" and conv or nil,
+            },
+          })
+          :wait(60000)
+        eq(rb.code, 2, "Git Bash, MSYS_NO_PATHCONV=" .. conv .. ": the engine runs")
+        says(
+          rb,
+          "usage",
+          "Git Bash, MSYS_NO_PATHCONV=" .. conv .. ": the engine's usage is printed"
+        )
+      end
+    else
+      print("n/a  no Git Bash at " .. git_bash)
+    end
+  end
+
   -- without nvim on the PATH: never silent, exit 3
   local bare
   if win then
