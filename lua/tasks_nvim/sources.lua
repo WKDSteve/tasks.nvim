@@ -5,7 +5,8 @@
 --- reads the table, sends one HEAD request per `http(s)` link of the first column (a GET when the server refuses HEAD),
 --- and sorts the answers: `ok`, `redirected` (the link works but moved), `blocked` (401, 403, 429: a server that
 --- shuts out a program and may still open in a browser, so neither dead nor checkable), `dead` (404, 410), `error`
---- (any other 4xx or 5xx) and `unreachable` (no answer, a timeout). `write` puts the date and the answer into the cell
+--- (any other 4xx or 5xx), `unreachable` (no answer, a timeout) and `unverified` (a 2xx from a host that answers 200
+--- for any path, a single-page app such as `help.sap.com`: alive or dead shows only in a browser; `SPA_HOSTS`). `write` puts the date and the answer into the cell
 --- `Geprüft` of each row it asked about.
 ---
 --- The requests go out through `curl` (an `https` link needs TLS) and ONLY when a caller asks: `tasks check --sources`.
@@ -19,7 +20,7 @@ local mdlinks = require("tasks_nvim.mdlinks")
 
 local M = {}
 
----@alias Tasks.SourceState "ok"|"redirected"|"blocked"|"dead"|"error"|"unreachable"
+---@alias Tasks.SourceState "ok"|"redirected"|"blocked"|"dead"|"error"|"unreachable"|"unverified"
 
 ---@class Tasks.SourceRow
 ---@field line integer     # 1-based line of the table row.
@@ -42,6 +43,11 @@ local M = {}
 
 M.DEFAULT_TIMEOUT = 8
 M.CONCURRENCY = 6
+
+---Hosts known to answer 200 for any path (single-page apps that render "not found" in the browser): a 2xx from them
+---says nothing, so the row is `unverified`. Compared like `safe_target` does (lower case, without `www.` and port);
+---`check --sources --spa-host=<host,...>` adds more for one run. No host here offers a machine-readable check of a page.
+M.SPA_HOSTS = { "help.sap.com" }
 
 ---The cells of a table row: split at the pipes that are no escaped `\|`, trimmed.
 ---@param line string
@@ -113,14 +119,24 @@ function M.rows(text)
   return out
 end
 
----What the status of an answer means.
+local host_of
+
+---What the status of an answer means. A 2xx whose last address is on one of `spa_hosts` (default `M.SPA_HOSTS`) is
+---`unverified`: such a host answers 200 for a page that does not exist.
 ---@param p Tasks.SourceProbe
+---@param spa_hosts? string[]
 ---@return Tasks.SourceState
-function M.classify(p)
+function M.classify(p, spa_hosts)
   local code = p.code
   if p.timeout or code == 0 then
     return "unreachable"
   elseif code >= 200 and code < 300 then
+    local host = p.final and host_of(p.final) or ""
+    for _, h in ipairs(spa_hosts or M.SPA_HOSTS) do
+      if host ~= "" and host == host_of("https://" .. h) then
+        return "unverified"
+      end
+    end
     return p.redirects > 0 and "redirected" or "ok"
   elseif code == 401 or code == 403 or code == 429 then
     return "blocked"
@@ -244,7 +260,7 @@ end
 ---The host of an `http(s)` address for comparing: lower case, no user info, no port, no leading `www.`.
 ---@param url string
 ---@return string
-local function host_of(url)
+function host_of(url)
   local auth = (url:match("^https?://([^/?#]*)") or ""):gsub("^.*@", ""):gsub(":%d*$", "")
   return (auth:lower():gsub("^www%.", ""))
 end
@@ -335,7 +351,7 @@ end
 
 ---Ask about the web links of a path file's Quellen table (at most `M.CONCURRENCY` at a time). Blocks until all answered.
 ---@param text string
----@param opts? { timeout?: integer, fix?: boolean, allow_host_change?: boolean, resolve?: function, probe?: fun(url: string, timeout: integer, done: fun(p: Tasks.SourceProbe)) }
+---@param opts? { timeout?: integer, fix?: boolean, allow_host_change?: boolean, spa_hosts?: string[], resolve?: function, probe?: fun(url: string, timeout: integer, done: fun(p: Tasks.SourceProbe)) }
 ---@return Tasks.SourceResult[]
 function M.check_text(text, opts)
   opts = opts or {}
@@ -352,7 +368,7 @@ function M.check_text(text, opts)
       probe(row.url, timeout, function(p) ---@cast p Tasks.SourceResult
         vim.schedule(function()
           p.row = row
-          p.state = M.classify(p)
+          p.state = M.classify(p, opts.spa_hosts)
           results[at] = p
           running = running - 1
           finished = finished + 1
@@ -399,6 +415,8 @@ function M.cell(r, today)
     return ("tot (%d) %s"):format(r.code, today)
   elseif state == "error" then
     return ("Fehler (%d) %s"):format(r.code, today)
+  elseif state == "unverified" then
+    return "Single-Page-App, Inhalt im Browser prüfen " .. today
   end
   return (r.timeout and "keine Antwort (Zeitlimit) " or "keine Antwort ") .. today
 end
@@ -460,7 +478,7 @@ end
 
 ---Ask about the links of one file and, with `write`, put the answers into it.
 ---@param path string
----@param opts? { timeout?: integer, write?: boolean, fix?: boolean, allow_host_change?: boolean, today?: string, probe?: function, resolve?: function }
+---@param opts? { timeout?: integer, write?: boolean, fix?: boolean, allow_host_change?: boolean, spa_hosts?: string[], today?: string, probe?: function, resolve?: function }
 ---@return Tasks.SourceResult[]|nil results
 ---@return string|nil err
 function M.check_file(path, opts)

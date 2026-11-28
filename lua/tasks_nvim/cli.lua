@@ -357,7 +357,7 @@ commands:
                                           the sheet (testing sheets accept: only when it loads) or the bug task of
                                           the AI's answer; shown only, written with --yes
   check [<area>]                          rule check; exit 1 on any error
-  check --sources [<file|dir>] [--write] [--fix] [--allow-host-change] [--timeout=<s>]
+  check --sources [<file|dir>] [--write] [--fix] [--allow-host-change] [--spa-host=<h,...>] [--timeout=<s>]
                                           ask the web links of the `## Quellen` table of a learning path (all open
                                           paths without an argument) with HEAD (GET as fallback): dead (404),
                                           blocked (401/403/429), moved; exit 1 on a dead link. Needs the network, so
@@ -366,7 +366,9 @@ commands:
                                           (301, 308) into the link (`fixed` lines; a temporary one, a front page,
                                           a step back to http or ANOTHER HOST stays: `kept`; the host is compared
                                           without www., port and case; --allow-host-change takes a new host too,
-                                          look at the `fixed old -> new` lines first)
+                                          look at the `fixed old -> new` lines first). A 2xx from a host that
+                                          answers 200 for any path (single-page app: help.sap.com; more with
+                                          --spa-host=) is `unverified`, check it in the browser; no exit 1
   relink [<area>] [--dry-run]             mend the dead relative links to .md files below ROADMAP/, Backlog/ and
                                           MEETINGS/: a link whose slug names one file (a task finished into the
                                           Backlog, a folder task, another area) is rewritten to it; ambiguous and
@@ -741,7 +743,7 @@ local SPECS = {
   ["sheet-run"] = { value = { "testing-cli" }, flag = { "dry-run" } },
   ["sheet-ai"] = { value = { "testing-cli", "from" }, flag = { "yes" } },
   check = {
-    value = { "timeout" },
+    value = { "spa-host", "timeout" },
     flag = { "all", "allow-host-change", "fix", "sources", "write" },
   },
   relink = { value = {}, flag = { "dry-run" } },
@@ -4301,7 +4303,19 @@ local function check_sources(ctx)
   end
   local sources = require("tasks_nvim.sources")
   local today = eo.today or model.today()
-  local counts = { ok = 0, redirected = 0, blocked = 0, dead = 0, error = 0, unreachable = 0 }
+  local spa_hosts = vim.deepcopy(sources.SPA_HOSTS)
+  local extra_spa = args.opt["spa-host"]
+  if extra_spa ~= nil then
+    if type(extra_spa) ~= "string" or vim.trim(extra_spa) == "" then
+      ctx.warn("error: --spa-host takes host names, comma separated (--spa-host=docs.example.com)")
+      return 2
+    end
+    for _, h in ipairs(vim.split(extra_spa, ",", { plain = true, trimempty = true })) do
+      spa_hosts[#spa_hosts + 1] = vim.trim(h)
+    end
+  end
+  local counts =
+    { ok = 0, redirected = 0, blocked = 0, dead = 0, error = 0, unreachable = 0, unverified = 0 }
   local total, rewritten = 0, 0
   for _, path in ipairs(files) do
     local results, err = sources.check_file(path, {
@@ -4309,6 +4323,7 @@ local function check_sources(ctx)
       write = args.opt.write == true,
       fix = args.opt.fix == true,
       allow_host_change = args.opt["allow-host-change"] == true,
+      spa_hosts = spa_hosts,
       today = today,
     })
     if not results then
@@ -4326,6 +4341,7 @@ local function check_sources(ctx)
       end
       if r.state ~= "ok" then
         local note = r.state == "redirected" and (" -> " .. r.final)
+          or r.state == "unverified" and " (SPA: check in the browser)"
           or (r.timeout and " (timeout)" or "")
         ctx.say(
           ("%s\t%s:%d\t%s%s\t%s"):format(
@@ -4341,7 +4357,7 @@ local function check_sources(ctx)
     end
   end
   ctx.say(
-    ("sources: %d link(s) in %d file(s): %d ok, %d moved, %d blocked (not checkable), %d dead, %d other error, %d no answer%s"):format(
+    ("sources: %d link(s) in %d file(s): %d ok, %d moved, %d blocked (not checkable), %d dead, %d other error, %d no answer, %d unverified (SPA)%s"):format(
       total,
       #files,
       counts.ok,
@@ -4350,6 +4366,7 @@ local function check_sources(ctx)
       counts.dead,
       counts.error,
       counts.unreachable,
+      counts.unverified,
       (args.opt.write and "; column Geprüft written" or "")
         .. (args.opt.fix and ("; %d link(s) rewritten"):format(rewritten) or "")
     )
@@ -4361,8 +4378,16 @@ function commands.check(ctx)
   local args, eo = ctx.args, ctx.eo
   if args.opt.sources then
     return check_sources(ctx)
-  elseif args.opt.write or args.opt.timeout or args.opt.fix or args.opt["allow-host-change"] then
-    ctx.warn("error: --write, --fix, --allow-host-change and --timeout belong to --sources")
+  elseif
+    args.opt.write
+    or args.opt.timeout
+    or args.opt.fix
+    or args.opt["allow-host-change"]
+    or args.opt["spa-host"]
+  then
+    ctx.warn(
+      "error: --write, --fix, --allow-host-change, --spa-host and --timeout belong to --sources"
+    )
     return 2
   end
   if #args.pos > 1 then

@@ -287,6 +287,46 @@ return function(H)
   }, { fix = true })
   has(fixed_text, "| [/moved](" .. base .. "/ok#frag) | Doku | x | frei | ungeprüft |")
 
+  -- ── a single-page app answers 200 for any path (help.sap.com): `unverified`, not `ok` ──
+  local spa_url = "https://help.sap.com/docs/NOT_A_PRODUCT_XYZ"
+  eq(sources.classify({ code = 200, redirects = 0, final = spa_url }), "unverified")
+  eq(
+    sources.classify({ code = 200, redirects = 1, final = "https://www.HELP.sap.com/x" }),
+    "unverified",
+    "a redirect onto the host counts too, compared without www. and case"
+  )
+  eq(
+    sources.classify({ code = 404, redirects = 0, final = spa_url }),
+    "dead",
+    "a 404 is still dead"
+  )
+  eq(sources.classify({ code = 200, redirects = 0, final = "https://sap.com/x" }), "ok")
+  local spa_doc = table.concat({
+    "## Quellen",
+    "",
+    "| Quelle | Typ | Worauf achten | Zugang | Geprüft |",
+    "| --- | --- | --- | --- | --- |",
+    "| [SAP](" .. spa_url .. ") | Doku | x | frei | ungeprüft |",
+    "",
+  }, "\n")
+  -- the fake of the HTTP access: 200 and an HTML "not found" page for any path, as the SPA does
+  local spa = sources.check_text(spa_doc, {
+    probe = function(url, _, done)
+      done({ code = 200, redirects = 0, final = url, timeout = false, method = "HEAD" })
+    end,
+  })
+  eq(spa[1].state, "unverified")
+  has(sources.cell(spa[1], "2026-11-28"), "Single-Page-App, Inhalt im Browser prüfen 2026-11-28")
+  -- the CLI: a host named with --spa-host (here the local server) is unverified, no exit 1, counted
+  H.write(doc, table_doc({ "/ok" }))
+  local spa_run = run({ "check", "--sources", doc, "--spa-host=127.0.0.1" })
+  eq(spa_run.code, 0, spa_run.out .. spa_run.err)
+  has(spa_run.out, "unverified\t")
+  has(spa_run.out, "(SPA: check in the browser)")
+  has(spa_run.out, "1 unverified (SPA)")
+  eq(run({ "check", "--sources", doc, "--spa-host=" }).code, 2, "an empty --spa-host is refused")
+  eq(run({ "check", "--spa-host=x" }).code, 2, "--spa-host belongs to --sources")
+
   -- usage
   eq(run({ "check", "--fix" }).code, 2, "--fix belongs to --sources")
   eq(run({ "check", "--sources", "--timeout=0" }).code, 2)
