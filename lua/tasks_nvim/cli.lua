@@ -4104,6 +4104,18 @@ function commands.unclaim(ctx)
     ctx.warn("error: " .. tostring(err))
     return 1
   end
+  if res.already_done then
+    ctx.say(("unclaimed\t%s\tdone"):format(id))
+    ctx.warn(
+      ("note: %s is already done (%s): only the claim was removed, no file was written%s"):format(
+        id,
+        res.already_done,
+        res.leftover and ("; the open file %s is left over, remove it by hand"):format(res.leftover)
+          or ""
+      )
+    )
+    return 0
+  end
   ctx.say(("unclaimed\t%s\t%s"):format(id, res.status or "-"))
   return 0
 end

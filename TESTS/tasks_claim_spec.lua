@@ -391,6 +391,33 @@ return function(H)
   -- `release <key>` is still the verb of the parked tasks
   ok(run({ "release", "no-such-key" }).code ~= 2, "release is still a known verb")
 
+  -- claimed here, finished in another checkout of the vault (a worktree) and pulled in: the failed autostash left
+  -- the `doing` copy in ROADMAP/tasks beside the finished file. unclaim writes no file, says done, drops the claim.
+  local elsewhere = task("done-elsewhere")
+  eq(run({ "claim", elsewhere, "--by=agent-a" }).code, 0)
+  local open_path = scan.find(elsewhere, { root = root }).path
+  local left_text = H.read(open_path)
+  has(left_text, "status: doing")
+  H.write(
+    root .. "/lib.nvim/Backlog/TASKS/2026-11-06_done-elsewhere.md",
+    (left_text:gsub("status: doing", "status: done"))
+  )
+  local u3 = run({ "unclaim", elsewhere, "--by=agent-a" })
+  eq(u3.code, 0, u3.err)
+  has(u3.out, "unclaimed\t" .. elsewhere .. "\tdone")
+  has(u3.err, "already done (lib.nvim/Backlog/TASKS/2026-11-06_done-elsewhere.md)")
+  has(u3.err, "lib.nvim/ROADMAP/tasks/done-elsewhere.md is left over")
+  eq(H.read(open_path), left_text, "the open copy is not written (no status open)")
+  eq(claims.read(root, elsewhere), nil, "the claim is gone")
+  -- the same with the open copy gone: no file appears
+  eq(run({ "claim", elsewhere, "--by=agent-a" }).code, 0)
+  os.remove(open_path)
+  local u4 = run({ "unclaim", elsewhere, "--by=agent-a" })
+  eq(u4.code, 0, u4.err)
+  has(u4.out, "unclaimed\t" .. elsewhere .. "\tdone")
+  ok(not vim.uv.fs_stat(open_path), "no open file is written")
+  eq(claims.read(root, elsewhere), nil)
+
   -- ── two processes claim the same task: exactly one wins ────────────────────
   local lib = vim.env.LIB_NVIM_DIR
   if lib and lib ~= "" then

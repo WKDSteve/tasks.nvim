@@ -3291,6 +3291,16 @@ function M.task_unclaim(ctx)
     return
   end
   refresh_task_buffers(id)
+  if res.already_done then
+    notify.warn(
+      ("unclaimed %s: already done (%s), no file was written%s"):format(
+        id,
+        res.already_done,
+        res.leftover and ("; %s is left over"):format(res.leftover) or ""
+      )
+    )
+    return
+  end
   notify.info(("unclaimed %s: %s"):format(id, res.status or "-"))
 end
 

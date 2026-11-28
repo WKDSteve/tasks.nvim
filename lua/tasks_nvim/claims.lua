@@ -479,10 +479,12 @@ function M.acquire(id, opts)
 end
 
 ---Give a task back. Only the owner may (or `force` with a `note`); a task that is `doing` goes to `open` (or
----`opts.status`), as nothing says "somebody works on it" any more.
+---`opts.status`), as nothing says "somebody works on it" any more. A task already finished (its file in `Backlog/`,
+---done in another checkout of the vault) is never written: only the claim goes, `already_done` names the finished
+---file and `leftover` an open file still lying beside it (to remove by hand).
 ---@param id string
 ---@param opts? Tasks.ClaimOpts
----@return { id: string, released: boolean, status?: string }|nil result
+---@return { id: string, released: boolean, status?: string, already_done?: string, leftover?: string }|nil result
 ---@return string|nil err
 ---@return table|nil info
 function M.release(id, opts)
@@ -505,6 +507,24 @@ function M.release(id, opts)
     if not ok then
       return nil, gerr, ginfo
     end
+  end
+  -- finished in another checkout of the vault (a worktree) and pulled in: an open file left beside it (a failed
+  -- autostash keeps the `doing` copy) is no task to give back; only the claim goes, no file is written
+  local finished = scan.find_done(id, { root = root })
+  if finished then
+    M.remove(root, id)
+    local base = fsio.norm(root) .. "/"
+    local function rel(path)
+      local p = fsio.norm(path)
+      return p:sub(1, #base) == base and p:sub(#base + 1) or p
+    end
+    return {
+      id = id,
+      released = claim ~= nil,
+      already_done = rel(finished.path),
+      leftover = task and rel(task.path) or nil,
+    },
+      nil
   end
   local back
   if task and task.status == "doing" then
