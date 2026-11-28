@@ -53,6 +53,7 @@ the version is not tagged yet (the repository is not published).
 
 ### Fixed
 
+- `meeting_new` with `prep`: a Lua error while the meeting is written takes the preparation task back too (it is raised again afterwards); a meeting title near the limit gets a preparation title cut to the limit with an ellipsis instead of `payload_too_large`; without `lang` the words ("Vorbereitung:"/"Prepare:") follow the vault's marker file (`lang`), not always German. Spec `tasks_meeting_extras_spec`.
 - `checklist_delete` (`checklist.list_delete`) checks and removes a list under the lock of its `list.md`, and `entry_add` (`checklist.add`) takes the same lock before it creates an entry: an entry added at the same moment either comes first (`conflict`) or finds the list gone (`not_found`, or `locked` while the delete runs), never a folder with the entry and without its `list.md`. A lock file beside `list.md` is no system file the delete sweeps away. Spec `tasks_checklist_spec`.
 - The link of an attachment never lands inside the frontmatter: a task just opened (`:Tasks new` with "Yes, attach a screenshot") has its cursor in line 1, and the link replaced the opening `---`. With the cursor in the frontmatter the link goes in as a line of its own after the summary, before the first `## ` heading. Spec `tasks_attach_ui_spec`.
 - `bin/tasks` hands nvim the script path in Windows form (`pwd -W`) in Git Bash (MINGW/MSYS): with `MSYS_NO_PATHCONV=1` the `/e/...` path reached the native nvim unconverted and every command failed. Spec `tasks_launcher_spec`.

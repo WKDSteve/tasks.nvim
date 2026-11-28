@@ -183,6 +183,67 @@ return function(H)
     "invalid_argument"
   )
 
+  -- a Lua error while the meeting is written (after the task was made) takes the task back as well
+  local mw = require("tasks_nvim.meeting_write")
+  local real_new = mw.new
+  mw.new = function(area, o)
+    if o and o.dry_run then
+      return real_new(area, o)
+    end
+    error("disk on fire")
+  end
+  local called = pcall(ops_mod.run, {
+    ops = {
+      {
+        op = "meeting_new",
+        area = "lib.nvim",
+        title = "Crash",
+        fields = { date = "2026-12-07" },
+        prep = true,
+      },
+    },
+  }, { root = root, today = F.TODAY })
+  mw.new = real_new
+  meetings.reset_cache()
+  ok(called ~= nil, "the run came back or threw")
+  ok(
+    not scan.find("lib.nvim/vorbereitung-crash", { root = root }),
+    "no preparation task is left after a Lua error"
+  )
+  eq(#vim.fn.readdir(root .. "/lib.nvim/ROADMAP/tasks"), before, "the tasks folder is as before")
+
+  -- a meeting title near the limit: the preparation title is cut to the limit, not refused
+  local long = string.rep("x", require("tasks_nvim.contract").LIMITS.title - 4)
+  local cut = run({
+    {
+      op = "meeting_new",
+      area = "lib.nvim",
+      title = long,
+      fields = { date = "2026-12-08" },
+      prep = true,
+    },
+  })
+  eq(cut.ok, true, vim.inspect(cut))
+  local cut_title = assert(scan.find(cut.prep.id, { root = root })).title
+  eq(vim.fn.strchars(cut_title), require("tasks_nvim.contract").LIMITS.title, "at the limit")
+  ok(vim.startswith(cut_title, "Vorbereitung: xxx"), cut_title)
+  ok(vim.endswith(cut_title, "\226\128\166"), "with an ellipsis: " .. cut_title)
+
+  -- without lang: the language of the vault (its marker file), not always German
+  local marker = require("tasks_nvim.vault_marker")
+  H.write(root .. "/" .. marker.FILE, marker.render({ lang = "en" }))
+  local vault_en = run({
+    {
+      op = "meeting_new",
+      area = "lib.nvim",
+      title = "Planning",
+      fields = { date = "2026-12-09" },
+      prep = true,
+    },
+  })
+  H.write(root .. "/" .. marker.FILE, marker.render({}))
+  eq(assert(scan.find(vault_en.prep.id, { root = root })).title, "Prepare: Planning")
+
   -- ── overlap: ok ──
   local quiet = run({
     {

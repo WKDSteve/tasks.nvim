@@ -2959,14 +2959,35 @@ local function any_control(t)
   return false
 end
 
----The title of the preparation task of a meeting (`meeting_new` with `prep`).
+---The language of the preparation task of a meeting: `op.lang`, else the one the vault's marker file names (as
+---`new` takes it for the body), else German.
 ---@param op table
+---@param ctx Tasks.OpsCtx
+---@return "de"|"en"
+local function prep_lang_of(op, ctx)
+  if op.lang == "de" or op.lang == "en" then
+    return op.lang
+  end
+  local marker = require("tasks_nvim.vault_marker").read(ctx.root)
+  return marker and marker.lang == "en" and "en" or "de"
+end
+
+---The title of the preparation task of a meeting (`meeting_new` with `prep`): `prep_title`, else "Vorbereitung: "
+---("Prepare: ") and the meeting's title, cut with an ellipsis to the limit of a title (a meeting title near the limit
+---would make the prefixed one too long).
+---@param op table
+---@param lang "de"|"en"
 ---@return string
-local function prep_title_of(op)
+local function prep_title_of(op, lang)
   if type(op.prep_title) == "string" and vim.trim(op.prep_title) ~= "" then
     return vim.trim(op.prep_title)
   end
-  return (op.lang == "en" and "Prepare: " or "Vorbereitung: ") .. vim.trim(op.title)
+  local title = (lang == "en" and "Prepare: " or "Vorbereitung: ") .. vim.trim(op.title)
+  local max = contract.LIMITS.title
+  if vim.fn.strchars(title) > max then
+    title = vim.fn.strcharpart(title, 0, max - 1) .. "\226\128\166"
+  end
+  return title
 end
 
 local do_new_meeting_file
@@ -3002,9 +3023,10 @@ local function do_meeting_new(op, ctx)
   if not probe.ok then
     return probe
   end
+  local lang = prep_lang_of(op, ctx)
   local task = do_new({
     area = op.area,
-    title = prep_title_of(op),
+    title = prep_title_of(op, lang),
     fields = { due = model.add_days(date, -1) },
   }, ctx)
   if not task.ok then
@@ -3024,10 +3046,14 @@ local function do_meeting_new(op, ctx)
     tasks[#tasks + 1] = task.id
   end
   with_prep.fields.tasks = tasks
-  local entry = do_new_meeting_file(with_prep, ctx)
-  if not entry.ok then
+  -- a Lua error while the meeting is written takes the task back too, then goes on as the error it was
+  local called, entry = pcall(do_new_meeting_file, with_prep, ctx)
+  if not called or not entry.ok then
     if not ctx.dry and task.file then
       os.remove(ctx.root .. "/" .. task.file)
+    end
+    if not called then
+      error(entry, 0)
     end
     return entry
   end
