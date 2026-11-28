@@ -38,6 +38,11 @@ return function(H)
         status, extra = "308 Permanent Redirect", "Location: /moved\r\n"
       elseif path == "/home" then
         status, extra = "301 Moved Permanently", "Location: /\r\n"
+      elseif path == "/a/b/c" then
+        -- a page that moved up to the overview of its section
+        status, extra = "301 Moved Permanently", "Location: /a/b\r\n"
+      elseif path == "/a/b/x" then
+        status, extra = "301 Moved Permanently", "Location: /a/b/d\r\n"
       elseif path == "/otherhost" then
         -- the same server under another name: a different host as far as the table is concerned
         status = "301 Moved Permanently"
@@ -395,6 +400,24 @@ return function(H)
   )
   has(sources.pins_version("https://a.example/x", "https://a.example/v2.1/x") or "", "version")
   eq(run({ "check", "--allow-version-pin" }).code, 2, "--allow-version-pin belongs to --sources")
+
+  -- ── a move to a broader page of the same section is held, a sideways move is fixed ──
+  eq(sources.broader(base .. "/a/b/c", base .. "/a/b"), true, "a parent")
+  eq(sources.broader(base .. "/a/b/c", base .. "/a/x"), true, "fewer segments, same section")
+  eq(sources.broader(base .. "/a/b/c", base .. "/a/b/d"), false, "a sideways move")
+  eq(sources.broader(base .. "/a/b/c", base .. "/z/b"), false, "another section")
+  H.write(doc, table_doc({ "/a/b/c", "/a/b/x" }))
+  local seen = run({ "check", "--sources", doc })
+  has(seen.out, "/a/b (broader page: check by hand)", "seen before anything is written")
+  lacks(seen.out, "/a/b/d (broader", "a sideways move has no hint")
+  local broad = run({ "check", "--sources", doc, "--fix" })
+  eq(broad.code, 0, broad.out .. broad.err)
+  has(broad.out, "kept\t" .. doc .. ":7\t" .. base .. "/a/b/c\tbroader page: check by hand")
+  has(broad.out, "fixed\t" .. doc .. ":8\t" .. base .. "/a/b/x -> " .. base .. "/a/b/d")
+  has(H.read(doc), "](" .. base .. "/a/b/c)", "the broader target is not written")
+  local taken_b = run({ "check", "--sources", doc, "--fix", "--allow-broader" })
+  has(taken_b.out, "fixed\t" .. doc .. ":7\t" .. base .. "/a/b/c -> " .. base .. "/a/b")
+  eq(run({ "check", "--allow-broader" }).code, 2, "--allow-broader belongs to --sources")
 
   -- usage
   eq(run({ "check", "--fix" }).code, 2, "--fix belongs to --sources")

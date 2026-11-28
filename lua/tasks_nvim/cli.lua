@@ -358,7 +358,7 @@ commands:
                                           the AI's answer; shown only, written with --yes
   check [<area>]                          rule check; exit 1 on any error
   check --sources [<file|dir>] [--write] [--fix] [--allow-host-change] [--allow-version-pin]
-                [--spa-host=<h,...>] [--timeout=<s>]
+                [--allow-broader] [--spa-host=<h,...>] [--timeout=<s>]
                                           ask the web links of the `## Quellen` table of a learning path (all open
                                           paths without an argument) with HEAD (GET as fallback): dead (404),
                                           blocked (401/403/429), moved; exit 1 on a dead link. Needs the network, so
@@ -369,7 +369,9 @@ commands:
                                           without www., port and case; --allow-host-change takes a new host too,
                                           look at the `fixed old -> new` lines first). A target that only adds
                                           a query (?view=...) or a version/date segment (/2026-07-28/, /v2.1/)
-                                          pins an evergreen link: `kept` unless --allow-version-pin. A 2xx from a host that
+                                          pins an evergreen link: `kept` unless --allow-version-pin; a move to a
+                                          broader page (/a/b/c -> /a/b) is `kept` unless --allow-broader, and
+                                          its `redirected` line says so. A 2xx from a host that
                                           answers 200 for any path (single-page app: help.sap.com; more with
                                           --spa-host=) is `unverified`, check it in the browser; no exit 1
   relink [<area>] [--dry-run]             mend the dead relative links to .md files below ROADMAP/, Backlog/ and
@@ -747,7 +749,15 @@ local SPECS = {
   ["sheet-ai"] = { value = { "testing-cli", "from" }, flag = { "yes" } },
   check = {
     value = { "spa-host", "timeout" },
-    flag = { "all", "allow-host-change", "allow-version-pin", "fix", "sources", "write" },
+    flag = {
+      "all",
+      "allow-broader",
+      "allow-host-change",
+      "allow-version-pin",
+      "fix",
+      "sources",
+      "write",
+    },
   },
   relink = { value = {}, flag = { "dry-run" } },
   ci = { value = { "md-lint", "own-since" }, flag = { "strict", "no-lint", "trust-vault-lint" } },
@@ -4327,6 +4337,7 @@ local function check_sources(ctx)
       fix = args.opt.fix == true,
       allow_host_change = args.opt["allow-host-change"] == true,
       allow_version_pin = args.opt["allow-version-pin"] == true,
+      allow_broader = args.opt["allow-broader"] == true,
       spa_hosts = spa_hosts,
       today = today,
     })
@@ -4344,7 +4355,8 @@ local function check_sources(ctx)
         ctx.say(("kept\t%s:%d\t%s\t%s"):format(path, r.row.line, r.row.url, r.kept))
       end
       if r.state ~= "ok" then
-        local note = r.state == "redirected" and (" -> " .. r.final)
+        local note = r.state == "redirected"
+            and (" -> " .. r.final .. (r.broader and " (broader page: check by hand)" or ""))
           or r.state == "unverified" and " (SPA: check in the browser)"
           or (r.timeout and " (timeout)" or "")
         ctx.say(
@@ -4388,10 +4400,12 @@ function commands.check(ctx)
     or args.opt.fix
     or args.opt["allow-host-change"]
     or args.opt["allow-version-pin"]
+    or args.opt["allow-broader"]
     or args.opt["spa-host"]
   then
     ctx.warn(
-      "error: --write, --fix, --allow-host-change, --allow-version-pin, --spa-host and --timeout belong to --sources"
+      "error: --write, --fix, --allow-host-change, --allow-version-pin, --allow-broader, --spa-host and --timeout"
+        .. " belong to --sources"
     )
     return 2
   end

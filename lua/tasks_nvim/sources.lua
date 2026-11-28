@@ -40,6 +40,7 @@ local M = {}
 ---@field state Tasks.SourceState
 ---@field fixed? string      # `fix`: the address a permanent redirect (301, 308) leads to; the link is rewritten to it.
 ---@field kept? string       # `fix`: why a moved link was left as it is.
+---@field broader? boolean   # `redirected` to a broader page of the same host (`M.broader`).
 
 M.DEFAULT_TIMEOUT = 8
 M.CONCURRENCY = 6
@@ -342,6 +343,27 @@ function M.pins_version(old, new)
   return nil
 end
 
+---Whether a redirect leads from a page to a broader one on the same host: a target path with fewer segments in the
+---same section (the first segment), a parent of the old path among them. The new page may still mention the topic,
+---but it is the overview of a whole area, so the link no longer points at what it was written for (a front page has a
+---rule of its own in `safe_target`).
+---@param old string
+---@param new string
+---@return boolean
+function M.broader(old, new)
+  if host_of(old) ~= host_of(new) then
+    return false
+  end
+  local o, n = {}, {}
+  for seg in path_of(old):gmatch("[^/]+") do
+    o[#o + 1] = seg
+  end
+  for seg in path_of(new):gmatch("[^/]+") do
+    n[#n + 1] = seg
+  end
+  return #n > 0 and #n < #o and n[1] == o[1]
+end
+
 ---Follow an address by hand and return where its PERMANENT redirects (301, 308) lead: a temporary one (302, 303, 307)
 ---ends the walk, as does a plain answer. At most 5 hops. nil: it is not moved for good.
 ---@param url string
@@ -369,7 +391,15 @@ end
 ---@param resolve? fun(url: string, timeout: integer, done: fun(target: string|nil))
 ---@param allow_host_change? boolean
 ---@param allow_version_pin? boolean
-local function resolve_moved(results, timeout, resolve, allow_host_change, allow_version_pin)
+---@param allow_broader? boolean
+local function resolve_moved(
+  results,
+  timeout,
+  resolve,
+  allow_host_change,
+  allow_version_pin,
+  allow_broader
+)
   resolve = resolve or M.permanent_target
   for _, r in ipairs(results) do
     if r.state == "redirected" then
@@ -393,6 +423,8 @@ local function resolve_moved(results, timeout, resolve, allow_host_change, allow
           r.kept = why
         elseif pin then
           r.kept = pin .. " (--allow-version-pin)"
+        elseif not allow_broader and M.broader(r.row.url, target) then
+          r.kept = "broader page: check by hand (--allow-broader)"
         elseif target == r.row.url then
           r.kept = "same address"
         else
@@ -405,7 +437,7 @@ end
 
 ---Ask about the web links of a path file's Quellen table (at most `M.CONCURRENCY` at a time). Blocks until all answered.
 ---@param text string
----@param opts? { timeout?: integer, fix?: boolean, allow_host_change?: boolean, allow_version_pin?: boolean, spa_hosts?: string[], resolve?: function, probe?: fun(url: string, timeout: integer, done: fun(p: Tasks.SourceProbe)) }
+---@param opts? { timeout?: integer, fix?: boolean, allow_host_change?: boolean, allow_version_pin?: boolean, allow_broader?: boolean, spa_hosts?: string[], resolve?: function, probe?: fun(url: string, timeout: integer, done: fun(p: Tasks.SourceProbe)) }
 ---@return Tasks.SourceResult[]
 function M.check_text(text, opts)
   opts = opts or {}
@@ -423,6 +455,8 @@ function M.check_text(text, opts)
         vim.schedule(function()
           p.row = row
           p.state = M.classify(p, opts.spa_hosts)
+          -- seen before anything is written: the `redirected` line says so
+          p.broader = p.state == "redirected" and M.broader(row.url, p.final) or nil
           results[at] = p
           running = running - 1
           finished = finished + 1
@@ -448,7 +482,14 @@ function M.check_text(text, opts)
       }
   end
   if opts.fix then
-    resolve_moved(results, timeout, opts.resolve, opts.allow_host_change, opts.allow_version_pin)
+    resolve_moved(
+      results,
+      timeout,
+      opts.resolve,
+      opts.allow_host_change,
+      opts.allow_version_pin,
+      opts.allow_broader
+    )
   end
   return results
 end
@@ -532,7 +573,7 @@ end
 
 ---Ask about the links of one file and, with `write`, put the answers into it.
 ---@param path string
----@param opts? { timeout?: integer, write?: boolean, fix?: boolean, allow_host_change?: boolean, allow_version_pin?: boolean, spa_hosts?: string[], today?: string, probe?: function, resolve?: function }
+---@param opts? { timeout?: integer, write?: boolean, fix?: boolean, allow_host_change?: boolean, allow_version_pin?: boolean, allow_broader?: boolean, spa_hosts?: string[], today?: string, probe?: function, resolve?: function }
 ---@return Tasks.SourceResult[]|nil results
 ---@return string|nil err
 function M.check_file(path, opts)
